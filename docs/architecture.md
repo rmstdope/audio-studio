@@ -49,7 +49,8 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 retroquest/                      ← user runs `content-studio` here
 ├── content-studio.json          ← project file (committed)
 ├── .env                         ← FISH_AUDIO_API_KEY (gitignored, already exists)
-├── .content-studio/             ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard
+├── content-studio/              ← the studio folder: its .gitignore (written at start if missing) keeps cache/ out
+│   └── cache/                   ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard, settings
 ├── tts/cast.json                ← character resource, shared by all parts (read + written)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
@@ -75,22 +76,26 @@ retroquest/                      ← user runs `content-studio` here
    opened: the walk also looks for `audio-studio.json`, and the project folder for `.audio-studio/`,
    and `content-studio` prints the renames left (`core/renames.ts`, `locateProject` in
    `services/workspace.ts`) and exits before any server starts. The old names are never read.
-2. It validates the project file and every resource it points to, then starts a Bun HTTP server on
+2. It validates the project file (a file without `"version": 2` is refused with one problem at
+   `version`, saying to convert it as docs/project-files.md describes) and every resource it points
+   to, writes the studio folder's `.gitignore` (`cache/`) when it is missing
+   (`services/studioFolder.ts`), then starts a Bun HTTP server on
    `127.0.0.1` (random free port, or `--port`) and opens the browser on it.
 3. The UI talks to the server over a small JSON API, and gets live job progress over a WebSocket.
 4. The studio writes only to paths the project file names, and every path goes through
    `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
    they are plain files in the part's clips folder (no folders, no symbolic links). The one
    exception is the game's own commands: **Refresh dialog**, on a part's overview, and **Refresh
-   from the game**, on an act's Music, Images and Scenes pages (the same `refreshDialog` command) and on the Stingers
-   page (`music.refreshShared`) and the Sound effects page (`effects.refresh`), run in the project root, only when the user clicks one on the
+   from the game**, on an act's Music, Images and Scenes pages (the same `refresh.part` command) and on the Stingers
+   and Sound effects pages (the one `refresh.shared` command), run in the project root, only when the user clicks one on the
    studio's page; what a command writes is the game's business, and the studio does not check it
    beyond reading the dialog, the loops or the stingers again.
    Besides those paths, the studio writes the project file itself in a few places only: the project's
    own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3),
    the models (`narration.models`, `narration.elevenlabs.models`, `music.model` and `images.model`) from Setup's
-   Models panel, the retirement
-   switch of `s1`, `narration.quality.fishTier`, and `takeFade` from Setup's Playing takes panel.
+   Models panel, and the retirement
+   switch of `s1`. The Fish tier and the take fade are the person's own, not the project's: they are
+   kept in the cache (`content-studio/cache/settings.json`), never in the project file.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 
@@ -159,7 +164,7 @@ audio-studio/
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
-│   │   ├── spending.ts          the record of paid recordings (.content-studio/spending.json) and the running ones
+│   │   ├── spending.ts          the record of paid recordings (content-studio/cache/spending.json) and the running ones
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
 │   │   ├── models.ts            s1 → s2.1-pro, and a stage's model, in the project file's `narration.models`
 │   │   ├── modelsView.ts        the whole dialog's size and what recorded clips were made with, for the Models panel
@@ -186,7 +191,7 @@ audio-studio/
 │       │   ├── audition/        the audition board, ruled-out voices
 │       │   ├── characters/      all characters, a character's page, the casting brief
 │       │   └── narration/       line table, plan, job progress, inspector
-│       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in (from the element's playing event) and out for the project's `takeFade`, the game's file does not
+│       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in (from the element's playing event) and out for the person's `takeFade` setting, the game's file does not
 │       ├── loopAudio.ts         the player's audio: a loop decoded once and played round on Web Audio with no gap (an audio element's loop clicks where it comes round), every other clip on the element
 │       └── components/          buttons, chips, waveform, player, status pills
 ├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
@@ -206,20 +211,27 @@ The format the studio is moving to, version 2, is described for the people who w
 the files as the studio reads them today; each step of the move takes its part out of them.
 
 `content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
-an id and a title.
+an id and a title. Its top level, the studio folder and the cache are version 2 already (as-6u9.2);
+the sections keep their shape until their own step moves them.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/<owner>/audio-studio/main/schema/project.json",
+  "$schema": "https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json",
+  "version": 2,
   "name": "RetroQuest",
   "description": "A retro-style text adventure played in the browser. Narrated by a warm storyteller; characters are villagers of Willowbrook.",
   "env": ".env",
+  "partLabel": "Act",
+  "parts": [
+    { "id": "act1", "title": "Act I: The Call to Adventure" },
+    { "id": "act2", "title": "Act II" }
+  ],
+  "languages": ["en"],
+  "refresh": {
+    "part": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-{part}.ts",
+    "shared": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-shared.ts"
+  },
   "narration": {
-    "partLabel": "Act",
-    "parts": [
-      { "id": "act1", "title": "Act I: The Call to Adventure" },
-      { "id": "act2", "title": "Act II" }
-    ],
     "characters": "tts/cast.json",
     "paths": {
       "dialog": "tts/{part}/script.json",
@@ -228,7 +240,6 @@ an id and a title.
       "clips": "web/public/audio/narration/{part}",
       "manifest": "web/public/audio/narration/{part}/manifest.json"
     },
-    "refreshDialog": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-{part}.ts",
     "models": { "audition": "s2.1-pro-free", "draft": "s2.1-pro-free", "final": "s2.1-pro-free" },
     "tts": { "temperature": 0.7, "topP": 0.7, "speed": 1.0 },
     "output": { "codec": "mp3", "bitrate": "64k", "channels": 1, "lufs": -16 },
@@ -250,7 +261,15 @@ an id and a title.
 }
 ```
 
-- `languages` lists the languages the game is narrated in, by code (`["en", "sv"]`; default
+- `version` is required and must be `2`. Any other, or none, is refused with one problem at
+  `version` ("This project file is in the format before version 2. Add "version": 2 and move its
+  fields as docs/project-files.md describes."), whatever else the file holds (`parseProject` in
+  `core/project.ts`). There is no migration: a game is converted by hand.
+- `$schema` names the JSON Schema of the file, `schema/content-studio.schema.json` in this
+  repository, made from `ProjectSchema` (its input side, so a field with a default is optional) by
+  `bun run schema` (`core/projectSchema.ts`); a test fails when the checked-in file is out of date.
+- `partLabel` (default `Part`) and `parts` (required) are at the top level.
+- `languages` (top level) lists the languages the game is narrated in, by code (`["en", "sv"]`; default
   `["en"]`). The first is the source language: its dialog is the line shown beneath a translation.
   Path templates may contain `{language}`; with more than one language every path (`dialog`,
   `cues`, `lock`, `clips`, `manifest`) must, or languages would share a file. Each language is
@@ -258,9 +277,13 @@ an id and a title.
 - `audition.phrases` (optional, language code → phrase) is the standard audition phrase of each
   language but the first, whose own is `audition.phrase`; each must fit one take. A language
   without one borrows her longest line (§6).
-- `refreshDialog` is optional. When set, the UI offers **Refresh dialog**, which runs it in the
-  project root and reloads the script. This is how the studio stays generic: the game owns how its
-  dialog is extracted.
+- `refresh` is optional, and so is each of its two commands. `refresh.part` (it must contain
+  `{part}`, replaced by the part's id) writes one part's lists of every kind: the UI offers
+  **Refresh dialog**, and Refresh from the game on an act's Music, Images and Scenes pages, which
+  run it in the project root and read the lists again. `refresh.shared` writes every list of no
+  part (the stingers and the sound effects alike): Refresh from the game on the Stingers and Sound
+  effects pages runs it, one run at a time whichever page asked. This is how the studio stays
+  generic: the game owns how its lists are extracted.
 - `env` names the file holding `FISH_AUDIO_API_KEY` (and `ELEVENLABS_API_KEY`), read each time a
   key is needed. The environment variable wins if set, except a value Bun itself loaded at start
   from this same file (it loads the `.env` files of the folder it is started in), which the studio
@@ -280,17 +303,19 @@ an id and a title.
   are compared in any alphabet (letters and their marks kept: "får" is not "för"), and the numbers
   0 to 99 of `en`, `sv`, `de`, `el` and `ru` are built-in groups of their language with the digits
   Whisper writes ("tjugo" and "20", "twenty one" and "21"; `core/numbers.ts`).
-- `quality.fishTier` (`under-100`, `100` or `1000`) is what the user has paid Fish in total, which
-  sets how many requests Fish takes at once (5, 15, 50). Fish offers no way to ask, so the user
-  says it once in the menu on Setup's Requests at once row, saved at once
-  (`PATCH /api/fish-tier`, `services/fishTier.ts`). Optional; absent means not told.
-- `takeFade` (seconds, 0 or more; 0 is no fade) is how long a music take fades in and out when it
-  plays in the studio, chosen in the Playing takes panel on Setup (No fade, 0.1, 0.2, 0.5, 1 or 2 s;
-  a length set by hand shows as an extra entry) and saved at once (`PATCH /api/take-fade`,
-  `services/takeFade.ts`). Top level, not under `music`, since the panel shows in a project with no
-  music yet. Optional; absent means 0.2 s. `ProjectSummary.takeFade` carries it; `useClipPlayer`
-  reads it from the project as each clip begins, so a take already playing keeps its fade. The
-  game's file and narration never fade.
+- The person's own settings are not in the project file but in the cache,
+  `content-studio/cache/settings.json` (`core/settings.ts`, read and written by
+  `services/settings.ts`), so each person keeps theirs and nothing personal is committed. A broken
+  settings file is a problem naming it, and is never written over. `fishTier` (`under-100`, `100`
+  or `1000`) is what the user has paid Fish in total, which sets how many requests Fish takes at
+  once (5, 15, 50). Fish offers no way to ask, so the user says it once in the menu on Setup's
+  Requests at once row, saved at once (`PATCH /api/fish-tier`, `services/fishTier.ts`); absent
+  means not told. `takeFade` (seconds, 0 or more; 0 is no fade) is how long a music take fades in
+  and out when it plays in the studio, chosen in the Playing takes panel on Setup (No fade, 0.1,
+  0.2, 0.5, 1 or 2 s; a length set by hand shows as an extra entry) and saved at once
+  (`PATCH /api/take-fade`, `services/takeFade.ts`); absent means 0.2 s. `ProjectSummary.takeFade`
+  carries it; `useClipPlayer` reads it from the project as each clip begins, so a take already
+  playing keeps its fade. The game's file and narration never fade.
 
 ---
 
@@ -424,13 +449,14 @@ the line again writes a new entry without it.
 
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
-**Cache** (`.content-studio/`, gitignored): the tool's own state, none of it the game's: audition
+**Cache** (`content-studio/cache/`, kept out of git by `content-studio/.gitignore`, which the
+studio writes at start when it is missing): the tool's own state, none of it the game's: audition
 takes, audition sessions in progress, the voices ruled out per character, a line's extra takes
-(`.content-studio/line-takes/<part>-<hash>/<key>/<id>.wav` and `.json`: the audio as Fish sent it,
+(`content-studio/cache/line-takes/<part>-<hash>/<key>/<id>.wav` and `.json`: the audio as Fish sent it,
 joined, and what Whisper made of it), the user's notes on
-lines (`.content-studio/notes/<part>-<hash>.json`: "too fast", "retake after the rewrite"; on this
+lines (`content-studio/cache/notes/<part>-<hash>.json`: "too fast", "retake after the rewrite"; on this
 machine only, so a teammate does not see them), and what Whisper heard
-of each kept take heard below full (`.content-studio/heard/<part>-<hash>.json`: per line, the lock
+of each kept take heard below full (`content-studio/cache/heard/<part>-<hash>.json`: per line, the lock
 entry's time, the text it was checked against, Whisper's words and the shown words it missed). Deleting it loses nothing the game
 needs; it forgets paused auditions, ruled-out voices, notes and what was heard. Notes, what was
 heard and a line's extra takes are kept per language: the source language's under the part's own
@@ -552,9 +578,9 @@ credit while Fish works), asks Fish, and charges nothing when it refuses. With n
 the page starts one afterwards (a paid audition model's own box follows).
 Fish makes no voice on the account from a design, only audio, so a design has no Fish id until it
 is cast. The studio gives each a local id `design-<12 hex>` and keeps them per character in
-`.content-studio/designs/<character>-<hash>.json` (one per language in a project with several, named as the audition's and ruled-out files are; `core/designs.ts`: the voices with their number
+`content-studio/cache/designs/<character>-<hash>.json` (one per language in a project with several, named as the audition's and ruled-out files are; `core/designs.ts`: the voices with their number
 "Design n", the description, when they were asked for, how many were ever made, and the last
-description sent); the preview is encoded to MP3 into `.content-studio/takes/` under a key made from
+description sent); the preview is encoded to MP3 into `content-studio/cache/takes/` under a key made from
 the id, so it plays as the voice's take (a design is never recorded on a paid model). The session
 only references them (`designed`, a place like `yours`; `setDesigned` refreshes it from the store
 when an audition starts or a design is made), so a design never cast is back on the next audition
@@ -638,8 +664,8 @@ An audition is for a character, not for a part: the result applies to every part
 - **Phrase**: the project's standard phrase, the character's own phrase, or any of their lines
   picked from the script of any part ("hear it say something it will actually say").
 - Both belong to the tool, not the game, so they live in the gitignored cache: audition sessions
-  in `.content-studio/auditions/<character>-<hash>.json` and ruled-out voices in
-  `.content-studio/ruled-out/<character>-<hash>.json` (each voice's id, title and when it was
+  in `content-studio/cache/auditions/<character>-<hash>.json` and ruled-out voices in
+  `content-studio/cache/ruled-out/<character>-<hash>.json` (each voice's id, title and when it was
   dropped, so the page names them without asking Fish). A readable name plus a short hash of the
   id makes any character name a safe file name. The cast is only changed on **Cast**.
 
@@ -723,7 +749,7 @@ An audition is for a character, not for a part: the result applies to every part
 - Hear a cue before saving it (built: **Hear it** while editing a line's cue): the speaker's cast
   voice says the line after the cue as typed (empty: the character's style), as the cast says it.
   It is a take, not a clip: recorded with the free model (whatever the audition model is), the whole line in one
-  request (Fish splits long text itself), kept in `.content-studio/takes/` under the take key, so
+  request (Fish splits long text itself), kept in `content-studio/cache/takes/` under the take key, so
   the same cue on the same line is recorded once; nothing of the game's is written. The clip
   recorded afterwards uses the draft model, chunked and checked, so it can sound a little
   different.
@@ -790,13 +816,13 @@ An audition is for a character, not for a part: the result applies to every part
   fast"), edited in place, with a **With a note** filter; kept in the tool cache, not committed.
   A note on a line that left the dialog is kept but not shown. A notes file that cannot be read
   is named as a problem and never written over: the notes are the user's own words.
-- Refresh dialog (runs `refreshDialog`; built).
+- Refresh dialog (runs `refresh.part`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
 - **Spending** page (built): what paid recordings (and, with ElevenLabs, music takes) cost,
   project-wide and read only. Every
   recording made with a paid model (a whole part's, draft or final, or one line's record or extra
-  take) is added to `.content-studio/spending.json` when it ends: when it started, part, language
+  take) is added to `content-studio/cache/spending.json` when it ends: when it started, part, language
   (the source language, as recording is), model, lines recorded out of lines planned, how it ended
   (done, stopped, or a failed line), and the dollars charged to its budget (`Budget.spent`: the
   studio's own price estimate as each line was sent, not Fish's bill). A recording that cost
@@ -855,7 +881,6 @@ stages' models):
 ```json
 "music": {
   "model": "balanced",
-  "refreshShared": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-shared.ts",
   "paths": {
     "loops": "tts/{part}/music.json",
     "stingers": "tts/stingers.json",
@@ -871,13 +896,13 @@ The clips folder is the studio's own: tracks that are not the studio's (RetroQue
 files) stay where they are, untouched. The music files (the game's lists, the studio's briefs, the
 lock, the clips and the manifest) join the Changes panel (§8.3); `briefs.json` is committed, the
 studio's own changes to the game's music. No music path may hold `{language}`: music is the same in
-every language. `refreshShared` is optional: the game's command for what belongs to no act (the
-stingers), run in the project root by Refresh from the game on the Stingers page, as `refreshDialog`
-is for an act; without it the page has no such button.
+every language. The top-level `refresh.shared` (§5) is the game's command for what belongs to no
+act (the stingers, and the sound effects alike), run in the project root by Refresh from the game
+on the Stingers page, as `refresh.part` is for an act; without it the page has no such button.
 
 **Track lists** (read only, written by the game): an act's loops in `loops`, written by the game's
-own `refreshDialog` command for that part alongside its dialog, and the stingers for the whole game
-in `stingers`, written by `refreshShared`. Both are lists in the game's order. A list that is there
+own `refresh.part` command for that part alongside its dialog, and the stingers for the whole game
+in `stingers`, written by `refresh.shared`. Both are lists in the game's order. A list that is there
 and empty means the game asks for none; a list that is not there yet means the game has not listed
 them ("The game has not listed the loops for Act IV yet."), and no track is taken for an orphan
 because of it.
@@ -929,7 +954,7 @@ which lists only the tracks not chosen and up to date (or the images, with those
 disagree on), with "Show all" back. Music opens into the acts and
 Stingers, a page each, listing its tracks
 with their status (see Status below). An act's page has **Refresh from the game** when the project
-has `refreshDialog`: the same command as Refresh dialog, which brings the act's lines and loops
+has `refresh.part`: the same command as Refresh dialog, which brings the act's lines and loops
 together, and its summary names the loops added and removed besides the lines. A refresh of an act
 and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
@@ -962,7 +987,7 @@ the board is what the game will play:
   fanfare asked for at 10 seconds ends after about 6).
 
 The numbers are fixed in `core/musicTake.ts` and its tests (built, 12.4). A take is cached in
-`.content-studio/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (brief, kind,
+`content-studio/cache/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (brief, kind,
 seconds, bpm, key; the hash still begins with Balanced's recipe, so choosing a model never changes it) and a take number counted from 1 per hash, with `<hash>.<n>.json` beside it
 (seed, length, waveform bars). The same seed does not make the same take again on the Mac, so the cache keeps the take
 itself; the seed is kept with it, in the board and the lock, to say where it came from (absent from
@@ -982,7 +1007,7 @@ takes as cards: The count menu ("Number of new takes", between the model menu an
 the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
-`.content-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed?,
+`content-studio/cache/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed?,
 seconds, peaks, inputs, model, movedFrom?, trim? }] }` (`model` is the recipe of the music model that made the take, which Choose records in the lock; a board without it is read as Balanced, the only model there was), the take's WAV beside the others in `music-takes/<track>/`. Take
 numbers are per track and never reused (`next` is reserved when takes are asked for), and a take
 is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
@@ -1298,7 +1323,7 @@ only, the fingerprint needs no provider of its own.
   meters stay at the top of the board as it scrolls; the bar, much taller, scrolls away with the
   voices, so it never hides a card's title. A resume asks for them again the same way.
 
-**Spending** (built in 14.7d). The log (`.content-studio/spending.json`) moves to version 2 when it
+**Spending** (built in 14.7d). The log (`content-studio/cache/spending.json`) moves to version 2 when it
 first needs to, with its first ElevenLabs credits or music take (`needsVersion2`), so a Fish-only
 project's log stays version 1 and readable by an older studio (which cannot read a version 2 log,
 and then logs nothing of its own). In version 2 a recording's row keeps its Fish dollars (`cost`)
@@ -1341,7 +1366,7 @@ and the cast names the id ElevenLabs gave it. A voice the user had added already
 added it, when it is the id it became; once added, the board marks it so and no longer says a take
 or cast will add it. When ElevenLabs
 will not add one, its take fails with ElevenLabs' answer and its credits are given back, or it is
-not cast. The studio remembers which voices it added (`.content-studio/eleven-voices.json`: the
+not cast. The studio remembers which voices it added (`content-studio/cache/eleven-voices.json`: the
 library id, the id on the account, its name, the character and when), so each is added once. **Voice slots** (built in 14.11b): below Bring in more, once a library
 voice is on the board or ElevenLabs' library is chosen, the board says how many of the plan's
 slots are used (from the subscription's `voice_limit` and `voice_slots_used`). A voice the studio
@@ -1429,7 +1454,7 @@ look every take is brought to (as-yag.5). The screens are drawn in `docs/ui/as-y
 
 **Project file.** An optional `images` section beside `narration` and `music`, its acts the
 narration's parts. No `{language}` in any path: images are the same in every language. Refresh from
-the game on an act's page runs `narration.refreshDialog`, as on Music's act pages.
+the game on an act's page runs `refresh.part`, as on Music's act pages.
 
 ```json
 "images": {
@@ -1503,7 +1528,7 @@ are ignored). An image is out of date when what a new take would be made from di
 words changes nothing the prompt uses, so it does not make an image out of date.
 
 **The style notice.** The studio keeps the game's style as the user last saw it in
-`.content-studio/images-style-seen.json`, written the first time a style is read and moved by **Seen**, or at once when
+`content-studio/cache/images-style-seen.json`, written the first time a style is read and moved by **Seen**, or at once when
 a change leaves no chosen image out of date (there is then no notice to put away). When the game's style differs from it and at least one chosen image was made with the old
 style, every Images page shows one notice naming what changed. The user's own change to the style
 shows no notice; the images made with the old style are marked out of date.
@@ -1514,8 +1539,8 @@ that names none starts on `defaultTakeModel`: the project's `images.model`, else
 one is not on this computer) at the take size (`takeSize`: the listed shape with the longer side 1024,
 each side a multiple of 16; the listed sizes are not, so a take is then brought to them, below)
 and a new seed, on the GPU queue (`makeImageTake`). The board is
-`.content-studio/images/<id>.json`, `{ next, takes: [{ n, seed, model, width, height, madeFrom, seen }] }`
-(`madeFrom` is what it was made from, as in the lock), the pictures `.content-studio/image-takes/<id>/<n>.png`;
+`content-studio/cache/images/<id>.json`, `{ next, takes: [{ n, seed, model, width, height, madeFrom, seen }] }`
+(`madeFrom` is what it was made from, as in the lock), the pictures `content-studio/cache/image-takes/<id>/<n>.png`;
 a take is on the board only once its picture is written, numbers are per image and never reused
 (reserved at once), and what waits, is made or failed is in memory (`globalThis`), polled by the
 page. **Stop** ends the one being made and drops those waiting; a failed take stays with its reason
@@ -1681,7 +1706,7 @@ lists effects; before that, and for the other model, whatever is missing shows a
 optional, and is not counted in the sidebar. One sentence per model that has something to say, with a
 step for each download; what to fix first still wins: uv missing, then a download, then a failed
 effect. When neither model can run the row says sound effects can't be made. The last failure of each
-model is kept in `.content-studio/effect-model-health.json` with the effect it was made on
+model is kept in `content-studio/cache/effect-model-health.json` with the effect it was made on
 (`createEffectHealth`: `record` when an effect fails, `clear` when one made with the model works,
 nothing when one is stopped); the row links the effect's page, and names no effect once the game no
 longer lists it.
@@ -1695,7 +1720,6 @@ choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
 
 ```json
 "effects": {
-  "refresh": "node tts/extract-effects.js",
   "model": "small-sfx",
   "paths": {
     "list": "tts/effects.json",
@@ -1709,9 +1733,10 @@ choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
 The `effects` section is optional; without it the page says how to add one. `model` is optional
 (`small-sfx`, the default, or `open-1`): the sound-effects model an effect's new takes start on,
 saved from the Sound effects row of Setup's Models panel (`PUT /api/effect-model`, `{ model, was }`,
-as `images.model` is), at once and with nothing asked, over a stale `was` refused (§8.8). `refresh` is optional:
-the game's command that writes the list, run in the project root, only when the user clicks
-Refresh from the game (the consumer rules in CLAUDE.md name it). `paths.list` may contain neither
+as `images.model` is), at once and with nothing asked, over a stale `was` refused (§8.8). The
+top-level `refresh.shared` (§5) is the game's command that writes the list, with the stingers, run
+in the project root only when the user clicks Refresh from the game (the consumer rules in
+CLAUDE.md name it). `paths.list` may contain neither
 `{part}` nor `{language}`. `lock`, `clips` and `manifest` (as-5wc.4) are required: where the studio
 writes what the game plays (§8.10); a section without them is a problem naming the path.
 
@@ -1723,7 +1748,7 @@ reported with its file and place (`tts/effects.json at [2].seconds`), and the re
 file that is not a list is unreadable as a whole. The name shown is made from the id ("door-creak"
 is "Door creak"); the game's list has none.
 
-**The studio's descriptions** are kept in `.content-studio/effects.json` (the studio's own state,
+**The studio's descriptions** are kept in `content-studio/cache/effects.json` (the studio's own state,
 never the game's files), one line per effect: `{ "<id>": { "words", "gameWas" } }`. `gameWas` is the
 game's description the words were written over. From it the page derives, with nothing else stored,
 that the game reworded an effect you changed (`gameWas` differs from the game's words now): the
@@ -1750,9 +1775,9 @@ the **Takes** panel (the others as cards, two to a row in take-number order). Th
 ends (the trailing silence already trimmed) and its **real length** is what the card shows and the
 manifest keeps; the length the game asked for stays in the Description panel. The menu is 1 to 8
 takes (starts on 4, page state); a batch goes on when the page is left or reloaded and survives a
-`--dev` reload, not a restart. The board is `.content-studio/effect-boards/<effect>.json`
+`--dev` reload, not a restart. The board is `content-studio/cache/effect-boards/<effect>.json`
 (`{ next, takes: [{ n, hash, seed, model, seconds, peaks, inputs }] }`; numbers never reused, reserved
-when takes are asked for), the WAV `.content-studio/effect-takes/<effect>/<hash>.<n>.wav`, the hash of
+when takes are asked for), the WAV `content-studio/cache/effect-takes/<effect>/<hash>.<n>.wav`, the hash of
 the description and length (the model is the take's own field). A take made for an earlier description stays a take, with no mark.
 A take that fails is kept in memory as "could not be made" with **Try again**; success clears and
 failure records the model's health (Setup's row, §8.8), a stopped take neither. **Stop** discards the
@@ -1844,7 +1869,7 @@ not grow.
 Without the section the sidebar has no Scenes workspace. Neither path may hold `{language}`. The
 mix is a file of the game (the game imports or fetches it, so it takes effect the next time the
 game starts), so its folder is the game's choice; the declarations are the music lists' sibling.
-Refresh from the game on the Scenes page is `narration.refreshDialog` for the part, as on an
+Refresh from the game on the Scenes page is `refresh.part` for the part, as on an
 act's Music and Images pages (the game's one command for an act's lists; no new command, no new
 consumer rule beyond naming this page).
 
@@ -1903,7 +1928,7 @@ consumer rule beyond naming this page).
   for no music; `level` is the loop's level, 0 to 3 like an effect's, 1 as chosen. The music level
   is the music's alone: it does not change the effects, which the game keeps following the music's
   fades (a crossfade, a dip under a voice) but not its level. Above 1 the game raises the music
-  with a gain, not the element's volume. The shared loops are what `music.refreshShared` lists;
+  with a gain, not the element's volume. The shared loops are what `refresh.shared` lists;
   today it lists only stingers, which are not loops, so the menu's "shared tracks" are none until
   the game lists some. Absent `music`: what the game chooses for the scene now (its own track when
   it has a chosen take or a file of the game's own, else the act's loop) at 1. A track with neither
@@ -2029,7 +2054,7 @@ with nothing playing has no figure ("nothing plays") and is never flagged. A fig
 against the target in `core/sceneLoudness.ts` as it is shown (rounded to one decimal, so the figure,
 the distance and the chip agree): within the tolerance is "on target", else "N dB too
 quiet / too loud" by how far from the target; a scene whose states disagree is "off target" in the
-list. The figures are **kept** in `.content-studio/scene-loudness.json` (act, then scene: `saved`,
+list. The figures are **kept** in `content-studio/cache/scene-loudness.json` (act, then scene: `saved`,
 the measure of the saved scene, and `draft`, the open scene's measure with its unsaved changes,
 kept beside it so Discard puts the saved figures back). Each measure remembers the scene's entry
 and the clip each sound played (its take or the game's file); the page says "changed since
@@ -2076,10 +2101,10 @@ and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, m
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
 retakeWeak }`: start a generation, a measuring or a checking again, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
-Takes are cached in `.content-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
+Takes are cached in `content-studio/cache/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
-`undo` (the last drop), `more` (`{ provider }`, `fish` unless `elevenlabs`; no body is Fish's), `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money, and `GET /api/elevenlabs/account` the plan's account and what is held of it, `GET /api/elevenlabs/voices/freeable` the voices the studio added that nothing uses and `POST /api/elevenlabs/voices/free` (`{ voices }`) removes them; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.content-studio/auditions/`. Ruled-out voices:
+`undo` (the last drop), `more` (`{ provider }`, `fish` unless `elevenlabs`; no body is Fish's), `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money, and `GET /api/elevenlabs/account` the plan's account and what is held of it, `GET /api/elevenlabs/voices/freeable` the voices the studio added that nothing uses and `POST /api/elevenlabs/voices/free` (`{ voices }`) removes them; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `content-studio/cache/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
 `DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
 voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
@@ -2120,10 +2145,10 @@ POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (
 DELETE /api/parts/:part/lines/:key/takes/:id     drop the take
 POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
-POST   /api/parts/:part/refresh                  run refreshDialog (its result names the act's loops added and removed)
+POST   /api/parts/:part/refresh                  run refresh.part (its result names the act's loops added and removed)
 PUT    /api/music/tracks/:id/takes/:file/fades  save a stinger take's fades (DELETE removes them); GET …/takes/:file?fadeIn&fadeOut&shape hears them
-POST   /api/music/stingers/refresh               run music.refreshShared; the stingers added and removed
-POST   /api/effects/refresh                      run effects.refresh; the effect ids added and removed
+POST   /api/music/stingers/refresh               run refresh.shared; the stingers added and removed
+POST   /api/effects/refresh                      run refresh.shared; the effect ids added and removed
 PATCH  /api/effects/:id                          the studio's description of a sound effect ({ description }; null or empty: the game's)
 POST   /api/effects/:id/keep-mine                keep the studio's words after the game reworded the effect
 POST   /api/effects/:id/forget                   delete the words of an effect the game no longer lists
@@ -2202,9 +2227,9 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   the Fish key in the environment or the env file (read on every check, as `env` above says), whether
   Fish answers (the server's credit
   lookup, only with a key), Requests at once (`quality.parallel` against the Fish account's limit
-  from `quality.fishTier`: ready up to 5 with no tier, a problem above it until the tier is
+  from the setting `fishTier` (§5): ready up to 5 with no tier, a problem above it until the tier is
   chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
-  which asks Fish once more), the optional `refreshDialog` and, with a `music` section, the music
+  which asks Fish once more), the optional `refresh.part` and, with a `music` section, the music
   generator (Apple silicon, uv, and the two model folders of the project's music model, Balanced's
   `acestep-v15-xl-turbo` and `acestep-5Hz-lm-4B` by default, in `$ACESTEP_CHECKPOINTS` or
   `~/.cache/ace-step/checkpoints`; downloaded outside the studio, about 28 GB for Balanced; when
@@ -2215,7 +2240,7 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   (**Image models**: mflux, and for FLUX.2 klein 4B and Z-Image-Turbo whether the whole download is in the Hugging Face cache,
   `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub` (`imageModelDownload`: `absent` with no folder; `whole` when a snapshot holds a
   `.safetensors` file, no blob is still `.incomplete`, no snapshot link points at a missing blob and every shard a `*.safetensors.index.json` names is there;
-  else `partial`), and whether the model's last take failed (the studio's own memory, `.content-studio/image-model-health.json`, one entry per model with the
+  else `partial`), and whether the model's last take failed (the studio's own memory, `content-studio/cache/image-model-health.json`, one entry per model with the
   image, take and the last line of the image tool's error, written when a take fails and removed when a take with that model works; a stopped take is no failure;
   it survives a restart). "Ready" with both whole and no failed take; for a model that is partly downloaded, not on the computer or failed: "Not set up" (Optional)
   when it is the other model, "Needs attention" when it is the project's model or neither model can run (and mflux itself), the incomplete download beating
@@ -2364,7 +2389,7 @@ Small, independently useful increments:
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in
-      `.content-studio/ruled-out/`, left out of every later search for it; listed on the character
+      `content-studio/cache/ruled-out/`, left out of every later search for it; listed on the character
       page, each allowed again or all forgotten.
    2. **Shortlist board** (built): voices to hear, Drop (gone at once, the last undone from a
       notice) and Shortlist, bring in more or a specific voice (also one dropped before), cast any
@@ -2422,7 +2447,7 @@ Small, independently useful increments:
        seam too.
     5. **Board** (built): a track's takes as cards, Make N more takes (N chosen, 1 to 6, in the background), Drop;
        takes from an earlier brief marked; Stop and Try again; the board saved in
-       `.content-studio/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
+       `content-studio/cache/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
     6. **Choose** (built): the chosen take levelled, encoded and written with the manifest and lock; each
        track's status on the Music pages; the music files in the Changes panel.
     7. **Orphans** (built): the music of a track the game no longer lists, shown on its list's page and
@@ -2451,7 +2476,7 @@ Small, independently useful increments:
     15. **The same press on the Stingers page** (built, as-23x.2): the page says "stinger", and Refresh from
         the game and the press are greyed while the other runs (§8.5).
 13. **Languages** (epic as-170), in small pull requests:
-    1. **Show a part's lines in each declared language** (built): `narration.languages`,
+    1. **Show a part's lines in each declared language** (built): `narration.languages` (top-level `languages` since as-6u9.2),
        `{language}` in the paths, a language switch on the lines page with each language's
        progress, untranslated lines, read only (no recording yet).
     2. **Cast each character per language** (built): a voice, speed and phrase per language in the
@@ -2607,10 +2632,13 @@ Small, independently useful increments:
 
 18. **One format for the project's files** (epic as-6u9), each step converting the studio, the sample
     project and RetroQuest together, in this order:
-    1. **The reference** (as-6u9.1): `docs/project-files.md`, the format of version 2 for the people
-       who write the files.
-    2. **The project file** (as-6u9.2): `version` and `$schema`, the top-level parts, languages and
-       refresh, the studio folder with its cache, and the personal settings moved into the cache.
+    1. **The reference** (as-6u9.1, built): `docs/project-files.md`, the format of version 2 for
+       the people who write the files.
+    2. **The project file** (as-6u9.2, built): `version` and `$schema` (the JSON Schema made by
+       `bun run schema`), the top-level parts, languages and refresh (`part`, and one `shared`
+       command for the stingers and the effects), the studio folder `content-studio/` with its
+       `.gitignore` and its cache (what `.content-studio/` held), and the personal settings
+       (`fishTier`, `takeFade`) moved into `content-studio/cache/settings.json`.
     3. **Narration** (as-6u9.3): the dialog, the cast, the cues as edits and the lock.
     4. **Music and stingers** (as-6u9.4): the lists, the edits in place of the briefs, the lock.
     5. **Images** (as-6u9.5): the lists, the style and rewordings as edits, the lock.

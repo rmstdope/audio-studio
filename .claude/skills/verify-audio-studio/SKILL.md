@@ -82,7 +82,8 @@ The declared launch serves the sample with the merged build, without reloading (
   `only-sv`); none for `act2` or `de`;
 - a narrator and a keeper in the cast, both with a voice, and a line by `wren`, who is not in the
   cast;
-- nothing recorded, and no cues, lock, manifest or `.content-studio/` until the studio writes them.
+- nothing recorded, and no cues, lock, manifest or `content-studio/cache/` until the studio writes them
+  (the studio folder's `.gitignore`, `content-studio/.gitignore`, is checked in).
 
 To reach the state a bead needs, **edit the sample in the tree** by hand, and only there. Do it
 before launching where you can; the studio reads the files again on every request, so an edit while
@@ -102,9 +103,9 @@ machine.
 
 A state the studio itself builds (cues, recorded clips, an audition in progress) is built **through
 the studio**, as a user would, and that walk is part of the evidence. Getting a part's dialog
-through **Refresh dialog** needs a `refreshDialog` command; the sample has none, so a bead about
-Refresh is looked at by adding a harmless one to the sample's project file (`true`, or a command that
-writes only inside the sample), never by pointing the studio at a game.
+through **Refresh dialog** needs a `refresh.part` command; the sample's (`sh tools/refresh.sh {part}`)
+writes only inside the sample, and a bead about Refresh may change it to another harmless one, never
+by pointing the studio at a game.
 
 Edits to the sample are part of the evidence: list each one in the report. **Never commit in the
 tree**, and never edit anything in it but the sample.
@@ -226,7 +227,7 @@ Subtract your own edits to the sample, then check:
 
 - **Only the sample changed**, and inside it only the files the project file names (cast, cues,
   lock, clips and manifest, per part and language, and dialog only through Refresh's command),
-  `.content-studio/`, and the project file itself. Anything else is a finding against the bead whose
+  `content-studio/cache/`, and the project file itself. Anything else is a finding against the bead whose
   journey wrote it.
 - **The project file** changed only in `narration.quality.soundAlike`, or in
   `narration.models.draft` / `final` moved from `s1` to `s2.1-pro` after the banner was confirmed,
@@ -331,7 +332,7 @@ Run this at **every** end of a look: after the verdicts, after a blocker, and wh
 away and the pass ends with beads pending. Never leave a key behind.
 
 Stop the server you started, and only that one. Then put the sample back and remove what the studio
-and you added (`-x` matters: it takes the ignored `.env` and `.content-studio/` too, which the next
+and you added (`-x` matters: it takes the ignored `.env` and `content-studio/cache/` too, which the next
 `prepare-worktree` would leave):
 
 ```bash

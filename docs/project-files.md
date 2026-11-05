@@ -9,8 +9,12 @@ three acts in English, Swedish and German, with values added where the sample le
 default, so that every field is shown.
 
 > **Status.** This is version 2 of the format, which the studio is moving to one section at a time
-> (epic as-6u9). Until a section has moved, the studio reads that section's files as
-> `docs/architecture.md` §5 and §6 describe them, and this document is the plan for it.
+> (epic as-6u9). In effect now: the project file's top level (`$schema`, `version`, `partLabel`,
+> `parts`, `languages`, `refresh`), the studio folder `content-studio/` with its `.gitignore`, and
+> the cache with your own settings. The sections (`narration`, `music`, `images`, `effects`,
+> `scenes`) and the studio's edits and locks have not moved yet: until a section has, the studio
+> reads that section as `docs/architecture.md` §5 and §6 describe it, and this document is the plan
+> for it.
 
 ## The four kinds of file
 
@@ -57,7 +61,6 @@ walking up from the folder it is started in.
   "name": "Sample Quest",
   "description": "A tiny project for working on the studio.",
   "env": ".env",
-  "studio": "content-studio",
   "partLabel": "Act",
   "parts": [
     { "id": "act1", "title": "Act I: The Lantern" },
@@ -126,20 +129,19 @@ walking up from the folder it is started in.
 
 ### The top level
 
-| Field                                  | What it is                                                                                   | Default            |
-| -------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------ |
-| `$schema`                              | The JSON Schema of this file, so an editor completes fields and flags mistakes.              | none               |
-| `version`                              | The format's version. This document describes `2`. The studio refuses any other, or none.    | required           |
-| `name`                                 | The game's name, shown in the studio.                                                        | required           |
-| `description`                          | What the game is, in a sentence or two. Shown on Setup.                                      | `""`               |
-| `env`                                  | The file holding the API keys (`FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`). Never committed. | `".env"`           |
-| `studio`                               | The studio folder, relative to the root.                                                     | `"content-studio"` |
-| `partLabel`                            | What the game calls a part, in the studio's words ("Act", "Chapter").                        | `"Part"`           |
-| `parts`                                | The parts in play order: `{ id, title }` each. The id is letters, digits, `-` and `_`.       | required           |
-| `languages`                            | The languages the game is narrated in. The first is the source language.                     | `["en"]`           |
-| `refresh`                              | The game's commands that write its lists (below).                                            | none               |
-| `narration`                            | Narration: the dialog and its voices (below).                                                | required           |
-| `music`, `images`, `effects`, `scenes` | The other sections, one per kind of content. Each is optional.                               | none               |
+| Field                                  | What it is                                                                                   | Default  |
+| -------------------------------------- | -------------------------------------------------------------------------------------------- | -------- |
+| `$schema`                              | The JSON Schema of this file, so an editor completes fields and flags mistakes.              | none     |
+| `version`                              | The format's version. This document describes `2`. The studio refuses any other, or none.    | required |
+| `name`                                 | The game's name, shown in the studio.                                                        | required |
+| `description`                          | What the game is, in a sentence or two. Shown on Setup.                                      | `""`     |
+| `env`                                  | The file holding the API keys (`FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`). Never committed. | `".env"` |
+| `partLabel`                            | What the game calls a part, in the studio's words ("Act", "Chapter").                        | `"Part"` |
+| `parts`                                | The parts in play order: `{ id, title }` each. The id is letters, digits, `-` and `_`.       | required |
+| `languages`                            | The languages the game is narrated in. The first is the source language.                     | `["en"]` |
+| `refresh`                              | The game's commands that write its lists (below).                                            | none     |
+| `narration`                            | Narration: the dialog and its voices (below).                                                | required |
+| `music`, `images`, `effects`, `scenes` | The other sections, one per kind of content. Each is optional.                               | none     |
 
 `refresh.part` writes one part's lists, of every kind; `{part}` in it is replaced by the part's id.
 `refresh.shared` writes every list that belongs to no part: the stingers and the sound effects
@@ -328,7 +330,8 @@ fire. Both are lists of ids.
 
 ## The studio folder: `content-studio/`
 
-Everything the studio owns, in a layout that is the same in every game:
+Everything the studio owns, in a folder beside the project file whose name and layout are the same
+in every game. The studio writes its `.gitignore` when it starts, if there is none:
 
 ```
 content-studio/

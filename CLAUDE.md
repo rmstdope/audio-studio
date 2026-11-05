@@ -73,14 +73,13 @@ bundle breaks.
   writes a hidden temporary file in the clips folder (through `resolveInRoot`), renamed into place
   only together with the manifest and lock update.
 - Another exception, to reading and writing only the named files: the project's own
-  `refreshDialog` command (the game's code, named in its project file) runs in the project root
+  `refresh.part` command (the game's code, named in its project file) runs in the project root
   only when the user clicks Refresh dialog on a part's page or Refresh from the game on an act's
-  Music, Images or Scenes page, and so does `music.refreshShared` when the user clicks Refresh from the game on the
-  Stingers page, and `effects.refresh` when the user clicks Refresh from the game on the Sound
-  effects page; each writes what the game writes.
+  Music, Images or Scenes page, and so does `refresh.shared` when the user clicks Refresh from the
+  game on the Stingers page or the Sound effects page; each writes what the game writes.
   The studio runs nothing else of the consumer's. The Scenes page writes one file of an act, the
   mix (`scenes.paths.mix`, §8.11), and never the declarations the game writes.
-- The project file itself is read, and changed in nine kinds of places only: the words that sound
+- The project file itself is read, and changed in seven kinds of places only: the words that sound
   the same (`narration.quality.soundAlike`, and `narration.quality.soundAlikeByLanguage` for the
   other languages), saved from the Words that sound the same panel, `narration.models.draft` /
   `final`, moved from `s1` to `s2.1-pro` when the user confirms the retirement banner,
@@ -89,15 +88,18 @@ bundle breaks.
   saved from that panel's ElevenLabs rows,
   `music.model`, saved from the Music row of the same panel,
   `images.model`, saved from the Images row of the same panel,
-  `effects.model`, saved from the Sound effects row of the same panel,
-  `narration.quality.fishTier`, saved from the menu on Setup's Requests at once row, and
-  `takeFade`, saved from the Playing takes panel on Setup. Each save
+  and `effects.model`, saved from the Sound effects row of the same panel. Each save
   writes the whole file again in its own indentation and line endings (a hand-compacted object is
   written out).
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
 - The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock
-  file and in `.content-studio/` (the sound effect descriptions in `.content-studio/effects.json`, their takes in `.content-studio/effect-boards/` and `.content-studio/effect-takes/`, the scenes' kept loudness in `.content-studio/scene-loudness.json`).
+  file and in the studio folder `content-studio/` beside the project file (a fixed name): its
+  `.gitignore`, written at start when missing, keeps out `content-studio/cache/`, which holds the
+  rest (the sound effect descriptions in `content-studio/cache/effects.json`, their takes in
+  `content-studio/cache/effect-boards/` and `content-studio/cache/effect-takes/`, the scenes' kept
+  loudness in `content-studio/cache/scene-loudness.json`, and the person's own settings, the Fish
+  tier and the take fade, in `content-studio/cache/settings.json`, never in the project file).
 - Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock).
 - Never delete clips without the user confirming it in the UI.
 - Only changes from the studio's own page are accepted (the Origin check on POST routes).
