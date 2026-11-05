@@ -173,7 +173,7 @@ describe('fading a stinger take on its page', () => {
     const { container, fadesButtons } = render('stinger', [take(2), take(3)], true)
     expect(fadesButtons().every((b) => b.disabled)).toBe(true)
     expect(container.textContent).toContain(
-      'Choosing, dropping, moving and fading wait until the music lock can be read. You can still listen and make more takes.',
+      'Choosing, dropping, moving, trimming and fading wait until the music lock can be read. You can still listen and make more takes.',
     )
   })
 })

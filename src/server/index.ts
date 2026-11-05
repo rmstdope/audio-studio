@@ -20,6 +20,7 @@ import {
   MakeTakesBody,
   MoveTakeBody,
   SetFadesBody,
+  TrimTakeBody,
   seamWav,
 } from '../core/musicTake'
 import { FadesSchema, applyFades } from '../core/fades'
@@ -528,7 +529,12 @@ export function allowedHosts(port: number): string[] {
  * loop come round; with `?fadeIn=&fadeOut=&shape=`, the take with those fades in the sound, which is
  * what the game will play once they are saved.
  */
-async function takeResponse(request: Request, file: string): Promise<Response> {
+async function takeResponse(
+  request: Request,
+  file: string,
+  /** The sound to serve instead of the file's: a trimmed take's part between its cuts. */
+  sound?: Uint8Array,
+): Promise<Response> {
   const params = new URL(request.url).searchParams
   if (params.get('seam') === '1') {
     const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
@@ -537,7 +543,9 @@ async function takeResponse(request: Request, file: string): Promise<Response> {
     })
   }
   if (!['fadeIn', 'fadeOut', 'shape'].some((name) => params.has(name))) {
-    return new Response(Bun.file(file))
+    return sound
+      ? new Response(sound as Uint8Array<ArrayBuffer>, { headers: { 'content-type': 'audio/wav' } })
+      : new Response(Bun.file(file))
   }
   const asked = FadesSchema.safeParse({
     in: Number(params.get('fadeIn') ?? 0),
@@ -547,7 +555,7 @@ async function takeResponse(request: Request, file: string): Promise<Response> {
   if (!asked.success) {
     return Response.json({ error: 'expected fadeIn, fadeOut and shape' }, { status: 400 })
   }
-  const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
+  const wav = readWav(sound ?? new Uint8Array(await Bun.file(file).arrayBuffer()))
   return new Response(writeWav(applyFades(wav, asked.data)) as Uint8Array<ArrayBuffer>, {
     headers: { 'content-type': 'audio/wav' },
   })
@@ -1938,7 +1946,14 @@ export function startServer({
             request.params.id,
             request.params.file,
           )
-          return file ? takeResponse(request, file) : notFound()
+          if (!file) return notFound()
+          // `?trimmed=1`: only the part between a trimmed take's cuts (the whole sound if not trimmed),
+          // with any fades asked for in the address over it.
+          const part =
+            new URL(request.url).searchParams.get('trimmed') === '1'
+              ? await musicTakes.trimmedSound(projectFile, request.params.id, request.params.file)
+              : null
+          return takeResponse(request, file, part ?? undefined)
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await musicTakes.drop(projectFile, request.params.id, request.params.file)
@@ -1977,6 +1992,22 @@ export function startServer({
           const body = ChooseTakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { file }' }, { status: 400 })
           const result = await musicTakes.choose(projectFile, request.params.id, body.data.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/trim': {
+        POST: fromOwnPage(async (request) => {
+          const body = TrimTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { file, undo? }' }, { status: 400 })
+          }
+          const result = await musicTakes.trim(
+            projectFile,
+            request.params.id,
+            body.data.file,
+            body.data.undo ?? false,
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

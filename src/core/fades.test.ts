@@ -140,6 +140,9 @@ describe('fades', () => {
       url: '/t/a.wav?fadeIn=0.5&fadeOut=0&shape=smooth',
       fade: false,
     })
+    expect(heardAs('/t/a.wav?trimmed=1', { in: 0.5, out: 0, shape: 'smooth' }).url).toBe(
+      '/t/a.wav?trimmed=1&fadeIn=0.5&fadeOut=0&shape=smooth',
+    )
     expect(heardAs('/t/a.wav', undefined)).toEqual({ url: '/t/a.wav', fade: true })
     expect(heardAs('/t/a.wav', none)).toEqual({ url: '/t/a.wav', fade: true })
   })

@@ -1,13 +1,21 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { TrackRow } from '../../../core/music'
-import { fadesLine, heardAs, envelopePoints, type Fades } from '../../../core/fades'
+import { envelopePoints, fadesLine, heardAs, type Fades } from '../../../core/fades'
 import { inTheGame, unchooseFailure, unchooseQuestion } from '../../../core/musicChoose'
 import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 import { useChooseTake, useUnchooseTake } from '../../api'
 import { Confirm } from '../../components/Confirm'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
-import { clock } from '../../format'
+import {
+  cutShares,
+  playedSeconds,
+  takeLength,
+  takeSoundUrl,
+  TrimmedTag,
+  useTrimControl,
+  wavePosition,
+} from './trimSilence'
 import { movedFromLine } from '../../../core/musicMove'
 import { FadesEditor } from './FadesEditor'
 
@@ -24,6 +32,7 @@ export function Wave({
   loop,
   position,
   quiet,
+  cut,
   fades,
 }: {
   peaks: number[]
@@ -31,7 +40,9 @@ export function Wave({
   position?: () => number | null
   /** The share of the waveform, from its end, where the sound has stopped (shaded), 0 to 1. */
   quiet?: number
-  /** A stinger take's fades: the fade line is drawn over the bars. */
+  /** The shares of the waveform, from each end, a trim cut away (hatched and dimmed), 0 to 1. */
+  cut?: { start: number; end: number } | null
+  /** A stinger take's fades, of the sound that plays (the part between the cuts): the fade line is drawn over it. */
   fades?: { fades: Fades; seconds: number }
 }) {
   const head = useRef<HTMLSpanElement>(null)
@@ -49,13 +60,35 @@ export function Wave({
   return (
     <div className="wave" aria-hidden>
       {peaks.map((peak, i) => (
-        <i key={i} style={{ height: `${Math.max(4, peak * 100)}%` }} />
+        <i
+          key={i}
+          className={
+            cut && (i < cut.start * peaks.length || i >= (1 - cut.end) * peaks.length)
+              ? 'cut'
+              : undefined
+          }
+          style={{ height: `${Math.max(4, peak * 100)}%` }}
+        />
       ))}
+      {cut && cut.start > 0 && (
+        <span className="cutzone" style={{ left: 0, width: `${Math.round(cut.start * 100)}%` }} />
+      )}
+      {cut && cut.end > 0 && (
+        <span className="cutzone" style={{ right: 0, width: `${Math.round(cut.end * 100)}%` }} />
+      )}
       {quiet !== undefined && quiet > 0 && (
         <span className="quiet" style={{ width: `${Math.round(quiet * 100)}%` }} />
       )}
       {fades && (
-        <svg className="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <svg
+          className="env"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          style={{
+            left: `${(cut?.start ?? 0) * 100}%`,
+            width: `${(1 - (cut?.start ?? 0) - (cut?.end ?? 0)) * 100}%`,
+          }}
+        >
           <polyline points={envelopePoints(fades.fades, fades.seconds)} />
         </svg>
       )}
@@ -93,6 +126,15 @@ export function InTheGame({
   const take = view.takes.find((t) => t.chosen)
   const unchoose = useUnchooseTake(track.id)
   const choose = useChooseTake(track.id)
+  const trimControl = useTrimControl({
+    trackId: track.id,
+    take,
+    inGame: true,
+    locked: view.lockUnread,
+    onPress: () => {
+      if (take && player.playing === `music-take-${track.id}-${take.n}`) player.stop()
+    },
+  })
   const [asking, setAsking] = useState(false)
   // The take the question was about: a refusal is still named after the page re-reads and the
   // block no longer knows it (a music lock that cannot be read). The line is shown under a chosen
@@ -236,6 +278,7 @@ export function InTheGame({
       <div className="take-row">
         {label}
         <b>Take {state.take}</b>
+        {take && <TrimmedTag take={take} />}
         {state.missing ? (
           <span className="chip chip-warn">music file missing</span>
         ) : (
@@ -256,9 +299,18 @@ export function InTheGame({
           onClose={() => onFadesClosed(take.n)}
         />
       ) : (
-        take && <Playback trackId={track.id} kind={view.kind} take={take} player={player} />
+        take && (
+          <Playback
+            trackId={track.id}
+            kind={view.kind}
+            take={take}
+            player={player}
+            note={trimControl.note}
+          />
+        )
       )}
       <div className="track-in-game-actions" hidden={take !== undefined && fading === take.n}>
+        {trimControl.button}
         {take && view.kind === 'stinger' && (
           <button
             type="button"
@@ -305,6 +357,7 @@ export function InTheGame({
         )}
       </div>
       {hint}
+      {trimControl.failure}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
       {choose.data && !choose.data.ok && (
         <span className="adopt-error">
@@ -322,43 +375,50 @@ function Playback({
   kind,
   take,
   player,
+  note,
 }: {
   trackId: string
   kind: MusicTakesView['kind']
   take: TakeView
   player: Player
+  /** The line under the waveform (what a trim cut), if any. */
+  note: ReactNode
 }) {
   const id = `music-take-${trackId}-${take.n}`
-  const url = `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${take.file}`
+  const url = takeSoundUrl(trackId, take)
+  const heard = heardAs(url, take.fades)
   const seamId = `${id}-seam`
   const playing = player.playing === id
-  const heard = heardAs(url, take.fades)
   return (
-    <div className="take-row">
-      <button
-        type="button"
-        className="play"
-        aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-        onClick={() => player.toggle(id, heard.url, { fade: heard.fade, loop: kind === 'loop' })}
-      >
-        {playing ? '■' : '▶'}
-      </button>
-      <Wave
-        peaks={take.peaks}
-        loop={kind === 'loop'}
-        position={playing ? player.position : undefined}
-        fades={take.fades ? { fades: take.fades, seconds: take.seconds } : undefined}
-      />
-      <span className="faint small">{clock(take.seconds)}</span>
-      {kind === 'loop' && (
+    <>
+      <div className="take-row">
         <button
           type="button"
-          className="btn btn-small"
-          onClick={() => player.toggle(seamId, `${url}?seam=1`, { fade: true })}
+          className="play"
+          aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
+          onClick={() => player.toggle(id, heard.url, { fade: heard.fade, loop: kind === 'loop' })}
         >
-          {player.playing === seamId ? 'Stop' : 'Hear the seam'}
+          {playing ? '■' : '▶'}
         </button>
-      )}
-    </div>
+        <Wave
+          peaks={take.peaks}
+          loop={kind === 'loop'}
+          cut={cutShares(take)}
+          position={playing ? wavePosition(take, player.position) : undefined}
+          fades={take.fades ? { fades: take.fades, seconds: playedSeconds(take) } : undefined}
+        />
+        <span className="faint small">{takeLength(take)}</span>
+        {kind === 'loop' && (
+          <button
+            type="button"
+            className="btn btn-small"
+            onClick={() => player.toggle(seamId, `${url}?seam=1`, { fade: true })}
+          >
+            {player.playing === seamId ? 'Stop' : 'Hear the seam'}
+          </button>
+        )}
+      </div>
+      {note}
+    </>
   )
 }

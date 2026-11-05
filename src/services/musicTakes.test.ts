@@ -74,6 +74,7 @@ function setup(
   gate?: Promise<void>,
   missing: string[] = [],
   seedless = false,
+  encoder?: Encoder,
 ) {
   const root = tempRepo({
     'content-studio.json': projectJson({ music }),
@@ -85,16 +86,16 @@ function setup(
   const { generator, requests } = fakeGenerator(ready, failOn, gate, missing, seedless)
   let seed = 100
   /** What the encoder was given, and whether it should fail. */
-  const encoder = { wavs: [] as Uint8Array[], fail: false }
+  const spy = { wavs: [] as Uint8Array[], fail: false }
   const encode: Encoder = async (wav, out) => {
-    if (encoder.fail) throw new Error('The disk is full.')
-    encoder.wavs.push(wav)
+    if (spy.fail) throw new Error('The disk is full.')
+    spy.wavs.push(wav)
     mkdirSync(dirname(out), { recursive: true })
     writeFileSync(out, 'mp3')
   }
   const takes = createMusicTakes({
     generator,
-    encode,
+    encode: encoder ?? encode,
     queue: createSerial(),
     now: () => 0,
     newSeed: () => seed++,
@@ -109,7 +110,7 @@ function setup(
     }
     throw new Error('takes never finished')
   }
-  return { root, file, takes, requests, settled, encoder }
+  return { root, file, takes, requests, settled, spy }
 }
 
 describe('makeAll, stopAll and modelState', () => {
@@ -1487,7 +1488,7 @@ describe('fading a stinger take', () => {
     const made = await stinger()
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
     expect((await takeOf(made)).fades).toEqual(fades)
-    expect(made.encoder.wavs).toHaveLength(0)
+    expect(made.spy.wavs).toHaveLength(0)
     expect(existsSync(join(made.root, 'music/music.lock.json'))).toBe(false)
   })
 
@@ -1495,11 +1496,11 @@ describe('fading a stinger take', () => {
     const made = await stinger()
     await made.takes.choose(made.file, 'victory', made.name)
     const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
-    expect(made.encoder.wavs).toHaveLength(1)
+    expect(made.spy.wavs).toHaveLength(1)
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
-    expect(made.encoder.wavs).toHaveLength(2)
-    expect(firstAndLast(made.encoder.wavs[1]!)).toEqual([0, 0])
-    expect(made.encoder.wavs[1]).not.toEqual(made.encoder.wavs[0]!)
+    expect(made.spy.wavs).toHaveLength(2)
+    expect(firstAndLast(made.spy.wavs[1]!)).toEqual([0, 0])
+    expect(made.spy.wavs[1]).not.toEqual(made.spy.wavs[0]!)
     expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
     expect(await takeOf(made)).toMatchObject({ chosen: true, fades })
   })
@@ -1508,7 +1509,7 @@ describe('fading a stinger take', () => {
     const made = await stinger()
     await made.takes.setFades(made.file, 'victory', made.name, fades)
     await made.takes.choose(made.file, 'victory', made.name)
-    expect(firstAndLast(made.encoder.wavs[0]!)).toEqual([0, 0])
+    expect(firstAndLast(made.spy.wavs[0]!)).toEqual([0, 0])
   })
 
   it('removes the fades: the take is back as generated, in the game too', async () => {
@@ -1516,8 +1517,8 @@ describe('fading a stinger take', () => {
     await made.takes.choose(made.file, 'victory', made.name)
     await made.takes.setFades(made.file, 'victory', made.name, fades)
     expect(await made.takes.setFades(made.file, 'victory', made.name, null)).toEqual({ ok: true })
-    expect(made.encoder.wavs).toHaveLength(3)
-    expect(made.encoder.wavs[2]).toEqual(made.encoder.wavs[0]!)
+    expect(made.spy.wavs).toHaveLength(3)
+    expect(made.spy.wavs[2]).toEqual(made.spy.wavs[0]!)
     expect((await takeOf(made)).fades).toBeUndefined()
   })
 
@@ -1540,7 +1541,7 @@ describe('fading a stinger take', () => {
   it('changes nothing when the game file cannot be written', async () => {
     const made = await stinger()
     await made.takes.choose(made.file, 'victory', made.name)
-    made.encoder.fail = true
+    made.spy.fail = true
     const answer = await made.takes.setFades(made.file, 'victory', made.name, fades)
     expect(answer).toMatchObject({
       ok: false,
@@ -1596,5 +1597,222 @@ describe('fading a stinger take', () => {
     expect(await made.takes.drop(made.file, 'defeat', moved.takes[0]!.file)).toEqual({ ok: true })
     const board = readFileSync(join(made.root, '.content-studio/music/defeat.json'), 'utf8')
     expect(board).not.toContain('fades')
+  })
+})
+
+describe('trimming a stinger take', () => {
+  /** A mono 1000 Hz WAV of a second of near-silence, four of sound and a second of near-silence. */
+  const padded = () => {
+    const samples = new Int16Array(6000)
+    samples.forEach((_, i) => {
+      samples[i] = i < 1000 ? (i % 2 ? 50 : -50) : i < 5000 ? (i % 2 ? 8000 : -8000) : 100
+    })
+    return writeWav({
+      format: { channels: 1, sampleRate: 1000, bitsPerSample: 16 },
+      data: new Uint8Array(samples.buffer),
+    })
+  }
+  const lists = {
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+    'tts/stingers.json': [
+      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
+      { id: 'defeat', title: 'Defeat', brief: 'sad', seconds: 6 },
+    ],
+  }
+  async function made(failEncode = false) {
+    const encoded: Uint8Array[] = []
+    let failing = failEncode
+    const encoder: Encoder = async (wav, out) => {
+      if (failing) throw new Error('the encoder broke')
+      encoded.push(wav)
+      mkdirSync(dirname(out), { recursive: true })
+      writeFileSync(out, `mp3 ${encoded.length}`)
+    }
+    const m = setup(undefined, lists, [], undefined, [], false, encoder)
+    await m.takes.make(m.file, 'victory', { count: 2 })
+    await m.settled('victory')
+    const folder = join(m.root, '.content-studio/music-takes/victory')
+    for (const name of readdirSync(folder)) writeFileSync(join(folder, name), padded())
+    return { ...m, encoded, folder, fail: (on: boolean) => (failing = on) }
+  }
+  type Made = Awaited<ReturnType<typeof made>>
+  const viewOf = async (m: Made, id = 'victory') => {
+    const view = await m.takes.view(m.file, id)
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    return view
+  }
+  const lockOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+  const manifestOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8'))
+
+  it('fades a trimmed take after the cut: the length is the part that is left, and the game gets both', async () => {
+    const m = await made()
+    const take = (await viewOf(m)).takes[0]!
+    expect(await m.takes.choose(m.file, 'victory', take.file)).toEqual({ ok: true })
+    expect(await m.takes.trim(m.file, 'victory', take.file, false)).toEqual({ ok: true })
+    const left = (await viewOf(m)).takes[0]!.trim!.seconds
+    const tooLong = { in: left, out: 1, shape: 'straight' } as const
+    expect(await m.takes.setFades(m.file, 'victory', take.file, tooLong)).toMatchObject({
+      ok: false,
+    })
+    const fades = { in: 0.5, out: 0.5, shape: 'straight' } as const
+    expect(await m.takes.setFades(m.file, 'victory', take.file, fades)).toEqual({ ok: true })
+    const sent = readWav(m.encoded.at(-1)!)
+    expect(wavSeconds(sent)).toBeCloseTo(left, 3)
+    const samples = new Int16Array(sent.data.buffer, sent.data.byteOffset, sent.data.length / 2)
+    expect(samples[0]).toBe(0)
+    expect(samples[samples.length - 1]).toBe(0)
+    // The part asked for to be heard is the cut sound only; the fades come from the address.
+    const heard = await m.takes.trimmedSound(m.file, 'victory', take.file)
+    expect(wavSeconds(readWav(heard!))).toBeCloseTo(left, 3)
+    expect(new Int16Array(readWav(heard!).data.buffer.slice(0, 2))[0]).not.toBe(0)
+  })
+
+  it('says what a stinger take has to cut, and a loop never does', async () => {
+    const m = await made()
+    expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
+    expect((await viewOf(m)).takes[0]).not.toHaveProperty('trim')
+    await m.takes.make(m.file, 'hall', { count: 1 })
+    await m.settled('hall')
+    const loop = (await viewOf(m, 'hall')).takes[0]!
+    expect(loop).not.toHaveProperty('trimmable')
+  })
+
+  it('says nothing to cut, and silent, from the take’s own sound', async () => {
+    const m = await made()
+    const [one, two] = (await viewOf(m)).takes
+    const flat = (level: number) =>
+      writeWav({
+        format: readWav(padded()).format,
+        data: new Uint8Array(new Int16Array(6000).fill(level).buffer),
+      })
+    writeFileSync(join(m.folder, one!.file), flat(8000))
+    writeFileSync(join(m.folder, two!.file), flat(40))
+    const view = await viewOf(m)
+    expect(view.takes.map((t) => t.trimmable)).toEqual(['nothing', 'silent'])
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toMatchObject({ ok: false })
+    expect(await m.takes.trim(m.file, 'victory', two!.file, false)).toMatchObject({ ok: false })
+  })
+
+  it('keeps the cut with the take, leaves its sound as generated, and undoes it', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    const before = readFileSync(join(m.folder, one!.file))
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    const trimmed = (await viewOf(m)).takes[0]!
+    expect(trimmed.seconds).toBe(6)
+    expect(trimmed.trim!.start).toBeCloseTo(0.95, 3)
+    expect(trimmed.trim!.end).toBeCloseTo(0.95, 3)
+    expect(trimmed.trim!.seconds).toBeCloseTo(4.1, 3)
+    expect(trimmed).not.toHaveProperty('trimmable')
+    expect(readFileSync(join(m.folder, one!.file)).equals(before)).toBe(true)
+    const sound = await m.takes.trimmedSound(m.file, 'victory', one!.file)
+    expect(wavSeconds(readWav(sound!))).toBeCloseTo(4.1, 3)
+    expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual({ ok: true })
+    expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
+  })
+
+  it('refuses a loop, and a take that is not there', async () => {
+    const m = await made()
+    await m.takes.make(m.file, 'hall', { count: 1 })
+    await m.settled('hall')
+    const loop = (await viewOf(m, 'hall')).takes[0]!
+    expect(await m.takes.trim(m.file, 'hall', loop.file, false)).toMatchObject({ ok: false })
+    expect(await m.takes.trim(m.file, 'victory', 'nope.wav', false)).toMatchObject({ ok: false })
+  })
+
+  it('writes the trimmed sound and length into the game when a trimmed take is chosen', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.trim(m.file, 'victory', one!.file, false)
+    expect(await m.takes.choose(m.file, 'victory', one!.file)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(m.encoded[0]!))).toBeCloseTo(4.1, 3)
+    expect(manifestOf(m.root).victory.duration).toBeCloseTo(4.1, 1)
+  })
+
+  it('rewrites the game’s file at once when the take in the game is trimmed and untrimmed', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    expect(wavSeconds(readWav(m.encoded[0]!))).toBeCloseTo(6, 3)
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(m.encoded[1]!))).toBeCloseTo(4.1, 3)
+    expect(manifestOf(m.root).victory.duration).toBeCloseTo(4.1, 1)
+    expect((await viewOf(m)).takes[0]).toMatchObject({ chosen: true })
+    expect(lockOf(m.root).victory).toMatchObject({ take: 1 })
+    expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(m.encoded[2]!))).toBeCloseTo(6, 3)
+    expect(manifestOf(m.root).victory.duration).toBe(6)
+    expect((await viewOf(m)).takes[0]).toMatchObject({ chosen: true, trimmable: 'cut' })
+  })
+
+  it('changes neither the take nor the game’s file when the game’s file cannot be written', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    m.fail(true)
+    const answer = await m.takes.trim(m.file, 'victory', one!.file, false)
+    expect(answer).toMatchObject({ ok: false, message: 'the encoder broke' })
+    expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
+    expect(readFileSync(join(m.root, 'audio/music/victory.mp3'), 'utf8')).toBe('mp3 1')
+    expect(manifestOf(m.root).victory.duration).toBe(6)
+  })
+
+  it('keeps an accepted brief change and the time of the choice when the take in the game is trimmed', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    const before = lockOf(m.root).victory
+    await setTrackBrief(m.file, 'victory', { brief: 'a louder fanfare' })
+    expect(await m.takes.accept(m.file, 'victory')).toEqual({ ok: true })
+    const accepted = lockOf(m.root).victory
+    expect(accepted.inputs.brief).toBe('a louder fanfare')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    expect(lockOf(m.root).victory.inputs).toEqual(accepted.inputs)
+    expect(lockOf(m.root).victory.at).toBe(before.at)
+  })
+
+  it('refuses while the music lock cannot be read, changing nothing', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    mkdirSync(join(m.root, 'music'), { recursive: true })
+    writeFileSync(join(m.root, 'music/music.lock.json'), '{ not json')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toMatchObject({
+      ok: false,
+      message: 'The music lock could not be read.',
+    })
+    expect((await viewOf(m)).takes[0]).not.toHaveProperty('trim')
+  })
+
+  it('gives a plain reason when the game’s manifest cannot be read', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    writeFileSync(join(m.root, 'audio/music/manifest.json'), '{ not json')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({
+      ok: false,
+      message: 'the music manifest could not be read',
+    })
+  })
+
+  it('says the sound file could not be read for a WAV that cannot be parsed', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    writeFileSync(join(m.folder, one!.file), 'not a wav')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({
+      ok: false,
+      message: 'The take’s sound file could not be read.',
+    })
+  })
+
+  it('keeps the trim on a take moved to another stinger', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.trim(m.file, 'victory', one!.file, false)
+    expect(await m.takes.move(m.file, 'victory', one!.file, 'defeat')).toMatchObject({ ok: true })
+    const moved = (await viewOf(m, 'defeat')).takes[0]!
+    expect(moved.trim!.seconds).toBeCloseTo(4.1, 3)
+    expect(await m.takes.trim(m.file, 'defeat', moved.file, true)).toEqual({ ok: true })
   })
 })

@@ -151,5 +151,9 @@ export function envelopePoints(fades: Fades, seconds: number): string {
 
 /** What to ask the player for a take: its address with the fades in the sound, and whether Setup's playback fade applies (not to a take with fades of its own). */
 export function heardAs(url: string, fades: Fades | undefined): { url: string; fade: boolean } {
-  return { url: `${url}${fadeQuery(fades)}`, fade: !fades || !hasFades(fades) }
+  const query = fadeQuery(fades)
+  return {
+    url: url.includes('?') && query ? `${url}&${query.slice(1)}` : `${url}${query}`,
+    fade: !fades || !hasFades(fades),
+  }
 }

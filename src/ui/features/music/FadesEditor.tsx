@@ -12,6 +12,7 @@ import {
   type Fades,
 } from '../../../core/fades'
 import type { TakeView } from '../../../core/musicTake'
+import { cutShares, playedSeconds, takeSoundUrl } from './trimSilence'
 import { useSetFades } from '../../api'
 import type { useClipPlayer } from '../../components/useClipPlayer'
 
@@ -34,13 +35,14 @@ function lengthOf(text: string): number {
  * height ghosted behind.
  */
 function FadeWave({
-  take,
+  part,
   fades,
   position,
   onIn,
   onOut,
 }: {
-  take: TakeView
+  /** The sound that plays: its length and the bars of the part between the cuts. */
+  part: { seconds: number; peaks: number[] }
   /** The fades as they last could be used. */
   fades: Fades
   position?: () => number | null
@@ -60,7 +62,7 @@ function FadeWave({
     draw()
     return () => cancelAnimationFrame(frame)
   }, [position])
-  const { seconds } = take
+  const { seconds } = part
   const lengthAt = (event: PointerEvent) => {
     const box = well.current?.getBoundingClientRect()
     return lengthAtX(event.clientX - (box?.left ?? 0), box?.width ?? 0, seconds)
@@ -76,10 +78,10 @@ function FadeWave({
     event.preventDefault()
     step(event.key === 'ArrowRight' ? 1 : -1, event.shiftKey)
   }
-  const bars = take.peaks.length
+  const bars = part.peaks.length
   return (
     <div className="wave wave-big" ref={well}>
-      {take.peaks.map((peak, i) => {
+      {part.peaks.map((peak, i) => {
         const gain = fadeGain(fades, seconds, ((i + 0.5) / bars) * seconds)
         return (
           <i key={i} aria-hidden>
@@ -166,7 +168,18 @@ export function FadesEditor({
   }, [])
 
   const typed: Fades = { in: lengthOf(inText), out: lengthOf(outText), shape }
-  const problem = fadesProblem(typed, take.seconds)
+  // A trimmed take is faded after the cut: the length, the bars and the sound are of the part between the cuts.
+  const cut = cutShares(take)
+  const part = {
+    seconds: playedSeconds(take),
+    peaks: cut
+      ? take.peaks.slice(
+          Math.floor(cut.start * take.peaks.length),
+          Math.ceil((1 - cut.end) * take.peaks.length),
+        )
+      : take.peaks,
+  }
+  const problem = fadesProblem(typed, part.seconds)
   // The handles and the sound stay where they last could be while the boxes hold lengths that cannot be used.
   const lastGood = useRef<Fades>(saved)
   if (!problem) lastGood.current = typed
@@ -177,10 +190,7 @@ export function FadesEditor({
   const canSave = changed && !saving
 
   const id = `music-take-${trackId}-${take.n}`
-  const { url, fade } = heardAs(
-    `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${take.file}`,
-    good,
-  )
+  const { url, fade } = heardAs(takeSoundUrl(trackId, take), good)
   const how = { fade }
   const playing = player.playing === id
   const heard = useRef(url)
@@ -258,14 +268,14 @@ export function FadesEditor({
         <span className="small muted grow">Hear it with the fades</span>
       </div>
       <FadeWave
-        take={take}
+        part={part}
         fades={good}
         position={playing ? player.position : undefined}
         onIn={(seconds) =>
-          setInText(boxText(Math.min(seconds, Math.max(0, take.seconds - good.out))))
+          setInText(boxText(Math.min(seconds, Math.max(0, part.seconds - good.out))))
         }
         onOut={(seconds) =>
-          setOutText(boxText(Math.min(seconds, Math.max(0, take.seconds - good.in))))
+          setOutText(boxText(Math.min(seconds, Math.max(0, part.seconds - good.in))))
         }
       />
       <div className="fades">
