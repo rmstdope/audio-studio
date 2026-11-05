@@ -36,6 +36,9 @@ export const STUDIO_DIR = 'content-studio'
 /** What the studio keeps for itself on this machine, never committed: takes, notes, settings. */
 export const CACHE_DIR = `${STUDIO_DIR}/cache`
 
+/** Where the cache was before format version 2; never read, only reported. */
+export const OLD_CACHE_DIR = '.content-studio'
+
 /** The project file's name before the rename to Content Studio; never read, only reported. */
 export const OLD_PROJECT_FILE = 'audio-studio.json'
 

@@ -6,7 +6,7 @@ import { basename, dirname, join } from 'node:path'
 import { soundAlikes, type SoundAlike } from '../core/align'
 import { capitalisesNouns, languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
-import { noProjectMessage, renameNotice, type FoundNames } from '../core/renames'
+import { noProjectMessage, oldCacheNotice, renameNotice, type FoundNames } from '../core/renames'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import {
   adoptUntracked,
@@ -17,6 +17,7 @@ import {
 } from '../core/planner'
 import {
   CACHE_DIR,
+  OLD_CACHE_DIR,
   OLD_PROJECT_FILE,
   OLD_STATE_DIR,
   PROJECT_FILE,
@@ -82,10 +83,17 @@ export function locateProject(start: string, explicit?: string): Located {
   }
 }
 
-/** `file` to open, unless the old names found in `dir` (a leftover old folder too) say to stop. */
+/**
+ * `file` to open, unless the old names found in `dir` (a leftover old folder too) or a cache still
+ * in `.content-studio/` say to stop.
+ */
 function opening(dir: string, file: string, found: Omit<FoundNames, 'oldFolder'>): Located {
   const oldFolder = isDirectory(join(dir, OLD_STATE_DIR))
-  const message = renameNotice({ ...found, oldFolder })
+  const message =
+    renameNotice({ ...found, oldFolder }) ??
+    (isDirectory(join(dir, OLD_CACHE_DIR))
+      ? oldCacheNotice(isDirectory(join(dir, CACHE_DIR)))
+      : null)
   return message ? { ok: false, message } : { ok: true, file }
 }
 

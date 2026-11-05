@@ -34,6 +34,24 @@ export function renameNotice({ oldFile, newFile, oldFolder }: FoundNames): strin
   return [LEAD, `${ask}, then run content-studio again:`, ...steps].join('\n')
 }
 
+/**
+ * What the terminal says when a game's studio cache is still in `.content-studio/`, where it was
+ * before format version 2: the move to `content-studio/cache/`, or, when that is there too, to
+ * merge or remove one by hand. The studio never reads the old folder.
+ */
+export function oldCacheNotice(cacheThere: boolean): string {
+  return cacheThere
+    ? [
+        'This game has both .content-studio/ and content-studio/cache/.',
+        'Merge them by hand, or remove one, then run content-studio again.',
+      ].join('\n')
+    : [
+        'This game’s studio cache is still in .content-studio/, where it was before version 2.',
+        'Move it, then run content-studio again:',
+        '  mkdir -p content-studio && mv .content-studio content-studio/cache',
+      ].join('\n')
+}
+
 /** What the terminal says when no project file is found from `cwd` upwards. */
 export function noProjectMessage(cwd: string): string {
   return (

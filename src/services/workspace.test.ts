@@ -68,6 +68,34 @@ describe('locateProject', () => {
     })
   })
 
+  it('stops while the cache is still in .content-studio, saying how to move it', () => {
+    const root = tempRepo({ 'content-studio.json': projectJson(), '.content-studio/x.json': {} })
+    expect(locateProject(root)).toEqual({
+      ok: false,
+      message: [
+        'This game’s studio cache is still in .content-studio/, where it was before version 2.',
+        'Move it, then run content-studio again:',
+        '  mkdir -p content-studio && mv .content-studio content-studio/cache',
+      ].join('\n'),
+    })
+    expect(locateProject(root, join(root, 'content-studio.json')).ok).toBe(false)
+  })
+
+  it('stops when both caches are there, asking to merge or remove one by hand', () => {
+    const root = tempRepo({
+      'content-studio.json': projectJson(),
+      '.content-studio/x.json': {},
+      'content-studio/cache/y.json': {},
+    })
+    expect(locateProject(root)).toEqual({
+      ok: false,
+      message: [
+        'This game has both .content-studio/ and content-studio/cache/.',
+        'Merge them by hand, or remove one, then run content-studio again.',
+      ].join('\n'),
+    })
+  })
+
   it('stops with the both-files message when both project files exist', () => {
     const root = tempRepo({
       'audio-studio.json': projectJson(),
