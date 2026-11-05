@@ -200,14 +200,9 @@ describe('the images files in the changes', () => {
   const withImages = ProjectSchema.parse(
     projectJson({
       images: {
-        paths: {
-          list: 'tts/{part}/images.json',
-          style: 'images/style.json',
-          prompts: 'images/prompts.json',
-          lock: 'images/images.lock.json',
-          clips: 'web/public/images/generated',
-          manifest: 'web/public/images/generated/manifest.json',
-        },
+        from: { part: 'tts/{part}/images.json' },
+        clips: 'web/public/images/generated',
+        manifest: 'web/public/images/generated/manifest.json',
       },
     }),
   )
@@ -215,17 +210,15 @@ describe('the images files in the changes', () => {
   it('lists the images files by role', () => {
     const groups = groupChanges(withImages, 'content-studio.json', [
       { path: 'tts/act1/images.json', change: 'modified' },
+      { path: 'content-studio/images/edits.json', change: 'modified' },
+      { path: 'content-studio/images/lock.json', change: 'modified' },
       { path: 'images/style.json', change: 'new' },
-      { path: 'images/prompts.json', change: 'modified' },
-      { path: 'images/images.lock.json', change: 'modified' },
-      { path: 'images/other.json', change: 'new' },
     ])
-    expect(groups.total).toBe(4)
+    expect(groups.total).toBe(3)
     expect(groups.images?.files.map((f) => [f.path, f.role])).toEqual([
       ['tts/act1/images.json', 'images'],
-      ['images/style.json', 'style'],
-      ['images/prompts.json', 'words'],
-      ['images/images.lock.json', 'lock'],
+      ['content-studio/images/edits.json', 'edits'],
+      ['content-studio/images/lock.json', 'lock'],
     ])
   })
 

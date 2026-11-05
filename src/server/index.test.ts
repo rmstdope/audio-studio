@@ -5117,20 +5117,18 @@ describe('the images routes', () => {
   const imagesRoot = tempRepo({
     'content-studio.json': projectJson({
       images: {
-        paths: {
-          list: 'tts/{part}/images.json',
-          style: 'images/style.json',
-          prompts: 'images/prompts.json',
-          lock: 'images/images.lock.json',
-          clips: 'web/public/images/generated',
-          manifest: 'web/public/images/generated/manifest.json',
-        },
+        from: { part: 'tts/{part}/images.json' },
+        clips: 'web/public/images/generated',
+        manifest: 'web/public/images/generated/manifest.json',
       },
     }),
     'tts/act1/images.json': [
       { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
     ],
-    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+    'content-studio/images/edits.json': {
+      style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
+      images: {},
+    },
   })
   const studio = startServer({
     projectFile: join(imagesRoot, 'content-studio.json'),
@@ -5159,7 +5157,6 @@ describe('the images routes', () => {
       ['PATCH', '/api/image-style', { look: 'x' }],
       ['POST', '/api/images/inn/compare', { choice: 'keep' }],
       ['PATCH', '/api/images/inn/act-style', { on: false }],
-      ['POST', '/api/image-style/seen', {}],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5194,12 +5191,13 @@ describe('the images routes', () => {
     expect((await send('PATCH', '/api/images/inn/act-style', { from: 3 })).status).toBe(400)
   })
 
-  it('saves a style field, settles a compare and puts the style notice away', async () => {
+  it('saves a style field, refuses an empty look, and settles a compare', async () => {
     expect((await send('PATCH', '/api/image-style', { look: 'oil' })).status).toBe(200)
-    expect((await summary()).style.look).toMatchObject({ words: 'oil', changed: true })
+    expect((await summary()).style.look).toBe('oil')
+    expect((await send('PATCH', '/api/image-style', { look: '' })).status).toBe(409)
     expect((await send('POST', '/api/images/inn/compare', { choice: 'game' })).status).toBe(200)
     expect((await summary()).acts[0].rows[0].changed).toBe(false)
-    expect((await send('POST', '/api/image-style/seen', {})).status).toBe(200)
+    expect((await send('POST', '/api/image-style/seen', {})).status).toBe(404)
   })
 })
 
@@ -5207,20 +5205,18 @@ describe('the image takes routes', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       images: {
-        paths: {
-          list: 'tts/{part}/images.json',
-          style: 'images/style.json',
-          prompts: 'images/prompts.json',
-          lock: 'images/images.lock.json',
-          clips: 'web/images',
-          manifest: 'web/images/manifest.json',
-        },
+        from: { part: 'tts/{part}/images.json' },
+        clips: 'web/images',
+        manifest: 'web/images/manifest.json',
       },
     }),
     'tts/act1/images.json': [
       { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
     ],
-    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+    'content-studio/images/edits.json': {
+      style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
+      images: {},
+    },
   })
   const studio = startServer({
     projectFile: join(root, 'content-studio.json'),
@@ -5387,20 +5383,18 @@ describe('the image model routes', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       images: {
-        paths: {
-          list: 'tts/{part}/images.json',
-          style: 'images/style.json',
-          prompts: 'images/prompts.json',
-          lock: 'images/images.lock.json',
-          clips: 'web/images',
-          manifest: 'web/images/manifest.json',
-        },
+        from: { part: 'tts/{part}/images.json' },
+        clips: 'web/images',
+        manifest: 'web/images/manifest.json',
       },
     }),
     'tts/act1/images.json': [
       { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
     ],
-    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+    'content-studio/images/edits.json': {
+      style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
+      images: {},
+    },
   })
   const asked: string[] = []
   const studio = startServer({

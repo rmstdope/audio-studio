@@ -1043,22 +1043,13 @@ export function useImageCompare(imageId: string) {
   }))
 }
 
-/** Saves the user's own words for the look or what is kept out (null takes them back). */
+/** Sets the style's look or what is kept out (null or empty: none, which the look refuses). */
 export function useSetStyleField(field: StyleField) {
   return useImageEdit<string | null>(`image-style-${field}`, (words) => ({
     method: 'PATCH',
     path: '/api/image-style',
     body: { [field]: words },
   }))
-}
-
-/** Puts the style-changed notice away, then runs `afterSeen` (the notice is gone by then). */
-export function useStyleSeen(afterSeen: () => void) {
-  return useImageEdit<void>(
-    'image-style-seen',
-    () => ({ method: 'POST', path: '/api/image-style/seen', body: {} }),
-    afterSeen,
-  )
 }
 
 /** A track's takes as its page shows them; polled while any is being made. */

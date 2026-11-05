@@ -64,7 +64,6 @@ import { moveCue, moveSceneCue, setCue, setInsideCue, setSceneCue } from '../ser
 import { gitChanges } from '../services/git'
 import { keepMyBrief, setTrackBrief } from '../services/briefs'
 import {
-  markStyleSeen,
   resolveImageCompare,
   setImageActStyle,
   setImageActStylePick,
@@ -1737,9 +1736,6 @@ export function startServer({
           const [field, text] = Object.entries(body.data)[0] as ['look' | 'keepOut', string | null]
           return imageAnswer(await setStyleField(projectFile, field, text))
         }),
-      },
-      '/api/image-style/seen': {
-        POST: fromOwnPage(async () => imageAnswer(await markStyleSeen(projectFile))),
       },
       '/api/effects/refresh': {
         POST: fromOwnPage(async () => {

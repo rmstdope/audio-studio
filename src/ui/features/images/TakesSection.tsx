@@ -642,9 +642,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                     </span>
                   </div>
                   {lookError !== null && (
-                    <span className="faint small">
-                      Fix the game&apos;s style file to choose this take.
-                    </span>
+                    <span className="faint small">Fix the style to choose this take.</span>
                   )}
                 </>
               ) : (

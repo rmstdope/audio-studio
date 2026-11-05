@@ -287,14 +287,9 @@ describe('checkSetup, requests at once', () => {
 
 describe('checkSetup of the image models', () => {
   const imagesSection = {
-    paths: {
-      list: 'tts/{part}/images.json',
-      style: 'images/style.json',
-      prompts: 'images/prompts.json',
-      lock: 'images/images.lock.json',
-      clips: 'web/images',
-      manifest: 'web/images/manifest.json',
-    },
+    from: { part: 'tts/{part}/images.json' },
+    clips: 'web/images',
+    manifest: 'web/images/manifest.json',
   }
   const noAccount = async (): Promise<ElevenAnswer> => ({
     ok: false,
@@ -372,7 +367,10 @@ describe('checkSetup of the image models', () => {
     const root = tempRepo({
       'content-studio.json': projectJson({ images: imagesSection }),
       'tts/act1/images.json': list,
-      'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+      'content-studio/images/edits.json': {
+        style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
+        images: {},
+      },
     })
     const file = join(root, 'content-studio.json')
     // Setup does not know it is the same studio: a new store on the same project is a restart.

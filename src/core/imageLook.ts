@@ -1,4 +1,4 @@
-import type { GameStyle } from './images'
+import type { ImageStyle } from './images'
 
 /** A colour as red, green and blue, 0 to 255. */
 export type Rgb = readonly [number, number, number]
@@ -25,7 +25,7 @@ export function parseColour(hex: string): Rgb {
 }
 
 /** The look a style file asks for: a listed palette wins, then the colour depth, else full colour. */
-export function lookOf(style: Pick<GameStyle, 'palette' | 'colourDepth' | 'dithering'>): Look {
+export function lookOf(style: Pick<ImageStyle, 'palette' | 'colourDepth' | 'dithering'>): Look {
   const dithering = style.dithering ?? 'patterned'
   if (style.palette.length) {
     return { colours: { kind: 'palette', palette: style.palette.map(parseColour) }, dithering }
@@ -95,15 +95,15 @@ export function lookChanges(then: string | null, now: string): string[] {
   return changes
 }
 
-/** The sentence saying why a style file can't be used, from what was read of it and where it is. */
-export function explainStyleProblem(raw: unknown, styleFile: string): string {
+/** The sentence saying why the style can't be used, from what was read of it and the file it is in. */
+export function explainStyleProblem(raw: unknown, file: string): string {
   const start = "Can't bring this take to the game's look:"
   const palette = (raw as { palette?: unknown } | null)?.palette
   if (Array.isArray(palette)) {
     const at = palette.findIndex((c) => typeof c !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(c))
     if (at !== -1) {
-      return `${start} the style file's palette has a colour that isn't one: palette ${at + 1}, “${String(palette[at])}”.`
+      return `${start} the style's palette has a colour that isn't one: palette ${at + 1}, “${String(palette[at])}”.`
     }
   }
-  return `${start} ${styleFile} cannot be read as the game's style.`
+  return `${start} the style in ${file} cannot be read.`
 }

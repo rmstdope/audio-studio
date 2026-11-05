@@ -43,14 +43,11 @@
     "manifest": "audio/music/manifest.json"
   },
   "images": {
-    "paths": {
-      "list": "tts/{part}/images.json",
-      "style": "images/style.json",
-      "prompts": "images/prompts.json",
-      "lock": "images/images.lock.json",
-      "clips": "web/public/images/generated",
-      "manifest": "web/public/images/generated/manifest.json"
-    }
+    "from": {
+      "part": "tts/{part}/images.json"
+    },
+    "clips": "web/public/images/generated",
+    "manifest": "web/public/images/generated/manifest.json"
   },
   "effects": {
     "paths": {

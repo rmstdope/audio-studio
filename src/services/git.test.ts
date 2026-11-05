@@ -85,27 +85,22 @@ describe('gitChanges', () => {
       ...files,
       'content-studio.json': projectJson({
         images: {
-          paths: {
-            list: 'tts/{part}/images.json',
-            style: 'images/style.json',
-            prompts: 'images/prompts.json',
-            lock: 'images/images.lock.json',
-            clips: 'web/public/images/generated',
-            manifest: 'web/public/images/generated/manifest.json',
-          },
+          from: { part: 'tts/{part}/images.json' },
+          clips: 'web/public/images/generated',
+          manifest: 'web/public/images/generated/manifest.json',
         },
       }),
     })
     git(root, 'init', '-q')
     git(root, 'add', '.')
     git(root, 'commit', '-q', '-m', 'start')
-    mkdirSync(join(root, 'images'), { recursive: true })
-    writeFileSync(join(root, 'images/prompts.json'), '{}')
+    mkdirSync(join(root, 'content-studio/images'), { recursive: true })
+    writeFileSync(join(root, 'content-studio/images/edits.json'), '{}')
     writeFileSync(join(root, 'tts/act1/images.json'), '[]')
     const result = await gitChanges(join(root, 'content-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.images?.files.map((f) => [f.path, f.role]).sort()).toEqual([
-      ['images/prompts.json', 'words'],
+      ['content-studio/images/edits.json', 'edits'],
       ['tts/act1/images.json', 'images'],
     ])
   })

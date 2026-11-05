@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
 import { narrationInLanguages, projectJson } from '../../test/helpers'
 import {
+  IMAGES_EDITS_FILE,
+  IMAGES_LOCK_FILE,
   CAST_FILE,
   DEFAULT_PHRASE,
   MUSIC_EDITS_FILE,
@@ -451,63 +453,57 @@ describe('the music section', () => {
 })
 
 describe('the images section', () => {
-  const images = (paths: Record<string, string> = {}) =>
-    projectJson({
-      images: {
-        paths: {
-          list: 'tts/{part}/images.json',
-          style: 'images/style.json',
-          prompts: 'images/prompts.json',
-          lock: 'images/images.lock.json',
-          clips: 'web/public/images/generated',
-          manifest: 'web/public/images/generated/manifest.json',
-          ...paths,
-        },
-      },
-    })
+  const section = (extra: Record<string, unknown> = {}) => ({
+    from: { part: 'tts/{part}/images.json' },
+    clips: 'web/public/images/generated',
+    manifest: 'web/public/images/generated/manifest.json',
+    ...extra,
+  })
+  const images = (extra: Record<string, unknown> = {}) => projectJson({ images: section(extra) })
 
   it('is optional', () => {
     expect(parse(projectJson()).data!.images).toBeUndefined()
   })
 
-  it('accepts the six paths', () => {
+  it("names each part's images, the clips folder and the manifest", () => {
     const result = parse(images())
     expect(result.success).toBe(true)
-    expect(result.data!.images!.paths.prompts).toBe('images/prompts.json')
-    expect(result.data!.images!.paths.clips).toBe('web/public/images/generated')
-    expect(result.data!.images!.paths.manifest).toBe('web/public/images/generated/manifest.json')
+    expect(result.data!.images!.from.part).toBe('tts/{part}/images.json')
+    expect(result.data!.images!.clips).toBe('web/public/images/generated')
+    expect(result.data!.images!.manifest).toBe('web/public/images/generated/manifest.json')
   })
 
   it('names the main image model, or none (FLUX.2 klein)', () => {
-    const withModel = (model: string) => {
-      const base = images().images as Record<string, unknown>
-      return projectJson({ images: { ...base, model } })
-    }
-    expect(parse(withModel('z-image-turbo')).data!.images!.model).toBe('z-image-turbo')
+    expect(parse(images({ model: 'z-image-turbo' })).data!.images!.model).toBe('z-image-turbo')
     expect(parse(images()).data!.images!.model).toBeUndefined()
-    expect(problems(withModel('huge')).map((p) => p.path)).toEqual(['images.model'])
+    expect(problems(images({ model: 'huge' })).map((p) => p.path)).toEqual(['images.model'])
   })
 
   it('needs the clips folder and the manifest, where chosen images are written', () => {
-    const base = images().images as { paths: Record<string, string> }
-    const { clips: _clips, manifest: _manifest, ...rest } = base.paths
-    const found = problems(projectJson({ images: { paths: rest } }))
-    expect(found.map((p) => p.path).sort()).toEqual(['images.paths.clips', 'images.paths.manifest'])
+    const { clips: _clips, manifest: _manifest, ...rest } = section()
+    const found = problems(projectJson({ images: rest }))
+    expect(found.map((p) => p.path).sort()).toEqual(['images.clips', 'images.manifest'])
   })
 
-  it('needs {part} in the list path', () => {
-    expect(problems(images({ list: 'tts/images.json' }))).toEqual([
+  it("needs each part's list, with {part} in its path", () => {
+    expect(problems(images({ from: {} })).map((p) => p.path)).toEqual(['images.from.part'])
+    expect(problems(images({ from: { part: 'tts/images.json' } }))).toEqual([
       {
         file: 'content-studio.json',
-        path: 'images.paths.list',
+        path: 'images.from.part',
         message: 'must contain {part}, or every part would share one file',
       },
     ])
   })
 
   it('refuses {language} in any images path', () => {
-    const found = problems(images({ style: '{language}/style.json' }))
-    expect(found.map((p) => p.path)).toEqual(['images.paths.style'])
+    const found = problems(images({ clips: '{language}/generated' }))
+    expect(found.map((p) => p.path)).toEqual(['images.clips'])
+  })
+
+  it('keeps the edits (with the style) and the lock at fixed places in the studio folder', () => {
+    expect(IMAGES_EDITS_FILE).toBe('content-studio/images/edits.json')
+    expect(IMAGES_LOCK_FILE).toBe('content-studio/images/lock.json')
   })
 })
 

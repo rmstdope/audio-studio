@@ -130,14 +130,9 @@ describe('modelsView', () => {
 
 describe('modelsView, with images', () => {
   const imagesSection = {
-    paths: {
-      list: 'tts/{part}/images.json',
-      style: 'images/style.json',
-      prompts: 'images/prompts.json',
-      lock: 'images/images.lock.json',
-      clips: 'web/images',
-      manifest: 'web/images/manifest.json',
-    },
+    from: { part: 'tts/{part}/images.json' },
+    clips: 'web/images',
+    manifest: 'web/images/manifest.json',
   }
 
   it('gives the main image model, which models are here', async () => {

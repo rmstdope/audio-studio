@@ -1,6 +1,8 @@
 import { posix } from 'node:path'
 import {
   CAST_FILE,
+  IMAGES_EDITS_FILE,
+  IMAGES_LOCK_FILE,
   MUSIC_EDITS_FILE,
   MUSIC_LOCK_FILE,
   narrationFile,
@@ -31,8 +33,8 @@ export interface MusicChanges {
   clips: Record<ChangeKind, number>
 }
 
-/** What an images file is for: the game's list of images, the game's style, the studio's words, or the lock. */
-export type ImagesFileRole = 'images' | 'style' | 'words' | 'lock'
+/** What an images file is for: the game's list of images, the studio's edits (the style and words), or the lock. */
+export type ImagesFileRole = 'images' | 'edits' | 'lock'
 
 /** The images files' changes. */
 export interface ImagesChanges {
@@ -99,12 +101,11 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
     images: images
       ? Object.fromEntries([
           ...project.parts.map((part): [string, ImagesFileRole] => [
-            normal(partPathFor(images.paths.list, part.id)),
+            normal(partPathFor(images.from.part, part.id)),
             'images',
           ]),
-          [normal(images.paths.style), 'style'],
-          [normal(images.paths.prompts), 'words'],
-          [normal(images.paths.lock), 'lock'],
+          [IMAGES_EDITS_FILE, 'edits'],
+          [IMAGES_LOCK_FILE, 'lock'],
         ])
       : null,
     music: music

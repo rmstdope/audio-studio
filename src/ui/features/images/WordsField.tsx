@@ -9,7 +9,8 @@ export type WordsSave = UseMutationResult<NonNullable<ImageEditResult>, Error, s
 /**
  * A field of the user's own words over the game's: labelled "from the game", or "changed here ·
  * use the game's" in warn colour; saved when left. An emptied field takes the user's words back,
- * as does the game's own text typed back (the server decides which).
+ * as does the game's own text typed back (the server decides which). Without `changed` the words
+ * are the studio's own (the style), and the field has no label of where they are from.
  */
 export function WordsField({
   label,
@@ -23,7 +24,8 @@ export function WordsField({
 }: {
   label: string
   words: string
-  changed: boolean
+  /** The user's words are over the game's; absent for words with no game's to go back to. */
+  changed?: boolean
   save: WordsSave
   /** The words were saved. */
   onSaved: () => void
@@ -55,7 +57,7 @@ export function WordsField({
         <label className="label" htmlFor={id}>
           {label}
         </label>
-        {changed ? (
+        {changed === undefined ? null : changed ? (
           <span className="field-tag changed">
             changed here ·{' '}
             <button
