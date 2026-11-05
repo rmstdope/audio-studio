@@ -5725,7 +5725,7 @@ describe('server, saving a scene', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/scenes.json': [{ id: 'store', name: 'Store', states: [], triggers: [] }],
+    'tts/act1/scenes.json': [{ id: 'store', title: 'Store', states: [], triggers: [] }],
   })
   const studio = startServer({
     projectFile: join(sceneRoot, 'content-studio.json'),
@@ -5800,7 +5800,7 @@ describe('server, measuring the loudness of scenes', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/scenes.json': [{ id: 'store', name: 'Store', states: [], triggers: [] }],
+    'tts/act1/scenes.json': [{ id: 'store', title: 'Store', states: [], triggers: [] }],
   })
   const studio = startServer({
     projectFile: join(root, 'content-studio.json'),

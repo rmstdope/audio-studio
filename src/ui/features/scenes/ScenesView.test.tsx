@@ -134,12 +134,12 @@ const effects = {
 
 const store = {
   id: 'act1-store',
-  name: 'General store',
+  title: 'General store',
   states: ['plain', 'cat-home'],
   triggers: ['door-opens'],
 }
-const forest = { id: 'act1-forest', name: 'Forest path', states: ['plain'], triggers: [] }
-const chapel = { id: 'act1-chapel', name: 'Village chapel', states: [], triggers: ['bell-tolls'] }
+const forest = { id: 'act1-forest', title: 'Forest path', states: ['plain'], triggers: [] }
+const chapel = { id: 'act1-chapel', title: 'Village chapel', states: [], triggers: ['bell-tolls'] }
 
 function summary(
   state: 'ok' | 'missing' | 'invalid' = 'ok',

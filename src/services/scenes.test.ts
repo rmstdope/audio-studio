@@ -23,7 +23,7 @@ async function load(files: Record<string, unknown>, section: unknown = scenes) {
   return loaded.summary
 }
 
-const store = { id: 'act1-store', name: 'General store', states: ['plain'], triggers: [] }
+const store = { id: 'act1-store', title: 'General store', states: ['plain'], triggers: [] }
 
 describe('the scenes of a project', () => {
   it('are null without a scenes section', async () => {
@@ -63,7 +63,7 @@ describe('the scenes of a project', () => {
 
   it('report a mix scene that cannot be read, and show the others', async () => {
     const summary = await load({
-      'tts/act1/scenes.json': [store, { id: 'other', name: 'Other' }],
+      'tts/act1/scenes.json': [store, { id: 'other', title: 'Other' }],
       'game/scenes/act1.mix.json': {
         scenes: { 'act1-store': { effects: [{ id: 'bell', play: { mode: 'loop' }, level: 9 }] } },
       },
@@ -94,7 +94,7 @@ describe('the scenes of a project', () => {
   })
 
   it('report a declarations entry left out', async () => {
-    const summary = await load({ 'tts/act1/scenes.json': [store, { id: 'Bad', name: 'x' }] })
+    const summary = await load({ 'tts/act1/scenes.json': [store, { id: 'Bad', title: 'x' }] })
     expect(summary.scenes!.acts[0]!.scenes.length).toBe(1)
     expect(summary.problems.map((p) => [p.file, p.path])).toEqual([
       ['tts/act1/scenes.json', '[1].id'],
@@ -108,7 +108,7 @@ describe('the scenes of a project', () => {
 
 describe('saving a scene', () => {
   const MIX = 'game/scenes/act1.mix.json'
-  const other = { id: 'act1-cottage', name: 'Cottage', states: [], triggers: [] }
+  const other = { id: 'act1-cottage', title: 'Cottage', states: [], triggers: [] }
   const entry = (level: number): SceneMix => ({
     music: { track: 'act1-store', level },
     effects: [{ id: 'bell', play: { mode: 'loop' }, level }],

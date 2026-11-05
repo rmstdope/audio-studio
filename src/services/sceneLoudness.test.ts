@@ -33,7 +33,7 @@ const choice = (id: string, over: Partial<SceneEffectChoice> = {}): SceneEffectC
 
 const declared = (id: string, states: string[] = []): SceneDeclaration => ({
   id,
-  name: id,
+  title: id,
   states,
   triggers: [],
 })
@@ -325,8 +325,8 @@ function repo() {
     'content-studio.json': projectJson({ scenes: scenesSection }),
     'content-studio/narration/cast.json': { speakers: {} },
     'tts/act1/scenes.json': [
-      { id: 'a', name: 'A', states: [], triggers: [] },
-      { id: 'b', name: 'B', states: [], triggers: [] },
+      { id: 'a', title: 'A', states: [], triggers: [] },
+      { id: 'b', title: 'B', states: [], triggers: [] },
     ],
   })
   return { root, projectFile: join(root, 'content-studio.json') }

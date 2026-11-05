@@ -18,7 +18,8 @@ const slugs = z
 /** A scene as the game declares it (§8.11): its states, the first being the default, and its triggers. */
 export const SceneDeclarationSchema = z.object({
   id: Slug,
-  name: z.string().min(1),
+  /** What the studio calls the scene. */
+  title: z.string().min(1),
   states: slugs,
   triggers: slugs,
 })
@@ -386,8 +387,8 @@ function sceneRow(
   known: Known,
   kept: SceneKept = { saved: null, draft: null },
 ): SceneRow {
-  const { id, name, states, triggers } = declared
-  const row = { id, name, states, triggers }
+  const { id, title, states, triggers } = declared
+  const row = { id, name: title, states, triggers }
   const unreadable = mix.status === 'unreadable' || (mix.status === 'ok' && mix.badIds.has(id))
   if (unreadable) {
     return {

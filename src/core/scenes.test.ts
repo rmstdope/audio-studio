@@ -11,7 +11,7 @@ import {
   type SceneMix,
 } from './scenes'
 
-const slug = (id: string): SceneDeclaration => ({ id, name: id, states: [], triggers: [] })
+const slug = (id: string): SceneDeclaration => ({ id, title: id, states: [], triggers: [] })
 
 describe('readSceneDeclarations', () => {
   it('reads the scenes in the game order, states and triggers defaulting to none', () => {
@@ -19,11 +19,11 @@ describe('readSceneDeclarations', () => {
       [
         {
           id: 'act1-store',
-          name: 'General store',
+          title: 'General store',
           states: ['plain', 'cat-home'],
           triggers: ['door-opens'],
         },
-        { id: 'act1-cottage', name: "Elior's cottage" },
+        { id: 'act1-cottage', title: "Elior's cottage" },
       ],
       'tts/act1/scenes.json',
     )
@@ -31,7 +31,7 @@ describe('readSceneDeclarations', () => {
     expect(read.scenes.map((s) => s.id)).toEqual(['act1-store', 'act1-cottage'])
     expect(read.scenes[1]).toEqual({
       id: 'act1-cottage',
-      name: "Elior's cottage",
+      title: "Elior's cottage",
       states: [],
       triggers: [],
     })
@@ -40,7 +40,7 @@ describe('readSceneDeclarations', () => {
 
   it('leaves out an entry with a problem and reports its place', () => {
     const read = readSceneDeclarations(
-      [slug('a'), { id: 'b', name: 'B', states: ['Not A Slug'] }],
+      [slug('a'), { id: 'b', title: 'B', states: ['Not A Slug'] }],
       'f.json',
     )
     if (!read.ok) throw new Error('expected a list')
@@ -48,9 +48,16 @@ describe('readSceneDeclarations', () => {
     expect(read.problems.map((p) => [p.file, p.path])).toEqual([['f.json', '[1].states[0]']])
   })
 
+  it('needs a title: a scene named as before version 2 is a problem at its place', () => {
+    const read = readSceneDeclarations([slug('a'), { id: 'b', name: 'B' }], 'f.json')
+    if (!read.ok) throw new Error('expected a list')
+    expect(read.scenes.map((s) => s.id)).toEqual(['a'])
+    expect(read.problems.map((p) => p.path)).toEqual(['[1].title'])
+  })
+
   it('leaves out both entries of an id used twice, and a repeated state', () => {
     const read = readSceneDeclarations(
-      [slug('a'), slug('a'), { id: 'c', name: 'C', states: ['x', 'x'] }],
+      [slug('a'), slug('a'), { id: 'c', title: 'C', states: ['x', 'x'] }],
       'f.json',
     )
     if (!read.ok) throw new Error('expected a list')
@@ -169,10 +176,15 @@ function summarize(over: {
 describe('summarizeScenes', () => {
   const store = {
     id: 'store',
-    name: 'General store',
+    title: 'General store',
     states: ['plain', 'cat-home'],
     triggers: ['door-opens'],
   }
+
+  it("names a scene by the game's title", () => {
+    const act = summarize({ declarations: decl(store), mix: mixOf({}) })
+    expect(act.scenes[0]!.name).toBe('General store')
+  })
 
   it('reads a scene as the mix says, in the declarations order', () => {
     const act = summarize({
