@@ -4,8 +4,9 @@ This is the reference for the files Content Studio reads and writes in a game's 
 each one is for, who writes it, and every field it holds. It is written for the people who set a
 game up for the studio and for the game's own code that reads what the studio makes.
 
-The examples are the studio's sample project (`test/fixtures/sample`), a tiny game with three acts
-in English, Swedish and German.
+The examples start from the studio's sample project (`test/fixtures/sample`), a tiny game with
+three acts in English, Swedish and German, with values added where the sample leaves a field at its
+default, so that every field is shown.
 
 > **Status.** This is version 2 of the format, which the studio is moving to one section at a time
 > (epic as-6u9). Until a section has moved, the studio reads that section's files as
@@ -66,7 +67,7 @@ walking up from the folder it is started in.
   "languages": ["en", "sv", "de"],
   "refresh": {
     "part": "sh tools/refresh.sh {part}",
-    "shared": "sh tools/refresh-stingers.sh"
+    "shared": "sh tools/refresh-shared.sh"
   },
   "narration": {
     "from": { "part": "tts/{part}/{language}/script.json" },
@@ -91,7 +92,8 @@ walking up from the folder it is started in.
       "phrase": {
         "en": "Come in out of the rain, child. Sit by the fire, and I will tell you how it all began."
       },
-      "candidatesPerRound": 5
+      "candidatesPerRound": 5,
+      "searchLanguage": "en"
     },
     "clips": "audio/narration/{part}/{language}",
     "manifest": "audio/narration/{part}/{language}/manifest.json"
@@ -124,36 +126,38 @@ walking up from the folder it is started in.
 
 ### The top level
 
-| Field                                               | What it is                                                                                   | Default            |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------ |
-| `$schema`                                           | The JSON Schema of this file, so an editor completes fields and flags mistakes.              | none               |
-| `version`                                           | The format's version. This document describes `2`. The studio refuses any other, or none.    | required           |
-| `name`                                              | The game's name, shown in the studio.                                                        | required           |
-| `description`                                       | What the game is, in a sentence or two. Shown on Setup.                                      | `""`               |
-| `env`                                               | The file holding the API keys (`FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`). Never committed. | `".env"`           |
-| `studio`                                            | The studio folder, relative to the root.                                                     | `"content-studio"` |
-| `partLabel`                                         | What the game calls a part, in the studio's words ("Act", "Chapter").                        | `"Part"`           |
-| `parts`                                             | The parts in play order: `{ id, title }` each. The id is letters, digits, `-` and `_`.       | required           |
-| `languages`                                         | The languages the game is narrated in. The first is the source language.                     | `["en"]`           |
-| `refresh`                                           | The game's commands that write its lists (below).                                            | none               |
-| `narration`, `music`, `images`, `effects`, `scenes` | The sections, one per kind of content. Each is optional.                                     | none               |
+| Field                                  | What it is                                                                                   | Default            |
+| -------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------ |
+| `$schema`                              | The JSON Schema of this file, so an editor completes fields and flags mistakes.              | none               |
+| `version`                              | The format's version. This document describes `2`. The studio refuses any other, or none.    | required           |
+| `name`                                 | The game's name, shown in the studio.                                                        | required           |
+| `description`                          | What the game is, in a sentence or two. Shown on Setup.                                      | `""`               |
+| `env`                                  | The file holding the API keys (`FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`). Never committed. | `".env"`           |
+| `studio`                               | The studio folder, relative to the root.                                                     | `"content-studio"` |
+| `partLabel`                            | What the game calls a part, in the studio's words ("Act", "Chapter").                        | `"Part"`           |
+| `parts`                                | The parts in play order: `{ id, title }` each. The id is letters, digits, `-` and `_`.       | required           |
+| `languages`                            | The languages the game is narrated in. The first is the source language.                     | `["en"]`           |
+| `refresh`                              | The game's commands that write its lists (below).                                            | none               |
+| `narration`                            | Narration: the dialog and its voices (below).                                                | required           |
+| `music`, `images`, `effects`, `scenes` | The other sections, one per kind of content. Each is optional.                               | none               |
 
-`refresh.part` writes one part's lists; `{part}` in it is replaced by the part's id. `refresh.shared`
-writes the lists that belong to no part. The studio runs one of them, in the project root, only
+`refresh.part` writes one part's lists, of every kind; `{part}` in it is replaced by the part's id.
+`refresh.shared` writes every list that belongs to no part: the stingers and the sound effects
+alike, so a game with two extractors for them runs both in this one command. The studio runs one of them, in the project root, only
 when you press **Refresh** on a page that shows a list it writes, and never otherwise.
 
 ### The sections
 
 Every section has the same skeleton. A field a kind of content has no use for is simply absent.
 
-| Field              | What it is                                                                                                                            |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `from`             | The game's lists: `part`, a path with `{part}` for a list per part; `shared`, a path for one list for the whole game. Either or both. |
-| `models` / `model` | The models takes are made with. Narration has a model per provider and stage; the other kinds have one.                               |
-| `output`           | What the made file must be: format, loudness, size.                                                                                   |
-| `generate`         | How takes are made and checked.                                                                                                       |
-| `clips`            | The folder the chosen takes are written to, for the game to play.                                                                     |
-| `manifest`         | The manifest in that folder, which the game reads.                                                                                    |
+| Field              | What it is                                                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `from`             | The game's lists: `part`, a path with `{part}` for a list per part; `shared`, a path for one list for the whole game. At least one. |
+| `models` / `model` | The models takes are made with. Narration has a model per provider and stage; the other kinds have one.                             |
+| `output`           | What the made file must be: format, loudness, size.                                                                                 |
+| `generate`         | How takes are made and checked.                                                                                                     |
+| `clips`            | The folder the chosen takes are written to, for the game to play.                                                                   |
+| `manifest`         | The manifest in that folder, which the game reads.                                                                                  |
 
 Paths are relative to the project root and may not leave it. A path that differs per part contains
 `{part}`; with more than one language, every narration path contains `{language}`. Music, images,
@@ -161,29 +165,30 @@ effects and scenes are the same in every language, so their paths never do.
 
 ### `narration`
 
-| Field                                            | What it is                                                                                                                                                                                            | Default                                |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `from.part`                                      | Each part's dialog, per language.                                                                                                                                                                     | required                               |
-| `models.fish.audition` / `draft` / `final`       | The Fish model of each stage. Any whose price the studio knows.                                                                                                                                       | `s2.1-pro-free`                        |
-| `models.elevenlabs.audition` / `draft` / `final` | The ElevenLabs model of each stage, for characters cast with an ElevenLabs voice.                                                                                                                     | `eleven_v3`                            |
-| `output.codec`                                   | `mp3`.                                                                                                                                                                                                | `mp3`                                  |
-| `output.bitrate`                                 | The MP3 bitrate.                                                                                                                                                                                      | `64k`                                  |
-| `output.channels`                                | `1` or `2`.                                                                                                                                                                                           | `1`                                    |
-| `output.lufs`                                    | The loudness each clip is levelled to, in integrated LUFS; `null` leaves it as made.                                                                                                                  | `null`                                 |
-| `generate.fish`                                  | Fish's voice settings: `temperature` and `topP` (0 to 1), `speed` (0.5 to 2).                                                                                                                         | 0.7, 0.7, 1                            |
-| `generate.elevenlabs`                            | ElevenLabs' voice settings: `stability` (0, 0.5 or 1), `similarityBoost` and `style` (0 to 1).                                                                                                        | 0.5, 0.75, 0                           |
-| `generate.minHeard`                              | The share of a line's words Whisper must hear for a take to pass.                                                                                                                                     | `0.9`                                  |
-| `generate.takes`                                 | How many takes of a line are tried before the best is kept.                                                                                                                                           | `3`                                    |
-| `generate.chunkLimit`                            | The longest piece sent in one request, in characters; 100 or more.                                                                                                                                    | `400`                                  |
-| `generate.parallel`                              | How many requests run at once.                                                                                                                                                                        | `4`                                    |
-| `generate.transcriber`                           | `mlx-whisper` checks each take; `none` makes one unchecked take.                                                                                                                                      | `mlx-whisper`                          |
-| `generate.whisperModel`                          | The Whisper model.                                                                                                                                                                                    | `mlx-community/whisper-large-v3-turbo` |
-| `generate.soundAlike`                            | The game's own words that sound the same, by language: groups of two or more words or phrases. Whisper writing one for another still counts as heard. Saved from the Words that sound the same panel. | `{}`                                   |
-| `generate.sceneCueSpeakers`                      | The speakers whose lines follow their scene's cue.                                                                                                                                                    | `["narrator"]`                         |
-| `audition.phrase`                                | The standard audition phrase, by language. A language without one borrows a character's longest line. Each must fit in one piece (`chunkLimit`).                                                      | the English phrase above               |
-| `audition.candidatesPerRound`                    | How many voices an audition round brings in.                                                                                                                                                          | `5`                                    |
-| `clips`                                          | The folder of a part's clips, per language.                                                                                                                                                           | required                               |
-| `manifest`                                       | That folder's manifest.                                                                                                                                                                               | required                               |
+| Field                                            | What it is                                                                                                                                                                                            | Default                                   |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `from.part`                                      | Each part's dialog, per language.                                                                                                                                                                     | required                                  |
+| `models.fish.audition` / `draft` / `final`       | The Fish model of each stage. Any whose price the studio knows.                                                                                                                                       | `s2.1-pro-free`                           |
+| `models.elevenlabs.audition` / `draft` / `final` | The ElevenLabs model of each stage, for characters cast with an ElevenLabs voice.                                                                                                                     | `eleven_v3`                               |
+| `output.codec`                                   | `mp3`.                                                                                                                                                                                                | `mp3`                                     |
+| `output.bitrate`                                 | The MP3 bitrate.                                                                                                                                                                                      | `64k`                                     |
+| `output.channels`                                | `1` or `2`.                                                                                                                                                                                           | `1`                                       |
+| `output.lufs`                                    | The loudness each clip is levelled to, in integrated LUFS; `null` leaves it as made.                                                                                                                  | `null`                                    |
+| `generate.fish`                                  | Fish's voice settings: `temperature` and `topP` (0 to 1), `speed` (more than 0).                                                                                                                      | 0.7, 0.7, 1                               |
+| `generate.elevenlabs`                            | ElevenLabs' voice settings: `stability` (0, 0.5 or 1), `similarityBoost` and `style` (0 to 1).                                                                                                        | 0.5, 0.75, 0                              |
+| `generate.minHeard`                              | The share of a line's words Whisper must hear for a take to pass.                                                                                                                                     | `0.9`                                     |
+| `generate.takes`                                 | How many takes of a line are tried before the best is kept.                                                                                                                                           | `3`                                       |
+| `generate.chunkLimit`                            | The longest piece sent in one request, in characters; 100 or more.                                                                                                                                    | `400`                                     |
+| `generate.parallel`                              | How many requests run at once.                                                                                                                                                                        | `4`                                       |
+| `generate.transcriber`                           | `mlx-whisper` checks each take; `none` makes one unchecked take.                                                                                                                                      | `mlx-whisper`                             |
+| `generate.whisperModel`                          | The Whisper model.                                                                                                                                                                                    | `mlx-community/whisper-large-v3-turbo`    |
+| `generate.soundAlike`                            | The game's own words that sound the same, by language: groups of two or more words or phrases. Whisper writing one for another still counts as heard. Saved from the Words that sound the same panel. | `{}`                                      |
+| `generate.sceneCueSpeakers`                      | The speakers whose lines follow their scene's cue.                                                                                                                                                    | `["narrator"]`                            |
+| `audition.phrase`                                | The standard audition phrase, by language. A language without one borrows a character's longest line. Each must fit in one piece (`chunkLimit`).                                                      | the phrase above, for the source language |
+| `audition.searchLanguage`                        | The language the voice library is searched in for the source language's voices.                                                                                                                       | `en`                                      |
+| `audition.candidatesPerRound`                    | How many voices an audition round brings in.                                                                                                                                                          | `5`                                       |
+| `clips`                                          | The folder of a part's clips, per language.                                                                                                                                                           | required                                  |
+| `manifest`                                       | That folder's manifest.                                                                                                                                                                               | required                                  |
 
 ### `music`
 
@@ -214,12 +219,12 @@ The look every image shares is the studio's own, in the images edits (below).
 
 ### `scenes`
 
-| Field              | What it is                                                                                       | Default  |
-| ------------------ | ------------------------------------------------------------------------------------------------ | -------- |
-| `from.part`        | Each part's scenes, with their states and triggers.                                              | required |
-| `output.lufs`      | The loudness a scene should sit at, in integrated LUFS. Without it nothing is flagged.           | none     |
-| `output.tolerance` | How far a scene may be off it, in dB.                                                            | none     |
-| `mix`              | Each part's mix: what plays in each scene and how loud. Written by the studio, read by the game. | required |
+| Field              | What it is                                                                                                                   | Default  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `from.part`        | Each part's scenes, with their states and triggers.                                                                          | required |
+| `output.lufs`      | The loudness a scene should sit at, in integrated LUFS. Given with `tolerance`, or neither; without them nothing is flagged. | none     |
+| `output.tolerance` | How far a scene may be off it, in dB (0 or more).                                                                            | none     |
+| `mix`              | Each part's mix: what plays in each scene and how loud. Written by the studio, read by the game.                             | required |
 
 ## The game's lists
 
@@ -239,7 +244,7 @@ none; a list that is missing means the game has not written it yet.
 ```json
 [
   {
-    "id": "a1-001",
+    "id": "a1",
     "speaker": "narrator",
     "text": "The lantern still burns.",
     "scene": "lantern-hall"
@@ -247,7 +252,9 @@ none; a list that is missing means the game has not written it yet.
 ]
 ```
 
-`speaker` names the character as the cast does. `scene` is the scene the line belongs to, if any.
+`speaker` names the character as the cast does. `scene` is the name of the scene the line belongs
+to, if any, as the dialog gives it; the scenes' cues are kept under that name, and it need not be a
+declared scene's id.
 Between languages, lines are matched by `id`.
 
 **A track** (`music.from.part`, `music.from.shared`):
@@ -347,9 +354,11 @@ content-studio/
 ```
 
 A file of a language besides the source has the language's code before `.edits` or `.lock`; the
-source language's has none, so adding a language never renames a file. There is one lock beside
+source language's has none, even in a game with one language, so adding a language never renames
+a file. There is one lock beside
 each manifest or mix the game reads: per part (and language) for narration and scenes, one for the
-whole game for music, images and effects.
+whole game for music, images and effects, whose clips share one folder (and an image or track may be
+listed by several parts).
 
 ### Edits
 
@@ -366,12 +375,12 @@ it was written over:
 When the game's words change, `gameWas` no longer matches, and the studio shows both so you can
 keep yours or take the game's. Every kind's rewording has this shape.
 
-**`narration/cast.json`**: every character, keyed by the name the dialog's `speaker` uses, and how
+**`narration/cast.json`**: every speaker, keyed by the name the dialog's `speaker` uses, and how
 words are said.
 
 ```json
 {
-  "characters": {
+  "speakers": {
     "narrator": {
       "voice": "7d805071401d4b738334f332a8c320c2",
       "voiceName": "Old man bible storytelling",
@@ -405,6 +414,11 @@ words are said.
 | `languages`         | The casting in a language besides the source: `voice`, `voiceName`, `speed`, `phrase`. |
 | `pronounce`         | By language: written words → how they are spoken, applied in the order listed.         |
 
+A speaker's casting in the source language is its own fields, and its casting in another language
+is under `languages`, so a game with one language never sees language codes there. The tables
+that belong to the whole project (`pronounce` here, `soundAlike` and `audition.phrase` in the
+project file) are keyed by language, the source included.
+
 A character is the same in every part. To give one a different voice in a part, the game names the
 speaker differently (`narrator-act2`).
 
@@ -413,8 +427,8 @@ speaker differently (`narrator-act2`).
 ```json
 {
   "cues": {
-    "a1-001": "[hushed, the words almost breathed]",
-    "a1-007": "[ashamed] I did it. [resolute] I will fix it."
+    "a1": "[hushed, the words almost breathed]",
+    "a4": "[ashamed] I did it. [resolute] I will fix it."
   },
   "scenes": {
     "lantern-hall": "[slow, like opening an old storybook]"
@@ -466,16 +480,16 @@ and `key` (`null` for none).
 }
 ```
 
-| Field                         | What it is                                                                                                 |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `style.look`                  | What every image looks like.                                                                               |
-| `style.keepOut`               | What no image may hold.                                                                                    |
-| `style.palette`               | The only colours a picture may use, as `#rrggbb`; empty for any.                                           |
-| `style.colourDepth`           | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                    |
-| `style.dithering`             | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.               |
-| `style.parts`                 | A part's addition to the look, by part id.                                                                 |
-| `images.<id>.text`, `gameWas` | A rewording.                                                                                               |
-| `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none. Absent: the first part that lists it. |
+| Field                         | What it is                                                                                                      | Default                      |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `style.look`                  | What every image looks like.                                                                                    | required                     |
+| `style.keepOut`               | What no image may hold.                                                                                         | `""`                         |
+| `style.palette`               | The only colours a picture may use, as `#rrggbb`.                                                               | `[]`: any                    |
+| `style.colourDepth`           | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                         | `full`                       |
+| `style.dithering`             | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.                    | `patterned`                  |
+| `style.parts`                 | A part's addition to the look, by part id.                                                                      | `{}`                         |
+| `images.<id>.text`, `gameWas` | A rewording.                                                                                                    | none                         |
+| `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`). | the first part that lists it |
 
 **`effects/edits.json`**: the studio's changes to effects, by effect id: a rewording.
 
@@ -489,28 +503,15 @@ What each chosen take was made from, so the studio can say when an item has chan
 lock is an object keyed by item id, written one entry per line in id order, so choosing a take is a
 one-line change in a diff:
 
+<!-- prettier-ignore -->
 ```json
 {
-  "rain": {
-    "fp": "8c67d33efba8d9af",
-    "model": "small-sfx",
-    "seed": 29507973,
-    "take": 2,
-    "inputs": { "text": "Steady rain on a tin roof", "seconds": 8, "loops": true },
-    "at": "2026-11-04T09:56:41.790Z"
-  },
-  "wind-howl": {
-    "fp": "b6b1e1b80690ed14",
-    "model": "small-sfx",
-    "seed": 2067760593,
-    "take": 1,
-    "inputs": { "text": "Wind howls through a stone gap", "seconds": 10 },
-    "at": "2026-11-04T10:05:31.480Z"
-  }
+ "rain": {"fp":"8c67d33efba8d9af","model":"small-sfx","seed":29507973,"take":2,"inputs":{"text":"Steady rain on a tin roof","seconds":8,"loops":true},"at":"2026-11-04T09:56:41.790Z"},
+ "wind-howl": {"fp":"b6b1e1b80690ed14","model":"small-sfx","seed":2067760593,"take":1,"inputs":{"text":"Wind howls through a stone gap","seconds":10},"at":"2026-11-04T10:05:31.480Z"}
 }
 ```
 
-Every entry has the same fields:
+The locks of music, images and effects share these fields:
 
 | Field    | What it is                                                                                       |
 | -------- | ------------------------------------------------------------------------------------------------ |
@@ -523,25 +524,33 @@ Every entry has the same fields:
 
 What `inputs` holds is each kind's own:
 
-- **Music**: `text`, `kind` (`loop` or `stinger`), `seconds`, `bpm`, `key`.
-- **Images**: `text`, `width`, `height`, `style` (`{ look, keepOut, part }`, the words the take was
-  made with) and `look` (`{ palette, colourDepth, dithering }`, what the picture was brought to).
+- **Music**: `text`, `kind` (`loop` or `stinger`), `seconds`, `bpm`, `key`. A music entry also
+  records `list`: the part whose list the track came from, or `shared` for a stinger.
+- **Images**: `text`, `width`, `height`, `style` (`{ look, keepOut, part }`: the words the take was
+  made with, `part` being the part's addition as written) and `look` (`{ palette, colourDepth,
+dithering }`, what the picture was brought to).
 - **Effects**: `text`, `seconds`, `loops`.
-- **Narration** keeps short hashes, not the words, which would copy the whole script into the lock:
-  `hashes: { cue, text, said, settings }` in place of `inputs`, with the `voice`. It also records
-  `heard` (the share of the words Whisper heard), `takes` (how many were tried), `accepted` (true
-  when a weak clip was accepted as it is) and `adopted` (true for a clip made before the studio).
-- **Scenes** record the loudness each scene was measured at: `measuredAt`, the mix `entry`
-  measured, the `clips` each sound came from, `states` (`{ state, lufs }` each), what was left
-  `without`, an `error` when it could not be measured, and `moved` after a suggested change; under
-  `saved` for the mix as saved and `draft` for unsaved changes.
+
+Two locks record something else, in the same layout:
+
+- **Narration** keeps short hashes, not the words, which would copy the whole script into the lock.
+  An entry is `fp`, `model`, `voice`, `hashes: { cue, text, said, settings }` and `at`, with `heard`
+  (the share of the words Whisper heard), `takes` (how many were tried), `accepted` (true when a
+  weak clip was accepted as it is) and `adopted` (true for a clip made before the studio). A line
+  has one clip, so it has no `take` or `seed`.
+- **Scenes** record the loudness each scene was measured at, not a take: under `saved` for the mix
+  as saved and `draft` for unsaved changes, each with `measuredAt`, the mix `entry` measured, the
+  `clips` each sound came from, `states` (`{ state, lufs }` each), what was left `without`, an
+  `error` when it could not be measured, and `moved` after a suggested change.
 
 ### The cache
 
 `cache/` holds the studio's working state on this machine: audition takes and sessions in progress,
 the voices ruled out, every take not chosen, notes on lines, what Whisper heard, and your own
 settings (`cache/settings.json`: how much you have paid Fish, which sets how many requests it takes
-at once, and how long takes fade when played in the studio). None of it is the game's. Deleting the
+at once, and how long takes fade when played in the studio). None of it is the game's. The cache
+keeps no copy of the image style: the style is the studio's own, so there is no game style to
+compare it with. Deleting the
 cache loses unfinished work and these settings, never what the game plays. Its layout is the
 studio's own and may change.
 
