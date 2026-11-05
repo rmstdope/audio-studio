@@ -15,7 +15,7 @@ function tag(text: string): string {
 
 /**
  * Where a take's game's version is, or null while it has none to show (being brought to the look,
- * never brought to it, or the style file cannot be used). The look and the count of saved choices
+ * never brought to it, or the style cannot be used). The look and the count of saved choices
  * are in the address: the picture at it changes with them, and a browser keeps what it loaded at an
  * address. `current` is the picture the game has now, for the chosen take.
  */
@@ -44,7 +44,7 @@ export function modelSource(id: string, take: ImageTakeView): string {
  * the game's size, with crisp pixels. `current` shows the picture the game has now instead of the
  * take's own game version (the chosen take, whose version the game may still have under an old
  * look). In place of the game's version it says so while the take is being brought to the look, and
- * says what to fix when the style file cannot be used. While the choice of the take shown as
+ * says what to fix when the style cannot be used. While the choice of the take shown as
  * `current` is still being saved the game has no such picture yet, so none is asked for. The game's
  * version is captioned and shaped by its own size once it loads, which is the old one for a picture
  * brought to the look before the image's size changed; it is drawn as wide as the image would be,

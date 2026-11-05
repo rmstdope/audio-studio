@@ -135,7 +135,7 @@ export interface ImageTakesView {
   failed: ImageFailedView[]
   /** The lock cannot be read, so which take is chosen is not known. */
   lockUnread: boolean
-  /** Why the takes cannot be brought to the game's look (the style file); null when they can. */
+  /** Why the takes cannot be brought to the game's look (the style); null when they can. */
   lookError: string | null
 }
 

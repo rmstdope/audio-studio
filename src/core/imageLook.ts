@@ -24,7 +24,7 @@ export function parseColour(hex: string): Rgb {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
-/** The look a style file asks for: a listed palette wins, then the colour depth, else full colour. */
+/** The look a style asks for: a listed palette wins, then the colour depth, else full colour. */
 export function lookOf(style: Pick<ImageStyle, 'palette' | 'colourDepth' | 'dithering'>): Look {
   const dithering = style.dithering ?? 'patterned'
   if (style.palette.length) {

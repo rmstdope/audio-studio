@@ -445,7 +445,7 @@ describe('the game’s look in the rows', () => {
     expect(looksOld).toBe(false)
     expect(images.lookNotice).toBeNull()
   })
-  it('is full colour when the game has no style file', () => {
+  it('is full colour when there is no style', () => {
     const { look } = summarizeImages(input({ style: null, look: undefined })).images.acts[0]!
       .rows[0]!
     expect(look.line).toBe('320 × 200 · full colour')
