@@ -29,6 +29,8 @@ const row = (over: Partial<TrackRow> = {}): TrackRow => ({
   bpm: null,
   key: null,
   game: { brief: 'A brief', seconds: 30, bpm: null, key: null },
+  gameChanged: false,
+  gameWas: null,
   status: 'chosen',
   changed: [],
   chosenAt: '2026-10-01T10:00:00.000Z',

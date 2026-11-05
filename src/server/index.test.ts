@@ -3255,6 +3255,33 @@ describe('server, the music pages', () => {
       const stingers = body.summary.music.lists.find((l: { id: string }) => l.id === 'stingers')
       expect(stingers.tracks[0]).toMatchObject({ brief: 'ours', game: { brief: 'fanfare' } })
     })
+
+    it('keeps the studio’s brief over the game’s new one, from the studio’s own page only', async () => {
+      const keep = (id: string, origin = studio.url.origin) =>
+        fetch(new URL(`/api/music/tracks/${id}/keep-mine`, studio.url), {
+          method: 'POST',
+          headers: { origin },
+        })
+      const stingers = async () => {
+        const body = await (await fetch(new URL('/api/project', studio.url))).json()
+        return body.summary.music.lists.find((l: { id: string }) => l.id === 'stingers')
+      }
+      writeFileSync(
+        join(musicRoot, 'content-studio/music/edits.json'),
+        JSON.stringify({ victory: { text: 'ours', gameWas: 'older' } }),
+      )
+      expect((await stingers()).tracks[0]).toMatchObject({ gameChanged: true, gameWas: 'older' })
+      expect((await keep('victory', 'https://evil.example')).status).toBe(403)
+      expect((await keep('nobody')).status).toBe(404)
+      const answer = await keep('victory')
+      expect(answer.status).toBe(200)
+      expect(await answer.json()).toEqual({ ok: true })
+      expect((await stingers()).tracks[0]).toMatchObject({
+        brief: 'ours',
+        gameChanged: false,
+        gameWas: 'fanfare',
+      })
+    })
   })
 
   it('refuses with a reason when the project has no shared command', async () => {

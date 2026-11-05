@@ -3,6 +3,8 @@ import {
   BriefsSchema,
   MAX_STINGER_SECONDS,
   applyBriefChange,
+  formatBriefs,
+  keepMineBrief,
   staleIds,
   trackFor,
   type BriefChange,
@@ -13,7 +15,7 @@ import {
 } from '../core/music'
 import { MUSIC_EDITS_FILE, type MusicConfig, type Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
-import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
+import { listFiles, readResource, writeAtomic } from './files'
 import { readChosen } from './musicClips'
 import { readMusic } from './musicLists'
 import { boardQueue, deleteBoard, MUSIC_BOARD_DIR } from './musicTakes'
@@ -28,7 +30,7 @@ export type BriefChangeResult =
 const serial = createSerial()
 
 /**
- * Saves one field of a track's brief, length, tempo or key in `briefs.json` (the studio's changes
+ * Saves one field of a track's brief, length, tempo or key in the music edits (the studio's changes
  * over the game's values; the game's lists are never written). A value the game already has takes
  * the change back. A briefs file that cannot be read is reported and left as it is.
  */
@@ -72,8 +74,31 @@ async function save(
   )
   const stale = new Set(await dropStale(projectFile, root, project.music, summary!, changed))
   const next = Object.fromEntries(Object.entries(changed).filter(([key]) => !stale.has(key)))
-  await writeAtomic(root, file, formatEntriesPerLine(next))
+  await writeAtomic(root, file, formatBriefs(next))
   return { ok: true }
+}
+
+/**
+ * "Keep mine" on a track whose brief the game changed: the studio's brief stays, now over the
+ * game's brief as it is. Nothing is written for a track whose brief is the game's; null for a track
+ * the project does not list. An edits file that cannot be read is reported and left as it is.
+ */
+export function keepMyBrief(projectFile: string, id: string): Promise<BriefChangeResult> {
+  return serial.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const root = dirname(projectFile)
+    const summary = await readMusic(root, opened.project, [])
+    const found = trackFor(summary?.lists ?? [], id)
+    if (!found) return null
+    const problems: Problem[] = []
+    const briefs = await readResource(root, MUSIC_EDITS_FILE, BriefsSchema, problems)
+    if (briefs === 'invalid') return { ok: false, problems }
+    if (briefs === 'missing') return { ok: true }
+    const next = keepMineBrief(briefs, id, found.track.game.brief)
+    if (next !== briefs) await writeAtomic(root, MUSIC_EDITS_FILE, formatBriefs(next))
+    return { ok: true }
+  })
 }
 
 /**
@@ -118,7 +143,7 @@ export function forgetBriefs(
     if (briefs === 'invalid') return { ok: false, problems }
     if (briefs !== 'missing' && ids.some((id) => id in briefs)) {
       const next = Object.fromEntries(Object.entries(briefs).filter(([key]) => !ids.includes(key)))
-      await writeAtomic(root, file, formatEntriesPerLine(next))
+      await writeAtomic(root, file, formatBriefs(next))
     }
     return { ok: true }
   })

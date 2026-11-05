@@ -62,7 +62,7 @@ import { appendMusic, createSpendLog, readSpending } from '../services/spending'
 import { outcomeOf, summariseSpending } from '../core/spending'
 import { moveCue, moveSceneCue, setCue, setInsideCue, setSceneCue } from '../services/cues'
 import { gitChanges } from '../services/git'
-import { setTrackBrief } from '../services/briefs'
+import { keepMyBrief, setTrackBrief } from '../services/briefs'
 import {
   markStyleSeen,
   resolveImageCompare,
@@ -1921,6 +1921,13 @@ export function startServer({
             )
           }
           const result = await setTrackBrief(projectFile, request.params.id, body.data)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/keep-mine': {
+        POST: fromOwnPage(async (request) => {
+          const result = await keepMyBrief(projectFile, request.params.id)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

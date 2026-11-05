@@ -817,7 +817,7 @@ describe('loadProject with a music section', () => {
       'tts/act1/music.json': [loop('a'), loop('b')],
       'tts/act2/music.json': [],
       'tts/stingers.json': [loop('victory', { seconds: 5 })],
-      'content-studio/music/edits.json': { a: { brief: 'ours' } },
+      'content-studio/music/edits.json': { a: { text: 'ours', gameWas: 'a brief' } },
     })
     const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')

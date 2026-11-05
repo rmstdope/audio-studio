@@ -27,6 +27,8 @@ const track: TrackRow = {
   bpm: null,
   key: null,
   game: { brief: 'fanfare', seconds: 6, bpm: null, key: null },
+  gameChanged: false,
+  gameWas: null,
   status: 'chosen',
   changed: [],
   chosenAt: '2026-01-01T00:00:00.000Z',

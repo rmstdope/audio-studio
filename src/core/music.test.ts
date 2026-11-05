@@ -5,6 +5,8 @@ import {
   LoopListSchema,
   applyBriefChange,
   fieldSource,
+  formatBriefs,
+  keepMineBrief,
   parseClock,
   StingerListSchema,
   loopsDiff,
@@ -89,9 +91,36 @@ describe('the track schemas', () => {
     expect(problemsFrom('f.json', long.error).map((p) => p.path)).toEqual(['[0].seconds'])
   })
 
-  it('reads briefs, null meaning none of tempo or key', () => {
-    const briefs = BriefsSchema.parse({ a: { brief: 'new', bpm: null, key: null }, b: {} })
-    expect(briefs.a).toEqual({ brief: 'new', bpm: null, key: null })
+  it('reads the edits, the text as the brief, null meaning none of tempo or key', () => {
+    const briefs = BriefsSchema.parse({
+      a: { text: 'new', gameWas: 'old', bpm: null, key: null },
+      b: {},
+    })
+    expect(briefs.a).toEqual({ brief: 'new', gameWas: 'old', bpm: null, key: null })
+  })
+
+  it('refuses a text without the game’s words it was written over, and those alone', () => {
+    const parsed = BriefsSchema.safeParse({ a: { text: 'new' }, b: { gameWas: 'old' } })
+    if (parsed.success) throw new Error('expected a problem')
+    expect(problemsFrom('f.json', parsed.error).map((p) => p.path)).toEqual(['a.gameWas', 'b.text'])
+  })
+})
+
+describe('formatBriefs', () => {
+  it('writes the edits one track per line, the brief as text before the game’s words', () => {
+    expect(
+      formatBriefs({
+        a: { brief: 'ours', gameWas: 'theirs', seconds: 60, bpm: null },
+        b: { key: 'C major' },
+      }),
+    ).toBe(
+      '{\n "a": {"text":"ours","gameWas":"theirs","seconds":60,"bpm":null},\n "b": {"key":"C major"}\n}\n',
+    )
+  })
+
+  it('reads back what it writes', () => {
+    const briefs = { a: { brief: 'ours', gameWas: 'theirs', key: null } }
+    expect(BriefsSchema.parse(JSON.parse(formatBriefs(briefs)))).toEqual(briefs)
   })
 })
 
@@ -354,7 +383,7 @@ describe('applyBriefChange', () => {
   it('records a change, in id order', () => {
     const next = applyBriefChange({ z: { seconds: 5 } }, 'a', 'brief', 'ours', game)
     expect(Object.keys(next)).toEqual(['a', 'z'])
-    expect(next.a).toEqual({ brief: 'ours' })
+    expect(next.a).toEqual({ brief: 'ours', gameWas: 'g' })
   })
 
   it('drops a field typed back to the game’s, and the entry once empty', () => {
@@ -366,7 +395,13 @@ describe('applyBriefChange', () => {
       game,
     )
     expect(next).toEqual({ b: { seconds: 5 } })
-    const kept = applyBriefChange({ a: { brief: 'ours', seconds: 5 } }, 'a', 'brief', 'g', game)
+    const kept = applyBriefChange(
+      { a: { brief: 'ours', gameWas: 'g', seconds: 5 } },
+      'a',
+      'brief',
+      'g',
+      game,
+    )
     expect(kept).toEqual({ a: { seconds: 5 } })
   })
 
@@ -379,17 +414,60 @@ describe('applyBriefChange', () => {
 
   it('keeps the fields of an entry in one order, whichever was set first', () => {
     const a = applyBriefChange({ a: { seconds: 60 } }, 'a', 'brief', 'x', game)
-    const b = applyBriefChange({ a: { brief: 'x' } }, 'a', 'seconds', 60, game)
-    expect(JSON.stringify(a)).toBe('{"a":{"brief":"x","seconds":60}}')
+    const b = applyBriefChange({ a: { brief: 'x', gameWas: 'g' } }, 'a', 'seconds', 60, game)
+    expect(JSON.stringify(a)).toBe('{"a":{"brief":"x","gameWas":"g","seconds":60}}')
     expect(JSON.stringify(b)).toBe(JSON.stringify(a))
     const c = applyBriefChange({ a: { key: 'C', bpm: 90 } }, 'a', 'brief', 'x', game)
-    expect(Object.keys(c.a!)).toEqual(['brief', 'bpm', 'key'])
+    expect(Object.keys(c.a!)).toEqual(['brief', 'gameWas', 'bpm', 'key'])
+  })
+
+  it('keeps with a rewording the game’s brief it is written over, as the game says it now', () => {
+    const next = applyBriefChange(
+      { a: { brief: 'mine', gameWas: 'older' } },
+      'a',
+      'brief',
+      'x',
+      game,
+    )
+    expect(next.a).toEqual({ brief: 'x', gameWas: 'g' })
   })
 
   it('does not change the briefs it was given', () => {
     const before = { a: { brief: 'ours' } }
     applyBriefChange(before, 'a', 'brief', 'g', game)
     expect(before).toEqual({ a: { brief: 'ours' } })
+  })
+})
+
+describe('the game’s brief changed under the studio’s', () => {
+  const row = (briefs: Parameters<typeof summarizeMusic>[1]) =>
+    summarizeMusic([list('act1', [track('a')])], briefs).music.lists[0]!.tracks[0]!
+
+  it('is not so while the studio’s brief was written over what the game says now', () => {
+    expect(row({ a: { brief: 'ours', gameWas: 'a brief' } })).toMatchObject({
+      brief: 'ours',
+      gameChanged: false,
+      gameWas: 'a brief',
+    })
+    expect(row({})).toMatchObject({ gameChanged: false, gameWas: null })
+  })
+
+  it('is so once the game words it otherwise, the studio’s brief still in force', () => {
+    expect(row({ a: { brief: 'ours', gameWas: 'old words' } })).toMatchObject({
+      brief: 'ours',
+      gameChanged: true,
+      gameWas: 'old words',
+      game: { brief: 'a brief' },
+    })
+  })
+
+  it('is settled by Keep mine: the studio’s brief over what the game says now', () => {
+    const briefs = { a: { brief: 'ours', gameWas: 'old words', seconds: 60 }, b: { seconds: 5 } }
+    expect(keepMineBrief(briefs, 'a', 'a brief')).toEqual({
+      a: { brief: 'ours', gameWas: 'a brief', seconds: 60 },
+      b: { seconds: 5 },
+    })
+    expect(keepMineBrief(briefs, 'b', 'x')).toEqual(briefs)
   })
 })
 

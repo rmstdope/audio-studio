@@ -27,6 +27,8 @@ const row = (id: string, title: string, over: Partial<TrackRow> = {}): TrackRow 
   bpm: null,
   key: null,
   game: { brief: 'b', seconds: 60, bpm: null, key: null },
+  gameChanged: false,
+  gameWas: null,
   status: 'not-chosen',
   changed: [],
   chosenAt: null,

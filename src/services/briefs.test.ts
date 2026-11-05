@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { setTrackBrief } from './briefs'
+import { keepMyBrief, setTrackBrief } from './briefs'
 
 const music = {
   from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
@@ -28,11 +28,13 @@ function repo(extra: Record<string, unknown> = {}) {
 }
 
 describe('setTrackBrief', () => {
-  it('writes the change to briefs.json, one track to a line', async () => {
+  it('writes the change to the music edits, one track to a line, a brief as text over the game’s', async () => {
     const { file, briefs } = repo()
     expect(await setTrackBrief(file, 'lane', { brief: '  a walk  ' })).toEqual({ ok: true })
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
-    expect(briefs()).toBe('{\n "hall": {"bpm":70},\n "lane": {"brief":"a walk"}\n}\n')
+    expect(briefs()).toBe(
+      '{\n "hall": {"bpm":70},\n "lane": {"text":"a walk","gameWas":"recorder"}\n}\n',
+    )
   })
 
   it('takes a change back when the game’s value is typed again, leaving {} at the end', async () => {
@@ -48,7 +50,7 @@ describe('setTrackBrief', () => {
     expect(JSON.parse(briefs())).toEqual({ lane: { bpm: null, key: null } })
   })
 
-  it('writes briefs.json and nothing else', async () => {
+  it('writes the music edits and nothing else', async () => {
     const { root, file } = repo()
     const files = () =>
       readdirSync(root, { recursive: true, withFileTypes: true })
@@ -82,7 +84,7 @@ describe('setTrackBrief', () => {
     expect(await setTrackBrief(file, 'hall', { seconds: 600 })).toEqual({ ok: true })
   })
 
-  it('never writes over a briefs file it cannot read', async () => {
+  it('never writes over an edits file it cannot read', async () => {
     const { root, file } = repo({ 'content-studio/music/edits.json': '{ not json' })
     const result = await setTrackBrief(file, 'hall', { brief: 'ours' })
     expect(result).toMatchObject({
@@ -100,7 +102,7 @@ describe('setTrackBrief', () => {
       setTrackBrief(file, 'lane', { key: 'E minor' }),
     ])
     expect(JSON.parse(briefs())).toEqual({
-      hall: { brief: 'ours', seconds: 60 },
+      hall: { text: 'ours', gameWas: 'warm lute', seconds: 60 },
       lane: { key: 'E minor' },
     })
   })
@@ -110,6 +112,32 @@ describe('setTrackBrief', () => {
     expect(
       await setTrackBrief(join(root, 'content-studio.json'), 'hall', { brief: 'x' }),
     ).toBeNull()
+  })
+})
+
+describe('keepMyBrief', () => {
+  it('keeps the studio’s brief over the game’s brief as it is now', async () => {
+    const { file, briefs } = repo({
+      'content-studio/music/edits.json': { hall: { text: 'ours', gameWas: 'old lute', bpm: 70 } },
+    })
+    expect(await keepMyBrief(file, 'hall')).toEqual({ ok: true })
+    expect(briefs()).toBe('{\n "hall": {"text":"ours","gameWas":"warm lute","bpm":70}\n}\n')
+  })
+
+  it('writes nothing for a track whose brief is the game’s, and knows no unlisted track', async () => {
+    const { root, file } = repo()
+    expect(await keepMyBrief(file, 'hall')).toEqual({ ok: true })
+    expect(existsSync(join(root, 'content-studio/music/edits.json'))).toBe(false)
+    expect(await keepMyBrief(file, 'nobody')).toBeNull()
+  })
+
+  it('never writes over an edits file it cannot read', async () => {
+    const { file, briefs } = repo({ 'content-studio/music/edits.json': '{ not json' })
+    expect(await keepMyBrief(file, 'hall')).toMatchObject({
+      ok: false,
+      problems: [{ file: 'content-studio/music/edits.json' }],
+    })
+    expect(briefs()).toBe('{ not json')
   })
 })
 
