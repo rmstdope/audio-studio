@@ -168,6 +168,7 @@ describe('the fades editor', () => {
     })
     expect(e.closed).toEqual([])
     expect(e.container.textContent).toContain('The fades could not be saved. The disk is full.')
+    expect(e.container.textContent).not.toContain('still plays')
     expect(e.box('Fade in').value).toBe('0.3')
   })
 
@@ -209,6 +210,29 @@ describe('the fades editor', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
     })
     expect(e.container.textContent).toContain('The fades could not be saved. The disk is full.')
+    expect(e.container.textContent).not.toContain('still plays')
+  })
+
+  it('says only the reason when a remove fails on a take that is not chosen', async () => {
+    answer = Response.json({ ok: false, message: 'The disk is full.' }, { status: 409 })
+    const e = open({ fades: { in: 0.3, out: 0, shape: 'smooth' } })
+    await act(async () => e.button('Remove fades')!.click())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(e.container.textContent).toContain('The fades could not be removed. The disk is full.')
+    expect(e.container.textContent).not.toContain('still plays')
+  })
+
+  it('claims nothing about the game when the answer never came', async () => {
+    answer = Response.json({}, { status: 500 })
+    const e = open({ chosen: true }, true)
+    e.type(e.box('Fade in'), '0.3')
+    await act(async () => e.button('Save fades')!.click())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(e.container.textContent).toContain('The fades could not be saved.')
     expect(e.container.textContent).not.toContain('still plays')
   })
 

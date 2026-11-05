@@ -319,6 +319,7 @@ export function FadesEditor({
         <span className="adopt-error" role="alert">
           The fades could not be {removing ? 'removed' : 'saved'}. {failure}
           {chosen &&
+            !set.isError &&
             !gameChanged &&
             ` The game still plays Take ${take.n} ${removing ? 'with its fades' : 'as before'}.`}
         </span>
