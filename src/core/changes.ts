@@ -1,5 +1,12 @@
 import { posix } from 'node:path'
-import { CAST_FILE, narrationFile, partPathFor, type Project } from './project'
+import {
+  CAST_FILE,
+  MUSIC_EDITS_FILE,
+  MUSIC_LOCK_FILE,
+  narrationFile,
+  partPathFor,
+  type Project,
+} from './project'
 
 /** How git sees a changed file; a conflict is a merge left to resolve before committing. */
 export type ChangeKind = 'new' | 'modified' | 'deleted' | 'renamed' | 'conflict'
@@ -94,16 +101,20 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
     music: music
       ? {
           files: Object.fromEntries([
-            ...project.parts.map((part): [string, MusicFileRole] => [
-              normal(partPathFor(music.paths.loops, part.id)),
-              'list',
-            ]),
-            [normal(music.paths.stingers), 'list'],
-            [normal(music.paths.briefs), 'briefs'],
-            [normal(music.paths.lock), 'lock'],
-            [normal(music.paths.manifest), 'manifest'],
+            ...(music.from.part === undefined
+              ? []
+              : project.parts.map((part): [string, MusicFileRole] => [
+                  normal(partPathFor(music.from.part!, part.id)),
+                  'list',
+                ])),
+            ...(music.from.shared === undefined
+              ? []
+              : [[normal(music.from.shared), 'list'] as [string, MusicFileRole]]),
+            [MUSIC_EDITS_FILE, 'briefs'],
+            [MUSIC_LOCK_FILE, 'lock'],
+            [normal(music.manifest), 'manifest'],
           ]),
-          clips: `${normal(music.paths.clips)}/`,
+          clips: `${normal(music.clips)}/`,
         }
       : null,
     own: [normal(projectPath), CAST_FILE],

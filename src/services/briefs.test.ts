@@ -5,14 +5,9 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import { setTrackBrief } from './briefs'
 
 const music = {
-  paths: {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
-    clips: 'audio/music',
-    manifest: 'audio/music/manifest.json',
-  },
+  from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+  clips: 'audio/music',
+  manifest: 'audio/music/manifest.json',
 }
 const loops = [
   { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 80 },
@@ -28,7 +23,7 @@ function repo(extra: Record<string, unknown> = {}) {
     ...extra,
   })
   const file = join(root, 'content-studio.json')
-  const briefs = () => readFileSync(join(root, 'music/briefs.json'), 'utf8')
+  const briefs = () => readFileSync(join(root, 'content-studio/music/edits.json'), 'utf8')
   return { root, file, briefs }
 }
 
@@ -41,7 +36,7 @@ describe('setTrackBrief', () => {
   })
 
   it('takes a change back when the game’s value is typed again, leaving {} at the end', async () => {
-    const { file, briefs } = repo({ 'music/briefs.json': { hall: { seconds: 60 } } })
+    const { file, briefs } = repo({ 'content-studio/music/edits.json': { hall: { seconds: 60 } } })
     await setTrackBrief(file, 'hall', { seconds: 80 })
     expect(briefs()).toBe('{}\n')
   })
@@ -63,21 +58,21 @@ describe('setTrackBrief', () => {
     const before = files()
     const lists = readFileSync(join(root, 'tts/act1/music.json'), 'utf8')
     await setTrackBrief(file, 'hall', { brief: 'ours' })
-    expect(files()).toEqual([...before, join(root, 'music/briefs.json')].sort())
+    expect(files()).toEqual([...before, join(root, 'content-studio/music/edits.json')].sort())
     expect(readFileSync(join(root, 'tts/act1/music.json'), 'utf8')).toBe(lists)
   })
 
   it('knows no track that is not listed, and writes nothing for it', async () => {
     const { root, file } = repo()
     expect(await setTrackBrief(file, 'nobody', { brief: 'x' })).toBeNull()
-    expect(existsSync(join(root, 'music/briefs.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/music/edits.json'))).toBe(false)
   })
 
   it('refuses an empty brief', async () => {
     const { root, file } = repo()
     const result = await setTrackBrief(file, 'hall', { brief: '   ' })
     expect(result).toMatchObject({ ok: false })
-    expect(existsSync(join(root, 'music/briefs.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/music/edits.json'))).toBe(false)
   })
 
   it('refuses a stinger longer than ten seconds, and allows a loop that long', async () => {
@@ -88,10 +83,13 @@ describe('setTrackBrief', () => {
   })
 
   it('never writes over a briefs file it cannot read', async () => {
-    const { root, file } = repo({ 'music/briefs.json': '{ not json' })
+    const { root, file } = repo({ 'content-studio/music/edits.json': '{ not json' })
     const result = await setTrackBrief(file, 'hall', { brief: 'ours' })
-    expect(result).toMatchObject({ ok: false, problems: [{ file: 'music/briefs.json' }] })
-    expect(readFileSync(join(root, 'music/briefs.json'), 'utf8')).toBe('{ not json')
+    expect(result).toMatchObject({
+      ok: false,
+      problems: [{ file: 'content-studio/music/edits.json' }],
+    })
+    expect(readFileSync(join(root, 'content-studio/music/edits.json'), 'utf8')).toBe('{ not json')
   })
 
   it('keeps both of two fields saved at once', async () => {
@@ -118,11 +116,11 @@ describe('setTrackBrief', () => {
 describe('setTrackBrief and tracks the game dropped', () => {
   const stale = {
     'tts/act2/music.json': [],
-    'music/briefs.json': { gone: { bpm: 70 }, kept: { bpm: 80 } },
+    'content-studio/music/edits.json': { gone: { bpm: 70 }, kept: { bpm: 80 } },
     'content-studio/cache/music/gone.json': { next: 2, takes: [] },
     'content-studio/cache/music-takes/gone/0123456789abcdef.1.wav': 'wav',
     'content-studio/cache/music/lonely.json': { next: 2, takes: [] },
-    'music/music.lock.json': {
+    'content-studio/music/lock.json': {
       kept: {
         fp: 'f',
         model: 'm',
@@ -155,7 +153,7 @@ describe('setTrackBrief and tracks the game dropped', () => {
   })
 
   it('drops nothing when the lock cannot be read', async () => {
-    const { root, file, briefs } = repo({ ...stale, 'music/music.lock.json': '{ nope' })
+    const { root, file, briefs } = repo({ ...stale, 'content-studio/music/lock.json': '{ nope' })
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
     expect(JSON.parse(briefs())).toHaveProperty('gone')
     expect(existsSync(join(root, 'content-studio/cache/music/gone.json'))).toBe(true)

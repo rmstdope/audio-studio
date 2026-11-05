@@ -3173,14 +3173,9 @@ describe('server, the music pages', () => {
     'content-studio.json': projectJson({
       refresh: { shared: `mkdir -p tts && printf '%s' '${list}' > tts/stingers.json` },
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -3287,14 +3282,9 @@ describe('server, what music takes cost', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -3353,14 +3343,9 @@ describe('server, a track’s takes', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -3531,14 +3516,9 @@ describe('server, choosing a take', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -3671,14 +3651,9 @@ describe('server, playing what a track plays now', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -3691,7 +3666,7 @@ describe('server, playing what a track plays now', () => {
     ],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
-    'music/music.lock.json': { taken: lock },
+    'content-studio/music/lock.json': { taken: lock },
     'audio/music/manifest.json': { taken: { file: 'taken.mp3', duration: 5 } },
     'audio/music/taken.mp3': 'the take',
     'game/walk.mp3': 'the game file',
@@ -3737,21 +3712,16 @@ describe('server, removing music the game no longer asks for', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
-    'music/music.lock.json': {
+    'content-studio/music/lock.json': {
       'castle-gates': {
         fp: '0123456789abcdef',
         model: 'm',
@@ -3806,15 +3776,12 @@ describe('server, removing music the game no longer asks for', () => {
 
 describe('server, the music model', () => {
   const paths = {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
+    from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
     clips: 'audio/music',
     manifest: 'audio/music/manifest.json',
   }
   const root = tempRepo({
-    'content-studio.json': projectJson({ music: { paths } }),
+    'content-studio.json': projectJson({ music: paths }),
     'content-studio/narration/cast.json': { speakers: {} },
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
   })
@@ -3915,14 +3882,9 @@ describe('server, moving a take', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -5870,14 +5832,9 @@ describe('server, trimming a stinger take', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -5966,14 +5923,9 @@ describe('server, a stinger take’s fades', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },

@@ -14,14 +14,9 @@ import { mfluxReady } from './images'
 import { checkSetup, type Machine } from './setup'
 
 const musicSection = {
-  paths: {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
-    clips: 'web/public/audio/music/generated',
-    manifest: 'web/public/audio/music/generated/manifest.json',
-  },
+  from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+  clips: 'web/public/audio/music/generated',
+  manifest: 'web/public/audio/music/generated/manifest.json',
 }
 const credit = async (): Promise<CreditResult> => ({ ok: true, credit: 3 })
 const mac: Machine = { which: () => true, platform: 'darwin', arch: 'arm64' }

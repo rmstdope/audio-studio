@@ -207,21 +207,27 @@ const musicPath = z
 
 /** The optional `music` section: where the game lists its tracks and where their files go. */
 const MusicSchema = z.object({
+  /** The game's lists: each part's loops, and the stingers of the whole game. At least one. */
+  from: z
+    .object({
+      /** A part's loops, written by the game. */
+      part: musicPath
+        .refine((path) => path.includes('{part}'), {
+          error: 'must contain {part}, or every part would share one file',
+        })
+        .optional(),
+      /** The stingers of the whole game, written by the game. */
+      shared: musicPath.optional(),
+    })
+    .refine((from) => from.part !== undefined || from.shared !== undefined, {
+      error: 'name the loops (part), the stingers (shared) or both',
+    }),
   /** The music model new takes are made with unless a track asks for another; absent is Balanced. */
   model: z.enum(MUSIC_MODEL_IDS).optional(),
-  paths: z.object({
-    /** An act's loops, written by the game. */
-    loops: musicPath.refine((path) => path.includes('{part}'), {
-      error: 'must contain {part}, or every part would share one file',
-    }),
-    /** The stingers of the whole game, written by the game. */
-    stingers: musicPath,
-    /** The studio's changes to the game's briefs. */
-    briefs: musicPath,
-    lock: musicPath,
-    clips: musicPath,
-    manifest: musicPath,
-  }),
+  /** The folder the chosen takes are written to, for the game to play. */
+  clips: musicPath,
+  /** That folder's manifest, which the game reads. */
+  manifest: musicPath,
 })
 
 /** An images path: the same in every language, so it may not contain `{language}`. */
@@ -484,6 +490,15 @@ export function narrationFile(
   const suffix = language === project.languages[0] ? '' : `.${language}`
   return `${NARRATION_DIR}/${partId}${suffix}.${kind}.json`
 }
+
+/** Music's folder in the studio folder: the edits and the lock of every track. */
+export const MUSIC_DIR = `${STUDIO_DIR}/music`
+
+/** The studio's changes to the game's tracks, by track id. */
+export const MUSIC_EDITS_FILE = `${MUSIC_DIR}/edits.json`
+
+/** The chosen take of each track, and what it was made from. */
+export const MUSIC_LOCK_FILE = `${MUSIC_DIR}/lock.json`
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
 export interface Problem {

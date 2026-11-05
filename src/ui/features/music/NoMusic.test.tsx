@@ -6,6 +6,8 @@ GlobalRegistrator.register()
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { NoMusic } = await import('./NoMusic')
+const { ProjectSchema } = await import('../../../core/project')
+const { projectJson } = await import('../../../../test/helpers')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -40,5 +42,13 @@ describe('NoMusic', () => {
     const page = render()
     act(() => page.querySelector('button')?.click())
     expect(page.querySelector('section.no-music pre')?.textContent).toContain('"music": {')
+  })
+
+  it('shows a music section the studio accepts', () => {
+    const page = render()
+    act(() => page.querySelector('button')?.click())
+    const example = JSON.parse(`{${page.querySelector('section.no-music pre')!.textContent}}`)
+    const parsed = ProjectSchema.safeParse({ ...projectJson(), ...example })
+    expect(parsed.error?.issues ?? []).toEqual([])
   })
 })

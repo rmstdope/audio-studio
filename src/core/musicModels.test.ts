@@ -181,14 +181,9 @@ describe('Eleven Music', () => {
       ProjectSchema.safeParse(
         projectJson({
           music: {
-            paths: {
-              loops: 'l/{part}.json',
-              stingers: 's.json',
-              briefs: 'b.json',
-              lock: 'k.json',
-              clips: 'c',
-              manifest: 'm.json',
-            },
+            from: { part: 'l/{part}.json', shared: 's.json' },
+            clips: 'c',
+            manifest: 'm.json',
             model: 'eleven',
           },
         }),
@@ -269,14 +264,9 @@ describe('the words around the menus', () => {
 
 describe('music.model in the project file', () => {
   const music = {
-    paths: {
-      loops: 'l/{part}.json',
-      stingers: 's.json',
-      briefs: 'b.json',
-      lock: 'k.json',
-      clips: 'c',
-      manifest: 'm.json',
-    },
+    from: { part: 'l/{part}.json', shared: 's.json' },
+    clips: 'c',
+    manifest: 'm.json',
   }
   test('accepts a known model, and none', () => {
     const known = projectJson({ music: { ...music, model: 'careful' } })

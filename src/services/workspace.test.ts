@@ -792,14 +792,9 @@ describe('a part in several languages', () => {
 
 describe('loadProject with a music section', () => {
   const musicSection = {
-    paths: {
-      loops: 'tts/{part}/music.json',
-      stingers: 'tts/stingers.json',
-      briefs: 'music/briefs.json',
-      lock: 'music/music.lock.json',
-      clips: 'audio/music',
-      manifest: 'audio/music/manifest.json',
-    },
+    from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+    clips: 'audio/music',
+    manifest: 'audio/music/manifest.json',
   }
   const loop = (id: string, extra = {}) => ({
     id,
@@ -822,7 +817,7 @@ describe('loadProject with a music section', () => {
       'tts/act1/music.json': [loop('a'), loop('b')],
       'tts/act2/music.json': [],
       'tts/stingers.json': [loop('victory', { seconds: 5 })],
-      'music/briefs.json': { a: { brief: 'ours' } },
+      'content-studio/music/edits.json': { a: { brief: 'ours' } },
     })
     const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')
@@ -853,7 +848,7 @@ describe('loadProject with a music section', () => {
       'content-studio.json': projectJson({ music: musicSection }),
       'tts/act1/music.json': [loop('a'), { id: 'Bad Id', title: 'x', brief: 'x', seconds: 1 }],
       'tts/stingers.json': [loop('long', { seconds: 30 })],
-      'music/briefs.json': '{ broken',
+      'content-studio/music/edits.json': '{ broken',
     })
     const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')
@@ -865,7 +860,7 @@ describe('loadProject with a music section', () => {
     expect(loaded.summary.problems.map((p) => [p.file, p.path])).toEqual([
       ['tts/act1/music.json', '[1].id'],
       ['tts/stingers.json', '[0].seconds'],
-      ['music/briefs.json', ''],
+      ['content-studio/music/edits.json', ''],
     ])
   })
 

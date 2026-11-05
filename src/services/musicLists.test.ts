@@ -35,14 +35,9 @@ describe('a music lock that cannot be read', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -52,7 +47,7 @@ describe('a music lock that cannot be read', () => {
     'game/win.mp3': 'x',
     'audio/music/victory.mp3': 'x',
     'audio/music/manifest.json': { victory: { file: 'victory.mp3', duration: 5 } },
-    'music/music.lock.json': '{ broken',
+    'content-studio/music/lock.json': '{ broken',
   })
 
   it('makes what a track plays not known in the summary, not the game’s own file', async () => {
@@ -64,5 +59,29 @@ describe('a music lock that cannot be read', () => {
 
   it('serves no music for the track, not the game’s own file', async () => {
     expect(await musicCurrentFile(join(root, 'content-studio.json'), 'victory')).toBeNull()
+  })
+})
+
+describe('a music section with one list', () => {
+  const read = async (from: Record<string, string>) => {
+    const root = tempRepo({
+      'content-studio.json': projectJson({
+        music: { from, clips: 'audio/music', manifest: 'audio/music/manifest.json' },
+      }),
+      'content-studio/narration/cast.json': { speakers: {} },
+      'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'lute', seconds: 30 }],
+      'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }],
+    })
+    const loaded = await loadProject(join(root, 'content-studio.json'))
+    if (!loaded.ok) throw new Error('project')
+    return loaded.summary.music!.lists.map((list) => list.id)
+  }
+
+  it('has a page per part and no Stingers page without the shared list', async () => {
+    expect(await read({ part: 'tts/{part}/music.json' })).toEqual(['act1', 'act2'])
+  })
+
+  it('has only the Stingers page without the parts’ lists', async () => {
+    expect(await read({ shared: 'tts/stingers.json' })).toEqual(['stingers'])
   })
 })

@@ -11,7 +11,7 @@ import {
   type Briefs,
   type MusicSummary,
 } from '../core/music'
-import type { MusicConfig, Problem } from '../core/project'
+import { MUSIC_EDITS_FILE, type MusicConfig, type Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
 import { readChosen } from './musicClips'
@@ -50,7 +50,7 @@ async function save(
   const { project } = opened
   const root = dirname(projectFile)
   if (!project.music) return null
-  const file = project.music.paths.briefs
+  const file = MUSIC_EDITS_FILE
   const summary = await readMusic(root, project, [])
   const found = trackFor(summary?.lists ?? [], id)
   if (!found) return null

@@ -184,9 +184,8 @@ async function refresh(
   const root = dirname(projectFile)
   const dialogPath = partPathFor(narration.from.part, part.id, project.languages[0])
   const before = await readLines(root, dialogPath)
-  const loopsFile = opened.project.music
-    ? partPathFor(opened.project.music.paths.loops, part.id)
-    : null
+  const loopsTemplate = opened.project.music?.from.part
+  const loopsFile = loopsTemplate ? partPathFor(loopsTemplate, part.id) : null
   const loopsBefore = loopsFile ? await readTracks(root, loopsFile, LoopListSchema) : 'invalid'
 
   const command = partPathFor(partCommand, part.id)
@@ -223,23 +222,26 @@ async function refreshStingers(
   if (!opened.ok) return opened
   const { music, refresh } = opened.project
   const command = refresh?.shared
-  if (!music || !command) {
+  const stingers = music?.from.shared
+  if (!stingers || !command) {
     return {
       ok: false,
       reason: 'none',
-      message: 'The project file names no refresh.shared command.',
+      message: command
+        ? 'The project file names no music.from.shared list.'
+        : 'The project file names no refresh.shared command.',
     }
   }
   const root = dirname(projectFile)
-  const before = await readTracks(root, music.paths.stingers, StingerListSchema)
+  const before = await readTracks(root, stingers, StingerListSchema)
   const run = await shell(command, root, timeoutMs)
   if (!run.ok) return { ok: false, reason: 'failed', message: run.message, output: run.output }
 
   const problems: Problem[] = []
-  const read = await readResource(root, music.paths.stingers, StingerListSchema, problems)
+  const read = await readResource(root, stingers, StingerListSchema, problems)
   if (read === 'missing') {
     problems.push({
-      file: music.paths.stingers,
+      file: stingers,
       path: '',
       message: 'the command wrote no stingers file',
     })

@@ -147,14 +147,9 @@ describe('the music files in the changes', () => {
   const withMusic = ProjectSchema.parse(
     projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'web/audio/music',
-          manifest: 'web/audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'web/audio/music',
+        manifest: 'web/audio/music/manifest.json',
       },
     }),
   )
@@ -163,8 +158,8 @@ describe('the music files in the changes', () => {
     const groups = groupChanges(withMusic, 'content-studio.json', [
       { path: 'tts/act1/music.json', change: 'modified' },
       { path: 'tts/stingers.json', change: 'new' },
-      { path: 'music/briefs.json', change: 'modified' },
-      { path: 'music/music.lock.json', change: 'modified' },
+      { path: 'content-studio/music/edits.json', change: 'modified' },
+      { path: 'content-studio/music/lock.json', change: 'modified' },
       { path: 'web/audio/music/manifest.json', change: 'modified' },
       { path: 'web/audio/music/a.mp3', change: 'new' },
       { path: 'web/audio/music/b.mp3', change: 'modified' },
@@ -174,8 +169,8 @@ describe('the music files in the changes', () => {
     expect(groups.music?.files.map((f) => [f.path, f.role])).toEqual([
       ['tts/act1/music.json', 'list'],
       ['tts/stingers.json', 'list'],
-      ['music/briefs.json', 'briefs'],
-      ['music/music.lock.json', 'lock'],
+      ['content-studio/music/edits.json', 'briefs'],
+      ['content-studio/music/lock.json', 'lock'],
       ['web/audio/music/manifest.json', 'manifest'],
     ])
     expect(groups.music?.clips).toMatchObject({ new: 1, modified: 1, deleted: 0 })
@@ -196,7 +191,7 @@ describe('the music files in the changes', () => {
   it('names the music paths for git to ask about', () => {
     const paths = projectPaths(withMusic, 'content-studio.json')
     expect(paths.music?.clips).toBe('web/audio/music/')
-    expect(Object.keys(paths.music!.files)).toContain('music/music.lock.json')
+    expect(Object.keys(paths.music!.files)).toContain('content-studio/music/lock.json')
     expect(projectPaths(project, 'content-studio.json').music).toBeNull()
   })
 })

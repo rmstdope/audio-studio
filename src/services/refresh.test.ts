@@ -163,14 +163,9 @@ describe('refreshing the music lists', () => {
     ...extra,
   })
   const music = () => ({
-    paths: {
-      loops: 'tts/{part}/music.json',
-      stingers: 'tts/stingers.json',
-      briefs: 'music/briefs.json',
-      lock: 'music/music.lock.json',
-      clips: 'audio/music',
-      manifest: 'audio/music/manifest.json',
-    },
+    from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+    clips: 'audio/music',
+    manifest: 'audio/music/manifest.json',
   })
   const withMusic = (command: string, shared?: string, files: Record<string, unknown> = {}) => {
     const json = projectJson({ music: music(), refresh: { part: forPart(command), shared } })
@@ -249,6 +244,23 @@ describe('refreshing the music lists', () => {
       ok: false,
       reason: 'none',
     })
+  })
+
+  it('says when the project lists no stingers, running nothing', async () => {
+    const json = projectJson({
+      music: { ...music(), from: { part: 'tts/{part}/music.json' } },
+      refresh: { part: forPart('true'), shared: 'touch ran' },
+    })
+    const root = tempRepo({
+      'content-studio.json': json,
+      'content-studio/narration/cast.json': { speakers: {} },
+    })
+    expect(await refreshShared(join(root, 'content-studio.json'))).toEqual({
+      ok: false,
+      reason: 'none',
+      message: 'The project file names no music.from.shared list.',
+    })
+    expect(existsSync(join(root, 'ran'))).toBe(false)
   })
 
   it('reports a failing command, a missing list and a broken one', async () => {
@@ -367,14 +379,9 @@ describe('the one shared command', () => {
       'content-studio.json': projectJson({
         refresh: { shared: command },
         music: {
-          paths: {
-            loops: 'tts/{part}/music.json',
-            stingers: 'tts/stingers.json',
-            briefs: 'music/briefs.json',
-            lock: 'music/music.lock.json',
-            clips: 'audio/music',
-            manifest: 'audio/music/manifest.json',
-          },
+          from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
         },
         effects: {
           paths: {

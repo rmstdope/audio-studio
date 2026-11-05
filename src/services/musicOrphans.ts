@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import { orphanOf } from '../core/music'
 import { resolveInRoot } from '../core/paths'
 import { pythonJson } from '../core/pyjson'
-import type { Problem } from '../core/project'
+import { MUSIC_EDITS_FILE, MUSIC_LOCK_FILE, type Problem } from '../core/project'
 import { formatEntriesPerLine, writeAtomic } from './files'
 import { forgetBriefs } from './briefs'
 import { choices, lockNow, manifestNow, sorted, type CommitResult } from './musicClips'
@@ -37,7 +37,7 @@ export async function removeOrphan(projectFile: string, id: string): Promise<Rem
       async (): Promise<RemoveResult> => {
         // A lock that cannot be read says nothing of what is chosen: its problems, not "no orphan".
         const found: Problem[] = []
-        const lock = await lockNow(root, music, found)
+        const lock = await lockNow(root, found)
         if (!lock) return { ok: false, file: found[0]!.file, problems: found }
         const summary = await readMusic(root, project, [])
         if (!summary || !orphanOf(summary.lists, id)) return null
@@ -46,12 +46,12 @@ export async function removeOrphan(projectFile: string, id: string): Promise<Rem
         try {
           if (id in manifest) {
             delete manifest[id]
-            await writeAtomic(root, music.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
+            await writeAtomic(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
           }
-          await rm(resolveInRoot(root, `${music.paths.clips}/${id}.mp3`), { force: true })
+          await rm(resolveInRoot(root, `${music.clips}/${id}.mp3`), { force: true })
           await deleteBoard(root, id)
           delete lock[id]
-          await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
+          await writeAtomic(root, MUSIC_LOCK_FILE, formatEntriesPerLine(lock))
           return { ok: true }
         } catch (error) {
           return { ok: false, message: error instanceof Error ? error.message : String(error) }
@@ -62,9 +62,9 @@ export async function removeOrphan(projectFile: string, id: string): Promise<Rem
     // Outside the choice turn (the briefs' turn is taken before the boards', never inside it). With
     // the lock entry gone the track's brief changes are those of an unlisted track never chosen,
     // which the next save of the briefs drops anyway, so a failure here costs nothing.
-    const briefs = await forgetBriefs(projectFile, root, music.paths.briefs, [id])
+    const briefs = await forgetBriefs(projectFile, root, MUSIC_EDITS_FILE, [id])
     return briefs.ok
       ? { ok: true }
-      : { ok: false, file: music.paths.briefs, problems: briefs.problems }
+      : { ok: false, file: MUSIC_EDITS_FILE, problems: briefs.problems }
   })
 }

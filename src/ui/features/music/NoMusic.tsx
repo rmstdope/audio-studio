@@ -2,14 +2,9 @@ import { useState } from 'react'
 
 /** The example `music` section the page shows under "How to set it up". */
 const EXAMPLE = `"music": {
-  "paths": {
-    "loops": "tts/{part}/music.json",
-    "stingers": "tts/stingers.json",
-    "briefs": "music/briefs.json",
-    "lock": "music/music.lock.json",
-    "clips": "web/public/audio/music/generated",
-    "manifest": "web/public/audio/music/generated/manifest.json"
-  }
+  "from": { "part": "tts/{part}/music.json", "shared": "tts/stingers.json" },
+  "clips": "web/public/audio/music/generated",
+  "manifest": "web/public/audio/music/generated/manifest.json"
 }`
 
 /** Music in a project whose file has no `music` section: what to add, with an example. */

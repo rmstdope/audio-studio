@@ -103,14 +103,9 @@ describe('modelsView', () => {
     const root = tempRepo({
       'content-studio.json': projectJson({
         music: {
-          paths: {
-            loops: 'tts/{part}/music.json',
-            stingers: 'tts/stingers.json',
-            briefs: 'music/briefs.json',
-            lock: 'music/music.lock.json',
-            clips: 'audio/music',
-            manifest: 'audio/music/manifest.json',
-          },
+          from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
         },
       }),
       'tts/act1/music.json': [
@@ -118,7 +113,7 @@ describe('modelsView', () => {
         { id: 'cave', title: 'Cave', brief: 'drone', seconds: 20 },
       ],
       'tts/stingers.json': [{ id: 'win', title: 'Win', brief: 'fanfare', seconds: 6 }],
-      'music/briefs.json': { cave: { seconds: 25 } },
+      'content-studio/music/edits.json': { cave: { seconds: 25 } },
     })
     const view = await modelsView(join(root, 'content-studio.json'))
     if (!view.ok) throw new Error('expected a view')

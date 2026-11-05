@@ -17,14 +17,9 @@ import { ffmpegEncoder, type Encoder, type EncodeOptions } from './audio'
 import { acceptChange, commitChoice, readChosen, uncommitChoice } from './musicClips'
 
 const music = {
-  paths: {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
-    clips: 'audio/music',
-    manifest: 'audio/music/manifest.json',
-  },
+  from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+  clips: 'audio/music',
+  manifest: 'audio/music/manifest.json',
 }
 const config = ProjectSchema.parse(projectJson({ music })).music!
 
@@ -73,7 +68,7 @@ describe('commitChoice', () => {
     expect(JSON.parse(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8'))).toEqual({
       hall: { file: 'hall.mp3', duration: 30 },
     })
-    const lock = readFileSync(join(root, 'music/music.lock.json'), 'utf8')
+    const lock = readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')
     expect(lock.split('\n')).toHaveLength(4) // { / one entry / } / trailing newline
     expect(JSON.parse(lock).hall).toEqual({
       fp: '0123456789abcdef',
@@ -106,7 +101,7 @@ describe('commitChoice', () => {
     await choose('hall', 1)
     await choose('cave', 1)
     await choose('hall', 3)
-    const lock = JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+    const lock = JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8'))
     expect(Object.keys(lock)).toEqual(['cave', 'hall'])
     expect(lock.hall.take).toBe(3)
   })
@@ -124,9 +119,9 @@ describe('commitChoice', () => {
       encode,
       now: () => at,
     })
-    expect(JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).hall.model).toBe(
-      'older-model',
-    )
+    expect(
+      JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')).hall.model,
+    ).toBe('older-model')
   })
 
   it('writes nothing when the clip cannot be encoded', async () => {
@@ -143,13 +138,13 @@ describe('commitChoice', () => {
       now: () => at,
     })
     expect(result).toMatchObject({ ok: false, message: expect.stringContaining('boom') })
-    expect(existsSync(join(root, 'music/music.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/music/lock.json'))).toBe(false)
     expect(existsSync(join(root, 'audio/music/manifest.json'))).toBe(false)
     expect(readdirSync(join(root, 'audio/music'), { withFileTypes: true }).length).toBe(0)
   })
 
   it('refuses a broken lock, saying so, writing nothing and leaving no temporary file', async () => {
-    const root = tempRepo({ 'music/music.lock.json': '{ nope' })
+    const root = tempRepo({ 'content-studio/music/lock.json': '{ nope' })
     const { encode } = fakeEncoder()
     const result = await commitChoice({
       root,
@@ -165,7 +160,7 @@ describe('commitChoice', () => {
       ok: false,
       message: 'Take 3 could not be chosen: the music lock could not be read. Nothing was changed.',
     })
-    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
+    expect(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')).toBe('{ nope')
     expect(readdirSync(join(root, 'audio/music'))).toEqual([])
   })
 
@@ -188,7 +183,7 @@ describe('commitChoice', () => {
         'Take 1 could not be chosen: the music manifest could not be read. Nothing was changed.',
     })
     expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
-    expect(existsSync(join(root, 'music/music.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/music/lock.json'))).toBe(false)
     expect(readdirSync(join(root, 'audio/music'))).toEqual(['manifest.json'])
   })
 })
@@ -230,7 +225,7 @@ describe('commitChoice with both files broken', () => {
   it('names the manifest, writing nothing', async () => {
     const root = tempRepo({
       'audio/music/manifest.json': '{ nope',
-      'music/music.lock.json': '{ nope',
+      'content-studio/music/lock.json': '{ nope',
     })
     const { encode } = fakeEncoder()
     const result = await commitChoice({
@@ -249,7 +244,7 @@ describe('commitChoice with both files broken', () => {
         'Take 2 could not be chosen: the music manifest could not be read. Nothing was changed.',
     })
     expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
-    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
+    expect(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')).toBe('{ nope')
     expect(readdirSync(join(root, 'audio/music'))).toEqual(['manifest.json'])
   })
 })
@@ -257,7 +252,7 @@ describe('commitChoice with both files broken', () => {
 describe('readChosen', () => {
   it('reads the lock and whether each clip is a plain file on disk', async () => {
     const root = tempRepo({
-      'music/music.lock.json': {
+      'content-studio/music/lock.json': {
         hall: {
           fp: '0123456789abcdef',
           model: MUSIC_MODEL,
@@ -290,10 +285,10 @@ describe('readChosen', () => {
   it('is empty without a lock, and null for a broken one, reported as a problem with its file', async () => {
     const root = tempRepo({})
     expect(await readChosen(root, config, [])).toEqual({})
-    const broken = tempRepo({ 'music/music.lock.json': { hall: { fp: 1 } } })
+    const broken = tempRepo({ 'content-studio/music/lock.json': { hall: { fp: 1 } } })
     const problems: { file: string }[] = []
     expect(await readChosen(broken, config, problems as never)).toBeNull()
-    expect(problems[0]?.file).toBe('music/music.lock.json')
+    expect(problems[0]?.file).toBe('content-studio/music/lock.json')
   })
 })
 
@@ -324,7 +319,7 @@ describe('uncommitChoice', () => {
     expect(await uncommitChoice({ root, music: config, id: 'hall' })).toEqual({ ok: true })
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(false)
     expect(Object.keys(readJson(root, 'audio/music/manifest.json'))).toEqual(['cave'])
-    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave'])
+    expect(Object.keys(readJson(root, 'content-studio/music/lock.json'))).toEqual(['cave'])
     expect(existsSync(join(root, 'audio/music/cave.mp3'))).toBe(true)
   })
 
@@ -332,19 +327,19 @@ describe('uncommitChoice', () => {
     const root = await chosen()
     rmSync(join(root, 'audio/music/hall.mp3'))
     expect(await uncommitChoice({ root, music: config, id: 'hall' })).toEqual({ ok: true })
-    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave'])
+    expect(Object.keys(readJson(root, 'content-studio/music/lock.json'))).toEqual(['cave'])
   })
 
   it('refuses a track with no chosen take, changing nothing', async () => {
     const root = await chosen()
     const result = await uncommitChoice({ root, music: config, id: 'nobody' })
     expect(result).toEqual({ ok: false, message: 'No take is chosen for this track.' })
-    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave', 'hall'])
+    expect(Object.keys(readJson(root, 'content-studio/music/lock.json'))).toEqual(['cave', 'hall'])
   })
 
   it('deletes nothing when the lock cannot be read', async () => {
     const root = await chosen()
-    writeFileSync(join(root, 'music/music.lock.json'), '{ nope')
+    writeFileSync(join(root, 'content-studio/music/lock.json'), '{ nope')
     const result = await uncommitChoice({ root, music: config, id: 'hall' })
     expect(result).toEqual({ ok: false, message: 'The music lock could not be read.' })
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
@@ -357,18 +352,18 @@ describe('uncommitChoice', () => {
     const result = await uncommitChoice({ root, music: config, id: 'hall' })
     expect(result).toEqual({ ok: false, message: 'The music manifest could not be read.' })
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
-    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave', 'hall'])
+    expect(Object.keys(readJson(root, 'content-studio/music/lock.json'))).toEqual(['cave', 'hall'])
   })
 
   it('names the manifest when both the manifest and the lock cannot be read', async () => {
     const root = await chosen()
     writeFileSync(join(root, 'audio/music/manifest.json'), '{ nope')
-    writeFileSync(join(root, 'music/music.lock.json'), '{ nope')
+    writeFileSync(join(root, 'content-studio/music/lock.json'), '{ nope')
     const result = await uncommitChoice({ root, music: config, id: 'hall' })
     expect(result).toEqual({ ok: false, message: 'The music manifest could not be read.' })
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
     expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
-    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
+    expect(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')).toBe('{ nope')
   })
 
   it.skipIf(process.getuid?.() === 0)(
@@ -385,7 +380,10 @@ describe('uncommitChoice', () => {
       }
       expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
       expect(Object.keys(readJson(root, 'audio/music/manifest.json'))).toEqual(['cave', 'hall'])
-      expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave', 'hall'])
+      expect(Object.keys(readJson(root, 'content-studio/music/lock.json'))).toEqual([
+        'cave',
+        'hall',
+      ])
     },
   )
 })
@@ -406,7 +404,7 @@ describe('acceptChange', () => {
     return root
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8')) as Record<
+    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')) as Record<
       string,
       { inputs: TakeInputs; fp: string; take: number }
     >
@@ -414,7 +412,7 @@ describe('acceptChange', () => {
   it('counts the chosen take as made from the brief, tempo and key now, and changes nothing else', async () => {
     const root = await chosen()
     const now = { ...inputs, brief: 'warm lute, a little slower', bpm: 90, key: 'D minor' }
-    expect(await acceptChange({ root, music: config, id: 'hall', now })).toEqual({ ok: true })
+    expect(await acceptChange({ root, id: 'hall', now })).toEqual({ ok: true })
     const entry = lockOf(root).hall!
     expect(entry.inputs).toEqual(now)
     expect([entry.fp, entry.take]).toEqual(['0123456789abcdef', 1])
@@ -426,7 +424,7 @@ describe('acceptChange', () => {
       { ...inputs, seconds: 40 },
       { ...inputs, brief: 'other', bpm: 90, seconds: 40 },
     ]) {
-      const result = await acceptChange({ root, music: config, id: 'hall', now })
+      const result = await acceptChange({ root, id: 'hall', now })
       expect(result).toEqual({
         ok: false,
         message: 'A changed length cannot be accepted: the track needs a new take.',
@@ -437,22 +435,22 @@ describe('acceptChange', () => {
 
   it('writes nothing while the lock cannot be read', async () => {
     const root = await chosen()
-    writeFileSync(join(root, 'music/music.lock.json'), '{ broken')
+    writeFileSync(join(root, 'content-studio/music/lock.json'), '{ broken')
     const now = { ...inputs, brief: 'other' }
-    expect(await acceptChange({ root, music: config, id: 'hall', now })).toEqual({
+    expect(await acceptChange({ root, id: 'hall', now })).toEqual({
       ok: false,
       message: 'The music lock could not be read.',
     })
-    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ broken')
+    expect(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')).toBe('{ broken')
   })
 
   it('refuses a track with nothing changed, or none chosen', async () => {
     const root = await chosen()
-    expect(await acceptChange({ root, music: config, id: 'hall', now: inputs })).toEqual({
+    expect(await acceptChange({ root, id: 'hall', now: inputs })).toEqual({
       ok: false,
       message: 'Nothing has changed since the take was chosen.',
     })
-    expect(await acceptChange({ root, music: config, id: 'cave', now: inputs })).toEqual({
+    expect(await acceptChange({ root, id: 'cave', now: inputs })).toEqual({
       ok: false,
       message: 'No take is chosen for this track.',
     })

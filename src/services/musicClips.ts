@@ -14,7 +14,7 @@ import {
 } from '../core/musicChoose'
 import { MUSIC_MODEL, type BoardTake, type TakeInputs } from '../core/musicTake'
 import { resolveInRoot } from '../core/paths'
-import type { MusicConfig, Problem } from '../core/project'
+import { MUSIC_LOCK_FILE, type MusicConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import { FileNotWritten, type Encoder } from './audio'
 import { formatEntriesPerLine, isWriteFailure, listFiles, readResource, writeAtomic } from './files'
@@ -28,12 +28,8 @@ export const MUSIC_OUTPUT = { bitrate: '160k', channels: 2, lufs: -20 } as const
 export type CommitResult = { ok: true } | { ok: false; message: string } | ProjectFailure
 
 /** The music lock as it is now: empty if there is none; null (with the problems added) if broken. */
-export async function lockNow(
-  root: string,
-  music: MusicConfig,
-  problems: Problem[],
-): Promise<MusicLock | null> {
-  const read = await readResource(root, music.paths.lock, MusicLockSchema, problems)
+export async function lockNow(root: string, problems: Problem[]): Promise<MusicLock | null> {
+  const read = await readResource(root, MUSIC_LOCK_FILE, MusicLockSchema, problems)
   return read === 'invalid' ? null : read === 'missing' ? {} : read
 }
 
@@ -43,7 +39,7 @@ export async function manifestNow(
   music: MusicConfig,
   problems: Problem[],
 ): Promise<MusicManifest | null> {
-  const read = await readResource(root, music.paths.manifest, MusicManifestSchema, problems)
+  const read = await readResource(root, music.manifest, MusicManifestSchema, problems)
   return read === 'invalid' ? null : read === 'missing' ? {} : read
 }
 
@@ -57,9 +53,9 @@ export async function readChosen(
   music: MusicConfig,
   problems: Problem[],
 ): Promise<Record<string, ChosenState> | null> {
-  const lock = await lockNow(root, music, problems)
+  const lock = await lockNow(root, problems)
   if (!lock) return null
-  const files = await listFiles(resolveInRoot(root, music.paths.clips))
+  const files = await listFiles(resolveInRoot(root, music.clips))
   return Object.fromEntries(
     Object.entries(lock).map(([id, entry]) => [
       id,
@@ -108,8 +104,8 @@ export async function commitChoice({
   soundOnly?: boolean
 }): Promise<CommitResult> {
   const file = `${id}.mp3`
-  const target = resolveInRoot(root, join(music.paths.clips, file))
-  const temporary = resolveInRoot(root, join(music.paths.clips, `.${id}.${randomUUID()}.mp3`))
+  const target = resolveInRoot(root, join(music.clips, file))
+  const temporary = resolveInRoot(root, join(music.clips, `.${id}.${randomUUID()}.mp3`))
   try {
     await encode(wav, temporary, MUSIC_OUTPUT)
   } catch (error) {
@@ -123,7 +119,7 @@ export async function commitChoice({
     return await choices().run(`music-choice\0${projectFile}`, async (): Promise<CommitResult> => {
       const found: Problem[] = []
       const manifest = await manifestNow(root, music, found)
-      const lock = await lockNow(root, music, found)
+      const lock = await lockNow(root, found)
       if (!manifest || !lock) {
         const unread = !manifest ? 'manifest' : 'lock'
         const message = `Take ${take.n} could not be chosen: the music ${unread} could not be read.`
@@ -145,8 +141,8 @@ export async function commitChoice({
       }
       lock[id] = entry
       await rename(temporary, target)
-      await writeAtomic(root, music.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
-      await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
+      await writeAtomic(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
+      await writeAtomic(root, MUSIC_LOCK_FILE, formatEntriesPerLine(lock))
       return { ok: true }
     })
   } catch (error) {
@@ -179,17 +175,17 @@ export async function uncommitChoice({
     return await choices().run(`music-choice\0${projectFile}`, async (): Promise<CommitResult> => {
       const found: Problem[] = []
       const manifest = await manifestNow(root, music, found)
-      const lock = await lockNow(root, music, found)
+      const lock = await lockNow(root, found)
       if (!manifest) return { ok: false, message: 'The music manifest could not be read.' }
       if (!lock) return { ok: false, message: 'The music lock could not be read.' }
       if (!(id in lock)) return { ok: false, message: 'No take is chosen for this track.' }
       if (id in manifest) {
         delete manifest[id]
-        await writeAtomic(root, music.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
+        await writeAtomic(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
       }
-      await rm(resolveInRoot(root, join(music.paths.clips, `${id}.mp3`)), { force: true })
+      await rm(resolveInRoot(root, join(music.clips, `${id}.mp3`)), { force: true })
       delete lock[id]
-      await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
+      await writeAtomic(root, MUSIC_LOCK_FILE, formatEntriesPerLine(lock))
       return { ok: true }
     })
   } catch (error) {
@@ -208,21 +204,19 @@ export async function uncommitChoice({
 export async function acceptChange({
   root,
   projectFile = root,
-  music,
   id,
   now,
 }: {
   root: string
   /** What names the project in the queue; the root by default. */
   projectFile?: string
-  music: MusicConfig
   id: string
   /** The track's inputs now. */
   now: TakeInputs
 }): Promise<CommitResult> {
   try {
     return await choices().run(`music-choice\0${projectFile}`, async (): Promise<CommitResult> => {
-      const lock = await lockNow(root, music, [])
+      const lock = await lockNow(root, [])
       if (!lock) return { ok: false, message: 'The music lock could not be read.' }
       const entry = lock[id]
       if (!entry) return { ok: false, message: 'No take is chosen for this track.' }
@@ -239,7 +233,7 @@ export async function acceptChange({
         ...entry,
         inputs: { ...entry.inputs, brief: now.brief, bpm: now.bpm, key: now.key },
       }
-      await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
+      await writeAtomic(root, MUSIC_LOCK_FILE, formatEntriesPerLine(lock))
       return { ok: true }
     })
   } catch (error) {

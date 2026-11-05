@@ -26,14 +26,9 @@ import type { MusicSpend } from '../core/spending'
 import { createHash } from 'node:crypto'
 
 const music = {
-  paths: {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
-    clips: 'audio/music',
-    manifest: 'audio/music/manifest.json',
-  },
+  from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+  clips: 'audio/music',
+  manifest: 'audio/music/manifest.json',
 }
 
 /**
@@ -1071,7 +1066,7 @@ describe('choosing a take', () => {
     return made
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8'))
 
   it('keeps and chooses a take made without a seed, with none recorded', async () => {
     const { root, file, takes, settled } = setup(undefined, {}, [], undefined, [], true)
@@ -1204,7 +1199,9 @@ describe('choosing a take', () => {
     ])
     const after = await takes.view(file, 'hall')
     if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
-    const lock = existsSync(join(root, 'music/music.lock.json')) ? lockOf(root).hall : undefined
+    const lock = existsSync(join(root, 'content-studio/music/lock.json'))
+      ? lockOf(root).hall
+      : undefined
     // Either the take was chosen and stays, or it was dropped and nothing names it.
     if (lock) expect(after.takes.some((t) => t.chosen)).toBe(true)
     else expect(after.takes.some((t) => t.n === 1)).toBe(false)
@@ -1215,15 +1212,15 @@ describe('choosing a take', () => {
   })
 
   it('refuses to drop anything while the lock cannot be read', async () => {
-    const { file, takes, settled } = await twoTakes({ 'music/music.lock.json': '{ nope' })
+    const { file, takes, settled } = await twoTakes({ 'content-studio/music/lock.json': '{ nope' })
     const view = await settled('hall')
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
     const answer = await takes.drop(file, 'hall', view.takes[0]!.file)
-    expect(answer).toMatchObject({ ok: false, file: 'music/music.lock.json' })
+    expect(answer).toMatchObject({ ok: false, file: 'content-studio/music/lock.json' })
   })
 
   it('tells the view the lock cannot be read, and not when it can', async () => {
-    const bad = await twoTakes({ 'music/music.lock.json': '{ nope' })
+    const bad = await twoTakes({ 'content-studio/music/lock.json': '{ nope' })
     const unread = await bad.settled('hall')
     if (!unread || !('ok' in unread) || !unread.ok) throw new Error('expected a view')
     expect(unread.lockUnread).toBe(true)
@@ -1259,7 +1256,7 @@ describe('moving a take', () => {
     return view
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8'))
 
   it('moves a take to a loop in another act as that loop’s next take, sound and all', async () => {
     const m = await made()
@@ -1349,7 +1346,7 @@ describe('moving a take', () => {
   })
 
   it('refuses while the music lock cannot be read', async () => {
-    const m = await made(2, { 'music/music.lock.json': '{ nope' })
+    const m = await made(2, { 'content-studio/music/lock.json': '{ nope' })
     const [one] = (await viewOf(m, 'hall')).takes
     expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({
       ok: false,
@@ -1460,7 +1457,7 @@ describe('moving a take', () => {
     const before = readdirSync(m.root).sort()
     await m.takes.move(m.file, 'hall', one!.file, 'hut')
     expect(readdirSync(m.root).sort()).toEqual(before)
-    expect(existsSync(join(m.root, 'music/music.lock.json'))).toBe(false)
+    expect(existsSync(join(m.root, 'content-studio/music/lock.json'))).toBe(false)
   })
 })
 
@@ -1493,19 +1490,19 @@ describe('fading a stinger take', () => {
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
     expect((await takeOf(made)).fades).toEqual(fades)
     expect(made.spy.wavs).toHaveLength(0)
-    expect(existsSync(join(made.root, 'music/music.lock.json'))).toBe(false)
+    expect(existsSync(join(made.root, 'content-studio/music/lock.json'))).toBe(false)
   })
 
   it('writes the faded sound at once when the take is the chosen one, leaving the lock alone', async () => {
     const made = await stinger()
     await made.takes.choose(made.file, 'victory', made.name)
-    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    const lock = readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')
     expect(made.spy.wavs).toHaveLength(1)
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
     expect(made.spy.wavs).toHaveLength(2)
     expect(firstAndLast(made.spy.wavs[1]!)).toEqual([0, 0])
     expect(made.spy.wavs[1]).not.toEqual(made.spy.wavs[0]!)
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     expect(await takeOf(made)).toMatchObject({ chosen: true, fades })
   })
 
@@ -1531,11 +1528,11 @@ describe('fading a stinger take', () => {
     await made.takes.choose(made.file, 'victory', made.name)
     await setTrackBrief(made.file, 'victory', { brief: 'a drum' })
     expect(await made.takes.accept(made.file, 'victory')).toEqual({ ok: true })
-    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    const lock = readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     expect(await made.takes.setFades(made.file, 'victory', made.name, null)).toEqual({ ok: true })
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     const loaded = await loadProject(made.file)
     if (!loaded.ok) throw new Error('project')
     const row = loaded.summary.music!.lists.find((l) => l.kind === 'stingers')!.tracks[0]!
@@ -1575,7 +1572,7 @@ describe('fading a stinger take', () => {
   it('says why when the board cannot be written for the chosen take, the lock untouched', async () => {
     const made = await stinger()
     await made.takes.choose(made.file, 'victory', made.name)
-    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    const lock = readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')
     const folder = join(made.root, 'content-studio/cache/music')
     chmodSync(folder, 0o555)
     const quiet = console.error
@@ -1589,7 +1586,7 @@ describe('fading a stinger take', () => {
       console.error = quiet
       chmodSync(folder, 0o755)
     }
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     expect((await takeOf(made)).fades).toBeUndefined()
   })
 
@@ -1654,10 +1651,10 @@ describe('fading a stinger take', () => {
   })
 
   it('refuses while the lock cannot be read', async () => {
-    const made = await stinger({ 'music/music.lock.json': '{ nope' })
+    const made = await stinger({ 'content-studio/music/lock.json': '{ nope' })
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toMatchObject({
       ok: false,
-      file: 'music/music.lock.json',
+      file: 'content-studio/music/lock.json',
     })
   })
 
@@ -1724,7 +1721,7 @@ describe('trimming a stinger take', () => {
     return view
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8'))
   const manifestOf = (root: string) =>
     JSON.parse(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8'))
 
@@ -1895,8 +1892,8 @@ describe('trimming a stinger take', () => {
   it('refuses while the music lock cannot be read, changing nothing', async () => {
     const m = await made()
     const [one] = (await viewOf(m)).takes
-    mkdirSync(join(m.root, 'music'), { recursive: true })
-    writeFileSync(join(m.root, 'music/music.lock.json'), '{ not json')
+    mkdirSync(join(m.root, 'content-studio/music'), { recursive: true })
+    writeFileSync(join(m.root, 'content-studio/music/lock.json'), '{ not json')
     expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toMatchObject({
       ok: false,
       message: 'The music lock could not be read.',
