@@ -1550,6 +1550,21 @@ describe('fading a stinger take', () => {
     expect((await takeOf(made)).fades).toBeUndefined()
   })
 
+  it('says why when the take board cannot be written, not a bare failure', async () => {
+    const made = await stinger()
+    const folder = join(made.root, '.content-studio/music')
+    chmodSync(folder, 0o555)
+    try {
+      expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({
+        ok: false,
+        message: 'The take board could not be written.',
+      })
+    } finally {
+      chmodSync(folder, 0o755)
+    }
+    expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
   it('refuses a loop, a take that is not there, fades too long, and an unknown track', async () => {
     const made = await stinger()
     await made.takes.make(made.file, 'hall', { count: 1 })

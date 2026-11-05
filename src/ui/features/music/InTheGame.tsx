@@ -284,6 +284,7 @@ export function InTheGame({
         ) : (
           <span className="chip chip-ok">chosen</span>
         )}
+        {take && fading === take.n && <span className="chip chip-fade">fading</span>}
         {take && <span className="faint small">{take.model}</span>}
       </div>
       {take?.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
@@ -309,53 +310,55 @@ export function InTheGame({
           />
         )
       )}
-      <div className="track-in-game-actions" hidden={take !== undefined && fading === take.n}>
-        {trimControl.button}
-        {take && view.kind === 'stinger' && (
+      {!(take && fading === take.n) && (
+        <div className="track-in-game-actions">
+          {trimControl.button}
+          {take && view.kind === 'stinger' && (
+            <button
+              type="button"
+              className="btn btn-small"
+              ref={fadesOpener(take.n)}
+              aria-disabled={fading !== null && fading !== take.n ? true : undefined}
+              title={
+                fading !== null && fading !== take.n
+                  ? `Close the fades of Take ${fading} first.`
+                  : undefined
+              }
+              onClick={() => {
+                if (fading !== null) return
+                if (player.playing === `music-take-${track.id}-${take.n}`) player.stop()
+                onFades(take.n)
+              }}
+            >
+              Fades…
+            </button>
+          )}
+          <span className="grow" />
           <button
             type="button"
             className="btn btn-small"
-            ref={fadesOpener(take.n)}
-            aria-disabled={fading !== null && fading !== take.n ? true : undefined}
-            title={
-              fading !== null && fading !== take.n
-                ? `Close the fades of Take ${fading} first.`
-                : undefined
-            }
+            ref={opener}
+            disabled={unchoose.isPending}
             onClick={() => {
-              if (fading !== null) return
-              if (player.playing === `music-take-${track.id}-${take.n}`) player.stop()
-              onFades(take.n)
+              unchoose.reset()
+              setAsked(state.take)
+              setAsking(true)
             }}
           >
-            Fades…
+            Un-choose
           </button>
-        )}
-        <span className="grow" />
-        <button
-          type="button"
-          className="btn btn-small"
-          ref={opener}
-          disabled={unchoose.isPending}
-          onClick={() => {
-            unchoose.reset()
-            setAsked(state.take)
-            setAsking(true)
-          }}
-        >
-          Un-choose
-        </button>
-        {state.missing && take && (
-          <button
-            type="button"
-            className="btn btn-primary btn-small"
-            disabled={choose.isPending}
-            onClick={() => choose.mutate(take.file)}
-          >
-            {choose.isPending ? 'Choosing…' : 'Choose again'}
-          </button>
-        )}
-      </div>
+          {state.missing && take && (
+            <button
+              type="button"
+              className="btn btn-primary btn-small"
+              disabled={choose.isPending}
+              onClick={() => choose.mutate(take.file)}
+            >
+              {choose.isPending ? 'Choosing…' : 'Choose again'}
+            </button>
+          )}
+        </div>
+      )}
       {hint}
       {trimControl.failure}
       {failedLine && <span className="adopt-error">{failedLine}</span>}

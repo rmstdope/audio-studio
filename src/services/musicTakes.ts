@@ -856,7 +856,7 @@ export function createMusicTakes({
         }
         board.takes = board.takes.map((t) => (t === take ? next : t))
         return { ok: true }
-      })
+      }).catch((): DropResult => ({ ok: false, message: 'The take board could not be written.' }))
     },
 
     async choose(projectFile, id, name) {
