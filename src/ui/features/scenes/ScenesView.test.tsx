@@ -1603,6 +1603,32 @@ describe('the Loudness panel', () => {
     )
   })
 
+  it('sets each clip path in the red box in the code font, the words unchanged', () => {
+    const failed = measureOf({
+      error:
+        'ffmpeg could not read audio/a.mp3, .content-studio/effect-takes/x/3.mp3: Invalid data.',
+      states: [{ state: 'plain', lufs: null }],
+    })
+    const page = render(open, summary('ok', true, { target, loudness: loudness(failed) }))
+    const box = panel(page).querySelector('.scene-problem')
+    expect([...box!.querySelectorAll('code.scene-clip-path')].map((c) => text(c))).toEqual([
+      'audio/a.mp3',
+      '.content-studio/effect-takes/x/3.mp3',
+    ])
+    expect(text(box)).toBe(
+      'Couldn’t measure General store: ffmpeg could not read audio/a.mp3, .content-studio/effect-takes/x/3.mp3: Invalid data. The other scenes were measured.',
+    )
+  })
+
+  it('sets nothing in the code font when no clip is involved', () => {
+    const failed = measureOf({
+      error: 'ffmpeg fell over',
+      states: [{ state: 'plain', lufs: null }],
+    })
+    const page = render(open, summary('ok', true, { target, loudness: loudness(failed) }))
+    expect(panel(page).querySelector('.scene-problem code')).toBeNull()
+  })
+
   it('presses Measure loudness for the whole act, sending the scene as it is on the page', async () => {
     const page = render(open, summary('ok', true, { target }))
     await act(async () => button(panel(page), 'Measure loudness').click())

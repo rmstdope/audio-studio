@@ -4771,3 +4771,9 @@ button.cue-chip[aria-expanded='true'] {
     grid-column: 2 / -1;
   }
 }
+
+/* A clip path in the Loudness panel's error box: the code font, nothing else. */
+.scene-clip-path {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}

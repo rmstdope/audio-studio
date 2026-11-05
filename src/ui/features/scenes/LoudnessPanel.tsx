@@ -4,6 +4,7 @@ import {
   chipFor,
   expectedFigures,
   shiftStates,
+  splitClipPaths,
   suggestChange,
   formatLufs,
   targetLine,
@@ -218,8 +219,17 @@ export function LoudnessPanel({
       )}
       {measure?.error != null && (
         <div className="panel scene-problem">
-          Couldn’t measure {scene.name}: {measure.error.replace(/\.+$/, '')}. The other scenes were
-          measured.
+          Couldn’t measure {scene.name}:{' '}
+          {splitClipPaths(measure.error.replace(/\.+$/, '')).map((piece, i) =>
+            piece.path ? (
+              <code key={i} className="scene-clip-path">
+                {piece.text}
+              </code>
+            ) : (
+              piece.text
+            ),
+          )}
+          . The other scenes were measured.
         </div>
       )}
       {refused && <div className="panel scene-problem">{refused}</div>}
