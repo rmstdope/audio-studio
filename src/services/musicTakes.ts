@@ -92,7 +92,16 @@ export type ModelStateResult =
   { ok: true; model: MusicModelId; ready: boolean; message: string | null } | ProjectFailure | null
 
 /** What dropping a take answered; null for a track the project does not list. */
-export type DropResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
+export type DropResult =
+  | { ok: true }
+  | {
+      ok: false
+      message: string
+      /** Set when a failed fade save could not put the game's file back: the game plays the new sound. */
+      gameChanged?: true
+    }
+  | ProjectFailure
+  | null
 
 /** What moving a take answered: its number on the other track; null for a track the project does not list. */
 export type MoveResult =
@@ -399,6 +408,8 @@ export function createMusicTakes({
     projectFile: string,
     found: Found,
     change: (board: MusicBoard) => T | Promise<T>,
+    /** Called when the board cannot be written, to take back what `change` did elsewhere. */
+    undo?: () => Promise<void>,
   ): Promise<T | ProjectFailure> {
     return boards.run(`${projectFile}\0${found.id}`, async () => {
       const board = await readBoard(found.root, found.board)
@@ -407,7 +418,14 @@ export function createMusicTakes({
       const answer = await change(board)
       const after = JSON.stringify(board, null, 2)
       // Nothing changed (a drop of a take that is not there): nothing is written.
-      if (after !== before) await writeAtomic(found.root, found.board, `${after}\n`)
+      if (after !== before) {
+        try {
+          await writeAtomic(found.root, found.board, `${after}\n`)
+        } catch (error) {
+          await undo?.()
+          throw error
+        }
+      }
       return answer
     })
   }
@@ -815,52 +833,81 @@ export function createMusicTakes({
     async setFades(projectFile, id, name, fades) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      return changeBoard(projectFile, found, async (board): Promise<DropResult> => {
-        const problems: Problem[] = []
-        const chosenTracks = await readChosen(found.root, found.music, problems)
-        // Which take the game plays is not known: nothing is changed.
-        if (!chosenTracks || problems.length)
-          return { ok: false, file: found.music.paths.lock, problems }
-        if (found.inputs.kind !== 'stinger')
-          return { ok: false, message: 'Only a stinger can fade.' }
-        const take = board.takes.find((t) => fileOf(t) === name)
-        if (!take) return { ok: false, message: 'That take is not on the board.' }
-        // The fades are of what the game plays: the take between its cuts, if it is trimmed.
-        const wrong =
-          fades &&
-          fadesProblem(fades, take.trim ? trimmedSeconds(take.seconds, take.trim) : take.seconds)
-        if (wrong) return { ok: false, message: wrong }
-        const next: BoardTake = { ...take }
-        delete next.fades
-        if (fades && hasFades(fades)) next.fades = fades
-        const chosen = chosenTracks[id]?.lock
-        if (chosen?.take === take.n && chosen.fp === take.hash) {
-          let wav: Uint8Array
-          try {
-            wav = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
-          } catch {
-            return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
+      /** Puts the game's file back, once the board turned out not to be writable. */
+      let putBack: (() => Promise<void>) | null = null
+      let stuck = false
+      return changeBoard(
+        projectFile,
+        found,
+        async (board): Promise<DropResult> => {
+          const problems: Problem[] = []
+          const chosenTracks = await readChosen(found.root, found.music, problems)
+          // Which take the game plays is not known: nothing is changed.
+          if (!chosenTracks || problems.length)
+            return { ok: false, file: found.music.paths.lock, problems }
+          if (found.inputs.kind !== 'stinger')
+            return { ok: false, message: 'Only a stinger can fade.' }
+          const take = board.takes.find((t) => fileOf(t) === name)
+          if (!take) return { ok: false, message: 'That take is not on the board.' }
+          // The fades are of what the game plays: the take between its cuts, if it is trimmed.
+          const wrong =
+            fades &&
+            fadesProblem(fades, take.trim ? trimmedSeconds(take.seconds, take.trim) : take.seconds)
+          if (wrong) return { ok: false, message: wrong }
+          const next: BoardTake = { ...take }
+          delete next.fades
+          if (fades && hasFades(fades)) next.fades = fades
+          const chosen = chosenTracks[id]?.lock
+          if (chosen?.take === take.n && chosen.fp === take.hash) {
+            let wav: Uint8Array
+            try {
+              wav = new Uint8Array(
+                await Bun.file(join(found.root, found.folder, name)).arrayBuffer(),
+              )
+            } catch {
+              return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
+            }
+            const game = join(found.music.paths.clips, `${id}.mp3`)
+            const was = await Bun.file(resolveInRoot(found.root, game))
+              .bytes()
+              .catch(() => null)
+            putBack = async () => {
+              if (was) await writeAtomic(found.root, game, was)
+              else await rm(resolveInRoot(found.root, game), { force: true })
+            }
+            // Only the sound changes: the manifest and the lock (an accepted change too) stay as they are.
+            const done = await commitChoice({
+              root: found.root,
+              projectFile,
+              music: found.music,
+              id,
+              listId: chosen.list,
+              take: next,
+              wav: playedOf(next, wav).wav,
+              encode,
+              soundOnly: true,
+            })
+            if (!done.ok) return done
           }
-          // Only the sound changes: the manifest and the lock (an accepted change too) stay as they are.
-          const done = await commitChoice({
-            root: found.root,
-            projectFile,
-            music: found.music,
-            id,
-            listId: chosen.list,
-            take: next,
-            wav: playedOf(next, wav).wav,
-            encode,
-            soundOnly: true,
-          })
-          if (!done.ok) return done
-        }
-        board.takes = board.takes.map((t) => (t === take ? next : t))
-        return { ok: true }
-      }).catch((error): DropResult => {
+          board.takes = board.takes.map((t) => (t === take ? next : t))
+          return { ok: true }
+        },
+        () =>
+          (putBack?.() ?? Promise.resolve()).catch((error) => {
+            stuck = true
+            console.error('putting the game’s file back failed', error)
+          }),
+      ).catch((error): DropResult => {
         // Kept in the server log: the person is told the plain reason, not the stack.
         console.error('saving the fades failed', error)
-        return { ok: false, message: 'The take board could not be written.' }
+        return stuck
+          ? {
+              ok: false,
+              message:
+                'The take board could not be written, and the game’s file could not be put back.',
+              gameChanged: true,
+            }
+          : { ok: false, message: 'The take board could not be written.' }
       })
     },
 

@@ -160,6 +160,8 @@ export function FadesEditor({
   const saved: Fades = take.fades ?? { in: 0, out: 0, shape: 'smooth' }
   const [inText, setInText] = useState(boxText(saved.in))
   const [outText, setOutText] = useState(boxText(saved.out))
+  /** Which button was pressed last: the failure line says saved or removed. */
+  const [removing, setRemoving] = useState(false)
   const [shape, setShape] = useState<Fades['shape']>(saved.shape)
   const set = useSetFades(trackId)
   const actions = useTrackActions()
@@ -216,9 +218,11 @@ export function FadesEditor({
   }
   const save = () => {
     if (!canSave) return
+    setRemoving(false)
     actions.press(`fades:${take.n}`)
     set.mutate({ file: take.file, fades: typed }, { onSuccess: finish })
   }
+  const gameChanged = set.data && !set.data.ok && 'gameChanged' in set.data
   const failure = !actions.shows(`fades:${take.n}`)
     ? null
     : set.isError
@@ -313,7 +317,10 @@ export function FadesEditor({
       </span>
       {failure && (
         <span className="adopt-error" role="alert">
-          The fades could not be saved. {failure}
+          The fades could not be {removing ? 'removed' : 'saved'}. {failure}
+          {chosen &&
+            !gameChanged &&
+            ` The game still plays Take ${take.n} ${removing ? 'with its fades' : 'as before'}.`}
         </span>
       )}
       <div className="take-row editor-actions">
@@ -323,6 +330,7 @@ export function FadesEditor({
             className="btn btn-ghost btn-small"
             disabled={saving}
             onClick={() => {
+              setRemoving(true)
               actions.press(`fades:${take.n}`)
               set.mutate({ file: take.file, fades: null }, { onSuccess: finish })
             }}

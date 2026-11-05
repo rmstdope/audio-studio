@@ -171,6 +171,47 @@ describe('the fades editor', () => {
     expect(e.box('Fade in').value).toBe('0.3')
   })
 
+  it('says the game still plays the take as before when a save fails on the chosen take', async () => {
+    answer = Response.json({ ok: false, message: 'The disk is full.' }, { status: 409 })
+    const e = open({ chosen: true }, true)
+    e.type(e.box('Fade in'), '0.3')
+    await act(async () => e.button('Save fades')!.click())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(e.container.textContent).toContain(
+      'The fades could not be saved. The disk is full. The game still plays Take 3 as before.',
+    )
+  })
+
+  it('says the game keeps its fades when a remove fails on the chosen take', async () => {
+    answer = Response.json({ ok: false, message: 'The disk is full.' }, { status: 409 })
+    const e = open({ chosen: true, fades: { in: 0.3, out: 0, shape: 'smooth' } }, true)
+    await act(async () => e.button('Remove fades')!.click())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(e.closed).toEqual([])
+    expect(e.container.textContent).toContain(
+      'The fades could not be removed. The disk is full. The game still plays Take 3 with its fades.',
+    )
+  })
+
+  it('claims nothing about the game when its file could not be put back', async () => {
+    answer = Response.json(
+      { ok: false, message: 'The disk is full.', gameChanged: true },
+      { status: 409 },
+    )
+    const e = open({ chosen: true }, true)
+    e.type(e.box('Fade in'), '0.3')
+    await act(async () => e.button('Save fades')!.click())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(e.container.textContent).toContain('The fades could not be saved. The disk is full.')
+    expect(e.container.textContent).not.toContain('still plays')
+  })
+
   it('removes the fades in one press, with no question', async () => {
     const e = open({ fades: { in: 0.3, out: 0, shape: 'smooth' } })
     await act(async () => e.button('Remove fades')!.click())
