@@ -22,6 +22,8 @@ describe("the Loudness panel's header in a narrow window", () => {
     const head = rule('.scene-loud-head', narrow())
     expect(head).toMatch(/flex-direction:\s*column/)
     expect(head).toMatch(/align-items:\s*flex-start/)
+    // The mockup's 10 px gap and the button's 6 px margin above it.
+    expect(head).toMatch(/row-gap:\s*16px/)
   })
 
   it('leaves the table alone, so it keeps its three columns', () => {

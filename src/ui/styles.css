@@ -4667,6 +4667,7 @@ button.cue-chip[aria-expanded='true'] {
   .scene-loud-head {
     flex-direction: column;
     align-items: flex-start;
+    row-gap: 16px;
   }
 }
 
