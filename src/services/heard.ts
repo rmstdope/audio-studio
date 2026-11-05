@@ -5,9 +5,10 @@ import { resolveInRoot } from '../core/paths'
 import { characterFile, readCached, writeAtomic } from './files'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
+import { CACHE_DIR } from '../core/project'
 
 /** Where what Whisper heard of each part's lines is kept, in the project's tool cache. */
-export const HEARD_DIR = '.content-studio/heard'
+export const HEARD_DIR = `${CACHE_DIR}/heard`
 
 /** What Whisper heard of a line's take now, or nothing kept for it; null for an unknown line. */
 export type HeardResult = { ok: true; heard: HeardLine | null } | ProjectFailure | null

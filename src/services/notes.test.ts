@@ -26,7 +26,7 @@ describe('setNote', () => {
     const projectFile = join(root, 'content-studio.json')
     expect(await setNote(projectFile, 'act1', 'k1', ' too fast ')).toEqual({ ok: true })
     expect(await notesOf(projectFile)).toEqual({ k1: 'too fast' })
-    expect(readdirSync(join(root, '.content-studio/notes'))).toEqual([
+    expect(readdirSync(join(root, 'content-studio/cache/notes'))).toEqual([
       expect.stringMatching(/^act1-[0-9a-f]{8}\.json$/),
     ])
   })
@@ -39,8 +39,8 @@ describe('setNote', () => {
     await setNote(projectFile, 'act1', 'k1', '')
     expect(await notesOf(projectFile)).toEqual({ k2: 'b' })
     await setNote(projectFile, 'act1', 'k2', '')
-    expect(existsSync(join(root, '.content-studio/notes'))).toBe(true)
-    expect(readdirSync(join(root, '.content-studio/notes'))).toEqual([])
+    expect(existsSync(join(root, 'content-studio/cache/notes'))).toBe(true)
+    expect(readdirSync(join(root, 'content-studio/cache/notes'))).toEqual([])
   })
 
   it('is null for an unknown part or line, writing nothing of the game’s', async () => {
@@ -48,7 +48,7 @@ describe('setNote', () => {
     const projectFile = join(root, 'content-studio.json')
     expect(await setNote(projectFile, 'act9', 'k1', 'x')).toBeNull()
     expect(await setNote(projectFile, 'act1', 'zz', 'x')).toBeNull()
-    expect(existsSync(join(root, '.content-studio'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache'))).toBe(false)
     expect(existsSync(join(root, 'tts/act1/cues.json'))).toBe(false)
   })
 
@@ -56,7 +56,7 @@ describe('setNote', () => {
     const root = tempRepo(files)
     const projectFile = join(root, 'content-studio.json')
     await setNote(projectFile, 'act1', 'k1', 'kept by hand')
-    const dir = join(root, '.content-studio/notes')
+    const dir = join(root, 'content-studio/cache/notes')
     const file = join(dir, readdirSync(dir)[0]!)
     writeFileSync(file, '{"version": 1, "part": "act1", "lines": {"k1": "kept by hand"},}')
     const part = await loadPart(projectFile, 'act1')
@@ -64,7 +64,7 @@ describe('setNote', () => {
     expect(part.part.notes).toEqual({})
     expect(part.part.problems).toEqual([
       {
-        file: `.content-studio/notes/${readdirSync(dir)[0]}`,
+        file: `content-studio/cache/notes/${readdirSync(dir)[0]}`,
         path: '',
         message: expect.any(String),
       },
@@ -87,7 +87,7 @@ describe('setNote', () => {
     )
     expect(await notesOf(projectFile)).toEqual({})
     await setNote(projectFile, 'act1', 'k1', 'still here')
-    const dir = join(root, '.content-studio/notes')
+    const dir = join(root, 'content-studio/cache/notes')
     expect(readFileSync(join(dir, readdirSync(dir)[0]!), 'utf8')).toContain('gone soon')
   })
 })

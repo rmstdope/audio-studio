@@ -13,7 +13,7 @@ import { createSerial } from './serial'
 /** What a take that failed tells the store: the image and take, and the image tool's last error line. */
 export type ImageFailureReport = Omit<ImageFailure, 'at'>
 
-/** The studio's memory of image models whose last take failed, kept in the project's `.content-studio/`. */
+/** The studio's memory of image models whose last take failed, kept in the project's `content-studio/cache/`. */
 export interface ImageHealthStore {
   /** The failed last takes, by model; a model with none is not there. A file that cannot be read says none. */
   read(projectFile: string): Promise<ImageHealth['models']>

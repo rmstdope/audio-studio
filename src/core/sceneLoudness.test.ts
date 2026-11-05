@@ -396,8 +396,9 @@ describe('splitClipPaths', () => {
     ])
   })
   it('marks each clip of a list and leaves the commas plain', () => {
-    const m = 'ffmpeg could not read a/b.mp3, c/d.mp3, .content-studio/effect-takes/x/3.mp3: bad'
-    expect(paths(m)).toEqual(['a/b.mp3', 'c/d.mp3', '.content-studio/effect-takes/x/3.mp3'])
+    const m =
+      'ffmpeg could not read a/b.mp3, c/d.mp3, content-studio/cache/effect-takes/x/3.mp3: bad'
+    expect(paths(m)).toEqual(['a/b.mp3', 'c/d.mp3', 'content-studio/cache/effect-takes/x/3.mp3'])
     expect(
       splitClipPaths(m)
         .map((p) => p.text)

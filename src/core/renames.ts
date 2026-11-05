@@ -10,8 +10,8 @@ export interface FoundNames {
 
 const LEAD = 'This game is set up for Audio Studio, which is now Content Studio.'
 const RENAME_FILE = '  git mv audio-studio.json content-studio.json'
-const RENAME_FOLDER = '  mv .audio-studio .content-studio'
-const RENAME_GITIGNORE = '  in .gitignore, change .audio-studio/ to .content-studio/'
+const RENAME_FOLDER = '  mkdir -p content-studio && mv .audio-studio content-studio/cache'
+const RENAME_GITIGNORE = '  in .gitignore, remove .audio-studio/'
 
 /**
  * What the terminal says when a game still has the studio's old names: exactly the renames left to

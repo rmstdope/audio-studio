@@ -11,9 +11,10 @@ import type { Problem, Project } from '../core/project'
 import { effectsWithTakes } from './effectBoards'
 import { readEffectChosen } from './effectClips'
 import { readJson, readResource } from './files'
+import { CACHE_DIR } from '../core/project'
 
 /** The studio's own descriptions of sound effects: its state, not the game's. */
-export const EFFECTS_OVERRIDES_FILE = '.content-studio/effects.json'
+export const EFFECTS_OVERRIDES_FILE = `${CACHE_DIR}/effects.json`
 
 /**
  * The game's effects list at `path`, entry by entry. Its problems (with their file and place) are

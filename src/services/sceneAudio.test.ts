@@ -108,13 +108,13 @@ describe.skipIf(!hasFfmpeg)('ffmpegSceneAudio', () => {
   })
 
   it('names every clip of a mix, in order, in full', async () => {
-    mkdirSync(join(root, '.content-studio/effect-takes'), { recursive: true })
-    const a = join(root, '.content-studio/effect-takes/a.mp3')
+    mkdirSync(join(root, 'content-studio/cache/effect-takes'), { recursive: true })
+    const a = join(root, 'content-studio/cache/effect-takes/a.mp3')
     const b = join(root, 'b.mp3')
     writeFileSync(a, 'x')
     writeFileSync(b, 'x')
     const mix = await audio.loudness([part(a), part(b)], 60).catch((e: Error) => e.message)
-    expect(mix).toContain('could not read .content-studio/effect-takes/a.mp3, b.mp3:')
+    expect(mix).toContain('could not read content-studio/cache/effect-takes/a.mp3, b.mp3:')
     expect(mix).not.toContain(root)
   })
 })

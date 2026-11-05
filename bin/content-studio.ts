@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 import { parseArgs } from 'node:util'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { PROJECT_FILE } from '../src/core/project'
 import { startServer } from '../src/server/index'
 import { forgetLoadedKeys } from '../src/services/env'
+import { ensureStudioFolder } from '../src/services/studioFolder'
 import { locateProject, projectFileProblem } from '../src/services/workspace'
 
 const HELP = `content-studio: make a game's narration, music and images.
@@ -62,6 +63,11 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
 // Bun has read the env files of this folder into the environment, where a key would win over
 // the project's env file for good: forget those of the project's own, so a key changed in it is seen.
 forgetLoadedKeys(process.cwd(), projectFile)
+
+// The studio folder's .gitignore keeps the cache out of git; without it the studio still works.
+await ensureStudioFolder(dirname(projectFile)).catch((error: unknown) => {
+  console.warn(`Note: could not write content-studio/.gitignore (${(error as Error).message}).`)
+})
 
 const server = startServer({ projectFile, port, development: values.dev })
 

@@ -1,4 +1,5 @@
 node_modules/
+# The studio's cache before format version 2; the sample's is now kept out by its content-studio/.gitignore.
 .content-studio/
 .env
 *.log

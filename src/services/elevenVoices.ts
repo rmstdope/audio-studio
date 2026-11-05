@@ -11,9 +11,10 @@ import { elevenVoice, providerId } from '../core/voices'
 import { ElevenLabsError, NO_ELEVENLABS_KEY, type ElevenLabsClient } from './elevenlabs'
 import { readJson, writeAtomic } from './files'
 import { createSerial } from './serial'
+import { CACHE_DIR } from '../core/project'
 
 /** The voices the studio added from ElevenLabs' library, in the project's tool cache. */
-export const ELEVEN_VOICES_FILE = '.content-studio/eleven-voices.json'
+export const ELEVEN_VOICES_FILE = `${CACHE_DIR}/eleven-voices.json`
 
 /** Additions to a project's voices, one at a time, so a library voice is added once. */
 const writes = createSerial()

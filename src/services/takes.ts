@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import {
+  CACHE_DIR,
   declaredLanguage,
   FREE_MODELS,
   phraseProblem,
@@ -37,7 +38,7 @@ import { randomUUID } from 'node:crypto'
 import { NO_KEY } from './fish'
 
 /** Where audition takes are kept, in the project's tool cache (gitignored by the consumer). */
-export const TAKES_DIR = '.content-studio/takes'
+export const TAKES_DIR = `${CACHE_DIR}/takes`
 
 /** A recorded take (its key, and the text it is of), or why there is none. Null for an unknown character. */
 export type TakeResult =

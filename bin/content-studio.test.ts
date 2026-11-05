@@ -32,8 +32,8 @@ describe('content-studio on a game still set up for Audio Studio', () => {
         'This game is set up for Audio Studio, which is now Content Studio.',
         'Rename these, then run content-studio again:',
         '  git mv audio-studio.json content-studio.json',
-        '  mv .audio-studio .content-studio',
-        '  in .gitignore, change .audio-studio/ to .content-studio/',
+        '  mkdir -p content-studio && mv .audio-studio content-studio/cache',
+        '  in .gitignore, remove .audio-studio/',
         '',
       ].join('\n'),
     )
@@ -68,7 +68,7 @@ describe('content-studio on a game still set up for Audio Studio', () => {
     expect(code).toBe(1)
     expect(stdout).toBe('')
     expect(stderr).not.toContain('git mv')
-    expect(stderr).toContain('  mv .audio-studio .content-studio')
+    expect(stderr).toContain('  mkdir -p content-studio && mv .audio-studio content-studio/cache')
   })
 
   it('says so when there is no project file', async () => {

@@ -13,7 +13,7 @@ import { createSerial } from './serial'
 /** What an effect that failed tells the store: the effects tool's last error line. */
 export type EffectFailureReport = Omit<EffectFailure, 'at'>
 
-/** The studio's memory of effect models whose last effect failed, kept in the project's `.content-studio/`. */
+/** The studio's memory of effect models whose last effect failed, kept in the project's `content-studio/cache/`. */
 export interface EffectHealthStore {
   /** The failed last effects, by model; a model with none is not there. A file that cannot be read says none. */
   read(projectFile: string): Promise<EffectHealth['models']>

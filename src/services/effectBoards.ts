@@ -4,12 +4,13 @@ import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { readResource } from './files'
 import type { ProjectFailure } from './workspace'
+import { CACHE_DIR } from '../core/project'
 
 /** Where an effect's takes are cached, one folder per effect. */
-export const EFFECT_TAKES_DIR = '.content-studio/effect-takes'
+export const EFFECT_TAKES_DIR = `${CACHE_DIR}/effect-takes`
 
 /** Where an effect's board is saved: one file per effect (an effect id is a slug, so a safe file name). */
-export const EFFECT_BOARD_DIR = '.content-studio/effect-boards'
+export const EFFECT_BOARD_DIR = `${CACHE_DIR}/effect-boards`
 
 /** An effect's board file, relative to the project root. */
 export const boardFile = (id: string) => `${EFFECT_BOARD_DIR}/${id}.json`

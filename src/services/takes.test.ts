@@ -72,7 +72,7 @@ describe('recordTake', () => {
       },
     ])
     const file = await takeFile(projectFile, result.key)
-    expect(file).toBe(join(root, '.content-studio/takes', `${result.key}.mp3`))
+    expect(file).toBe(join(root, 'content-studio/cache/takes', `${result.key}.mp3`))
     expect([...readFileSync(file!)]).toEqual([7, 7, 7])
   })
 
@@ -151,7 +151,7 @@ describe('recordTake', () => {
       createLimiter(),
     )
     expect(result).toMatchObject({ ok: false, reason: 'fish' })
-    expect(existsSync(join(root, '.content-studio/takes'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/takes'))).toBe(false)
   })
 
   it('refuses a phrase in the cast too long for one take, and pays nothing', async () => {
@@ -232,7 +232,7 @@ describe('recordTake', () => {
 
 describe('takeFile', () => {
   it('knows only keys that look like keys and have a file', async () => {
-    const root = tempRepo({ ...files, '.content-studio/takes/0123456789abcdef.mp3': 'x' })
+    const root = tempRepo({ ...files, 'content-studio/cache/takes/0123456789abcdef.mp3': 'x' })
     const projectFile = join(root, 'content-studio.json')
     expect(await takeFile(projectFile, '0123456789abcdef')).not.toBeNull()
     expect(await takeFile(projectFile, 'fedcba9876543210')).toBeNull()
@@ -343,7 +343,7 @@ describe('tryLine', () => {
       },
     ])
     expect(await takeFile(projectFileOf(root), result.key)).toBe(
-      join(root, '.content-studio/takes', `${result.key}.mp3`),
+      join(root, 'content-studio/cache/takes', `${result.key}.mp3`),
     )
     // Nothing of the game's: no cue saved, no manifest or lock made.
     for (const file of [
@@ -482,7 +482,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
     'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
   })
   const spending = (root: string) => {
-    const file = join(root, '.content-studio/spending.json')
+    const file = join(root, 'content-studio/cache/spending.json')
     return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null
   }
   const take = (root: string, eleven: ReturnType<typeof fakeEleven>['client'] | null) =>
@@ -517,7 +517,9 @@ describe('takes and tries with an ElevenLabs voice', () => {
       },
     ])
     const key = (result as { key: string }).key
-    expect(readFileSync(join(root, `.content-studio/takes/${key}.mp3`))).toEqual(Buffer.from(wav()))
+    expect(readFileSync(join(root, `content-studio/cache/takes/${key}.mp3`))).toEqual(
+      Buffer.from(wav()),
+    )
     expect(spending(root)).toMatchObject({
       version: 2,
       tries: [
@@ -812,11 +814,11 @@ describe('takes and tries with an ElevenLabs voice', () => {
       message: 'ElevenLabs answered 401: quota exceeded',
     })
     expect(spending(root)).toBeNull()
-    expect(existsSync(join(root, '.content-studio/takes'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/takes'))).toBe(false)
   })
 
   it('logs what ElevenLabs made even when the take cannot be kept', async () => {
-    const root = tempRepo({ ...elevenFiles(), '.content-studio/takes': 'not a folder' })
+    const root = tempRepo({ ...elevenFiles(), 'content-studio/cache/takes': 'not a folder' })
     const eleven = fakeEleven({}, { speak: wav })
     expect(await take(root, eleven.client)).toMatchObject({ ok: false, reason: 'elevenlabs' })
     expect(spending(root).tries).toMatchObject([{ kind: 'take', credits: 22 }])

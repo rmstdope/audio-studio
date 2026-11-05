@@ -16,6 +16,7 @@ import {
   type PlanInput,
 } from '../core/planner'
 import {
+  CACHE_DIR,
   OLD_PROJECT_FILE,
   OLD_STATE_DIR,
   PROJECT_FILE,
@@ -225,7 +226,7 @@ export async function loadWorkspace(projectFile: string): Promise<
 }
 
 /** Where the user's notes on each part's lines are kept, in the project's tool cache. */
-export const NOTES_DIR = '.content-studio/notes'
+export const NOTES_DIR = `${CACHE_DIR}/notes`
 
 /**
  * The notes on a part's lines: none if there is no file. A file that cannot be read or does not

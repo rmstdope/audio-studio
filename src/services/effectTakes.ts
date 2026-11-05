@@ -153,9 +153,9 @@ function describeFailure(error: unknown): string {
 
 /**
  * The takes of the game's sound effects: made by `generator` one at a time (the CPU), each ending
- * where its sound ends, and kept on a board per effect in `.content-studio/effect-boards/<effect>.json`
+ * where its sound ends, and kept on a board per effect in `content-studio/cache/effect-boards/<effect>.json`
  * (with its seed, real length and waveform), its WAV in
- * `.content-studio/effect-takes/<effect>/<hash>.<n>.wav`. Takes waiting, being made and failed are
+ * `content-studio/cache/effect-takes/<effect>/<hash>.<n>.wav`. Takes waiting, being made and failed are
  * kept in memory, per effect, for the page to poll (they survive a `--dev` reload, not a restart).
  * The generator's failures and successes go to `health`, which Setup's Sound-effect models row reads.
  */

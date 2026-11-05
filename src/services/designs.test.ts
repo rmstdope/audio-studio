@@ -419,7 +419,9 @@ describe('designs with ElevenLabs', () => {
         Buffer.from([Number(v.design!.generated!.slice(1))]),
       )
     }
-    const spending = JSON.parse(readFileSync(join(root, '.content-studio/spending.json'), 'utf8'))
+    const spending = JSON.parse(
+      readFileSync(join(root, 'content-studio/cache/spending.json'), 'utf8'),
+    )
     expect(spending.tries).toMatchObject([
       { kind: 'design', character: 'mira', model: 'eleven_ttv_v3', credits: plan.credits },
     ])

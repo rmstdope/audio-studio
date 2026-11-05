@@ -57,15 +57,16 @@ import { readMusic } from './musicLists'
 import { isRefreshing, isRefreshingShared } from './refresh'
 import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
+import { CACHE_DIR } from '../core/project'
 
 /** The queue's key for takes made in the cloud: one at a time, beside the GPU's. */
 const CLOUD = 'music-cloud'
 
 /** Where a project's music takes are cached, one folder per track. */
-export const MUSIC_TAKES_DIR = '.content-studio/music-takes'
+export const MUSIC_TAKES_DIR = `${CACHE_DIR}/music-takes`
 
 /** Where a track's board is saved: one file per track (a track id is a safe file name). */
-export const MUSIC_BOARD_DIR = '.content-studio/music'
+export const MUSIC_BOARD_DIR = `${CACHE_DIR}/music`
 
 /** A track id that is safe as a file and folder name (the game's list is validated too; this guards the board's path on its own). */
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
@@ -293,8 +294,8 @@ function playedOf(take: BoardTake, bytes: Uint8Array): { take: BoardTake; wav: U
 /**
  * The takes of the game's music: made by `generator` on the GPU `queue` (shared with Whisper),
  * shaped to what the game would play, and kept on a board per track in
- * `.content-studio/music/<track>.json` (each take with its seed, waveform and the inputs it was made
- * from), its WAV in `.content-studio/music-takes/<track>/<hash>.<n>.wav`. Takes waiting, being made
+ * `content-studio/cache/music/<track>.json` (each take with its seed, waveform and the inputs it was made
+ * from), its WAV in `content-studio/cache/music-takes/<track>/<hash>.<n>.wav`. Takes waiting, being made
  * and failed are kept in memory, per track, for the page to poll (they survive a `--dev` reload,
  * not a restart); a take made is a file and a board entry.
  */

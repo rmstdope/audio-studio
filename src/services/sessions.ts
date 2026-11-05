@@ -23,7 +23,7 @@ import {
 import { listDesigns } from '../core/designs'
 import { resolveInRoot } from '../core/paths'
 import { perTakeCost } from '../core/sitting'
-import { declaredLanguage, type Problem } from '../core/project'
+import { CACHE_DIR, declaredLanguage, type Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
@@ -55,7 +55,7 @@ import {
 } from './workspace'
 
 /** Where audition sessions are kept, in the project's tool cache. */
-export const SESSIONS_DIR = '.content-studio/auditions'
+export const SESSIONS_DIR = `${CACHE_DIR}/auditions`
 
 /** Why a session action did nothing. */
 export type SessionFailure =

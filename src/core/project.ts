@@ -30,6 +30,12 @@ export function phraseProblem(phrase: string, chunkLimit: number): string | null
 /** The file name the CLI looks for, walking up from the current directory. */
 export const PROJECT_FILE = 'content-studio.json'
 
+/** The studio's own folder, beside the project file: its edits and locks, and the cache. */
+export const STUDIO_DIR = 'content-studio'
+
+/** What the studio keeps for itself on this machine, never committed: takes, notes, settings. */
+export const CACHE_DIR = `${STUDIO_DIR}/cache`
+
 /** The project file's name before the rename to Content Studio; never read, only reported. */
 export const OLD_PROJECT_FILE = 'audio-studio.json'
 

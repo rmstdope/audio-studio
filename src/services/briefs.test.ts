@@ -119,9 +119,9 @@ describe('setTrackBrief and tracks the game dropped', () => {
   const stale = {
     'tts/act2/music.json': [],
     'music/briefs.json': { gone: { bpm: 70 }, kept: { bpm: 80 } },
-    '.content-studio/music/gone.json': { next: 2, takes: [] },
-    '.content-studio/music-takes/gone/0123456789abcdef.1.wav': 'wav',
-    '.content-studio/music/lonely.json': { next: 2, takes: [] },
+    'content-studio/cache/music/gone.json': { next: 2, takes: [] },
+    'content-studio/cache/music-takes/gone/0123456789abcdef.1.wav': 'wav',
+    'content-studio/cache/music/lonely.json': { next: 2, takes: [] },
     'music/music.lock.json': {
       kept: {
         fp: 'f',
@@ -134,30 +134,30 @@ describe('setTrackBrief and tracks the game dropped', () => {
       },
     },
     'audio/music/kept.mp3': 'mp3',
-    '.content-studio/music/kept.json': { next: 2, takes: [] },
+    'content-studio/cache/music/kept.json': { next: 2, takes: [] },
   }
 
   it('drops the briefs and boards of unlisted tracks never chosen, at the next save', async () => {
     const { root, file, briefs } = repo(stale)
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
     expect(JSON.parse(briefs())).toEqual({ hall: { bpm: 70 }, kept: { bpm: 80 } })
-    expect(existsSync(join(root, '.content-studio/music/gone.json'))).toBe(false)
-    expect(existsSync(join(root, '.content-studio/music-takes/gone'))).toBe(false)
-    expect(existsSync(join(root, '.content-studio/music/lonely.json'))).toBe(false)
-    expect(existsSync(join(root, '.content-studio/music/kept.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/cache/music/gone.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/music-takes/gone'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/music/lonely.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/music/kept.json'))).toBe(true)
   })
 
   it('drops nothing while a list is missing', async () => {
     const { root, file, briefs } = repo({ ...stale, 'tts/stingers.json': undefined })
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
     expect(JSON.parse(briefs())).toHaveProperty('gone')
-    expect(existsSync(join(root, '.content-studio/music/gone.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/cache/music/gone.json'))).toBe(true)
   })
 
   it('drops nothing when the lock cannot be read', async () => {
     const { root, file, briefs } = repo({ ...stale, 'music/music.lock.json': '{ nope' })
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
     expect(JSON.parse(briefs())).toHaveProperty('gone')
-    expect(existsSync(join(root, '.content-studio/music/gone.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/cache/music/gone.json'))).toBe(true)
   })
 })

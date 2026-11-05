@@ -35,7 +35,10 @@ describe('locateProject', () => {
   })
 
   it('opens when everything is renamed', () => {
-    const root = tempRepo({ 'content-studio.json': projectJson(), '.content-studio/x.json': {} })
+    const root = tempRepo({
+      'content-studio.json': projectJson(),
+      'content-studio/cache/x.json': {},
+    })
     expect(locateProject(root)).toEqual({ ok: true, file: join(root, 'content-studio.json') })
   })
 

@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { clipInputs, fingerprint, type ClipInputs } from '../core/fingerprint'
 import { LineTakeSchema, takesView, type LineTake, type LineTakeView } from '../core/lineTakes'
 import { resolveInRoot } from '../core/paths'
-import { partCacheName, type Problem } from '../core/project'
+import { CACHE_DIR, partCacheName, type Problem } from '../core/project'
 import type { Line } from '../core/resources'
 import { createBudget, type Budget, type SpendProblem } from '../core/spend'
 import type { FishFactory } from './auditions'
@@ -29,7 +29,7 @@ import { openProject, readPart, type PartRead, type ProjectFailure } from './wor
 const NO_CREDITS = createBudget({ model: DEFAULT_ELEVEN_MODEL, dollars: 0 })
 
 /** Where a line's extra takes are kept, in the project's tool cache: a folder per part and line. */
-const LINE_TAKES_DIR = '.content-studio/line-takes'
+const LINE_TAKES_DIR = `${CACHE_DIR}/line-takes`
 
 /** A line's extra takes, newest first, or why they cannot be listed. Null for an unknown part or line. */
 export type LineTakesResult =
