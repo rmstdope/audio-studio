@@ -21,7 +21,7 @@ import {
   LockSchema,
   ManifestSchema,
   ttsFor,
-  type Cast,
+  type SpokenCast,
   type Character,
   type Line,
   type Lock,
@@ -383,7 +383,7 @@ export type Spoken =
  */
 export function finalFingerprint(
   line: Line,
-  cast: Cast,
+  cast: SpokenCast,
   cues: Record<string, string>,
   narration: Project['narration'],
 ): string | null {
@@ -421,7 +421,7 @@ export async function speakLine({
   speak: Speak
   line: Line
   inputs: ClipInputs
-  cast: Cast
+  cast: SpokenCast
   narration: Project['narration']
   budget: Budget
   limiter: Limiter
@@ -469,7 +469,7 @@ export async function checkTake(
   checker: Transcriber | null,
   clip: { wav: Uint8Array; seconds: number },
   line: Line,
-  cast: Cast,
+  cast: SpokenCast,
   narration: Project['narration'],
   ears: Ears,
 ): Promise<Take> {

@@ -294,13 +294,13 @@ export function summarize({
     parts,
     characters: characters.sort((a, b) => b.totalLines - a.totalLines || a.id.localeCompare(b.id)),
     canRefresh: Boolean(project.refresh?.part),
-    pronounce: cast ? Object.entries(cast.pronounce) : null,
+    pronounce: cast ? Object.entries(pronounceOf(cast, source)) : null,
     soundAlike: soundAlikeOf(project, source),
     perLanguage: Object.fromEntries(
       project.languages.map((language) => [
         language,
         {
-          pronounce: cast ? Object.entries(pronounceOf(cast, language, source)) : null,
+          pronounce: cast ? Object.entries(pronounceOf(cast, language)) : null,
           soundAlike: soundAlikeOf(project, language),
         },
       ]),

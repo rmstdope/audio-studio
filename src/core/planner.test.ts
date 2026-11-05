@@ -4,7 +4,7 @@ import { clipInputs, cueInputs, fingerprint } from './fingerprint'
 import { mergeCues } from './cued'
 import { adoptUntracked, planPart, type PlanInput } from './planner'
 import { ProjectSchema } from './project'
-import type { Cast, Line, LockEntry } from './resources'
+import type { Line, LockEntry, SpokenCast } from './resources'
 
 const narration = ProjectSchema.parse(projectJson()).narration
 
@@ -14,7 +14,7 @@ const lines: Line[] = [
   { key: 't1', speaker: 'tilda', text: 'Have you heard?' },
 ]
 
-const cast: Cast = {
+const cast: SpokenCast = {
   speakers: {
     narrator: { voice: 'v-narrator', style: '[warm]' },
     mira: { voice: 'v-mira', style: '[low, calm]' },
@@ -41,7 +41,7 @@ function input(overrides: Partial<PlanInput> = {}): PlanInput {
 /** The lock entry a clip of `line` made with today's inputs would have. */
 function entryFor(
   line: Line,
-  theCast: Cast = cast,
+  theCast: SpokenCast = cast,
   extra: Partial<LockEntry> = {},
   cues: Record<string, string> = {},
 ): LockEntry {
@@ -81,7 +81,7 @@ describe('planPart', () => {
   })
 
   it('names a changed voice', () => {
-    const recast: Cast = {
+    const recast: SpokenCast = {
       ...cast,
       speakers: { ...cast.speakers, mira: { voice: 'v-new', style: '[low, calm]' } },
     }
@@ -96,14 +96,14 @@ describe('planPart', () => {
   })
 
   it('makes a pronunciation stale only the lines that contain it', () => {
-    const said: Cast = { ...cast, pronounce: { Elior: 'El-ee-or' } }
+    const said: SpokenCast = { ...cast, pronounce: { Elior: 'El-ee-or' } }
     const state = planPart(input({ lock: trackedLock, cast: said }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['pronunciation'] })
     expect(state.lines[1]!.status).toBe('ok')
   })
 
   it('speaks a character at its own speed, a change of which is a settings change', () => {
-    const quick: Cast = {
+    const quick: SpokenCast = {
       ...cast,
       speakers: { ...cast.speakers, mira: { ...cast.speakers.mira, speed: 1.2 } },
     }
@@ -715,7 +715,7 @@ describe('mergeCues', () => {
 })
 
 describe('a line with an ElevenLabs voice', () => {
-  const elevenCast: Cast = {
+  const elevenCast: SpokenCast = {
     speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]', speed: 1.1 } },
     pronounce: {},
   }
@@ -814,7 +814,7 @@ describe('a line on an ElevenLabs model that reads no cues', () => {
 })
 
 describe('a final step on ElevenLabs’ side only', () => {
-  const elevenCast: Cast = {
+  const elevenCast: SpokenCast = {
     speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]' } },
     pronounce: {},
   }
@@ -846,7 +846,7 @@ describe('a final step on ElevenLabs’ side only', () => {
 })
 
 describe('which stages of a line are sent without its cues', () => {
-  const elevenCast: Cast = {
+  const elevenCast: SpokenCast = {
     speakers: { ...cast.speakers, mira: { voice: 'eleven:abc' } },
     pronounce: {},
   }
@@ -891,7 +891,7 @@ describe('a Fish voice’s fingerprint', () => {
 
 describe('a final plan, with a line whose voice has no final step', () => {
   it('counts an up-to-date ElevenLabs line as final, so a final recording leaves it alone', () => {
-    const elevenCast: Cast = {
+    const elevenCast: SpokenCast = {
       speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]' } },
       pronounce: {},
     }

@@ -15,7 +15,7 @@ import {
   cueFor,
   sceneKey,
   sceneOfKey,
-  type Cast,
+  type SpokenCast,
   type Cues,
   type Line,
   type Lock,
@@ -144,7 +144,7 @@ export interface PlanInput {
    * source line missing from `lines` (or blank there) is listed as untranslated.
    */
   source?: Line[]
-  cast: Cast
+  cast: SpokenCast
   /**
    * The cues the lines are spoken with. In a language besides the source, the source's cues under
    * the language's own, so a line follows the source's cue until it has one of its own.

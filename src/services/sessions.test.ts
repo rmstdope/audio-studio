@@ -91,7 +91,7 @@ const files = {
     '{\n  "speakers": {\n' +
     '    "mira": { "voice": "cur", "style": "[low]", "audition": { "keywords": ["warm"] } },\n' +
     '    "tilda": { "voice": "t1" }\n' +
-    '  },\n  "pronounce": { "Act I:": "Act One:", "Elior": "El-ee-or" }\n}\n',
+    '  },\n  "pronounce": {\n    "en": { "Act I:": "Act One:", "Elior": "El-ee-or" }\n  }\n}\n',
   'audio/act1/manifest.json': { a1: { file: 'a1.mp3' } },
   'audio/act1/a1.mp3': 'clip',
   'tts/act1/script.json': [
@@ -571,7 +571,7 @@ describe('castVoice', () => {
       '{\n  "speakers": {\n' +
         '    "mira": { "voice": "b", "voiceName": "Warm b", "style": "[low]", "audition": { "keywords": ["warm"] } },\n' +
         '    "tilda": { "voice": "t1" }\n' +
-        '  },\n  "pronounce": { "Act I:": "Act One:", "Elior": "El-ee-or" }\n}\n',
+        '  },\n  "pronounce": {\n    "en": { "Act I:": "Act One:", "Elior": "El-ee-or" }\n  }\n}\n',
     )
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
   })

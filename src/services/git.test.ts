@@ -31,7 +31,7 @@ describe('gitChanges', () => {
     git(root, 'commit', '-q', '-m', 'start')
     writeFileSync(
       join(root, 'content-studio/narration/cast.json'),
-      '{"speakers":{},"pronounce":{"a":"b"}}',
+      '{"speakers":{},"pronounce":{"en":{"a":"b"}}}',
     )
     writeFileSync(join(root, 'content-studio/narration/act1.edits.json'), '{}')
     writeFileSync(join(root, 'audio/act1/b.mp3'), 'new clip')

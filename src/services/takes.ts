@@ -13,7 +13,7 @@ import {
 import type { Budget } from '../core/spend'
 import { isPaid } from '../core/sitting'
 import { sceneCueFor } from '../core/fingerprint'
-import { cueFor, projectCast, ttsFor, type Cast } from '../core/resources'
+import { cueFor, projectCast, ttsFor, type Cast, type SpokenCast } from '../core/resources'
 import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import { normalizeCue, withInside, wordsOf } from '../core/cued'
@@ -386,7 +386,7 @@ interface ElevenText {
 /** The page take's text with and without the character's style, as `ElevenText` wants it. */
 function pageText(
   text: AuditionText,
-  cast: Cast,
+  cast: SpokenCast,
   characterId: string,
 ): Pick<ElevenText, 'withCues' | 'bare' | 'cued'> {
   return {
@@ -575,7 +575,7 @@ export function auditionIn(
   summary: ProjectSummary,
   characterId: string,
   asked?: string,
-): { language: string; cast: Cast; audition: AuditionText } {
+): { language: string; cast: SpokenCast; audition: AuditionText } {
   const { languages } = project
   const language = declaredLanguage(project, asked)
   const seen = projectCast(cast, language, languages[0]!)
@@ -585,7 +585,7 @@ export function auditionIn(
     cast: seen,
     audition: auditionText(
       seen.speakers[characterId] ?? {},
-      cast.pronounce,
+      seen.pronounce,
       project,
       language,
       longest ?? null,
@@ -601,7 +601,7 @@ export function auditionIn(
 export function recordedTakes(
   root: string,
   project: Project,
-  cast: Cast,
+  cast: SpokenCast,
   characterId: string,
   text: AuditionText,
   voiceIds: string[],
@@ -646,7 +646,7 @@ function takeOf(
   project: Project,
   voice: string,
   text: AuditionText,
-  cast: Cast,
+  cast: SpokenCast,
   characterId: string,
   model: string,
   language: string,
@@ -665,7 +665,7 @@ function takeOf(
  */
 export function elevenTakeCost(
   project: Project,
-  cast: Cast,
+  cast: SpokenCast,
   characterId: string,
   text: AuditionText,
 ): { model: string; perTake: number } {
@@ -683,7 +683,7 @@ const ELEVEN_ANY = 'eleven:any'
  */
 export function elevenPageTake(
   project: Project,
-  cast: Cast,
+  cast: SpokenCast,
   characterId: string,
   text: AuditionText,
   voice: string,

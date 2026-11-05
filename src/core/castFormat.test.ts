@@ -30,12 +30,17 @@ describe('formatCast', () => {
     )
   })
 
-  it('writes a long pronunciation table one entry per line', () => {
-    const pronounce = Object.fromEntries(
+  it('writes each language’s pronunciations on its line, a long table one entry per line', () => {
+    const long = Object.fromEntries(
       Array.from({ length: 8 }, (_, i) => [`Word${i}`, `Said as word number ${i}`]),
     )
+    const pronounce = { en: { Elior: 'El-ee-or' }, sv: long }
     const text = formatCast({ speakers: {}, pronounce })
-    expect(text).toContain('  "pronounce": {\n    "Word0": "Said as word number 0",\n')
+    expect(text).toContain(
+      '  "pronounce": {\n' +
+        '    "en": { "Elior": "El-ee-or" },\n' +
+        '    "sv": {\n      "Word0": "Said as word number 0",\n',
+    )
     expect(JSON.parse(text)).toEqual({ speakers: {}, pronounce })
   })
 

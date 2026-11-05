@@ -4,22 +4,24 @@ import { CastSchema, DialogSchema, pronounceOf, projectCast, ttsFor, voiceOf } f
 
 describe('CastSchema', () => {
   it('explains a pronunciation without the word it replaces', () => {
-    const result = CastSchema.safeParse({ speakers: {}, pronounce: { '': 'nothing' } })
+    const result = CastSchema.safeParse({ speakers: {}, pronounce: { en: { '': 'nothing' } } })
     if (result.success) throw new Error('expected an empty key to be refused')
     expect(problemsFrom('content-studio/narration/cast.json', result.error)).toEqual([
       {
         file: 'content-studio/narration/cast.json',
-        path: 'pronounce',
+        path: 'pronounce.en',
         message: 'a pronunciation needs the word it replaces; one has an empty word',
       },
     ])
   })
 
   it('reports a __proto__ pronunciation instead of losing it', () => {
-    const result = CastSchema.safeParse(JSON.parse('{"speakers":{},"pronounce":{"__proto__":"x"}}'))
+    const result = CastSchema.safeParse(
+      JSON.parse('{"speakers":{},"pronounce":{"en":{"__proto__":"x"}}}'),
+    )
     if (result.success) throw new Error('expected __proto__ to be refused')
     expect(problemsFrom('content-studio/narration/cast.json', result.error)[0]).toMatchObject({
-      path: 'pronounce',
+      path: 'pronounce.en',
       message: expect.stringContaining('__proto__'),
     })
   })
@@ -93,8 +95,12 @@ describe('a character per language', () => {
     })
   })
 
-  it('projects the cast: the source language is as it is', () => {
-    expect(projectCast(cast, 'en', 'en')).toBe(cast)
+  it('projects the cast: the source language’s speakers as they are, with its pronunciations', () => {
+    const withTable = { ...cast, pronounce: { en: { Elior: 'El-ee-or' } } }
+    expect(projectCast(withTable, 'en', 'en')).toEqual({
+      speakers: cast.speakers,
+      pronounce: { Elior: 'El-ee-or' },
+    })
   })
 
   it('projects the cast into a language: its voice, speed and phrase in the top-level places', () => {
@@ -114,23 +120,22 @@ describe('a character per language', () => {
   it('reads a language’s own pronunciations, and applies them to that language only', () => {
     const withTables = CastSchema.parse({
       speakers: {},
-      pronounce: { Elior: 'El-ee-or' },
-      languages: { sv: { pronounce: { Elior: 'Eli-or' } } },
+      pronounce: { en: { Elior: 'El-ee-or' }, sv: { Elior: 'Eli-or' } },
     })
-    expect(pronounceOf(withTables, 'en', 'en')).toEqual({ Elior: 'El-ee-or' })
-    expect(pronounceOf(withTables, 'sv', 'en')).toEqual({ Elior: 'Eli-or' })
-    expect(pronounceOf(withTables, 'de', 'en')).toEqual({})
+    expect(pronounceOf(withTables, 'en')).toEqual({ Elior: 'El-ee-or' })
+    expect(pronounceOf(withTables, 'sv')).toEqual({ Elior: 'Eli-or' })
+    expect(pronounceOf(withTables, 'de')).toEqual({})
     expect(projectCast(withTables, 'sv', 'en').pronounce).toEqual({ Elior: 'Eli-or' })
   })
 
   it('reports a bad pronunciation of a language with its path', () => {
     const result = CastSchema.safeParse({
       speakers: {},
-      languages: { sv: { pronounce: { '': 'nothing' } } },
+      pronounce: { sv: { '': 'nothing' } },
     })
     if (result.success) throw new Error('expected an empty key to be refused')
     expect(problemsFrom('content-studio/narration/cast.json', result.error)[0]?.path).toBe(
-      'languages.sv.pronounce',
+      'pronounce.sv',
     )
   })
 })

@@ -124,7 +124,10 @@ describe('summarize', () => {
 
 describe('summarize, pronunciations', () => {
   it('lists the table in its order, or null when the cast cannot be read', () => {
-    const cast = { speakers: {}, pronounce: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' } }
+    const cast = {
+      speakers: {},
+      pronounce: { en: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' } },
+    }
     expect(summarize(input({ cast })).pronounce).toEqual([
       ['Act I:', 'Act One:'],
       ['Eldoria', 'El-door-ia'],

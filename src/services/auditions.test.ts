@@ -391,12 +391,12 @@ describe('setKeywords', () => {
 
   it('changes nothing in the cast but the character', async () => {
     const original =
-      '{\n  "pronounce": { "Act I:": "Act One:" },\n  "speakers": {\n' +
+      '{\n  "pronounce": {\n    "en": { "Act I:": "Act One:" }\n  },\n  "speakers": {\n' +
       '    "grandmother": { "voice": "cur" }\n  },\n  "notes": "keep me"\n}\n'
     const root = tempRepo({ ...files, 'content-studio/narration/cast.json': original })
     await setKeywords(join(root, 'content-studio.json'), 'grandmother', ['old'])
     expect(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).toBe(
-      '{\n  "pronounce": { "Act I:": "Act One:" },\n  "speakers": {\n' +
+      '{\n  "pronounce": {\n    "en": { "Act I:": "Act One:" }\n  },\n  "speakers": {\n' +
         '    "grandmother": { "voice": "cur", "audition": { "keywords": ["old"] } }\n' +
         '  },\n  "notes": "keep me"\n}\n',
     )
@@ -405,7 +405,7 @@ describe('setKeywords', () => {
   it('writes a cast whose numeric pronunciation could not move', async () => {
     const root = tempRepo({
       ...files,
-      'content-studio/narration/cast.json': { speakers: {}, pronounce: { '1': 'one' } },
+      'content-studio/narration/cast.json': { speakers: {}, pronounce: { en: { '1': 'one' } } },
     })
     const result = await setKeywords(join(root, 'content-studio.json'), 'tilda', ['chatty'])
     expect(result).toEqual({ ok: true })
@@ -416,7 +416,7 @@ describe('setKeywords', () => {
       ...files,
       'content-studio/narration/cast.json': {
         speakers: {},
-        pronounce: { 'Act I:': 'Act One:', '10': 'ten' },
+        pronounce: { en: { 'Act I:': 'Act One:', '10': 'ten' } },
       },
     })
     const result = await setKeywords(join(root, 'content-studio.json'), 'tilda', ['chatty'])
@@ -560,7 +560,7 @@ describe('setPronunciations', () => {
     ...files,
     'content-studio/narration/cast.json': {
       speakers: { grandmother: { voice: 'cur', style: '[warm]' } },
-      pronounce: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' },
+      pronounce: { en: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' } },
     },
   }
   const was: [string, string][] = [
@@ -579,7 +579,7 @@ describe('setPronunciations', () => {
       ok: true,
     })
     const text = readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')
-    expect(Object.entries(JSON.parse(text).pronounce)).toEqual([
+    expect(Object.entries(JSON.parse(text).pronounce.en)).toEqual([
       ['Eldoria', 'El-dor-ia'],
       ['Act I:', 'Act One:'],
       ['Willowbrook', 'Willow brook'],
@@ -597,16 +597,18 @@ describe('setPronunciations', () => {
       ok: true,
     })
     const cast = JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8'))
-    expect(cast.languages).toEqual({ sv: { pronounce: { Eldoria: 'Eld-or-ia' } } })
-    expect(cast.pronounce).toEqual({ 'Act I:': 'Act One:', Eldoria: 'El-door-ia' })
+    expect(cast.pronounce).toEqual({
+      en: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' },
+      sv: { Eldoria: 'Eld-or-ia' },
+    })
     // `was` is that language's table.
     expect(await setPronunciations(projectFile, [], [], 'sv')).toMatchObject({ ok: false })
     expect(await setPronunciations(projectFile, [], [['Eldoria', 'Eld-or-ia']], 'sv')).toEqual({
       ok: true,
     })
     expect(
-      JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).languages,
-    ).toBeUndefined()
+      JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).pronounce,
+    ).toEqual({ en: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' } })
   })
 
   it('refuses when the table changed since the page showed it', async () => {
@@ -618,14 +620,11 @@ describe('setPronunciations', () => {
     )
     expect(result).toMatchObject({
       ok: false,
-      problems: [{ file: 'content-studio/narration/cast.json', path: 'pronounce' }],
+      problems: [{ file: 'content-studio/narration/cast.json', path: 'pronounce.en' }],
     })
     expect(
       JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).pronounce,
-    ).toEqual({
-      'Act I:': 'Act One:',
-      Eldoria: 'El-door-ia',
-    })
+    ).toEqual({ en: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' } })
   })
 
   it('starts a cast when there is none', async () => {
@@ -638,7 +637,7 @@ describe('setPronunciations', () => {
       JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')),
     ).toEqual({
       speakers: {},
-      pronounce: { Eldoria: 'El-door-ia' },
+      pronounce: { en: { Eldoria: 'El-door-ia' } },
     })
   })
 
@@ -647,7 +646,7 @@ describe('setPronunciations', () => {
       ...withTable,
       'content-studio/narration/cast.json': {
         speakers: {},
-        pronounce: { Eldoria: 'x', '10': 'ten' },
+        pronounce: { en: { Eldoria: 'x', '10': 'ten' } },
       },
     })
     const projectFile = join(root, 'content-studio.json')
@@ -671,13 +670,13 @@ describe('setPronunciations', () => {
       'content-studio.json': languageProject(),
       'content-studio/narration/cast.json': {
         speakers: { grandmother: { voice: 'cur' } },
-        languages: { sv: { pronounce: { Eldoria: 'x', '10': 'tio' } } },
+        pronounce: { sv: { Eldoria: 'x', '10': 'tio' } },
       },
     })
     const result = await setStyle(join(root, 'content-studio.json'), 'grandmother', '[x]')
     expect(result).toMatchObject({
       ok: false,
-      problems: [{ file: 'content-studio/narration/cast.json', path: 'languages.sv.pronounce' }],
+      problems: [{ file: 'content-studio/narration/cast.json', path: 'pronounce.sv' }],
     })
   })
 
@@ -687,14 +686,14 @@ describe('setPronunciations', () => {
       'content-studio.json': languageProject(),
       'content-studio/narration/cast.json': {
         speakers: { grandmother: { voice: 'cur' } },
-        pronounce: { Eldoria: 'x', '10': 'ten' },
+        pronounce: { en: { Eldoria: 'x', '10': 'ten' } },
       },
     })
     const projectFile = join(root, 'content-studio.json')
     const before = readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')
     expect(await setPronunciations(projectFile, [['Kom', 'Komm']], [], 'sv')).toMatchObject({
       ok: false,
-      problems: [{ file: 'content-studio/narration/cast.json', path: 'pronounce' }],
+      problems: [{ file: 'content-studio/narration/cast.json', path: 'pronounce.en' }],
     })
     expect(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).toBe(before)
   })
@@ -708,7 +707,7 @@ describe('setPronunciations', () => {
     ])
     const cast = JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother.style).toBe('[tired]')
-    expect(cast.pronounce).toEqual({ Eldoria: 'El-dor-ia' })
+    expect(cast.pronounce).toEqual({ en: { Eldoria: 'El-dor-ia' } })
   })
 
   it('refuses a table with a problem', async () => {
@@ -718,7 +717,7 @@ describe('setPronunciations', () => {
       [['', 'El-door-ia']],
       was,
     )
-    expect(result).toMatchObject({ ok: false, problems: [{ path: 'pronounce' }] })
+    expect(result).toMatchObject({ ok: false, problems: [{ path: 'pronounce.en' }] })
   })
 })
 

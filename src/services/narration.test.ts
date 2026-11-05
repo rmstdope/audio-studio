@@ -60,7 +60,7 @@ const files = {
   'content-studio.json': project,
   'content-studio/narration/cast.json': {
     speakers: { narrator: { voice: 'v-n', style: '[warm]' }, mira: { voice: 'v-m', speed: 1.15 } },
-    pronounce: { Elior: 'El-ee-or' },
+    pronounce: { en: { Elior: 'El-ee-or' } },
   },
   'tts/act1/script.json': [
     { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
@@ -1174,7 +1174,7 @@ describe('recording in a language besides the source', () => {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-n-sv' } } },
         mira: { voice: 'v-m' },
       },
-      pronounce: { Elior: 'El-ee-or' },
+      pronounce: { en: { Elior: 'El-ee-or' } },
     },
     'tts/act1/en/script.json': [
       { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },

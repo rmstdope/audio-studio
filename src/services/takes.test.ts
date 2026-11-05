@@ -26,7 +26,7 @@ const files = {
         audition: { phrase: 'Elior, dear.' },
       },
     },
-    pronounce: { Elior: 'El-ee-or' },
+    pronounce: { en: { Elior: 'El-ee-or' } },
   },
   'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Hello.' }],
 }
@@ -490,7 +490,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
           audition: { phrase: 'Elior, dear.' },
         },
       },
-      pronounce: { Elior: 'El-ee-or' },
+      pronounce: { en: { Elior: 'El-ee-or' } },
     },
     'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Come here now.' }],
   })

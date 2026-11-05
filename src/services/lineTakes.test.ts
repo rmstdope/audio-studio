@@ -19,7 +19,7 @@ const files = {
   'content-studio.json': projectJson(),
   'content-studio/narration/cast.json': {
     speakers: { narrator: { voice: 'v-n', style: '[warm]' } },
-    pronounce: { Elior: 'El-ee-or' },
+    pronounce: { en: { Elior: 'El-ee-or' } },
   },
   'tts/act1/script.json': [
     { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
@@ -256,14 +256,14 @@ describe('useLineTake', () => {
     const parsed = ProjectSchema.parse(project)
     const cast = {
       speakers: { narrator: { voice: 'v-n', style: '[warm]' } },
-      pronounce: { Elior: 'El-ee-or' },
+      pronounce: { en: { Elior: 'El-ee-or' } },
     }
     const line = { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }
     const finalInputs = clipInputs(
       line,
       cast.speakers.narrator,
       {},
-      cast.pronounce,
+      cast.pronounce.en,
       parsed.narration,
       's1',
     )!

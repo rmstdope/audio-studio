@@ -3140,10 +3140,8 @@ describe('server, generating per language', () => {
     ).toEqual({ ok: true })
     expect(
       JSON.parse(readFileSync(join(languageRoot, 'content-studio/narration/cast.json'), 'utf8'))
-        .languages,
-    ).toEqual({
-      sv: { pronounce: { Kom: 'Komm' } },
-    })
+        .pronounce,
+    ).toEqual({ sv: { Kom: 'Komm' } })
     expect(
       await send('PATCH', '/api/sound-alike?language=sv', {
         groups: [['Lyria', 'Liria']],
