@@ -16,7 +16,7 @@ import { MUSIC_MODEL, type BoardTake, type TakeInputs } from '../core/musicTake'
 import { resolveInRoot } from '../core/paths'
 import type { MusicConfig, Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
-import type { Encoder } from './audio'
+import { FileNotWritten, type Encoder } from './audio'
 import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
 import { createSerial, type Serial } from './serial'
 import type { ProjectFailure } from './workspace'
@@ -114,6 +114,9 @@ export async function commitChoice({
     await encode(wav, temporary, MUSIC_OUTPUT)
   } catch (error) {
     await rm(temporary, { force: true }).catch(() => {})
+    if (error instanceof FileNotWritten) {
+      return { ok: false, message: 'The game’s file could not be written.' }
+    }
     return { ok: false, message: error instanceof Error ? error.message : String(error) }
   }
   try {
