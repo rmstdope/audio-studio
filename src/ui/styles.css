@@ -4697,6 +4697,12 @@ button.cue-chip[aria-expanded='true'] {
   .scene-playbar {
     row-gap: 8px;
   }
+  /* The Loudness header stacks as agreed (as-snr): the heading and its target, then the button. */
+  .scene-loud-head {
+    flex-direction: column;
+    align-items: flex-start;
+    row-gap: 16px;
+  }
 }
 
 /* Each effect as a card, whenever the panel is narrower than the table needs while a scene plays
