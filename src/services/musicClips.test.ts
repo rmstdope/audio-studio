@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { MUSIC_MODEL, type BoardTake, type TakeInputs } from '../core/musicTake'
 import { ProjectSchema } from '../core/project'
-import type { Encoder, EncodeOptions } from './audio'
+import { ffmpegEncoder, type Encoder, type EncodeOptions } from './audio'
+import { writeWav } from '../core/wav'
 import { acceptChange, commitChoice, readChosen, uncommitChoice } from './musicClips'
 
 const music = {
@@ -181,6 +190,36 @@ describe('commitChoice', () => {
     expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
     expect(existsSync(join(root, 'music/music.lock.json'))).toBe(false)
     expect(readdirSync(join(root, 'audio/music'))).toEqual(['manifest.json'])
+  })
+})
+
+describe.skipIf(Bun.which('ffmpeg') === null)('commitChoice into a folder it cannot write', () => {
+  it('says plainly that the game’s file could not be written, without ffmpeg’s log', async () => {
+    const root = tempRepo({ 'audio/music/manifest.json': '{}\n' })
+    const clips = join(root, 'audio/music')
+    chmodSync(clips, 0o555)
+    try {
+      const wav = writeWav({
+        format: { channels: 1, sampleRate: 16000, bitsPerSample: 16 },
+        data: new Uint8Array(16000 * 2),
+      })
+      const result = await commitChoice({
+        root,
+        music: config,
+        id: 'hall',
+        listId: 'act1',
+        take: take(3),
+        wav,
+        encode: ffmpegEncoder,
+        now: () => at,
+      })
+      expect(result).toEqual({
+        ok: false,
+        message: 'The game’s file could not be written.',
+      })
+    } finally {
+      chmodSync(clips, 0o755)
+    }
   })
 })
 

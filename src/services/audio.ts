@@ -17,7 +17,8 @@ export type Encoder = (wav: Uint8Array, file: string, options: EncodeOptions) =>
 /**
  * An ffmpeg encoder (as RetroQuest's narrate.py uses) writing into `file`, then levelling it to
  * `lufs` when that is set (see `levelClip`). On failure nothing is left at `file`, and the error is
- * ffmpeg's own, even when it stops reading its input early. The encode, and the levelling, each
+ * ffmpeg's own, even when it stops reading its input early, except that a file it could not open
+ * for writing is said plainly ("The game’s file could not be written."). The encode, and the levelling, each
  * get `timeoutMs`, and are killed after it (ffmpeg ignores a polite stop while it waits for
  * input).
  */
@@ -67,6 +68,10 @@ export function createFfmpegEncoder({ timeoutMs }: { timeoutMs: number }): Encod
         throw new Error(
           `ffmpeg took longer than ${timeoutMs / 1000} s to encode the clip, and was stopped`,
         )
+      }
+      // A clips folder it may not write in: say so, not ffmpeg's log with its absolute paths.
+      if (message.includes(`Error opening output ${file}:`)) {
+        throw new Error('The game’s file could not be written.')
       }
       throw new Error(`ffmpeg could not encode the clip: ${message.trim() || `exit code ${code}`}`)
     }
