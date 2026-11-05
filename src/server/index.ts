@@ -15,7 +15,13 @@ import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { ChooseImageTakeBody, MakeImageTakesBody } from '../core/imageTakes'
 import { BriefChangeBody } from '../core/music'
-import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
+import {
+  ChooseTakeBody,
+  MakeTakesBody,
+  MoveTakeBody,
+  TrimTakeBody,
+  seamWav,
+} from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { FISH_VOICE_ID, providerOf, VOICE_ID } from '../core/voices'
@@ -1913,7 +1919,21 @@ export function startServer({
             request.params.id,
             request.params.file,
           )
-          return file ? takeResponse(request, file) : notFound()
+          if (!file) return notFound()
+          // `?trimmed=1`: only the part between a trimmed take's cuts (the whole sound if not trimmed).
+          if (new URL(request.url).searchParams.get('trimmed') === '1') {
+            const part = await musicTakes.trimmedSound(
+              projectFile,
+              request.params.id,
+              request.params.file,
+            )
+            if (part) {
+              return new Response(part as Uint8Array<ArrayBuffer>, {
+                headers: { 'content-type': 'audio/wav' },
+              })
+            }
+          }
+          return takeResponse(request, file)
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await musicTakes.drop(projectFile, request.params.id, request.params.file)
@@ -1926,6 +1946,22 @@ export function startServer({
           const body = ChooseTakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { file }' }, { status: 400 })
           const result = await musicTakes.choose(projectFile, request.params.id, body.data.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/trim': {
+        POST: fromOwnPage(async (request) => {
+          const body = TrimTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { file, undo? }' }, { status: 400 })
+          }
+          const result = await musicTakes.trim(
+            projectFile,
+            request.params.id,
+            body.data.file,
+            body.data.undo ?? false,
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

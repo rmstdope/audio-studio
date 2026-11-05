@@ -42,10 +42,17 @@ import { Failure } from '../../components/Failure'
 import { openTracking } from '../../components/openTracking'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
-import { clock } from '../../format'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { InTheGame, Wave } from './InTheGame'
+import {
+  cutShares,
+  takeLength,
+  takeSoundUrl,
+  TrimmedTag,
+  useTrimControl,
+  wavePosition,
+} from './trimSilence'
 import { MoveTakeDialog } from './MoveTakeDialog'
 
 /**
@@ -314,8 +321,8 @@ export function TakesPanel({
         )}
         {!none && view.lockUnread && (
           <span className="takes-missing small">
-            Choosing, dropping and moving wait until the music lock can be read. You can still
-            listen and make more takes.
+            Choosing, dropping, moving and trimming wait until the music lock can be read. You can
+            still listen and make more takes.
           </span>
         )}
         {!none && missing}
@@ -420,16 +427,26 @@ function TakeCard({
   opener: (button: HTMLButtonElement | null) => void
 }) {
   const id = `music-take-${trackId}-${take.n}`
-  const url = `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${take.file}`
+  const url = takeSoundUrl(trackId, take)
   const playing = player.playing === id
   const seamId = `${id}-seam`
   const seamPlaying = player.playing === seamId
   const drop = useDropTake(trackId)
   const choose = useChooseTake(trackId)
+  const trim = useTrimControl({
+    trackId,
+    take,
+    inGame: false,
+    locked,
+    onPress: () => {
+      if (playing) player.stop()
+    },
+  })
   return (
     <div className="take">
       <div className="take-row">
         <b className="grow">Take {take.n}</b>
+        <TrimmedTag take={take} />
         {take.earlier && <span className="faint small">earlier brief</span>}
       </div>
       {take.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
@@ -446,11 +463,14 @@ function TakeCard({
         <Wave
           peaks={take.peaks}
           loop={kind === 'loop'}
-          position={playing ? player.position : undefined}
+          cut={cutShares(take)}
+          position={playing ? wavePosition(take, player.position) : undefined}
         />
-        <span className="faint small">{clock(take.seconds)}</span>
+        <span className="faint small">{takeLength(take)}</span>
       </div>
-      <div className="take-row">
+      {trim.note}
+      <div className="take-row take-actions">
+        {trim.button}
         {kind === 'loop' && (
           <button
             type="button"
@@ -501,6 +521,7 @@ function TakeCard({
           {choose.isPending ? 'Choosing…' : 'Choose'}
         </button>
       </div>
+      {trim.failure}
       {(choose.isError || (choose.data && !choose.data.ok)) && (
         <span className="adopt-error">
           {choose.isError

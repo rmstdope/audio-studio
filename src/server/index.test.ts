@@ -5821,3 +5821,81 @@ describe('server, measuring the loudness of scenes', () => {
     expect(body.summary.scenes.acts[0].scenes[0].loudness.draft.entry).toEqual({ effects: [] })
   })
 })
+
+describe('server, trimming a stinger take', () => {
+  const root = tempRepo({
+    'content-studio.json': projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 }],
+  })
+  const studio = startServer({
+    projectFile: join(root, 'content-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    music: {
+      ready: () => ({ ok: true }),
+      installed: () => true,
+      async generate(request) {
+        // A second of near-silence, sound, a second of near-silence.
+        const samples = new Int16Array(request.seconds * 1000)
+        samples.forEach((_, i) => {
+          samples[i] = i < 1000 || i >= samples.length - 1000 ? 20 : i % 2 ? 4000 : -4000
+        })
+        const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
+        return {
+          wav: writeWav({ format, data: new Uint8Array(samples.buffer) }),
+          seed: request.seed,
+        }
+      },
+      close() {},
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const post = (path: string, body: unknown, origin = studio.url.origin) =>
+    fetch(at(path), {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('trims and untrims from the studio’s own page only, and plays only the part between the cuts', async () => {
+    await post('/api/music/tracks/victory/takes', { count: 1 })
+    let view = await (await fetch(at('/api/music/tracks/victory/takes'))).json()
+    for (let i = 0; i < 300 && (view.making.length || !view.takes.length); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      view = await (await fetch(at('/api/music/tracks/victory/takes'))).json()
+    }
+    const file = view.takes[0].file
+    expect(view.takes[0].trimmable).toBe('cut')
+    const path = '/api/music/tracks/victory/trim'
+    expect((await post(path, { file }, 'https://evil.example')).status).toBe(403)
+    expect((await post(path, { nope: 1 })).status).toBe(400)
+    expect((await post('/api/music/tracks/nobody/trim', { file })).status).toBe(404)
+    expect((await post(path, { file: '0123456789abcdef.9.wav' })).status).toBe(409)
+    expect(await post(path, { file }).then((r) => r.json())).toEqual({ ok: true })
+    const after = await (await fetch(at('/api/music/tracks/victory/takes'))).json()
+    expect(after.takes[0].trim.seconds).toBeCloseTo(5.05, 3)
+    const base = `/api/music/tracks/victory/takes/${file}`
+    const whole = await (await fetch(at(base))).arrayBuffer()
+    const part = await (await fetch(at(`${base}?trimmed=1`))).arrayBuffer()
+    expect(part.byteLength).toBeLessThan(whole.byteLength)
+    expect(await post(path, { file, undo: true }).then((r) => r.json())).toEqual({ ok: true })
+    const undone = await (await fetch(at(`${base}?trimmed=1`))).arrayBuffer()
+    expect(undone.byteLength).toBe(whole.byteLength)
+  })
+})

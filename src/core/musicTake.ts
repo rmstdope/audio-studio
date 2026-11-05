@@ -7,6 +7,7 @@ import {
   musicModel,
   type MusicModelId,
 } from './musicModels'
+import { TrimSchema } from './musicTrim'
 import { readWav, writeWav, type Wav } from './wav'
 
 /** What a take made before models were chosen records, and what the take fingerprint begins with. */
@@ -172,6 +173,13 @@ export interface TakeView {
   model: string
   /** The track it was moved from and its number there; absent on a take made for this track. */
   movedFrom?: MovedFrom
+  /** A stinger take trimmed: what is cut from each end, and the length that is left. */
+  trim?: { start: number; end: number; seconds: number }
+  /**
+   * A stinger take not trimmed: whether it has near-silence to cut, starts and ends on its sound
+   * (`nothing`) or has no sound (`silent`). Absent on a loop's take and on a trimmed one.
+   */
+  trimmable?: 'cut' | 'nothing' | 'silent'
 }
 
 /** A take being made or waiting its turn. */
@@ -241,6 +249,8 @@ export const BoardTakeSchema = z.object({
   inputs: TakeInputsSchema,
   /** Set when the take was moved here from another track, for good. */
   movedFrom: MovedFromSchema.optional(),
+  /** Set when a stinger take was trimmed: what is cut from each end. Its WAV stays as generated. */
+  trim: TrimSchema.optional(),
 })
 
 /** A track's board: the takes kept, and the number the next take gets (numbers are never reused). */
@@ -285,3 +295,8 @@ export const ChooseTakeBody = z.object({ file: z.string().min(1) }).strict()
 
 /** The body of a move: the take's file on this track's board, and the id of the track it moves to. */
 export const MoveTakeBody = z.object({ file: z.string().min(1), to: z.string().min(1) }).strict()
+
+/** The body of a trim: the take's file on this track's board, and whether to undo its trim. */
+export const TrimTakeBody = z
+  .object({ file: z.string().min(1), undo: z.boolean().optional() })
+  .strict()
