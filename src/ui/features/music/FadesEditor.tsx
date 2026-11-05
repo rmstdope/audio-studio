@@ -310,11 +310,6 @@ export function FadesEditor({
           {problem}
         </span>
       )}
-      <span className="faint small">
-        {chosen
-          ? 'Saving puts the faded sound in the game at once.'
-          : 'Drag the handles or type a length; 0 is no fade.'}
-      </span>
       {failure && (
         <span className="adopt-error" role="alert">
           The fades could not be {removing ? 'removed' : 'saved'}. {failure}
@@ -324,6 +319,11 @@ export function FadesEditor({
             ` The game still plays Take ${take.n} ${removing ? 'with its fades' : 'as before'}.`}
         </span>
       )}
+      <span className="faint small">
+        {chosen
+          ? 'Saving puts the faded sound in the game at once.'
+          : 'Drag the handles or type a length; 0 is no fade.'}
+      </span>
       <div className="take-row editor-actions">
         {take.fades && (
           <button

@@ -224,6 +224,32 @@ describe('the fades editor', () => {
     expect(e.container.textContent).not.toContain('still plays')
   })
 
+  for (const [action, chosen] of [
+    ['Save fades', true],
+    ['Save fades', false],
+    ['Remove fades', true],
+    ['Remove fades', false],
+  ] as const) {
+    it(`puts the failure line above the hint when ${action} fails on a take that is${chosen ? '' : ' not'} chosen`, async () => {
+      answer = Response.json({ ok: false, message: 'The disk is full.' }, { status: 409 })
+      const e = open({ chosen, fades: { in: 0.3, out: 0, shape: 'smooth' } }, chosen)
+      e.type(e.box('Fade in'), '0.4')
+      await act(async () => e.button(action)!.click())
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      })
+      const text = e.container.textContent ?? ''
+      const failure = text.indexOf('The fades could not be')
+      const hint = text.indexOf(
+        chosen
+          ? 'Saving puts the faded sound in the game at once.'
+          : 'Drag the handles or type a length; 0 is no fade.',
+      )
+      expect(failure).toBeGreaterThan(-1)
+      expect(hint).toBeGreaterThan(failure)
+    })
+  }
+
   it('claims nothing about the game when the answer never came', async () => {
     answer = Response.json({}, { status: 500 })
     const e = open({ chosen: true }, true)
