@@ -5720,7 +5720,8 @@ describe('server, saving a scene', () => {
   const sceneRoot = tempRepo({
     'content-studio.json': projectJson({
       scenes: {
-        paths: { declarations: 'tts/{part}/scenes.json', mix: 'game/scenes/{part}.mix.json' },
+        from: { part: 'tts/{part}/scenes.json' },
+        mix: 'game/scenes/{part}.mix.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -5793,8 +5794,9 @@ describe('server, measuring the loudness of scenes', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       scenes: {
-        paths: { declarations: 'tts/{part}/scenes.json', mix: 'game/scenes/{part}.mix.json' },
-        loudness: { target: -20, tolerance: 2 },
+        from: { part: 'tts/{part}/scenes.json' },
+        mix: 'game/scenes/{part}.mix.json',
+        output: { lufs: -20, tolerance: 2 },
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },

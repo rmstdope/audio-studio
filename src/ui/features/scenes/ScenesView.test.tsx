@@ -5,6 +5,8 @@ import type { MusicListSummary, TrackRow } from '../../../core/music'
 import { scaleMix, type SceneKept, type SceneMeasure } from '../../../core/sceneLoudness'
 import type { SceneMix } from '../../../core/scenes'
 import type { ProjectSummary } from '../../../core/summary'
+import { ProjectSchema } from '../../../core/project'
+import { projectJson } from '../../../../test/helpers'
 import { fakeHistory } from '../../../../test/fakeHistory'
 import { useRoute, type ScenesRoute } from '../../route'
 
@@ -263,6 +265,14 @@ describe('a project without scenes', () => {
     expect(text(page.querySelector('h1'))).toBe('Scenes')
     act(() => button(page, 'How to set it up').click())
     expect(page.querySelector('pre')?.textContent).toContain('"scenes": {')
+  })
+
+  it('shows a scenes section the studio accepts', () => {
+    const page = render({ view: 'scenes', page: null }, { scenes: null } as ProjectSummary)
+    act(() => button(page, 'How to set it up').click())
+    const example = JSON.parse(`{${page.querySelector('pre')!.textContent}}`)
+    const parsed = ProjectSchema.safeParse({ ...projectJson(), ...example })
+    expect(parsed.error?.issues ?? []).toEqual([])
   })
 })
 

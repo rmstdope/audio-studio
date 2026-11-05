@@ -294,24 +294,29 @@ const scenesPath = z
     error: "must contain {part} and not {language}: scenes are an act's, in every language",
   })
 
-/** The optional `scenes` section: the two files of an act, the game's declarations and the studio's mix (§8.11). */
+/**
+ * The optional `scenes` section: where the game lists each part's scenes, the loudness they should
+ * sit at, and each part's mix (§8.11). The kept loudness is in each part's lock, at a fixed place
+ * in the studio folder.
+ */
 const ScenesSchema = z.object({
-  paths: z.object({
-    /** An act's scenes with their states and triggers, written by the game and read only. */
-    declarations: scenesPath,
-    /** An act's mix, written by the studio and read by the game. */
-    mix: scenesPath,
+  /** The game's lists. */
+  from: z.object({
+    /** A part's scenes with their states and triggers, written by the game and read only. */
+    part: scenesPath,
   }),
   /**
    * The loudness the game's scenes should sit at (integrated LUFS) and how far one may be off it
    * (dB). Hand-edited; the studio only reads it. Without it nothing is flagged.
    */
-  loudness: z
+  output: z
     .object({
-      target: z.number().min(-70).max(0),
+      lufs: z.number().min(-70).max(0),
       tolerance: z.number().min(0),
     })
     .optional(),
+  /** A part's mix, written by the studio and read by the game. */
+  mix: scenesPath,
 })
 
 /** The project file format the studio reads; any other, or none, is refused. */
@@ -535,6 +540,14 @@ export const EFFECTS_EDITS_FILE = `${EFFECTS_DIR}/edits.json`
 
 /** The chosen take of each sound effect, and what it was made from. */
 export const EFFECTS_LOCK_FILE = `${EFFECTS_DIR}/lock.json`
+
+/** Scenes' folder in the studio folder: each part's lock. */
+export const SCENES_DIR = `${STUDIO_DIR}/scenes`
+
+/** A part's scenes lock: the loudness each of its scenes was last measured at. */
+export function scenesLockFile(partId: string): string {
+  return `${SCENES_DIR}/${partId}.lock.json`
+}
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
 export interface Problem {

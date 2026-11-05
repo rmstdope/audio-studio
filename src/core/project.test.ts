@@ -15,6 +15,7 @@ import {
   parseProject,
   partPathFor,
   problemsFrom,
+  scenesLockFile,
   soundAlikeOf,
   standardPhrase,
 } from './project'
@@ -658,49 +659,73 @@ describe('the effects section', () => {
 })
 
 describe('the scenes section', () => {
-  const scenes = (paths: Record<string, string> = {}) =>
-    projectJson({
-      scenes: {
-        paths: {
-          declarations: 'tts/{part}/scenes.json',
-          mix: 'web/scenes/{part}.mix.json',
-          ...paths,
-        },
-      },
-    })
+  const section = (extra: Record<string, unknown> = {}) => ({
+    from: { part: 'tts/{part}/scenes.json' },
+    mix: 'web/scenes/{part}.mix.json',
+    ...extra,
+  })
+  const scenes = (extra: Record<string, unknown> = {}) => projectJson({ scenes: section(extra) })
 
-  it('is optional and names the two files of an act', () => {
+  it("is optional and names each part's scene list and mix", () => {
     expect(parse(projectJson()).data!.scenes).toBeUndefined()
-    expect(parse(scenes()).data!.scenes!.paths.mix).toBe('web/scenes/{part}.mix.json')
+    expect(parse(scenes()).data!.scenes).toEqual(section())
+  })
+
+  it('needs the list and the mix', () => {
+    expect(problems(scenes({ from: {} })).map((p) => p.path)).toEqual(['scenes.from.part'])
+    const { mix: _mix, ...rest } = section()
+    expect(problems(projectJson({ scenes: rest })).map((p) => p.path)).toEqual(['scenes.mix'])
   })
 
   it('needs {part} in both paths and no {language}', () => {
-    expect(parse(scenes({ declarations: 'tts/scenes.json' })).success).toBe(false)
-    expect(parse(scenes({ mix: 'web/scenes.mix.json' })).success).toBe(false)
-    expect(parse(scenes({ mix: 'web/{part}/{language}.json' })).success).toBe(false)
+    for (const [field, value] of [
+      ['from', { part: 'tts/scenes.json' }],
+      ['from', { part: 'tts/{part}/{language}.json' }],
+      ['mix', 'web/scenes.mix.json'],
+      ['mix', 'web/{part}/{language}.json'],
+    ] as const) {
+      const found = problems(scenes({ [field]: value }))
+      expect(found.map((p) => p.path)).toEqual([
+        field === 'from' ? 'scenes.from.part' : 'scenes.mix',
+      ])
+    }
   })
 
-  describe('the loudness target', () => {
-    const paths = {
-      declarations: 'tts/{part}/scenes.json',
-      mix: 'web/scenes/{part}.mix.json',
-    }
-    const withLoudness = (loudness: unknown) => projectJson({ scenes: { paths, loudness } })
+  it('refuses the paths and loudness of the format before version 2', () => {
+    const old = projectJson({
+      scenes: {
+        paths: { declarations: 'tts/{part}/scenes.json', mix: 'web/scenes/{part}.mix.json' },
+        loudness: { target: -20, tolerance: 2 },
+      },
+    })
+    expect(problems(old).map((p) => p.path)).toEqual(['scenes.from', 'scenes.mix'])
+  })
+
+  it("keeps each part's lock at a fixed place in the studio folder", () => {
+    expect(scenesLockFile('act1')).toBe('content-studio/scenes/act1.lock.json')
+  })
+
+  describe('the loudness a scene should sit at', () => {
+    const withOutput = (output: unknown) => scenes({ output })
 
     it('is optional', () => {
-      expect(parse(scenes()).data!.scenes!.loudness).toBeUndefined()
+      expect(parse(scenes()).data!.scenes!.output).toBeUndefined()
     })
 
-    it('holds a target and a tolerance in dB', () => {
-      const read = parse(withLoudness({ target: -20, tolerance: 2 }))
-      expect(read.data!.scenes!.loudness).toEqual({ target: -20, tolerance: 2 })
+    it('holds the loudness in LUFS and a tolerance in dB', () => {
+      const read = parse(withOutput({ lufs: -20, tolerance: 2 }))
+      expect(read.data!.scenes!.output).toEqual({ lufs: -20, tolerance: 2 })
     })
 
-    it('needs both, and refuses a positive target or a negative tolerance', () => {
-      expect(parse(withLoudness({ target: -20 })).success).toBe(false)
-      expect(parse(withLoudness({ tolerance: 2 })).success).toBe(false)
-      expect(parse(withLoudness({ target: 3, tolerance: 2 })).success).toBe(false)
-      expect(parse(withLoudness({ target: -20, tolerance: -1 })).success).toBe(false)
+    it('needs both, and refuses a positive loudness or a negative tolerance', () => {
+      expect(problems(withOutput({ lufs: -20 })).map((p) => p.path)).toEqual([
+        'scenes.output.tolerance',
+      ])
+      expect(problems(withOutput({ tolerance: 2 })).map((p) => p.path)).toEqual([
+        'scenes.output.lufs',
+      ])
+      expect(parse(withOutput({ lufs: 3, tolerance: 2 })).success).toBe(false)
+      expect(parse(withOutput({ lufs: -20, tolerance: -1 })).success).toBe(false)
     })
   })
 })

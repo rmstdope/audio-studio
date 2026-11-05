@@ -315,8 +315,9 @@ describe('measureScenes', () => {
 })
 
 const scenesSection = {
-  paths: { declarations: 'tts/{part}/scenes.json', mix: 'game/{part}.mix.json' },
-  loudness: { target: -20, tolerance: 2 },
+  from: { part: 'tts/{part}/scenes.json' },
+  mix: 'game/{part}.mix.json',
+  output: { lufs: -20, tolerance: 2 },
 }
 
 function repo() {

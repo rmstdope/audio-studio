@@ -7,7 +7,8 @@ import { saveScene } from './scenes'
 import { loadProject } from './workspace'
 
 const scenes = {
-  paths: { declarations: 'tts/{part}/scenes.json', mix: 'game/scenes/{part}.mix.json' },
+  from: { part: 'tts/{part}/scenes.json' },
+  mix: 'game/scenes/{part}.mix.json',
 }
 
 /** The scenes of `act1` as a project reads them; `files` are the repository's other files. */
