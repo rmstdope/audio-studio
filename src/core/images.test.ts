@@ -39,13 +39,19 @@ const inn = {
 }
 
 describe('the game files', () => {
+  const { description, ...listed } = inn
+  const game = { ...listed, text: description }
+  it('reads an image’s words from text, as its description inside the studio', () => {
+    expect(ImageListSchema.parse([game])).toEqual([inn])
+    expect(ImageListSchema.safeParse([inn]).error?.issues.map((i) => i.path)).toEqual([[0, 'text']])
+  })
   it('accepts an image list and refuses a bad or repeated-in-list id', () => {
-    expect(ImageListSchema.safeParse([inn]).success).toBe(true)
-    expect(ImageListSchema.safeParse([{ ...inn, id: 'Silver Stag' }]).success).toBe(false)
-    expect(ImageListSchema.safeParse([{ ...inn, width: 0 }]).success).toBe(false)
+    expect(ImageListSchema.safeParse([game]).success).toBe(true)
+    expect(ImageListSchema.safeParse([{ ...game, id: 'Silver Stag' }]).success).toBe(false)
+    expect(ImageListSchema.safeParse([{ ...game, width: 0 }]).success).toBe(false)
   })
   it('takes the game’s own image file, inside the project and a picture', () => {
-    const file = (f: string) => ImageListSchema.safeParse([{ ...inn, file: f }]).success
+    const file = (f: string) => ImageListSchema.safeParse([{ ...game, file: f }]).success
     expect(file('web/public/images/inn.png')).toBe(true)
     expect(file('../inn.png')).toBe(false)
     expect(file('/inn.png')).toBe(false)

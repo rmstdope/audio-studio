@@ -20,7 +20,7 @@ const images = {
 }
 /** A picture's bytes as the text `readFileSync` gives. */
 const bytes = (png: Uint8Array) => Buffer.from(png).toString('utf8')
-const inn = { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 }
+const inn = { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 }
 const EDITS = 'content-studio/images/edits.json'
 const LOCK = 'content-studio/images/lock.json'
 const STYLE = { look: 'pixel art', keepOut: 'text', palette: ['#000000'] }
@@ -387,7 +387,7 @@ describe('choosing', () => {
     writeFileSync(
       join(root, 'tts/act1/images.json'),
       JSON.stringify([
-        { ...inn, description: 'a high inn', width: 160 },
+        { ...inn, text: 'a high inn', width: 160 },
         { ...inn, id: 'hall', title: 'Hall' },
       ]),
     )

@@ -21,7 +21,7 @@ const images = {
   manifest: 'web/public/images/generated/manifest.json',
 }
 const EDITS = 'content-studio/images/edits.json'
-const inn = { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 }
+const inn = { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 }
 const style = {
   look: 'pixel art',
   keepOut: 'text',

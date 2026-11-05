@@ -5123,7 +5123,7 @@ describe('the images routes', () => {
       },
     }),
     'tts/act1/images.json': [
-      { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
+      { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 },
     ],
     'content-studio/images/edits.json': {
       style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
@@ -5211,7 +5211,7 @@ describe('the image takes routes', () => {
       },
     }),
     'tts/act1/images.json': [
-      { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
+      { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 },
     ],
     'content-studio/images/edits.json': {
       style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
@@ -5389,7 +5389,7 @@ describe('the image model routes', () => {
       },
     }),
     'tts/act1/images.json': [
-      { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
+      { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 },
     ],
     'content-studio/images/edits.json': {
       style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },

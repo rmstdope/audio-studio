@@ -14,15 +14,25 @@ const GameFile = z
   })
 
 /** An image as the game lists it. The id names the image everywhere, so it is a slug. */
-export const ImageSchema = z.object({
+const ImageShape = z.object({
   id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
   title: z.string().min(1),
-  description: z.string().min(1),
+  /** What the image shows, in the game's words. */
+  text: z.string().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   /** The picture the game shows for it now, when it is not one the studio made. Read only. */
   file: GameFile.optional(),
 })
+
+/**
+ * An image of a list the game writes. The game's words (`text`) are the image's description inside
+ * the studio, its pages and its API.
+ */
+export const ImageSchema = ImageShape.transform(({ text, ...image }) => ({
+  ...image,
+  description: text,
+}))
 
 /** An act's images, in the game's order (a list that is there and empty means the game asks for none). */
 export const ImageListSchema = z.array(ImageSchema)

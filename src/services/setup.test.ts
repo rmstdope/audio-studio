@@ -362,7 +362,7 @@ describe('checkSetup of the image models', () => {
 
   it('remembers a failed take across a restart, naming the image while it is in the game', async () => {
     const list = [
-      { id: 'bridge', title: 'Bridge at dusk', description: 'a bridge', width: 320, height: 200 },
+      { id: 'bridge', title: 'Bridge at dusk', text: 'a bridge', width: 320, height: 200 },
     ]
     const root = tempRepo({
       'content-studio.json': projectJson({ images: imagesSection }),
