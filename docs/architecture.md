@@ -282,7 +282,8 @@ the sections keep their shape until their own step moves them.
   **Refresh dialog**, and Refresh from the game on an act's Music, Images and Scenes pages, which
   run it in the project root and read the lists again. `refresh.shared` writes every list of no
   part (the stingers and the sound effects alike): Refresh from the game on the Stingers and Sound
-  effects pages runs it, one run at a time whichever page asked. This is how the studio stays
+  effects pages runs it, one run at a time whichever page asked. Run from either page it rewrites
+  both lists, but each page reports only the changes to its own. This is how the studio stays
   generic: the game owns how its lists are extracted.
 - `env` names the file holding `FISH_AUDIO_API_KEY` (and `ELEVENLABS_API_KEY`), read each time a
   key is needed. The environment variable wins if set, except a value Bun itself loaded at start

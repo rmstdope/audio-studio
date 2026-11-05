@@ -89,8 +89,9 @@ To reach the state a bead needs, **edit the sample in the tree** by hand, and on
 before launching where you can; the studio reads the files again on every request, so an edit while
 it runs shows on the next reload.
 
-- the project file: `narration.languages`, `parts`, `models` (`s1` for the retirement banner, a paid
-  model for a paid flow), `quality` (`parallel`, `transcriber`), `soundAlike`;
+- the project file: the top-level `languages`, `parts` and `refresh`, `narration.models` (`s1` for
+  the retirement banner, a paid model for a paid flow), `narration.quality` (`parallel`,
+  `transcriber`), `soundAlike`;
 - `tts/cast.json`: a speaker added, cast or left uncast, a style, `pronounce` entries;
 - a part's `script.json`: a line added, changed (to make a recorded clip stale) or removed (to make
   an orphan clip);

@@ -76,7 +76,9 @@ bundle breaks.
   `refresh.part` command (the game's code, named in its project file) runs in the project root
   only when the user clicks Refresh dialog on a part's page or Refresh from the game on an act's
   Music, Images or Scenes page, and so does `refresh.shared` when the user clicks Refresh from the
-  game on the Stingers page or the Sound effects page; each writes what the game writes.
+  game on the Stingers page or the Sound effects page; each writes what the game writes. The one
+  shared command rewrites the stingers and the effects lists alike, but each page reports only its
+  own list's changes.
   The studio runs nothing else of the consumer's. The Scenes page writes one file of an act, the
   mix (`scenes.paths.mix`, §8.11), and never the declarations the game writes.
 - The project file itself is read, and changed in seven kinds of places only: the words that sound
