@@ -127,6 +127,11 @@ describe('Trim silence on a stinger’s takes', () => {
     ])
   })
 
+  it('waits while the music lock cannot be read, like Choose', () => {
+    const { buttons } = render({ ...view([take(1)]), lockUnread: true })
+    expect(buttons('Trim silence')[0]!.disabled).toBe(true)
+  })
+
   it('asks the server to trim the take, and stays on the button that now reads Undo trim', async () => {
     const { container, buttons } = render(view([take(1)]))
     const button = buttons('Trim silence')[0]!

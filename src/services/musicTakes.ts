@@ -259,6 +259,14 @@ interface StoredBatch extends Omit<MusicBatch, 'running'> {
 /** A take's file name on the board. */
 const fileOf = (take: Pick<BoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.wav`
 
+/** A refusal of a choice as a bare reason: "Take 1 could not be chosen: X. Nothing was changed." gives "X". */
+function plainReason(message: string): string {
+  return message
+    .replace(/^Take \d+ could not be chosen: /, '')
+    .replace(/\.? Nothing was changed\.$/, '')
+    .replace(/\.$/, '')
+}
+
 /**
  * What the game plays of a take: its WAV between the cuts if it was trimmed, and the take as the
  * board should hand it to the encoder, with the length that is left.
@@ -316,13 +324,13 @@ export function createMusicTakes({
 
   /** What the WAV at `path` has to cut. */
   async function scan(path: string): Promise<NonNullable<TakeView['trimmable']> | null> {
-    const file = Bun.file(path)
-    // The time to the nanosecond, so a sound written again at once is not taken for the one before.
-    const { size, mtimeMs, ctimeMs } = await stat(path)
-    const key = `${path}\0${size}\0${mtimeMs}\0${ctimeMs}`
-    const known = scans.get(key)
-    if (known) return known
     try {
+      // The time to the nanosecond, so a sound written again at once is not taken for the one before.
+      const { size, mtimeMs, ctimeMs } = await stat(path)
+      const key = `${path}\0${size}\0${mtimeMs}\0${ctimeMs}`
+      const known = scans.get(key)
+      if (known) return known
+      const file = Bun.file(path)
       const found = findTrim(readWav(new Uint8Array(await file.arrayBuffer())))
       const answer = found.kind === 'cut' ? 'cut' : found.kind
       scans.set(key, answer)
@@ -839,7 +847,12 @@ export function createMusicTakes({
         if (undo) {
           if (!take.trim) return { ok: false, message: 'That take is not trimmed.' }
         } else {
-          const finding = findTrim(readWav(bytes))
+          let finding: ReturnType<typeof findTrim>
+          try {
+            finding = findTrim(readWav(bytes))
+          } catch {
+            return { ok: false, message: 'The take’s sound file could not be read.' }
+          }
           if (finding.kind === 'nothing') return { ok: false, message: NOTHING_LINE }
           if (finding.kind === 'silent') return { ok: false, message: SILENT_LINE }
           trim = { start: finding.start, end: finding.end }
@@ -853,20 +866,27 @@ export function createMusicTakes({
         }
         const chosen = chosenTracks[id]?.lock
         if (chosen?.take === take.n && chosen.fp === take.hash) {
-          const played = playedOf(next, bytes)
+          let played: ReturnType<typeof playedOf>
+          try {
+            played = playedOf(next, bytes)
+          } catch {
+            return { ok: false, message: 'The take’s sound file could not be read.' }
+          }
           const committed = await commitChoice({
             root: found.root,
             projectFile,
             music: found.music,
             id,
             listId: found.listId,
-            take: played.take,
+            // The lock keeps what Accept made it count the take as made from, and when it was chosen.
+            take: { ...played.take, inputs: chosen.inputs },
+            now: () => new Date(chosen.at),
             wav: played.wav,
             encode,
           })
           if (!committed.ok) {
             return 'message' in committed
-              ? { ok: false, message: committed.message }
+              ? { ok: false, message: plainReason(committed.message) }
               : { ok: false, message: `${committed.file} could not be read` }
           }
         }

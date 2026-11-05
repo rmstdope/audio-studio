@@ -63,7 +63,7 @@ export function useTrimControl({
   take: TakeView | undefined
   /** The take is the one the game plays. */
   inGame: boolean
-  /** The music lock cannot be read: the take in the game waits, as Choose does. */
+  /** The music lock cannot be read: whether the take is in the game is not known, so Trim waits, as Choose does. */
   locked: boolean
   onPress: () => void
 }): { button: ReactNode; note: ReactNode; failure: ReactNode } {
@@ -93,7 +93,7 @@ export function useTrimControl({
       <button
         type="button"
         className="btn btn-small"
-        disabled={greyed || (locked && inGame)}
+        disabled={greyed || locked}
         // Not `disabled` while it works: that would take the keyboard focus off the button.
         aria-disabled={working ? true : undefined}
         aria-describedby={note ? noteId : undefined}

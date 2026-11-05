@@ -1591,6 +1591,53 @@ describe('trimming a stinger take', () => {
     expect(manifestOf(m.root).victory.duration).toBe(6)
   })
 
+  it('keeps an accepted brief change and the time of the choice when the take in the game is trimmed', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    const before = lockOf(m.root).victory
+    await setTrackBrief(m.file, 'victory', { brief: 'a louder fanfare' })
+    expect(await m.takes.accept(m.file, 'victory')).toEqual({ ok: true })
+    const accepted = lockOf(m.root).victory
+    expect(accepted.inputs.brief).toBe('a louder fanfare')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    expect(lockOf(m.root).victory.inputs).toEqual(accepted.inputs)
+    expect(lockOf(m.root).victory.at).toBe(before.at)
+  })
+
+  it('refuses while the music lock cannot be read, changing nothing', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    mkdirSync(join(m.root, 'music'), { recursive: true })
+    writeFileSync(join(m.root, 'music/music.lock.json'), '{ not json')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toMatchObject({
+      ok: false,
+      message: 'The music lock could not be read.',
+    })
+    expect((await viewOf(m)).takes[0]).not.toHaveProperty('trim')
+  })
+
+  it('gives a plain reason when the game’s manifest cannot be read', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    writeFileSync(join(m.root, 'audio/music/manifest.json'), '{ not json')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({
+      ok: false,
+      message: 'the music manifest could not be read',
+    })
+  })
+
+  it('says the sound file could not be read for a WAV that cannot be parsed', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    writeFileSync(join(m.folder, one!.file), 'not a wav')
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({
+      ok: false,
+      message: 'The take’s sound file could not be read.',
+    })
+  })
+
   it('keeps the trim on a take moved to another stinger', async () => {
     const m = await made()
     const [one] = (await viewOf(m)).takes

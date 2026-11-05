@@ -102,7 +102,9 @@ export function InTheGame({
     take,
     inGame: true,
     locked: view.lockUnread,
-    onPress: () => player.stop(),
+    onPress: () => {
+      if (take && player.playing === `music-take-${track.id}-${take.n}`) player.stop()
+    },
   })
   const [asking, setAsking] = useState(false)
   // The take the question was about: a refusal is still named after the page re-reads and the

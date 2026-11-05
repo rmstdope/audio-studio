@@ -321,8 +321,8 @@ export function TakesPanel({
         )}
         {!none && view.lockUnread && (
           <span className="takes-missing small">
-            Choosing, dropping and moving wait until the music lock can be read. You can still
-            listen and make more takes.
+            Choosing, dropping, moving and trimming wait until the music lock can be read. You can
+            still listen and make more takes.
           </span>
         )}
         {!none && missing}
@@ -437,7 +437,7 @@ function TakeCard({
     trackId,
     take,
     inGame: false,
-    locked: false,
+    locked,
     onPress: () => {
       if (playing) player.stop()
     },
