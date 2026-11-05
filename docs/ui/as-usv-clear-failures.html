@@ -1,21 +1,319 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Option B — one red line per track: the newest action owns it (recommended)</title><style>
-:root{--bg:#0b0c10;--panel:#12141a;--raised:#191c24;--line:#1f232d;--line-strong:#2a2e39;--text:#eceef3;--soft:#c7ccd6;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--ok:#3ddc97;--ok-bg:#10291f;--danger:#ff94a8;--danger-bg:#2e1720;--chip:#1a1d26;color-scheme:dark}
-*{box-sizing:border-box}body{margin:0;background:#07080b;color:var(--text);font:14px/1.45 system-ui,-apple-system,sans-serif;padding:24px}
-.intro{max-width:1100px;margin:0 auto 18px;color:var(--muted)}.intro h1{color:var(--text);font-size:20px;margin:0 0 6px}
-.steps{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-.step{border:1px solid var(--line-strong);border-radius:12px;background:var(--bg);padding:16px}
-.step h3{margin:0 0 4px;font-size:13px;color:var(--accent)}.step p.what{margin:0 0 12px;color:var(--soft);font-size:13px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
-.card.game{border-color:#3a2a20}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.grow{flex:1}
-.play{width:26px;height:26px;border-radius:50%;border:1px solid var(--line-strong);background:var(--raised);color:var(--text);font-size:10px}
-.chip{padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--soft);font-size:12px}.chip.ok{background:var(--ok-bg);color:var(--ok)}
-.btn{background:var(--raised);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;padding:3px 9px;font-size:12px}
-.label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
-.err{display:flex;gap:6px;align-items:flex-start;color:var(--danger);font-size:12.5px;margin-top:6px}
-.err .x{margin-left:auto;background:none;border:0;color:var(--danger);font-size:14px;cursor:pointer;padding:0 4px}
-.gone{color:var(--faint);font-size:12px;font-style:italic;margin-top:6px}
-.faint{color:var(--faint);font-size:12px}
-.note{max-width:1100px;margin:22px auto 0;color:var(--soft)}
-@media(max-width:480px){body{padding:16px}}
-</style></head><body><div class="intro"><h1>Option B — one red line per track: the newest action owns it (recommended)</h1><p>Victory, a stinger. Pressing <b>any</b> action on this track (Choose, Trim silence, Undo trim, Save fades) clears every older red line straight away. If that action fails, its line is the only one shown.</p></div><div class="steps"><div class="step"><h3>1 · Choose on Take 1 fails</h3><p class="what">The folder is read-only.</p><div class="card"><div class="row"><button class="play">▶</button><b>Take 1</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div><div class="err" role="alert"><span>The game's file could not be written.</span></div></div><div class="card"><div class="row"><button class="play">▶</button><b>Take 2</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div></div><div class="card"><div class="row"><button class="play">▶</button><b>Take 3</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div></div></div><div class="step"><h3>2 · Folder fixed, Choose on Take 3 succeeds</h3><p class="what">Take 1’s line went as soon as Choose on Take 3 was pressed; it succeeded, so no red line at all.</p><div class="card game"><div class="row"><span class="label">In the game</span> <button class="play">▶</button><b>Take 3</b><span class="chip ok">chosen</span><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><button class="btn">Trim silence</button><button class="btn">Fades…</button><span class="grow"></span><button class="btn">Un-choose</button></div></div><div class="card"><div class="row"><button class="play">▶</button><b>Take 1</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div><div class="gone">(red line gone)</div></div><div class="card"><div class="row"><button class="play">▶</button><b>Take 2</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div></div></div><div class="step"><h3>3 · Two failures in a row</h3><p class="what">Choose on Take 1 fails, then Choose on Take 2 fails: only Take 2’s line shows — it is the one that just happened.</p><div class="card"><div class="row"><button class="play">▶</button><b>Take 1</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div><div class="gone">(red line gone)</div></div><div class="card"><div class="row"><button class="play">▶</button><b>Take 2</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div><div class="err" role="alert"><span>The game's file could not be written.</span></div></div><div class="card"><div class="row"><button class="play">▶</button><b>Take 3</b><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Trim silence</button><button class="btn">Choose</button></div></div></div><div class="step"><h3>4 · The take in the game, Fades editor open</h3><p class="what">Undo trim had failed. Opening Fades is not an action, so the line stays; pressing Save fades clears it — if the save fails, only the Fades editor’s line shows.</p><div class="card game"><div class="row"><span class="label">In the game</span> <button class="play">▶</button><b>Take 3</b><span class="chip ok">chosen</span><span class="faint">0:04</span></div><div class="row" style="margin-top:6px"><button class="btn">Trim silence</button><button class="btn">Fades…</button><span class="grow"></span><button class="btn">Un-choose</button></div><div style="margin-top:8px;padding:8px;border:1px dashed var(--line-strong);border-radius:8px"><span class="label">Fades</span><div class="faint">In 0.2 s · Out 1.5 s</div><div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn">Cancel</button><button class="btn">Save fades</button></div><div class="err">The fades could not be saved: the game's file could not be written.</div></div></div></div></div><div class="note">Cost: the page never shows more than one red line per track, and it always belongs to what was pressed last. Standard “a retry replaces the old error” behaviour.</div></body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Option B — one red line per track: the newest action owns it (recommended)</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --danger: #ff94a8;
+        --danger-bg: #2e1720;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .steps {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 16px;
+      }
+      .step {
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 16px;
+      }
+      .step h3 {
+        margin: 0 0 4px;
+        font-size: 13px;
+        color: var(--accent);
+      }
+      .step p.what {
+        margin: 0 0 12px;
+        color: var(--soft);
+        font-size: 13px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+      }
+      .card.game {
+        border-color: #3a2a20;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .grow {
+        flex: 1;
+      }
+      .play {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 10px;
+      }
+      .chip {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--soft);
+        font-size: 12px;
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 6px;
+        padding: 3px 9px;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .err {
+        display: flex;
+        gap: 6px;
+        align-items: flex-start;
+        color: var(--danger);
+        font-size: 12.5px;
+        margin-top: 6px;
+      }
+      .err .x {
+        margin-left: auto;
+        background: none;
+        border: 0;
+        color: var(--danger);
+        font-size: 14px;
+        cursor: pointer;
+        padding: 0 4px;
+      }
+      .gone {
+        color: var(--faint);
+        font-size: 12px;
+        font-style: italic;
+        margin-top: 6px;
+      }
+      .faint {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .note {
+        max-width: 1100px;
+        margin: 22px auto 0;
+        color: var(--soft);
+      }
+      @media (max-width: 480px) {
+        body {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Option B — one red line per track: the newest action owns it (recommended)</h1>
+      <p>
+        Victory, a stinger. Pressing <b>any</b> action on this track (Choose, Trim silence, Undo
+        trim, Save fades) clears every older red line straight away. If that action fails, its line
+        is the only one shown.
+      </p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h3>1 · Choose on Take 1 fails</h3>
+        <p class="what">The folder is read-only.</p>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 1</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+          <div class="err" role="alert"><span>The game's file could not be written.</span></div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 2</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 3</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <h3>2 · Folder fixed, Choose on Take 3 succeeds</h3>
+        <p class="what">
+          Take 1’s line went as soon as Choose on Take 3 was pressed; it succeeded, so no red line
+          at all.
+        </p>
+        <div class="card game">
+          <div class="row">
+            <span class="label">In the game</span> <button class="play">▶</button><b>Take 3</b
+            ><span class="chip ok">chosen</span><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <button class="btn">Trim silence</button><button class="btn">Fades…</button
+            ><span class="grow"></span><button class="btn">Un-choose</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 1</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+          <div class="gone">(red line gone)</div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 2</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <h3>3 · Two failures in a row</h3>
+        <p class="what">
+          Choose on Take 1 fails, then Choose on Take 2 fails: only Take 2’s line shows — it is the
+          one that just happened.
+        </p>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 1</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+          <div class="gone">(red line gone)</div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 2</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+          <div class="err" role="alert"><span>The game's file could not be written.</span></div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <button class="play">▶</button><b>Take 3</b><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <span class="grow"></span><button class="btn">Trim silence</button
+            ><button class="btn">Choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <h3>4 · The take in the game, Fades editor open</h3>
+        <p class="what">
+          Undo trim had failed. Opening Fades is not an action, so the line stays; pressing Save
+          fades clears it — if the save fails, only the Fades editor’s line shows.
+        </p>
+        <div class="card game">
+          <div class="row">
+            <span class="label">In the game</span> <button class="play">▶</button><b>Take 3</b
+            ><span class="chip ok">chosen</span><span class="faint">0:04</span>
+          </div>
+          <div class="row" style="margin-top: 6px">
+            <button class="btn">Trim silence</button><button class="btn">Fades…</button
+            ><span class="grow"></span><button class="btn">Un-choose</button>
+          </div>
+          <div
+            style="
+              margin-top: 8px;
+              padding: 8px;
+              border: 1px dashed var(--line-strong);
+              border-radius: 8px;
+            "
+          >
+            <span class="label">Fades</span>
+            <div class="faint">In 0.2 s · Out 1.5 s</div>
+            <div class="row" style="margin-top: 6px">
+              <span class="grow"></span><button class="btn">Cancel</button
+              ><button class="btn">Save fades</button>
+            </div>
+            <div class="err">
+              The fades could not be saved: the game's file could not be written.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      Cost: the page never shows more than one red line per track, and it always belongs to what was
+      pressed last. Standard “a retry replaces the old error” behaviour.
+    </div>
+  </body>
+</html>
