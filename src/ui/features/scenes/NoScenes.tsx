@@ -2,10 +2,8 @@ import { useState } from 'react'
 
 /** The example `scenes` section the page shows under "How to set it up". */
 const EXAMPLE = `"scenes": {
-  "paths": {
-    "declarations": "tts/{part}/scenes.json",
-    "mix": "web/src/lantern/scenes/{part}.mix.json"
-  }
+  "from": { "part": "tts/{part}/scenes.json" },
+  "mix": "web/src/lantern/scenes/{part}.mix.json"
 }`
 
 /** Scenes in a project whose file has no `scenes` section: what to add, with an example. */

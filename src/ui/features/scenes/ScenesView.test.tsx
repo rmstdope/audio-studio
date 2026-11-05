@@ -5,6 +5,8 @@ import type { MusicListSummary, TrackRow } from '../../../core/music'
 import { scaleMix, type SceneKept, type SceneMeasure } from '../../../core/sceneLoudness'
 import type { SceneMix } from '../../../core/scenes'
 import type { ProjectSummary } from '../../../core/summary'
+import { ProjectSchema } from '../../../core/project'
+import { projectJson } from '../../../../test/helpers'
 import { fakeHistory } from '../../../../test/fakeHistory'
 import { useRoute, type ScenesRoute } from '../../route'
 
@@ -132,12 +134,12 @@ const effects = {
 
 const store = {
   id: 'act1-store',
-  name: 'General store',
+  title: 'General store',
   states: ['plain', 'cat-home'],
   triggers: ['door-opens'],
 }
-const forest = { id: 'act1-forest', name: 'Forest path', states: ['plain'], triggers: [] }
-const chapel = { id: 'act1-chapel', name: 'Village chapel', states: [], triggers: ['bell-tolls'] }
+const forest = { id: 'act1-forest', title: 'Forest path', states: ['plain'], triggers: [] }
+const chapel = { id: 'act1-chapel', title: 'Village chapel', states: [], triggers: ['bell-tolls'] }
 
 function summary(
   state: 'ok' | 'missing' | 'invalid' = 'ok',
@@ -263,6 +265,14 @@ describe('a project without scenes', () => {
     expect(text(page.querySelector('h1'))).toBe('Scenes')
     act(() => button(page, 'How to set it up').click())
     expect(page.querySelector('pre')?.textContent).toContain('"scenes": {')
+  })
+
+  it('shows a scenes section the studio accepts', () => {
+    const page = render({ view: 'scenes', page: null }, { scenes: null } as ProjectSummary)
+    act(() => button(page, 'How to set it up').click())
+    const example = JSON.parse(`{${page.querySelector('pre')!.textContent}}`)
+    const parsed = ProjectSchema.safeParse({ ...projectJson(), ...example })
+    expect(parsed.error?.issues ?? []).toEqual([])
   })
 })
 
@@ -1706,11 +1716,20 @@ describe('the Loudness panel', () => {
   })
 
   it('says why a measure was refused', async () => {
-    measureAnswer = { status: 409, body: { ok: false, message: 'the kept file cannot be read' } }
+    measureAnswer = {
+      status: 409,
+      body: {
+        ok: false,
+        message:
+          'content-studio/scenes/act1.lock.json cannot be read; fix or delete it, and measure again',
+      },
+    }
     const page = render(open, summary('ok', true, { target }))
     await act(async () => button(panel(page), 'Measure loudness').click())
     await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
-    expect(text(panel(page).querySelector('.scene-problem'))).toBe('the kept file cannot be read')
+    expect(text(panel(page).querySelector('.scene-problem'))).toBe(
+      'content-studio/scenes/act1.lock.json cannot be read; fix or delete it, and measure again',
+    )
   })
 
   it('keeps showing a measure made with unsaved changes after one more edit, saying it changed', async () => {

@@ -476,28 +476,23 @@
     "scenes": {
       "type": "object",
       "properties": {
-        "paths": {
+        "from": {
           "type": "object",
           "properties": {
-            "declarations": {
-              "type": "string",
-              "minLength": 1
-            },
-            "mix": {
+            "part": {
               "type": "string",
               "minLength": 1
             }
           },
           "required": [
-            "declarations",
-            "mix"
+            "part"
           ],
           "additionalProperties": false
         },
-        "loudness": {
+        "output": {
           "type": "object",
           "properties": {
-            "target": {
+            "lufs": {
               "type": "number",
               "minimum": -70,
               "maximum": 0
@@ -508,14 +503,19 @@
             }
           },
           "required": [
-            "target",
+            "lufs",
             "tolerance"
           ],
           "additionalProperties": false
+        },
+        "mix": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
-        "paths"
+        "from",
+        "mix"
       ],
       "additionalProperties": false
     }

@@ -18,8 +18,9 @@ import {
   type SceneRow,
 } from '../core/scenes'
 import { ffmpegSceneAudio } from './sceneAudio'
-import { keepMeasure, LOUDNESS_FILE, measuresBroken } from './sceneMeasures'
+import { keepMeasure, measuresBroken } from './sceneMeasures'
 import { dirname } from 'node:path'
+import { scenesLockFile } from '../core/project'
 import { effectCurrentFile, loadProject, musicCurrentFile } from './workspace'
 
 /** One clip in the minute that is measured, with the file it is read from. */
@@ -260,11 +261,11 @@ export async function startMeasure(
   if (running.has(key)) {
     return { ok: false, kind: 'running', message: `${part} is being measured already` }
   }
-  if (await measuresBroken(dirname(projectFile))) {
+  if (await measuresBroken(dirname(projectFile), part)) {
     return {
       ok: false,
       kind: 'unreadable',
-      message: `${LOUDNESS_FILE} cannot be read; fix or delete it, and measure again`,
+      message: `${scenesLockFile(part)} cannot be read; fix or delete it, and measure again`,
     }
   }
   const progress = { done: 0, total: act.scenes.filter((s) => !s.unreadable).length }

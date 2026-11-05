@@ -64,28 +64,25 @@ export async function readScenes(
   const { scenes } = project
   if (!scenes) return null
   const acts = []
-  const measures = await readMeasures(root, problems)
   for (const part of project.parts) {
-    const mixFile = partPathFor(scenes.paths.mix, part.id)
+    const mixFile = partPathFor(scenes.mix, part.id)
     acts.push({
       mixFile,
       id: part.id,
       title: part.title,
       canRefresh: Boolean(project.refresh?.part),
-      declarations: await readDeclarations(
-        root,
-        partPathFor(scenes.paths.declarations, part.id),
-        problems,
-      ),
+      declarations: await readDeclarations(root, partPathFor(scenes.from.part, part.id), problems),
       mix: await readMix(root, mixFile, problems),
-      loudness: measures[part.id],
+      loudness: await readMeasures(root, part.id, problems),
     })
   }
   return summarizeScenes({
     acts,
     effects: known.effects,
     music: known.music?.lists ?? [],
-    target: scenes.loudness ?? null,
+    target: scenes.output
+      ? { target: scenes.output.lufs, tolerance: scenes.output.tolerance }
+      : null,
   })
 }
 
@@ -172,7 +169,7 @@ export function saveScene(
     const problems: Problem[] = []
     const declarations = await readDeclarations(
       root,
-      partPathFor(project.scenes.paths.declarations, part),
+      partPathFor(project.scenes.from.part, part),
       problems,
     )
     if (declarations.status !== 'ok')
@@ -182,7 +179,7 @@ export function saveScene(
     const checked = SceneMixSchema.safeParse(scene)
     if (!checked.success) return refuse('invalid', 'the scene cannot be saved as it is')
 
-    const mixFile = partPathFor(project.scenes.paths.mix, part)
+    const mixFile = partPathFor(project.scenes.mix, part)
     const json = await readJson(resolveInRoot(root, mixFile))
     let raw: Record<string, unknown> = { scenes: {} }
     if (json.status === 'invalid') return refuse('unreadable', `${mixFile} cannot be read`)

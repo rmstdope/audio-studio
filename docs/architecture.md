@@ -55,6 +55,7 @@ retroquest/                      ← user runs `content-studio` here
 │   └── music/                   ← edits.json (the studio's changes to the tracks), lock.json (the chosen take of each track)
 │   └── images/                  ← edits.json (the style and the studio's changes to the images), lock.json (the chosen take of each image)
 │   └── effects/                 ← edits.json (the studio's rewordings of the sound effects), lock.json (the chosen take of each effect)
+│   └── scenes/                  ← act1.lock.json (the loudness each of an act's scenes was last measured at)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
 │   └── music.json               ← the act's loops, from the game (read; built, §8.5)
@@ -205,16 +206,13 @@ audio, network or disk.
 
 ## 5. The project file
 
-The format the studio is moving to, version 2, is described for the people who write the files in
+The format the studio reads, version 2, is described for the people who write the files in
 [docs/project-files.md](project-files.md) (epic as-6u9, §12 step 18), which is where the format of
-the project file's top level and of narration's, music's, images' and sound effects' files is described. This section and §6 say how the studio uses them, and
-describe the files of the sections that have not moved yet; each step of the move takes its part
-out of them.
+every file is described. This section and §6 say how the studio uses them.
 
 `content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
 an id and a title. Its top level, the studio folder and the cache (as-6u9.2), the `narration`
-section (as-6u9.3), the `music` section (as-6u9.4), the `images` section (as-6u9.5) and the `effects` section (as-6u9.6) are version 2; the `scenes` section keeps its shape until its own step moves
-it.
+section (as-6u9.3), the `music` section (as-6u9.4), the `images` section (as-6u9.5), the `effects` section (as-6u9.6) and the `scenes` section (as-6u9.7) are version 2.
 
 ```json
 {
@@ -1807,12 +1805,14 @@ not grow.
 
 ```json
 "scenes": {
-  "paths": {
-    "declarations": "tts/{part}/scenes.json",
-    "mix": "web/src/lantern/scenes/{part}.mix.json"
-  }
+  "from": { "part": "tts/{part}/scenes.json" },
+  "output": { "lufs": -20, "tolerance": 2 },
+  "mix": "web/src/lantern/scenes/{part}.mix.json"
 }
 ```
+
+The format of the section, the scene list, the mix and the scenes lock is in
+[docs/project-files.md](project-files.md) (as-6u9.7); this section says how the studio uses them.
 
 Without the section the sidebar has no Scenes workspace. Neither path may hold `{language}`. The
 mix is a file of the game (the game imports or fetches it, so it takes effect the next time the
@@ -1821,13 +1821,13 @@ Refresh from the game on the Scenes page is `refresh.part` for the part, as on a
 act's Music and Images pages (the game's one command for an act's lists; no new command, no new
 consumer rule beyond naming this page).
 
-**The declarations** (`scenes.paths.declarations`, game-written, read only, in the game's order):
+**The declarations** (`scenes.from.part`, game-written, read only, in the game's order):
 
 ```json
 [
   {
     "id": "act1-general-store",
-    "name": "General store",
+    "title": "General store",
     "states": ["plain", "cat-home"],
     "triggers": ["door-opens"]
   }
@@ -1837,7 +1837,7 @@ consumer rule beyond naming this page).
 - `id`: the scene's slug (`^[a-z0-9]+(-[a-z0-9]+)*$`), unique across the game's acts. RetroQuest
   uses the room's music track id (`roomTrackId`), so a scene's own track and its old
   `effectVolumes.json` key are its id.
-- `name`: what the page calls it. `states`: the scene's **named sound states**, the first being the
+- `title`: what the page calls it (the scene's `name` in the studio's pages and API). `states`: the scene's **named sound states**, the first being the
   game's default; `[]` or absent when the scene has none. The game names its default state: where
   a room's `soundState()` answers `''` today (GeneralStore, ForestPath) the declarations call it
   `plain` and the game reads a runtime `''` as that state (rq-xazj does the mapping, once, where
@@ -1850,7 +1850,7 @@ consumer rule beyond naming this page).
   used twice (both), is left out and reported with its file and place; a file that is not a list
   is unreadable as a whole. A file that is not there yet is "the game has not listed its scenes".
 
-**The mix** (`scenes.paths.mix`, studio-written, game-read), one object per act:
+**The mix** (`scenes.mix`, studio-written, game-read), one object per act:
 
 ```json
 {
@@ -1980,8 +1980,9 @@ carries a `problem` derived on every read from what the Music page knows (`take`
 read), and the chip links to the track's page and follows the track chosen in the menu before saving.
 
 **Loudness** (as-gdf.1; the screens are `docs/ui/as-gdf.1-scene-loudness.html`). The project file may
-say what the game's scenes should sound like: `scenes.loudness` is `{ "target": -20, "tolerance": 2 }`
-(integrated LUFS and dB), edited by hand and only read; without it nothing is flagged. The open
+say what the game's scenes should sound like: `scenes.output` is `{ "lufs": -20, "tolerance": 2 }`
+(integrated LUFS and dB, both or neither; the studio calls `lufs` the target), edited by hand and
+only read; without it nothing is flagged. The open
 scene's **Loudness** panel and the scene list's count column show the last measure of the act.
 **Measure loudness** (`POST /api/scene-loudness/:part`, with `open: { scene, entry }` when the open
 scene has unsaved changes) measures every readable scene of the act in the background, one after
@@ -2002,15 +2003,17 @@ with nothing playing has no figure ("nothing plays") and is never flagged. A fig
 against the target in `core/sceneLoudness.ts` as it is shown (rounded to one decimal, so the figure,
 the distance and the chip agree): within the tolerance is "on target", else "N dB too
 quiet / too loud" by how far from the target; a scene whose states disagree is "off target" in the
-list. The figures are **kept** in `content-studio/cache/scene-loudness.json` (act, then scene: `saved`,
-the measure of the saved scene, and `draft`, the open scene's measure with its unsaved changes,
-kept beside it so Discard puts the saved figures back). Each measure remembers the scene's entry
+list. The figures are **kept** in each act's scenes lock, `content-studio/scenes/<part>.lock.json`
+(committed; scene id to `saved`, the measure of the saved scene, and `draft`, the open scene's
+measure with its unsaved changes, kept beside it so Discard puts the saved figures back), written
+one scene per line in id order through `formatEntriesPerLine`. Each measure remembers the scene's entry
 and the clip each sound played (its take or the game's file); the page says "changed since
 measured" when the saved entry or one of those clips is no longer the same, or, before Save, when
 the levels on the page differ from those measured. A Save makes a draft
 measured from exactly the saved entry the saved figures, and drops any other draft
-(`services/sceneMeasures.ts`). The kept file only holds figures that can be measured again, so
-one that cannot be read is reported and read as empty. The figures reach the page with
+(`services/sceneMeasures.ts`). A lock only holds figures that can be measured again, so one that
+cannot be read is reported and read as empty, never written over, and Measure loudness on its act
+is refused naming it; the other acts are not affected. The figures reach the page with
 `ProjectSummary.scenes` (`SceneRow.loudness`, `ScenesSummary.loudnessTarget`).
 
 **Bringing a scene back to the target** (as-gdf.2; `docs/ui/as-gdf.2-loudness-suggestion.html`). When
@@ -2611,7 +2614,12 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
        and the lock (`inputs.text`) at fixed places in `content-studio/effects/`. The take hashes,
        the boards and the takes in the cache are unchanged, so a converted game's effects stay as
        they stood.
-    7. **Scenes** (as-6u9.7): the declarations, the mix and the kept loudness as the scenes lock.
+    7. **Scenes** (as-6u9.7, built): the `scenes` section (`from.part`,
+       `output: { lufs, tolerance }`, `mix`), scenes' names as `title`, and the kept loudness moved
+       from the gitignored cache into each part's committed scenes lock,
+       `content-studio/scenes/<part>.lock.json`.
+       The mix's format and the measures' fields are unchanged, so a converted game's figures stay
+       as they stood.
     8. **RetroQuest end to end** (as-6u9.8): the game and the studio shown working on the new files.
 
 ---
