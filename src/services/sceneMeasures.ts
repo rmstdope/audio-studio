@@ -1,12 +1,12 @@
 import { dirname } from 'node:path'
 import {
   LoudnessFileSchema,
+  movedEntry,
   type LoudnessFile,
   type SceneKept,
   type SceneMeasure,
 } from '../core/sceneLoudness'
 import { sameMix } from '../core/sceneEdit'
-import { scaleMix } from '../core/sceneLoudness'
 import type { Problem } from '../core/project'
 import type { SceneMix } from '../core/scenes'
 import { readResource, writeAtomic } from './files'
@@ -90,8 +90,7 @@ export async function sceneSaved(
       ? [kept.draft, kept.saved].find(
           (m) =>
             m?.measuredAt === moved.measuredAt &&
-            m.entry !== null &&
-            sameMix(scaleMix(m.entry, moved.db), entry),
+            sameMix(movedEntry(m.entry, moved.db, entry), entry),
         )
       : undefined
     if (base) {

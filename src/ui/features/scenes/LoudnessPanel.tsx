@@ -108,7 +108,7 @@ export function LoudnessPanel({
   const changed = status === 'changed'
   // The figures a person can trust: as measured, or moved by the change that was made.
   const measure = kept && moved && status !== 'measured' ? shiftStates(kept, moved.db) : kept
-  const made = moved ? `then made ${changeWord(moved.db)}` : null
+  const made = moved && status !== 'measured' ? `then made ${changeWord(moved.db)}` : null
   // Edits on the page since the measure make its figures wrong, whether or not they are saved.
   const edited = kept !== null && dirty && !sameMix(kept.entry, page)
   const suggestion =
@@ -217,7 +217,11 @@ export function LoudnessPanel({
       )}
       {refused && <div className="panel scene-problem">{refused}</div>}
       {line && (
-        <div className="scene-suggest">
+        <div
+          className={
+            suggestion?.kind === 'none' ? 'scene-suggest scene-suggest-muted' : 'scene-suggest'
+          }
+        >
           <span>
             {line.before}
             {line.strong && <strong>{line.strong}</strong>}

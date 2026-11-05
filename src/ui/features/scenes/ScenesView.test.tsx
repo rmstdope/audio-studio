@@ -1926,6 +1926,21 @@ describe('the loudness suggestion', () => {
     expect(text(panel(page).querySelector('h2'))).not.toContain('expected')
   })
 
+  it('words a scene with no states: one row "The scene", and "it"', () => {
+    const m = { ...saved(), states: [{ state: null, lufs: -24.1 }] }
+    const page = render(open, withMeasure(m))
+    expect(text(panel(page).querySelector('tbody tr'))).toBe('The scene−24.1 LUFS4.1 dB too quiet')
+    expect(line(page)).toContain('to bring it within the target.Make 4.1 dB louder')
+  })
+
+  it('announces the press as a status, and does not say it changed when put back by hand', async () => {
+    const page = render(open, withMeasure(saved()))
+    await press(page, 'Make 4.0 dB louder')
+    expect(text(panel(page).querySelector('[role="status"]'))).toBe(
+      'Made 4.0 dB louder. Save to keep it, Discard to undo.',
+    )
+  })
+
   it('offers the closest change, the ceiling and nothing, in the words agreed', () => {
     const apart = render(
       open,
@@ -1955,7 +1970,7 @@ describe('the loudness suggestion', () => {
       }),
     )
     expect(text(panel(nothing).querySelector('.scene-suggest'))).toBe(
-      'No single change helps: plain is too loud and cat-home is too quiet. Bring them closer in the scene’s levels.',
+      'No single change helps: plain is too loud and cat-home too quiet. Bring them closer in the scene’s levels.',
     )
   })
 })

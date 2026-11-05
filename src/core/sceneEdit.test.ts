@@ -202,5 +202,7 @@ describe('scaleDraft', () => {
     expect(out.music).toEqual({ track: 'theme', level: 1.58 })
     expect(out.effects.map((e) => e.level)).toEqual([0.95, 0])
     expect(out.effects[0]?.state).toBe('x')
+    // A scene with no music keeps its level.
+    expect(scaleDraft({ ...draft, music: { track: null, level: 1 } }, 4).music.level).toBe(1)
   })
 })

@@ -211,6 +211,10 @@ describe('suggestChange', () => {
       ceiling: { sound: 'cat-purr', still: [2.2, 3.4] },
     })
   })
+  it('is not a ceiling when the capped change still brings every state within the tolerance', () => {
+    const out = suggestChange(measure([-22.1, -22.3]), t2, mixOf({ a: 2.85 }))
+    expect(out).toMatchObject({ kind: 'change', ceiling: null })
+  })
   it('offers nothing when states disagree and the closest change is under 0.5 dB', () => {
     expect(change([-16.9, -22.8])).toEqual({ kind: 'none', loud: ['s0'], quiet: ['s1'] })
   })
@@ -236,6 +240,14 @@ describe('expectedFigures', () => {
     expect(expectedFigures(base, { db: 4 }, { entry: mixOf({ a: 0.7 }), clips: { a: '1' } })).toBe(
       'changed',
     )
+  })
+  it('is expected for a scene that had no entry or no music key, as the page fills them in', () => {
+    const page = { music: { track: 'theme', level: 1.58 }, effects: [] }
+    expect(
+      expectedFigures(measure([-24], { entry: null }), { db: 4 }, { entry: page, clips: {} }),
+    ).toBe('expected')
+    const noMusic = measure([-24], { entry: { effects: [] } })
+    expect(expectedFigures(noMusic, { db: 4 }, { entry: page, clips: {} })).toBe('expected')
   })
   it('shifts every figure and keeps what reads nothing', () => {
     const shifted = shiftStates(measure([-23.4, null as never]), 4)

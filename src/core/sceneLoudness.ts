@@ -270,12 +270,11 @@ export function suggestChange(
     if (room < db) {
       if (room < 0.1) return null
       db = room
-      ceiling = {
-        sound: top.id,
-        still: read
-          .filter((s) => s.off + db < -target.tolerance)
-          .map((s) => oneDecimal(-(s.off + db))),
-      }
+      const still = read
+        .filter((s) => s.off + db < -target.tolerance)
+        .map((s) => oneDecimal(-(s.off + db)))
+      // Within the tolerance after all: an ordinary change, with nothing left to explain.
+      if (still.length > 0) ceiling = { sound: top.id, still }
     }
   }
   return { kind: 'change', db, states: read.length, closest, ceiling }
@@ -301,10 +300,22 @@ export function expectedFigures(
   if (!measureChanged(measure, now)) return 'measured'
   if (
     moved &&
-    measure.entry &&
-    measureChanged({ ...measure, entry: scaleMix(measure.entry, moved.db) }, now) === false
+    now.entry &&
+    measureChanged({ ...measure, entry: movedEntry(measure.entry, moved.db, now.entry) }, now) ===
+      false
   ) {
     return 'expected'
   }
   return 'changed'
+}
+
+/**
+ * The measured entry moved by `db`, as the page has it: a scene with no entry or no music key
+ * has the page fill in its track (`like`) at 100% before the move.
+ */
+export function movedEntry(entry: SceneMix | null, db: number, like: SceneMix): SceneMix {
+  const moved = scaleMix(entry ?? { effects: [] }, db)
+  return !moved.music && like.music
+    ? { ...moved, music: { track: like.music.track, level: scaleLevel(1, db) } }
+    : moved
 }

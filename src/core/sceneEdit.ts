@@ -177,7 +177,11 @@ export function scaleLevel(level: number, db: number): number {
 /** The draft with the music and every effect moved by the same `db`; nothing else changes. */
 export function scaleDraft(draft: SceneDraft, db: number): SceneDraft {
   return {
-    music: { ...draft.music, level: scaleLevel(draft.music.level, db) },
+    // A scene with no music has no level to move.
+    music:
+      draft.music.track === null
+        ? draft.music
+        : { ...draft.music, level: scaleLevel(draft.music.level, db) },
     effects: draft.effects.map((e) => ({ ...e, level: scaleLevel(e.level, db) })),
   }
 }

@@ -4206,6 +4206,12 @@ button.cue-chip[aria-expanded='true'] {
   background: var(--warn-bg);
   overflow-wrap: anywhere;
 }
+.scene-suggest-muted {
+  background: none;
+  padding: 0;
+  color: var(--faint);
+  font-size: 12px;
+}
 .scene-suggest .btn {
   flex: none;
 }

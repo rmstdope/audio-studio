@@ -220,7 +220,7 @@ describe('the loudness suggestion line', () => {
     )
     const none = suggestionLine({ kind: 'none', loud: ['plain'], quiet: ['cat-home'] }, 2)
     expect(none.before).toBe(
-      'No single change helps: plain is too loud and cat-home is too quiet. Bring them closer in the scene’s levels.',
+      'No single change helps: plain is too loud and cat-home too quiet. Bring them closer in the scene’s levels.',
     )
     expect(none.button).toBeNull()
   })

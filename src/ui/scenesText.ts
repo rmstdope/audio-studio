@@ -142,7 +142,7 @@ export function suggestionLine(
   if (suggestion.kind === 'none') {
     const { loud, quiet } = suggestion
     return {
-      before: `No single change helps: ${joined(loud)} ${loud.length === 1 ? 'is' : 'are'} too loud and ${joined(quiet)} ${quiet.length === 1 ? 'is' : 'are'} too quiet. Bring them closer in the scene’s levels.`,
+      before: `No single change helps: ${joined(loud)} ${loud.length === 1 ? 'is' : 'are'} too loud and ${joined(quiet)} too quiet. Bring them closer in the scene’s levels.`,
       strong: '',
       after: '',
       button: null,
