@@ -1423,8 +1423,11 @@ per part id (an id the project does not have is a problem at `style.parts.<id>`)
 edits the look and what is kept out directly (`PATCH /api/image-style`, `{ look }` or `{ keepOut }`:
 an empty look is refused, an empty kept-out is none); the palette, colour depth, dithering and the
 parts' additions are changed in the file. Without a style each prompt is only its words, and the
-Style page says to add one; edits that cannot be read are a problem, and the style is then taken as
-none.
+Style page says to add one. The style and each image's edit are read apart
+(`readImageEditsValue`), each with its problems: a bad `images.<id>` drops only that image's edit,
+so the image shows the game's words; a bad style is taken as none and the rewordings are kept; a
+file that cannot be read at all holds nothing usable. Every save is refused, with those problems,
+while any part of the file cannot be read, so a save never writes over and loses it.
 
 **The prompt.** The image's words (the user's own, else the game's description), then the act's
 addition, the look, and `Kept out: …`, on separate lines; an empty part is left out. An image can
