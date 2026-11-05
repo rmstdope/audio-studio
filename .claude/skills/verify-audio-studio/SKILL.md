@@ -75,9 +75,9 @@ answers split a batch, record each bead by its own recipe.
 The declared launch serves the sample with the merged build, without reloading (`launch_web` in
 `.cerebro/project.conf`, no `--dev`). The sample is small on purpose:
 
-- the project "Sample Quest": two parts (`act1`, `act2`), three languages (`en`, `sv`, `de`), no
-  `quality` or `models` set, so every stage uses the free model, `quality.parallel` is 4 and the
-  transcriber is mlx-whisper;
+- the project "Sample Quest": three parts (`act1`, `act2`, `act3`), three languages (`en`, `sv`,
+  `de`), no `narration.generate` or `narration.models` set, so every stage uses the free model,
+  `generate.parallel` is 4 and the transcriber is mlx-whisper;
 - dialog for `act1` only, in `en` (lines `a1`–`a5`) and `sv` (no `a2`, and an `sv`-only line
   `only-sv`); none for `act2` or `de`;
 - a narrator and a keeper in the cast, both with a voice, and a line by `wren`, who is not in the
@@ -89,15 +89,16 @@ To reach the state a bead needs, **edit the sample in the tree** by hand, and on
 before launching where you can; the studio reads the files again on every request, so an edit while
 it runs shows on the next reload.
 
-- the project file: the top-level `languages`, `parts` and `refresh`, `narration.models` (`s1` for
-  the retirement banner, a paid model for a paid flow), `narration.quality` (`parallel`,
-  `transcriber`), `soundAlike`;
-- `tts/cast.json`: a speaker added, cast or left uncast, a style, `pronounce` entries;
+- the project file: the top-level `languages`, `parts` and `refresh`, `narration.models.fish` (`s1`
+  for the retirement banner, a paid model for a paid flow), `narration.generate` (`parallel`,
+  `transcriber`, `soundAlike`);
+- `content-studio/narration/cast.json`: a speaker added, cast or left uncast, a style, `pronounce`
+  entries;
 - a part's `script.json`: a line added, changed (to make a recorded clip stale) or removed (to make
   an orphan clip);
 - a broken file, to see the error page that names the file and the JSON path.
 
-**Set `narration.quality.transcriber` to `none`** unless the bead touches what Whisper checks (takes
+**Set `narration.generate.transcriber` to `none`** unless the bead touches what Whisper checks (takes
 checked by ear, heard shares, word timings). If it does, ask first, under `prepare`: the first run
 installs mlx-whisper through uv and downloads a model of over a gigabyte onto the navigator's
 machine.
@@ -226,12 +227,13 @@ git -C .cerebro/worktrees/psylocke diff --cached --quiet                        
 
 Subtract your own edits to the sample, then check:
 
-- **Only the sample changed**, and inside it only the files the project file names (cast, cues,
-  lock, clips and manifest, per part and language, and dialog only through Refresh's command),
-  `content-studio/cache/`, and the project file itself. Anything else is a finding against the bead whose
+- **Only the sample changed**, and inside it only the files the project file names (clips and
+  manifest, per part and language, and dialog only through Refresh's command), the studio folder's
+  own files (`content-studio/`: the cast, each part's edits and lock), `content-studio/cache/`, and
+  the project file itself. Anything else is a finding against the bead whose
   journey wrote it.
-- **The project file** changed only in `narration.quality.soundAlike`, or in
-  `narration.models.draft` / `final` moved from `s1` to `s2.1-pro` after the banner was confirmed,
+- **The project file** changed only in `narration.generate.soundAlike`, or in
+  `narration.models.fish.draft` / `final` moved from `s1` to `s2.1-pro` after the banner was confirmed,
   and kept its indentation and line endings.
 - **A manifest** keeps the game's format: open one and compare its shape with
   `docs/architecture.md` §6. The lock is written one entry per line, in stable key order.
