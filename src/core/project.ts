@@ -371,6 +371,19 @@ export const ProjectSchema = z
     effects: EffectsSchema.optional(),
     scenes: ScenesSchema.optional(),
   })
+  .superRefine(({ parts, music }, context) => {
+    // The music lock names the stingers' list `shared` (`stingers` inside the studio).
+    if (!music) return
+    parts.forEach((part, index) => {
+      if (part.id === 'shared' || part.id === 'stingers') {
+        context.addIssue({
+          code: 'custom',
+          path: ['parts', index, 'id'],
+          message: `"${part.id}" names the stingers in the music lock: give the part another id`,
+        })
+      }
+    })
+  })
   .superRefine(({ languages, narration }, context) => {
     if (languages.length > 1) {
       const paths: [string[], string][] = [

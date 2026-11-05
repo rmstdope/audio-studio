@@ -428,6 +428,22 @@ describe('the music section', () => {
     expect(found[0]!.message).toContain('{language}')
   })
 
+  it('refuses a part called shared or stingers, the names the music lock gives the stingers', () => {
+    const parts = [
+      { id: 'act1', title: 'Act I' },
+      { id: 'shared', title: 'Shared' },
+      { id: 'stingers', title: 'Stingers' },
+    ]
+    expect(problems({ ...music(), parts })).toEqual(
+      [1, 2].map((i) => ({
+        file: 'content-studio.json',
+        path: `parts[${i}].id`,
+        message: `"${parts[i]!.id}" names the stingers in the music lock: give the part another id`,
+      })),
+    )
+    expect(parse(projectJson({ parts })).success).toBe(true)
+  })
+
   it('keeps the edits and the lock at fixed places in the studio folder', () => {
     expect(MUSIC_EDITS_FILE).toBe('content-studio/music/edits.json')
     expect(MUSIC_LOCK_FILE).toBe('content-studio/music/lock.json')
