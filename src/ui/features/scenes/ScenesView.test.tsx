@@ -1981,10 +1981,11 @@ describe('the loudness suggestion', () => {
     expect(text(panel(page))).toContain('The scene changed since it was measured.')
   })
 
-  it('leaves the header alone for a hand edit on a measure nothing was pressed on', async () => {
+  it('says in the header that a hand edit on a measure nothing was pressed on changed the scene', async () => {
     const page = render(open, withMeasure(saved()))
     await drag(page, '50')
-    expect(text(panel(page).querySelector('h2'))).not.toContain('changed since measured')
+    expect(text(panel(page).querySelector('h2'))).toContain('· changed since measured')
+    expect(text(panel(page))).toContain('The scene changed since it was measured.')
   })
 
   it('drops the amber marks once an effect is removed after a press', async () => {

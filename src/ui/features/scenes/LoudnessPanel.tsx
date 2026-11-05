@@ -166,7 +166,9 @@ export function LoudnessPanel({
         <h2>
           Loudness <span className="faint scene-loud-target">{targetLine(target)}</span>
           {expected && <span className="scene-loud-warn"> · expected after your change</span>}
-          {changed && <span className="scene-loud-warn"> · changed since measured</span>}
+          {(changed || (edited && status === 'measured')) && (
+            <span className="scene-loud-warn"> · changed since measured</span>
+          )}
           {!expected && found?.unsaved && (
             <span className="scene-loud-warn"> · with your unsaved changes</span>
           )}
