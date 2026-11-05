@@ -25,16 +25,10 @@ export const EffectEntrySchema = z
     /** The effect plays round and round (ambience); absent: it plays once. */
     loops: z.boolean().optional(),
   })
-  .transform(({ text, ...rest }): EffectEntry => ({ ...rest, description: text }))
+  .transform(({ text, ...rest }) => ({ ...rest, description: text }))
 
 /** A sound effect of the game's list, its words as its description. */
-export interface EffectEntry {
-  id: string
-  title?: string
-  description: string
-  seconds: number
-  loops?: boolean
-}
+export type EffectEntry = z.output<typeof EffectEntrySchema>
 
 /** A rewording: the studio's own words for an effect (`text`), with the game's words they were written over. */
 const OwnWords = z.object({ text: z.string().min(1), gameWas: z.string() })
