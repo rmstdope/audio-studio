@@ -91,7 +91,7 @@ function setup(
     if (spy.fail) throw new Error('The disk is full.')
     spy.wavs.push(wav)
     mkdirSync(dirname(out), { recursive: true })
-    writeFileSync(out, 'mp3')
+    writeFileSync(out, `mp3 ${spy.wavs.length}`)
   }
   const takes = createMusicTakes({
     generator,
@@ -1098,7 +1098,7 @@ describe('choosing a take', () => {
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
     expect(view.takes.map((t) => t.chosen)).toEqual([false, false])
     expect(await takes.choose(file, 'hall', view.takes[1]!.file)).toEqual({ ok: true })
-    expect(readFileSync(join(root, 'audio/music/hall.mp3'), 'utf8')).toBe('mp3')
+    expect(readFileSync(join(root, 'audio/music/hall.mp3'), 'utf8')).toBe('mp3 1')
     expect(lockOf(root).hall).toMatchObject({ take: 2, seed: 101, list: 'act1' })
     const after = await takes.view(file, 'hall')
     if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
@@ -1591,6 +1591,44 @@ describe('fading a stinger take', () => {
     }
     expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
     expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
+  /** Runs `act` with the take board unwritable, the server log quiet. */
+  async function withBoardLocked(
+    made: Awaited<ReturnType<typeof stinger>>,
+    act: () => Promise<unknown>,
+  ) {
+    const folder = join(made.root, 'content-studio/cache/music')
+    chmodSync(folder, 0o555)
+    const quiet = console.error
+    console.error = () => {}
+    try {
+      return await act()
+    } finally {
+      console.error = quiet
+      chmodSync(folder, 0o755)
+    }
+  }
+
+  it('leaves the game’s file byte-identical when the board cannot be written on a save', async () => {
+    const made = await stinger()
+    await made.takes.choose(made.file, 'victory', made.name)
+    const game = join(made.root, 'audio/music/victory.mp3')
+    const before = readFileSync(game)
+    await withBoardLocked(made, () => made.takes.setFades(made.file, 'victory', made.name, fades))
+    expect(readFileSync(game).equals(before)).toBe(true)
+    expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
+  it('leaves the game’s file byte-identical when the board cannot be written on a remove', async () => {
+    const made = await stinger()
+    await made.takes.choose(made.file, 'victory', made.name)
+    await made.takes.setFades(made.file, 'victory', made.name, fades)
+    const game = join(made.root, 'audio/music/victory.mp3')
+    const before = readFileSync(game)
+    await withBoardLocked(made, () => made.takes.setFades(made.file, 'victory', made.name, null))
+    expect(readFileSync(game).equals(before)).toBe(true)
+    expect((await takeOf(made)).fades).toEqual(fades)
   })
 
   it('refuses a loop, a take that is not there, fades too long, and an unknown track', async () => {
