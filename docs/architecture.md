@@ -2013,7 +2013,8 @@ list. The figures are **kept** in `.content-studio/scene-loudness.json` (act, th
 the measure of the saved scene, and `draft`, the open scene's measure with its unsaved changes,
 kept beside it so Discard puts the saved figures back). Each measure remembers the scene's entry
 and the clip each sound played (its take or the game's file); the page says "changed since
-measured" when the saved entry or one of those clips is no longer the same. A Save makes a draft
+measured" when the saved entry or one of those clips is no longer the same, or, before Save, when
+the levels on the page differ from those measured. A Save makes a draft
 measured from exactly the saved entry the saved figures, and drops any other draft
 (`services/sceneMeasures.ts`). The kept file only holds figures that can be measured again, so
 one that cannot be read is reported and read as empty. The figures reach the page with

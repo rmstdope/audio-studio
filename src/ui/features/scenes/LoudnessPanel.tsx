@@ -118,9 +118,11 @@ export function LoudnessPanel({
   const edited = kept !== null && dirty && !sameMix(kept.entry, page)
   const suggestion =
     kept && status === 'measured' && !edited && target ? suggestChange(kept, target, page) : null
+  // The measured figures no longer match the page: the saved scene changed, or the page was edited.
+  const figuresOff = changed || (edited && status === 'measured')
   // The scene changed after a measure that was off the target (or after a press on one).
   const stale =
-    (changed || (edited && status === 'measured')) &&
+    figuresOff &&
     kept &&
     target &&
     (moved !== null || suggestChange(kept, target, now.entry ?? page) !== null)
@@ -166,7 +168,7 @@ export function LoudnessPanel({
         <h2>
           Loudness <span className="faint scene-loud-target">{targetLine(target)}</span>
           {expected && <span className="scene-loud-warn"> · expected after your change</span>}
-          {changed && <span className="scene-loud-warn"> · changed since measured</span>}
+          {figuresOff && <span className="scene-loud-warn"> · changed since measured</span>}
           {!expected && found?.unsaved && (
             <span className="scene-loud-warn"> · with your unsaved changes</span>
           )}
