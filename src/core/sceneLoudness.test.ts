@@ -253,6 +253,13 @@ describe('suggestChange', () => {
   it('says every sound is at the limit when none can go up, ignoring sounds at 0%', () => {
     expect(change([-48], mixOf({ a: 3, off: 0 }, 3))).toMatchObject({ every: true })
   })
+  it('names the limit for a scene with one unnamed state', () => {
+    const m = { ...measure([-48]), states: [{ state: null, lufs: -48 }] }
+    expect(suggestChange(m, t2, mixOf({ a: 3 }, 1))).toMatchObject({ kind: 'limit' })
+  })
+  it('names the limit when too loud and too quiet states need a louder closest change', () => {
+    expect(change([-17, -40], mixOf({ a: 3 }, 1))).toMatchObject({ kind: 'limit' })
+  })
   it('gives a too loud scene its ordinary change even with a sound at 300%', () => {
     expect(change([-16.2, -17], mixOf({ a: 3 }))).toMatchObject({ kind: 'change', db: -3.4 })
   })

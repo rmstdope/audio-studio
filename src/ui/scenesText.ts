@@ -148,24 +148,21 @@ export function limitLine(suggestion: Extract<Suggestion, { kind: 'limit' }>): S
     const top = Math.max(...sounds.map((s) => s.level))
     return [
       {
-        ...head,
+        strong: false,
         text: `${head.text}every sound in it is at ${top}%, as loud as it goes. The sounds themselves are too quiet for the target.`,
       },
     ]
   }
   const one = sounds.length === 1
   const same = sounds.every((s) => s.level === sounds[0]?.level)
-  const names = sounds.map((s) => (same ? s.name : `${s.name} (${s.level}%)`))
   const out: Segment[] = [head]
-  names.forEach((name, i) => {
-    if (i > 0) out.push({ text: i === names.length - 1 ? ' and ' : ', ', strong: false })
-    const bare = sounds[i]?.name ?? name
-    out.push({ text: bare, strong: true })
-    if (!same) out.push({ text: name.slice(bare.length), strong: false })
+  sounds.forEach((sound, i) => {
+    if (i > 0) out.push({ text: i === sounds.length - 1 ? ' and ' : ', ', strong: false })
+    out.push({ text: sound.name, strong: true })
+    if (!same) out.push({ text: ` (${sound.level}%)`, strong: false })
   })
-  const level = sounds[0]?.level
   const verb = same
-    ? `${one ? 'is' : 'are'} at ${level}%, as loud as ${one ? 'it goes' : 'they go'}`
+    ? `${one ? 'is' : 'are'} at ${sounds[0]?.level}%, as loud as ${one ? 'it goes' : 'they go'}`
     : 'are as loud as they go'
   out.push({
     text: ` ${verb}. Turn ${one ? sounds[0]?.name : 'them'} down or the others up by hand.`,
