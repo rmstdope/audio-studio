@@ -128,3 +128,28 @@ export function lengthAtX(x: number, width: number, seconds: number): number {
   const snapped = hundredths(Math.round(raw / FADE_STEP) * FADE_STEP)
   return Math.min(seconds, Math.max(0, snapped))
 }
+
+/** The query that asks for a take with these fades in its sound; empty when there are none. */
+export function fadeQuery(fades: Fades | undefined): string {
+  if (!fades || !hasFades(fades)) return ''
+  return `?fadeIn=${fades.in}&fadeOut=${fades.out}&shape=${fades.shape}`
+}
+
+/**
+ * The fade line over a waveform as the points of an SVG polyline in a 100 by 100 box: along the
+ * take left to right, the top for full volume and the bottom for silence.
+ */
+export function envelopePoints(fades: Fades, seconds: number): string {
+  const points: string[] = []
+  for (let step = 0; step <= 200; step++) {
+    const share = step / 200
+    const gain = fadeGain(fades, seconds, share * seconds)
+    points.push(`${hundredths(share * 100)},${hundredths((1 - gain) * 100)}`)
+  }
+  return points.join(' ')
+}
+
+/** What to ask the player for a take: its address with the fades in the sound, and whether Setup's playback fade applies (not to a take with fades of its own). */
+export function heardAs(url: string, fades: Fades | undefined): { url: string; fade: boolean } {
+  return { url: `${url}${fadeQuery(fades)}`, fade: !fades || !hasFades(fades) }
+}

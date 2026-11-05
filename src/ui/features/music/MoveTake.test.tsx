@@ -172,7 +172,7 @@ describe('Move… on a take card', () => {
     const page = render(village, view([take(1)], { lockUnread: true }))
     expect(page.buttons('Move…')[0]!.disabled).toBe(true)
     expect(document.body.textContent).toContain(
-      'Choosing, dropping and moving wait until the music lock can be read. You can still listen and make more takes.',
+      'Choosing, dropping, moving and fading wait until the music lock can be read. You can still listen and make more takes.',
     )
   })
 

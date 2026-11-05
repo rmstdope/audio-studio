@@ -4,6 +4,9 @@ import {
   FadesSchema,
   applyFades,
   fadeGain,
+  fadeQuery,
+  heardAs,
+  envelopePoints,
   fadesLine,
   fadesProblem,
   hasFades,
@@ -115,5 +118,29 @@ describe('fades', () => {
     expect(lengthAtX(-10, 100, 4)).toBe(0)
     expect(lengthAtX(130, 100, 4)).toBe(4)
     expect(lengthAtX(11, 100, 4)).toBe(0.45)
+  })
+
+  it('asks for a take with fades in its address, and for nothing when there are none', () => {
+    expect(fadeQuery({ in: 0.3, out: 1.5, shape: 'straight' })).toBe(
+      '?fadeIn=0.3&fadeOut=1.5&shape=straight',
+    )
+    expect(fadeQuery(none)).toBe('')
+    expect(fadeQuery(undefined)).toBe('')
+  })
+
+  it('draws the fade line from the gain: 100 at the bottom, 0 at the top', () => {
+    const points = envelopePoints({ in: 1, out: 1, shape: 'straight' }, 4)
+    expect(points.startsWith('0,100 ')).toBe(true)
+    expect(points.endsWith(' 100,100')).toBe(true)
+    expect(points).toContain('50,0')
+  })
+
+  it('plays a take with fades as the game will, without the playback fade; others keep it', () => {
+    expect(heardAs('/t/a.wav', { in: 0.5, out: 0, shape: 'smooth' })).toEqual({
+      url: '/t/a.wav?fadeIn=0.5&fadeOut=0&shape=smooth',
+      fade: false,
+    })
+    expect(heardAs('/t/a.wav', undefined)).toEqual({ url: '/t/a.wav', fade: true })
+    expect(heardAs('/t/a.wav', none)).toEqual({ url: '/t/a.wav', fade: true })
   })
 })

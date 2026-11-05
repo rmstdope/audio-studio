@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { TrackRow } from '../../../core/music'
+import { fadesLine, heardAs, envelopePoints, type Fades } from '../../../core/fades'
 import { inTheGame, unchooseFailure, unchooseQuestion } from '../../../core/musicChoose'
 import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 import { useChooseTake, useUnchooseTake } from '../../api'
@@ -8,6 +9,7 @@ import { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { clock } from '../../format'
 import { movedFromLine } from '../../../core/musicMove'
+import { FadesEditor } from './FadesEditor'
 
 /** One clip at a time, shared with the takes below. */
 type Player = ReturnType<typeof useClipPlayer>
@@ -22,12 +24,15 @@ export function Wave({
   loop,
   position,
   quiet,
+  fades,
 }: {
   peaks: number[]
   loop: boolean
   position?: () => number | null
   /** The share of the waveform, from its end, where the sound has stopped (shaded), 0 to 1. */
   quiet?: number
+  /** A stinger take's fades: the fade line is drawn over the bars. */
+  fades?: { fades: Fades; seconds: number }
 }) {
   const head = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -49,6 +54,11 @@ export function Wave({
       {quiet !== undefined && quiet > 0 && (
         <span className="quiet" style={{ width: `${Math.round(quiet * 100)}%` }} />
       )}
+      {fades && (
+        <svg className="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <polyline points={envelopePoints(fades.fades, fades.seconds)} />
+        </svg>
+      )}
       {loop && <span className="seam" />}
       {position && <span className="playhead" ref={head} />}
     </div>
@@ -64,10 +74,20 @@ export function InTheGame({
   track,
   view,
   player,
+  fading,
+  onFades,
+  onFadesClosed,
+  fadesOpener,
 }: {
   track: TrackRow
   view: MusicTakesView
   player: Player
+  /** The take whose fades are open, if any. */
+  fading: number | null
+  onFades: (n: number) => void
+  onFadesClosed: (n: number) => void
+  /** Hands a take's Fades… button to the panel, to give it focus back when the editor closes. */
+  fadesOpener: (n: number) => (button: HTMLButtonElement | null) => void
 }) {
   const state = inTheGame(track)
   const take = view.takes.find((t) => t.chosen)
@@ -224,8 +244,39 @@ export function InTheGame({
         {take && <span className="faint small">{take.model}</span>}
       </div>
       {take?.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
-      {take && <Playback trackId={track.id} kind={view.kind} take={take} player={player} />}
-      <div className="track-in-game-actions">
+      {take?.fades && fading !== take.n && (
+        <span className="faint small">{fadesLine(take.fades)}</span>
+      )}
+      {take && fading === take.n ? (
+        <FadesEditor
+          trackId={track.id}
+          take={take}
+          chosen
+          player={player}
+          onClose={() => onFadesClosed(take.n)}
+        />
+      ) : (
+        take && <Playback trackId={track.id} kind={view.kind} take={take} player={player} />
+      )}
+      <div className="track-in-game-actions" hidden={take !== undefined && fading === take.n}>
+        {take && view.kind === 'stinger' && (
+          <button
+            type="button"
+            className="btn btn-small"
+            ref={fadesOpener(take.n)}
+            aria-disabled={fading !== null && fading !== take.n ? true : undefined}
+            title={
+              fading !== null && fading !== take.n
+                ? `Close the fades of Take ${fading} first.`
+                : undefined
+            }
+            onClick={() => {
+              if (fading === null) onFades(take.n)
+            }}
+          >
+            Fades…
+          </button>
+        )}
         <span className="grow" />
         <button
           type="button"
@@ -279,13 +330,14 @@ function Playback({
   const url = `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${take.file}`
   const seamId = `${id}-seam`
   const playing = player.playing === id
+  const heard = heardAs(url, take.fades)
   return (
     <div className="take-row">
       <button
         type="button"
         className="play"
         aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-        onClick={() => player.toggle(id, url, { fade: true, loop: kind === 'loop' })}
+        onClick={() => player.toggle(id, heard.url, { fade: heard.fade, loop: kind === 'loop' })}
       >
         {playing ? '■' : '▶'}
       </button>
@@ -293,6 +345,7 @@ function Playback({
         peaks={take.peaks}
         loop={kind === 'loop'}
         position={playing ? player.position : undefined}
+        fades={take.fades ? { fades: take.fades, seconds: take.seconds } : undefined}
       />
       <span className="faint small">{clock(take.seconds)}</span>
       {kind === 'loop' && (
