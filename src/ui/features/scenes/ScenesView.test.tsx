@@ -861,6 +861,7 @@ describe('adding a sound effect', () => {
         loops: false,
         silent: false,
         playable: true,
+        clip: null,
       })
     }
     const page = render(open, shown)

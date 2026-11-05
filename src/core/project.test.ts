@@ -552,4 +552,28 @@ describe('the scenes section', () => {
     expect(parse(scenes({ mix: 'web/scenes.mix.json' })).success).toBe(false)
     expect(parse(scenes({ mix: 'web/{part}/{language}.json' })).success).toBe(false)
   })
+
+  describe('the loudness target', () => {
+    const paths = {
+      declarations: 'tts/{part}/scenes.json',
+      mix: 'web/scenes/{part}.mix.json',
+    }
+    const withLoudness = (loudness: unknown) => projectJson({ scenes: { paths, loudness } })
+
+    it('is optional', () => {
+      expect(parse(scenes()).data!.scenes!.loudness).toBeUndefined()
+    })
+
+    it('holds a target and a tolerance in dB', () => {
+      const read = parse(withLoudness({ target: -20, tolerance: 2 }))
+      expect(read.data!.scenes!.loudness).toEqual({ target: -20, tolerance: 2 })
+    })
+
+    it('needs both, and refuses a positive target or a negative tolerance', () => {
+      expect(parse(withLoudness({ target: -20 })).success).toBe(false)
+      expect(parse(withLoudness({ tolerance: 2 })).success).toBe(false)
+      expect(parse(withLoudness({ target: 3, tolerance: 2 })).success).toBe(false)
+      expect(parse(withLoudness({ target: -20, tolerance: -1 })).success).toBe(false)
+    })
+  })
 })

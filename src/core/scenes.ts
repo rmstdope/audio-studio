@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { effectName, type EffectsSummary } from './effects'
 import type { CurrentMusic, MusicListSummary } from './music'
 import { problemsFrom, type Problem } from './project'
+import type { LoudnessTarget, SceneKept } from './sceneLoudness'
 
 /** A name the game gives an id, a state or a trigger: lower-case words joined by `-`. */
 const Slug = z
@@ -215,6 +216,10 @@ export interface SceneRow {
   gone: number
   /** Effects with no take chosen, not counting those gone. */
   silent: number
+  /** The clip each sound plays now (`music:<track>`, `effect:<id>`): its take or the game's file. */
+  clips: Record<string, string>
+  /** What the last measures of the scene found (§8.11). */
+  loudness: SceneKept
 }
 
 /** A sound effect the game has, as the Add menu offers it. */
@@ -226,6 +231,8 @@ export interface SceneEffectChoice {
   silent: boolean
   /** A chosen take's clip is there to play. */
   playable: boolean
+  /** The clip it plays now ("take 3"), to tell when it changed; null when none. */
+  clip: string | null
 }
 
 /** Why a track plays nothing: its chosen take or the game's file is missing, or there is neither. */
@@ -239,6 +246,8 @@ export interface SceneTrackChoice {
   playable: boolean
   /** Why it plays nothing; null when it plays, or when that is not known (the lock cannot be read). */
   problem: TrackProblem | null
+  /** The clip it plays now ("take 3", "file a/b.mp3"), to tell when it changed; null when none. */
+  clip: string | null
 }
 
 /** Why a track's current source plays nothing, derived on every read. */
@@ -276,6 +285,8 @@ export interface ScenesSummary {
   effects: SceneEffectChoice[]
   /** The effects list is read in full, so an effect id it lacks is gone from the game. */
   effectsKnown: boolean
+  /** The loudness the project file asks of the scenes; null: none set, nothing is flagged. */
+  loudnessTarget: LoudnessTarget | null
 }
 
 /** An act with what was read of its two files. */
@@ -286,6 +297,8 @@ export interface SceneActInput {
   mixFile: string
   declarations: DeclarationsState
   mix: MixState
+  /** The kept loudness measures of the act's scenes, by scene id. */
+  loudness?: Record<string, SceneKept>
 }
 
 const NO_MUSIC: SceneMusic = { track: null, name: null, level: 1, playable: false, gone: false }
@@ -298,6 +311,7 @@ export function summarizeScenes(input: {
   acts: SceneActInput[]
   effects: EffectsSummary | null
   music: MusicListSummary[]
+  target?: LoudnessTarget | null
 }): ScenesSummary {
   const { effects } = input
   const effectsKnown = effects?.status === 'ok' && effects.unreadable === 0
@@ -310,11 +324,13 @@ export function summarizeScenes(input: {
           loops: r.loops,
           silent: r.current.kind === 'nothing',
           playable: r.current.kind === 'take' && r.current.exists,
+          clip: r.current.kind === 'take' ? `take ${r.current.take}` : null,
         }))
       : []
   return {
     effects: choices,
     effectsKnown,
+    loudnessTarget: input.target ?? null,
     acts: input.acts.map((act) => {
       const base = {
         id: act.id,
@@ -328,12 +344,23 @@ export function summarizeScenes(input: {
         title: t.title,
         playable: (t.current.kind === 'take' || t.current.kind === 'game') && t.current.exists,
         problem: trackProblem(t.current),
+        clip:
+          t.current.kind === 'take'
+            ? `take ${t.current.take}`
+            : t.current.kind === 'game'
+              ? `file ${t.current.file}`
+              : null,
       }))
       if (act.declarations.status !== 'ok') {
         return { ...base, state: act.declarations.status, tracks, scenes: [] }
       }
       const scenes = act.declarations.scenes.map((declared) =>
-        sceneRow(declared, act.mix, { effectById, effectsKnown, list }),
+        sceneRow(
+          declared,
+          act.mix,
+          { effectById, effectsKnown, list, tracks, choices },
+          act.loudness?.[declared.id],
+        ),
       )
       return { ...base, state: 'ok' as const, tracks, scenes }
     }),
@@ -347,10 +374,18 @@ interface Known {
   effectsKnown: boolean
   /** The act's music list. */
   list: MusicListSummary | undefined
+  /** The act's tracks and the game's effects, for the clips a scene plays. */
+  tracks: SceneTrackChoice[]
+  choices: SceneEffectChoice[]
 }
 
 /** One scene from its declaration and its entry in the mix. */
-function sceneRow(declared: SceneDeclaration, mix: MixState, known: Known): SceneRow {
+function sceneRow(
+  declared: SceneDeclaration,
+  mix: MixState,
+  known: Known,
+  kept: SceneKept = { saved: null, draft: null },
+): SceneRow {
   const { id, name, states, triggers } = declared
   const row = { id, name, states, triggers }
   const unreadable = mix.status === 'unreadable' || (mix.status === 'ok' && mix.badIds.has(id))
@@ -363,6 +398,8 @@ function sceneRow(declared: SceneDeclaration, mix: MixState, known: Known): Scen
       unreadable: true,
       gone: 0,
       silent: 0,
+      clips: {},
+      loudness: kept,
     }
   }
   const entry = mix.status === 'ok' ? mix.scenes[id] : undefined
@@ -389,9 +426,45 @@ function sceneRow(declared: SceneDeclaration, mix: MixState, known: Known): Scen
     effects.filter((e) => e.goneEffect || e.goneState || e.goneTrigger).length +
     (music.gone ? 1 : 0)
   const silent = effects.filter((e) => e.silent).length
-  return { ...row, music, effects, entry: entry ?? null, unreadable: false, gone, silent }
+  const clips = clipsOf(
+    music.track,
+    effects.map((e) => e.id),
+    known.tracks,
+    known.choices,
+  )
+  const loudness = kept
+  return {
+    ...row,
+    music,
+    effects,
+    entry: entry ?? null,
+    unreadable: false,
+    gone,
+    silent,
+    clips,
+    loudness,
+  }
 }
 
+/**
+ * The clip each sound of a scene plays now (`music:<track>`, `effect:<id>`), by its take or the
+ * game's file: what a measure remembers, to tell when a take it was made from has changed.
+ */
+export function clipsOf(
+  track: string | null,
+  effectIds: string[],
+  tracks: SceneTrackChoice[],
+  choices: SceneEffectChoice[],
+): Record<string, string> {
+  const clips: Record<string, string> = {}
+  const music = tracks.find((t) => t.id === track)?.clip
+  if (track !== null && music) clips[`music:${track}`] = music
+  for (const id of effectIds) {
+    const clip = choices.find((c) => c.id === id)?.clip
+    if (clip) clips[`effect:${id}`] = clip
+  }
+  return clips
+}
 /** A scene's music: what the mix says, else (no `music`) the scene's own track at 1 if the act has it. */
 function sceneMusic(sceneId: string, chosen: SceneMix['music'], { list }: Known): SceneMusic {
   const track = chosen ? chosen.track : list?.tracks.some((t) => t.id === sceneId) ? sceneId : null
