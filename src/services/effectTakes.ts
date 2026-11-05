@@ -286,6 +286,9 @@ export function createEffectTakes({
       }
       // The file first: a take is on the board only once its WAV is there.
       await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, bytes)
+      // The model worked: its failure is cleared before the take shows, so a page that sees the
+      // take made sees the model well too.
+      await health?.clear(projectFile, entry.model).catch(() => {})
       const saved = await changeBoard(projectFile, found, (board) => {
         if (stop.signal.aborted) return
         board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort((a, b) => a.n - b.n)
@@ -296,7 +299,6 @@ export function createEffectTakes({
       }
       if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       waiting.delete(entry.n)
-      await health?.clear(projectFile, entry.model).catch(() => {})
     } catch (error) {
       if (stop.signal.aborted) return
       entry.state = 'failed'

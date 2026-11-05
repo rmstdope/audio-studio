@@ -55,7 +55,12 @@ function fakeHealth(failed: EffectModelId[] = []) {
       >,
     record: async (_file, model, failure) =>
       void calls.push(`record ${model} ${failure.error} on ${failure.effect}`),
-    clear: async (_file, model) => void calls.push(`clear ${model}`),
+    // Slower than a poll of the view, as a store on a loaded disk can be: a take counts as
+    // made only once its model's failure is cleared.
+    clear: async (_file, model) => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      calls.push(`clear ${model}`)
+    },
   }
   return { health, calls }
 }
