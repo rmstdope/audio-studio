@@ -13,11 +13,11 @@ default, so that every field is shown.
 > `parts`, `languages`, `refresh`), the studio folder `content-studio/` with its `.gitignore`, the
 > cache with your own settings, narration (the `narration` section, the dialog list, and
 > `narration/cast.json` with each part's edits and lock), music (the `music` section, the track
-> lists, `music/edits.json` and `music/lock.json`) and images (the `images` section, the image
-> lists, `images/edits.json` with the style, and `images/lock.json`). The other sections
-> (`effects`, `scenes`) and their edits and locks have not moved yet: until a section has, the
-> studio reads that section as `docs/architecture.md` §5 and §6 describe it, and this document is
-> the plan for it.
+> lists, `music/edits.json` and `music/lock.json`), images (the `images` section, the image
+> lists, `images/edits.json` with the style, and `images/lock.json`) and sound effects (the
+> `effects` section, the effects list, `effects/edits.json` and `effects/lock.json`). The other
+> section (`scenes`) and its lock have not moved yet: until it has, the studio reads that section
+> as `docs/architecture.md` §5 and §8.11 describe it, and this document is the plan for it.
 
 ## The four kinds of file
 
@@ -507,6 +507,10 @@ of the file cannot be read, the studio refuses every save to it, so nothing in i
 ```json
 { "rain": { "text": "Rain hammering on a tin roof", "gameWas": "Steady rain on a tin roof" } }
 ```
+
+The studio writes it one effect per line. While the file cannot be read, the studio shows the
+game's words, reports the problem at its path and refuses every save to it, so nothing in it is
+lost.
 
 ### Locks
 
