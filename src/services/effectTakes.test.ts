@@ -135,7 +135,7 @@ describe('createEffectTakes', () => {
   it('makes takes from the studio’s own words when they are in use', async () => {
     const { file, takes, requests, settled } = setup(undefined, undefined, {
       'content-studio/effects/edits.json': {
-        coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' },
+        coins: { text: 'Coins on glass', gameWas: 'Coins spill on stone' },
       },
     })
     await takes.make(file, 'coins', { count: 1 })
@@ -408,7 +408,7 @@ describe('createEffectTakes', () => {
     mkdirSync(dirname(edits), { recursive: true })
     writeFileSync(
       edits,
-      JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
+      JSON.stringify({ coins: { text: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     expect(await takes.accept(file, 'coins')).toEqual({ ok: true })
     expect(
@@ -443,7 +443,7 @@ describe('createEffectTakes', () => {
     mkdirSync(dirname(edits), { recursive: true })
     writeFileSync(
       edits,
-      JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
+      JSON.stringify({ coins: { text: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     await takes.make(file, 'coins', { count: 1 })
     expect((await settled('coins')).takes.map((t) => t.n)).toEqual([1, 2])

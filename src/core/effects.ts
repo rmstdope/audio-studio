@@ -36,8 +36,8 @@ export interface EffectEntry {
   loops?: boolean
 }
 
-/** The studio's own words for an effect, with the game's words they were written over. */
-const OwnWords = z.object({ words: z.string().min(1), gameWas: z.string() })
+/** A rewording: the studio's own words for an effect (`text`), with the game's words they were written over. */
+const OwnWords = z.object({ text: z.string().min(1), gameWas: z.string() })
 
 /** `content-studio/effects/edits.json`: the studio's own descriptions, by effect id. */
 export const EffectOverridesSchema = z.record(z.string(), OwnWords)
@@ -129,7 +129,7 @@ export function applyDescription(
   const { [id]: _dropped, ...rest } = overrides
   const words = text?.trim() ?? ''
   if (words === '' || words === gameWords) return rest
-  return { ...rest, [id]: { words, gameWas: gameWords } }
+  return { ...rest, [id]: { text: words, gameWas: gameWords } }
 }
 
 /** The studio's descriptions after "Keep mine": yours stay, and the game's present words are the ones they are over. */
@@ -254,7 +254,7 @@ export function summarizeEffects(input: {
   }
   const rows: EffectRow[] = list.effects.map((effect) => {
     const own = overrides[effect.id]
-    const description = own?.words ?? effect.description
+    const description = own?.text ?? effect.description
     const loops = Boolean(effect.loops)
     const now = { description, seconds: effect.seconds, loops }
     const entry = state.chosen?.[effect.id]
@@ -287,7 +287,7 @@ export function summarizeEffects(input: {
   const listed = new Set([...rows.map((r) => r.id), ...list.seenIds])
   const dropped = Object.entries(overrides)
     .filter(([id]) => !listed.has(id))
-    .map(([id, own]) => ({ id, name: effectName(id), words: own.words }))
+    .map(([id, own]) => ({ id, name: effectName(id), words: own.text }))
   return {
     status: 'ok',
     canRefresh,

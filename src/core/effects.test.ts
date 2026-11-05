@@ -187,34 +187,34 @@ describe('an id used twice with one copy unreadable', () => {
 describe('the studio’s own descriptions', () => {
   it('stores the words with the game’s words they were written over', () => {
     expect(applyDescription({}, 'coins', 'Coins on glass', coins.description)).toEqual({
-      coins: { words: 'Coins on glass', gameWas: coins.description },
+      coins: { text: 'Coins on glass', gameWas: coins.description },
     })
   })
 
   it('trims the words', () => {
-    expect(applyDescription({}, 'coins', '  Coins on glass \n', 'x').coins!.words).toBe(
+    expect(applyDescription({}, 'coins', '  Coins on glass \n', 'x').coins!.text).toBe(
       'Coins on glass',
     )
   })
 
   it('returns to the game’s words when emptied, set to null or typed back', () => {
-    const own: EffectOverrides = { coins: { words: 'Mine', gameWas: coins.description } }
+    const own: EffectOverrides = { coins: { text: 'Mine', gameWas: coins.description } }
     expect(applyDescription(own, 'coins', '  ', coins.description)).toEqual({})
     expect(applyDescription(own, 'coins', null, coins.description)).toEqual({})
     expect(applyDescription(own, 'coins', coins.description, coins.description)).toEqual({})
   })
 
   it('keeps the other effects’ words', () => {
-    const own: EffectOverrides = { door: { words: 'D', gameWas: 'd' } }
+    const own: EffectOverrides = { door: { text: 'D', gameWas: 'd' } }
     expect(applyDescription(own, 'coins', 'C', 'c')).toEqual({
-      door: { words: 'D', gameWas: 'd' },
-      coins: { words: 'C', gameWas: 'c' },
+      door: { text: 'D', gameWas: 'd' },
+      coins: { text: 'C', gameWas: 'c' },
     })
   })
 
   it('keeps mine by taking the game’s present words as the ones yours were written over', () => {
-    const own: EffectOverrides = { coins: { words: 'Mine', gameWas: 'old' } }
-    expect(keepMine(own, 'coins', 'new')).toEqual({ coins: { words: 'Mine', gameWas: 'new' } })
+    const own: EffectOverrides = { coins: { text: 'Mine', gameWas: 'old' } }
+    expect(keepMine(own, 'coins', 'new')).toEqual({ coins: { text: 'Mine', gameWas: 'new' } })
     expect(keepMine(own, 'door', 'x')).toEqual(own)
   })
 })
@@ -251,7 +251,7 @@ describe('summarizeEffects', () => {
   it('shows the studio’s words in use, with the game’s beside them', () => {
     const summary = summarizeEffects({
       list: ok(),
-      overrides: { coins: { words: 'Coins on glass', gameWas: coins.description } },
+      overrides: { coins: { text: 'Coins on glass', gameWas: coins.description } },
       canRefresh: false,
     })
     const row = summary.rows[1]!
@@ -267,7 +267,7 @@ describe('summarizeEffects', () => {
   it('flags an effect whose game words changed since yours were written', () => {
     const summary = summarizeEffects({
       list: ok(),
-      overrides: { coins: { words: 'Mine', gameWas: 'Something older' } },
+      overrides: { coins: { text: 'Mine', gameWas: 'Something older' } },
       canRefresh: false,
     })
     expect(summary.rows[1]).toMatchObject({ changedHere: true, gameChanged: true })
@@ -277,8 +277,8 @@ describe('summarizeEffects', () => {
     const summary = summarizeEffects({
       list: ok([door], { seenIds: new Set(['door-creak', 'wind']), unreadable: 1 }),
       overrides: {
-        coins: { words: 'Mine', gameWas: 'x' },
-        wind: { words: 'Howl', gameWas: 'y' },
+        coins: { text: 'Mine', gameWas: 'x' },
+        wind: { text: 'Howl', gameWas: 'y' },
       },
       canRefresh: false,
     })
@@ -301,7 +301,7 @@ describe('summarizeEffects', () => {
     const problems = [{ file: 'f', path: '', message: 'bad' }]
     const invalid = summarizeEffects({
       list: { status: 'invalid', problems },
-      overrides: { coins: { words: 'Mine', gameWas: 'x' } },
+      overrides: { coins: { text: 'Mine', gameWas: 'x' } },
       canRefresh: true,
     })
     expect(invalid).toMatchObject({ status: 'invalid', rows: [], dropped: [], problems })
@@ -385,7 +385,7 @@ describe('summarizeEffects', () => {
       }
       const summary = summarizeEffects({
         list: ok(),
-        overrides: { coins: { words: 'Coins on glass', gameWas: coins.description } },
+        overrides: { coins: { text: 'Coins on glass', gameWas: coins.description } },
         canRefresh: false,
         state,
       })

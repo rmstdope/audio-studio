@@ -77,6 +77,21 @@ describe('reading the effects into the summary', () => {
         opened.summary.problems.some((p) => p.file === 'content-studio/effects/edits.json'),
     ).toBe(true)
   })
+
+  it('reads a rewording as text with gameWas, and reports one written as words', async () => {
+    const mine = { 'door-creak': { text: 'Mine', gameWas: 'A slow wooden door creaks' } }
+    const { file } = repo({ 'content-studio/effects/edits.json': mine })
+    expect((await summary(file)).rows[0]).toMatchObject({ description: 'Mine', changedHere: true })
+    const old = { 'door-creak': { words: 'Mine', gameWas: 'A slow wooden door creaks' } }
+    const before = repo({ 'content-studio/effects/edits.json': old })
+    const opened = await loadWorkspace(before.file)
+    expect(opened.ok && opened.summary.problems).toContainEqual(
+      expect.objectContaining({
+        file: 'content-studio/effects/edits.json',
+        path: 'door-creak.text',
+      }),
+    )
+  })
 })
 
 describe('setEffectDescription', () => {
@@ -85,7 +100,7 @@ describe('setEffectDescription', () => {
     const before = read('tts/effects.json')
     expect(await setEffectDescription(file, 'coins', '  Coins on glass ')).toEqual({ ok: true })
     expect(read('content-studio/effects/edits.json')).toBe(
-      '{\n "coins": {"words":"Coins on glass","gameWas":"Coins spill on stone"}\n}\n',
+      '{\n "coins": {"text":"Coins on glass","gameWas":"Coins spill on stone"}\n}\n',
     )
     expect(read('tts/effects.json')).toBe(before)
     expect((await summary(file)).rows[1]).toMatchObject({
@@ -118,7 +133,7 @@ describe('setEffectDescription', () => {
 
 describe('the game rewording an effect you changed', () => {
   const game = (text: string) => [{ ...list[0]!, text }, list[1]]
-  const mine = { 'door-creak': { words: 'Mine', gameWas: 'A slow wooden door creaks' } }
+  const mine = { 'door-creak': { text: 'Mine', gameWas: 'A slow wooden door creaks' } }
 
   it('flags it, across reads, until Keep mine', async () => {
     const { file } = repo({
@@ -162,7 +177,7 @@ describe('an effect the game drops', () => {
   const files = {
     'tts/effects.json': [list[0]],
     'content-studio/effects/edits.json': {
-      coins: { words: 'Mine', gameWas: 'Coins spill on stone' },
+      coins: { text: 'Mine', gameWas: 'Coins spill on stone' },
     },
   }
 
