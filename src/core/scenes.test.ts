@@ -407,13 +407,75 @@ describe('summarizeScenes', () => {
     const act = result.acts[0]!
     expect(act.scenes.map((s) => s.entry)).toEqual([entry, null])
     expect(act.tracks).toEqual([
-      { id: 'store', title: 'Track store', playable: true, problem: null },
-      { id: 'other', title: 'Track other', playable: false, problem: { kind: 'take', take: 1 } },
+      { id: 'store', title: 'Track store', playable: true, problem: null, clip: 'take 1' },
+      {
+        id: 'other',
+        title: 'Track other',
+        playable: false,
+        problem: { kind: 'take', take: 1 },
+        clip: 'take 1',
+      },
     ])
     expect(result.effectsKnown).toBe(true)
     expect(result.effects).toEqual([
-      { id: 'bell', name: 'bell', loops: true, silent: false, playable: true },
-      { id: 'quiet', name: 'quiet', loops: false, silent: true, playable: false },
+      { id: 'bell', name: 'bell', loops: true, silent: false, playable: true, clip: 'take 1' },
+      { id: 'quiet', name: 'quiet', loops: false, silent: true, playable: false, clip: null },
     ])
+  })
+})
+
+describe('summarizeScenes: loudness', () => {
+  const measured = {
+    measuredAt: '2026-11-05T14:02:00.000Z',
+    entry: null,
+    clips: {},
+    states: [{ state: null, lufs: -20 }],
+    without: [],
+    error: null,
+  }
+
+  it('names the clip each sound plays by its take or its file, for "changed since measured"', () => {
+    const act = summarize({
+      declarations: decl(slug('store')),
+      mix: mixOf({
+        store: {
+          music: { track: 'store', level: 1 },
+          effects: [{ id: 'bell', play: { mode: 'loop' }, level: 1 }],
+        },
+      }),
+      effects: effects([effectRow('bell', { current: { kind: 'take', take: 3, exists: true } })]),
+      music: [musicList([track('store', { kind: 'game', file: 'a/b.mp3', exists: true })])],
+    })
+    expect(act.scenes[0]!.clips).toEqual({
+      'music:store': 'file a/b.mp3',
+      'effect:bell': 'take 3',
+    })
+  })
+
+  it('carries the kept measures of a scene, and none for one never measured', () => {
+    const result = summarizeScenes({
+      acts: [
+        {
+          id: 'act1',
+          title: 'Act 1',
+          canRefresh: true,
+          mixFile: 'mix.json',
+          declarations: decl(slug('a'), slug('b')),
+          mix: mixOf({}),
+          loudness: { a: { saved: measured, draft: null } },
+        },
+      ],
+      effects: effects([]),
+      music: [musicList([])],
+      target: { target: -20, tolerance: 2 },
+    })
+    const [a, b] = result.acts[0]!.scenes
+    expect(a!.loudness.saved).toEqual(measured)
+    expect(b!.loudness).toEqual({ saved: null, draft: null })
+    expect(result.loudnessTarget).toEqual({ target: -20, tolerance: 2 })
+  })
+
+  it('has no target unless one is given', () => {
+    expect(summarizeScenes({ acts: [], effects: null, music: [] }).loudnessTarget).toBeNull()
   })
 })

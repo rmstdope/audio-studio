@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { EffectsSummary } from '../../../core/effects'
 import type { MusicListSummary, TrackRow } from '../../../core/music'
+import type { SceneKept, SceneMeasure } from '../../../core/sceneLoudness'
 import type { SceneMix } from '../../../core/scenes'
 import type { ProjectSummary } from '../../../core/summary'
 import { fakeHistory } from '../../../../test/fakeHistory'
@@ -31,6 +32,8 @@ const puts: { path: string; body: { scene: SceneMix; was: SceneMix | null } }[] 
 let saveAnswer: { status: number; body: unknown } = { status: 200, body: { ok: true } }
 let saveGate: Promise<void> | null = null
 const gains: number[] = []
+let measureAnswer: { status: number; body: unknown } = { status: 200, body: { ok: true } }
+const measures: { path: string; body: { open?: { scene: string; entry: SceneMix } } }[] = []
 const loops: boolean[] = []
 // A page left mounted would go on guarding its unsaved changes in the next test.
 afterEach(async () => {
@@ -46,6 +49,8 @@ beforeEach(() => {
   loops.length = 0
   refreshAnswer = { status: 200, body: { ok: true } }
   puts.length = 0
+  measures.length = 0
+  measureAnswer = { status: 200, body: { ok: true } }
   saveAnswer = { status: 200, body: { ok: true } }
   saveGate = null
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
@@ -54,6 +59,10 @@ beforeEach(() => {
       puts.push({ path, body: JSON.parse(init.body as string) })
       await saveGate
       return Response.json(saveAnswer.body, { status: saveAnswer.status })
+    }
+    if (init?.method === 'POST' && path.startsWith('/api/scene-loudness')) {
+      measures.push({ path, body: JSON.parse(init.body as string) })
+      return Response.json(measureAnswer.body, { status: measureAnswer.status })
     }
     if (init?.method === 'POST') {
       return Response.json(refreshAnswer.body, { status: refreshAnswer.status })
@@ -127,7 +136,14 @@ const store = {
 const forest = { id: 'act1-forest', name: 'Forest path', states: ['plain'], triggers: [] }
 const chapel = { id: 'act1-chapel', name: 'Village chapel', states: [], triggers: ['bell-tolls'] }
 
-function summary(state: 'ok' | 'missing' | 'invalid' = 'ok', canRefresh = true): ProjectSummary {
+function summary(
+  state: 'ok' | 'missing' | 'invalid' = 'ok',
+  canRefresh = true,
+  kept: {
+    loudness?: Record<string, SceneKept>
+    target?: { target: number; tolerance: number } | null
+  } = {},
+): ProjectSummary {
   const scenes = summarizeScenes({
     acts: [
       {
@@ -141,6 +157,7 @@ function summary(state: 'ok' | 'missing' | 'invalid' = 'ok', canRefresh = true):
             : state === 'missing'
               ? { status: 'missing' }
               : { status: 'invalid', problems: [] },
+        loudness: kept.loudness,
         mix: {
           status: 'ok',
           badIds: new Set(),
@@ -177,12 +194,18 @@ function summary(state: 'ok' | 'missing' | 'invalid' = 'ok', canRefresh = true):
     ],
     effects,
     music,
+    target: kept.target ?? null,
   })
   return { scenes } as unknown as ProjectSummary
 }
 
-function render(route: ScenesRoute, shown: ProjectSummary = summary()) {
+function render(
+  route: ScenesRoute,
+  shown: ProjectSummary = summary(),
+  making: Record<string, { done: number; total: number }> = {},
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  client.setQueryData(['scene-loudness'], making)
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
@@ -861,6 +884,7 @@ describe('adding a sound effect', () => {
         loops: false,
         silent: false,
         playable: true,
+        clip: null,
       })
     }
     const page = render(open, shown)
@@ -1449,5 +1473,299 @@ describe('playing a scene', () => {
     expect(text(page.querySelector('.scene-music-now'))).toBe('Not played')
     press(page, 'Stop the scene')
     await flush()
+  })
+})
+
+const measureOf = (over: Partial<SceneMeasure> = {}): SceneMeasure => ({
+  measuredAt: new Date(2026, 10, 5, 14, 2).toISOString(),
+  entry: null,
+  clips: {},
+  states: [
+    { state: 'plain', lufs: -19.4 },
+    { state: 'cat-home', lufs: -23.8 },
+  ],
+  without: [],
+  error: null,
+  ...over,
+})
+const target = { target: -20, tolerance: 2 }
+
+describe('the Loudness panel', () => {
+  /** The saved store scene as the page has it, so a measure of it is not "changed since measured". */
+  const savedStore = () => {
+    const scene = summary().scenes!.acts[0]!.scenes[0]!
+    return measureOf({ entry: scene.entry, clips: scene.clips })
+  }
+  const panel = (page: HTMLElement) => page.querySelector('[aria-label="Loudness"]') as HTMLElement
+  const loudness = (saved: SceneMeasure | null, draft: SceneMeasure | null = null) => ({
+    'act1-store': { saved, draft },
+  })
+
+  it('sits above Music, with the target, and says it was never measured', () => {
+    const page = render(open, summary('ok', true, { target }))
+    const sections = [...page.querySelectorAll('section.scene-panel')].map((s) =>
+      s.getAttribute('aria-label'),
+    )
+    expect(sections.slice(0, 2)).toEqual(['Loudness', 'Music'])
+    expect(text(panel(page).querySelector('h2'))).toBe('Loudness target −20 LUFS ± 2 dB')
+    expect(text(panel(page))).toContain('target −20 LUFS ± 2 dB')
+    expect(panel(page).querySelector('table')).toBeNull()
+    expect(text(panel(page))).toContain(
+      'Not measured yet. Measure loudness measures every scene in Act I.',
+    )
+    expect(text(button(panel(page), 'Measure loudness'))).toBe('Measure loudness')
+  })
+
+  it('shows a row for each state with its figure and a chip against the target', () => {
+    const page = render(open, summary('ok', true, { target, loudness: loudness(savedStore()) }))
+    const rows = [...panel(page).querySelectorAll('tbody tr')].map((tr) => text(tr))
+    expect(rows).toEqual(['plain−19.4 LUFSon target', 'cat-home−23.8 LUFS3.8 dB too quiet'])
+    expect(text(panel(page).querySelector('.scene-loud-when'))).toBe('Measured today 14:02')
+    expect([...panel(page).querySelectorAll('th')].map((th) => text(th))).toEqual([
+      'State',
+      'Loudness',
+      '',
+    ])
+  })
+
+  it('says "no target set", draws no chips and tells where to set one', () => {
+    const page = render(open, summary('ok', true, { loudness: loudness(savedStore()) }))
+    expect(text(panel(page).querySelector('h2 + .faint, .scene-loud-target'))).toBe('no target set')
+    expect(panel(page).querySelectorAll('.chip').length).toBe(0)
+    expect(text(panel(page).querySelector('.scene-loud-when'))).toBe(
+      'Measured today 14:02 · Set a loudness target and tolerance in the project file to be told which scenes are off.',
+    )
+  })
+
+  it('names a scene without states "The scene", and nothing playing without a chip', () => {
+    const chapelMeasure = measureOf({
+      states: [{ state: null, lufs: null }],
+    })
+    const page = render(
+      { ...open, scene: 'act1-chapel' },
+      summary('ok', true, {
+        target,
+        loudness: { 'act1-chapel': { saved: chapelMeasure, draft: null } },
+      }),
+    )
+    const rows = [...panel(page).querySelectorAll('tbody tr')].map((tr) => text(tr))
+    expect(rows).toEqual(['The scenenothing plays'])
+  })
+
+  it('words a loud state and names what was left out', () => {
+    const page = render(
+      open,
+      summary('ok', true, {
+        target,
+        loudness: loudness({
+          ...savedStore(),
+          states: [
+            { state: 'plain', lufs: -15.9 },
+            { state: 'cat-home', lufs: -20 },
+          ],
+          without: ['glass-clink, which has no take chosen'],
+        }),
+      }),
+    )
+    expect(text(panel(page).querySelectorAll('tbody tr')[0])).toBe('plain−15.9 LUFS4.1 dB too loud')
+    expect(text(panel(page).querySelector('.scene-loud-when'))).toBe(
+      'Measured today 14:02 · without glass-clink, which has no take chosen',
+    )
+  })
+
+  it('says a scene changed since it was measured, and keeps the figures', () => {
+    const changed = { ...savedStore(), clips: { 'effect:shop-bell': 'take 9' } }
+    const page = render(open, summary('ok', true, { target, loudness: loudness(changed) }))
+    expect(text(panel(page).querySelector('h2'))).toContain('· changed since measured')
+    expect(panel(page).querySelectorAll('tbody tr').length).toBe(2)
+  })
+
+  it('shows "couldn’t measure" and the reason in a red box when a scene could not be measured', () => {
+    const failed = measureOf({
+      error: 'ffmpeg fell over',
+      states: [
+        { state: 'plain', lufs: null },
+        { state: 'cat-home', lufs: null },
+      ],
+    })
+    const page = render(open, summary('ok', true, { target, loudness: loudness(failed) }))
+    const cells = [...panel(page).querySelectorAll('tbody td.scene-loud-bad')].map((td) => text(td))
+    expect(cells).toEqual(['couldn’t measure', 'couldn’t measure'])
+    expect(text(panel(page).querySelector('.scene-problem'))).toBe(
+      'Couldn’t measure General store: ffmpeg fell over. The other scenes were measured.',
+    )
+  })
+
+  it('presses Measure loudness for the whole act, sending the scene as it is on the page', async () => {
+    const page = render(open, summary('ok', true, { target }))
+    await act(async () => button(panel(page), 'Measure loudness').click())
+    expect(measures.map((m) => m.path)).toEqual(['/api/scene-loudness/act1'])
+    expect(measures[0]!.body.open).toBeUndefined()
+  })
+
+  it('sends the unsaved scene, and shows it with a word until Save; Discard puts the saved figures back', async () => {
+    const draftMeasure = measureOf({
+      states: [
+        { state: 'plain', lufs: -18 },
+        { state: 'cat-home', lufs: -18 },
+      ],
+    })
+    const page = render(
+      open,
+      summary('ok', true, { target, loudness: loudness(savedStore(), draftMeasure) }),
+    )
+    // Change the scene on the page (the music's level).
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(slider, '50')
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      slider.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await act(async () => button(panel(page), 'Measure loudness').click())
+    expect(measures[0]!.body.open?.scene).toBe('act1-store')
+    expect(measures[0]!.body.open?.entry.music?.level).toBe(0.5)
+    // The kept draft is of another version of the scene: the saved figures show.
+    expect(text(panel(page).querySelectorAll('tbody tr')[0])).toBe('plain−19.4 LUFSon target')
+  })
+
+  it('shows the draft measure when the page still has what it was measured from', async () => {
+    const store = summary().scenes!.acts[0]!.scenes[0]!
+    const entry = { ...store.entry!, music: { track: 'act1-store', level: 0.5 } }
+    const draftMeasure = measureOf({
+      entry,
+      states: [
+        { state: 'plain', lufs: -18 },
+        { state: 'cat-home', lufs: -18 },
+      ],
+    })
+    const page = render(
+      open,
+      summary('ok', true, { target, loudness: loudness(savedStore(), draftMeasure) }),
+    )
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(slider, '50')
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      slider.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(text(panel(page).querySelector('h2'))).toContain('· with your unsaved changes')
+    expect(text(panel(page).querySelectorAll('tbody tr')[0])).toBe('plain−18.0 LUFSon target')
+    await act(async () => button(page, 'Discard').click())
+    expect(text(panel(page).querySelector('h2'))).not.toContain('unsaved')
+    expect(text(panel(page).querySelectorAll('tbody tr')[0])).toBe('plain−19.4 LUFSon target')
+  })
+
+  it('shows how far a measure of the act has got, with the button off and the figures kept', () => {
+    const page = render(open, summary('ok', true, { target, loudness: loudness(savedStore()) }), {
+      act1: { done: 1, total: 5 },
+    })
+    const measuring = button(panel(page), 'Measuring 2 of 5…')
+    expect(measuring.getAttribute('aria-disabled')).toBe('true')
+    expect(panel(page).querySelectorAll('tbody tr').length).toBe(2)
+    expect(text(panel(page).querySelector('.scene-loud-when'))).toBe(
+      'Measured today 14:02 · being measured again',
+    )
+  })
+
+  it('says why a measure was refused', async () => {
+    measureAnswer = { status: 409, body: { ok: false, message: 'the kept file cannot be read' } }
+    const page = render(open, summary('ok', true, { target }))
+    await act(async () => button(panel(page), 'Measure loudness').click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
+    expect(text(panel(page).querySelector('.scene-problem'))).toBe('the kept file cannot be read')
+  })
+
+  it('keeps showing a measure made with unsaved changes after one more edit, saying it changed', async () => {
+    const draftMeasure = measureOf({ entry: { effects: [] } })
+    const page = render(
+      open,
+      summary('ok', true, { target, loudness: loudness(null, draftMeasure) }),
+    )
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(slider, '50')
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      slider.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(panel(page).querySelectorAll('tbody tr').length).toBe(2)
+    expect(text(panel(page).querySelector('h2'))).toContain('· changed since measured')
+  })
+
+  it('does not start a second measure while one runs', async () => {
+    const page = render(open, summary('ok', true, { target }), { act1: { done: 0, total: 3 } })
+    await act(async () => button(panel(page), 'Measuring 1 of 3…').click())
+    expect(measures).toEqual([])
+  })
+
+  it('has no panel for a scene whose entry cannot be read', () => {
+    const shown = summary('ok', true, { target })
+    shown.scenes!.acts[0]!.scenes[0]!.unreadable = true
+    expect(panel(render(open, shown))).toBeNull()
+  })
+
+  it('marks scenes off the target in the list, amber, from the last measure', () => {
+    const shown = summary('ok', true, {
+      target,
+      loudness: {
+        'act1-store': { saved: savedStore(), draft: null },
+        'act1-chapel': {
+          saved: measureOf({ states: [{ state: null, lufs: -12 }] }),
+          draft: null,
+        },
+      },
+    })
+    const page = render(open, shown)
+    const counts = [...page.querySelectorAll('.scene-list li')].map((li) =>
+      text(li.querySelector('.scene-count')),
+    )
+    expect(counts).toEqual(['too quiet', '1 gone', 'too loud'])
+    expect(page.querySelectorAll('.scene-count-warn').length).toBe(2)
+    const none = render(
+      open,
+      summary('ok', true, {
+        loudness: shown.scenes!.acts[0]!.scenes.reduce(
+          (m, s) => ({ ...m, [s.id]: s.loudness }),
+          {},
+        ),
+      }),
+    )
+    expect(
+      [...none.querySelectorAll('.scene-list li')].map((li) =>
+        text(li.querySelector('.scene-count')),
+      ),
+    ).toEqual(['4 effects', '1 gone', 'none'])
+  })
+
+  it('announces the end of a measure as a status', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, enabled: false } },
+    })
+    client.setQueryData(['scene-loudness'], { act1: { done: 2, total: 3 } })
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act(() => root.unmount()))
+    const show = () =>
+      act(() =>
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client },
+            createElement(ScenesView, { summary: summary('ok', true, { target }), route: open }),
+          ),
+        ),
+      )
+    show()
+    expect(text(container.querySelector('[role="status"].sr-only'))).toBe('')
+    await act(async () => {
+      client.setQueryData(['scene-loudness'], {})
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(text(container.querySelector('[role="status"].sr-only'))).toBe(
+      'Measured 3 scenes in Act I.',
+    )
   })
 })

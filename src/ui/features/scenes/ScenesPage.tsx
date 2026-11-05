@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { fixHeading } from '../../../core/sceneEdit'
 import type { SceneAct, ScenesSummary } from '../../../core/scenes'
-import { useRefreshDialog } from '../../api'
+import { useRefreshDialog, useSceneLoudness } from '../../api'
 import { Problems } from '../../components/Problems'
 import { shortTitle } from '../../format'
 import type { ScenesRoute } from '../../route'
@@ -10,6 +10,7 @@ import { useSceneClip } from '../../sceneClip'
 import { useScenePlay } from '../../sceneRun'
 import { useLeaveGuard, useSceneEditor, type Leaving } from '../../sceneDraft'
 import { LeaveDialog } from './LeaveDialog'
+import { LoudnessPanel } from './LoudnessPanel'
 import { PlayBar } from './PlayBar'
 import { SceneDetail } from './SceneDetail'
 import { SceneList } from './SceneList'
@@ -26,10 +27,11 @@ export function ScenesPage({
 }: {
   act: SceneAct
   route: ScenesRoute
-  summary: Pick<ScenesSummary, 'effects' | 'effectsKnown'>
+  summary: Pick<ScenesSummary, 'effects' | 'effectsKnown' | 'loudnessTarget'>
 }) {
   const name = shortTitle(act.title)
   const run = useRefreshDialog(act.id)
+  const loudness = useSceneLoudness(act.id)
   const clip = useSceneClip()
   const scene = currentScene(act, route)
   const editor = useSceneEditor(act.id, scene)
@@ -194,7 +196,12 @@ export function ScenesPage({
       )}
       {failed}
       <div className="scenes-body">
-        <SceneList act={act} open={scene} unsaved={editor.dirty ? scene.id : null} />
+        <SceneList
+          act={act}
+          open={scene}
+          unsaved={editor.dirty ? scene.id : null}
+          target={summary.loudnessTarget}
+        />
         <div className="scene-open">
           {scene.unreadable ? (
             <section className="panel scene-panel">
@@ -203,16 +210,30 @@ export function ScenesPage({
               </p>
             </section>
           ) : (
-            <SceneDetail
-              key={scene.id}
-              scene={scene}
-              act={act}
-              summary={summary}
-              draft={editor.draft}
-              player={player}
-              play={play}
-              onChange={editor.change}
-            />
+            <>
+              <LoudnessPanel
+                scene={scene}
+                act={act}
+                actName={name}
+                choices={summary.effects}
+                target={summary.loudnessTarget}
+                draft={editor.draft}
+                dirty={editor.dirty}
+                running={loudness.running}
+                refused={loudness.refused}
+                onMeasure={loudness.start}
+              />
+              <SceneDetail
+                key={scene.id}
+                scene={scene}
+                act={act}
+                summary={summary}
+                draft={editor.draft}
+                player={player}
+                play={play}
+                onChange={editor.change}
+              />
+            </>
           )}
           {!scene.unreadable && (
             <PlayBar

@@ -357,6 +357,16 @@ const ScenesSchema = z.object({
     /** An act's mix, written by the studio and read by the game. */
     mix: scenesPath,
   }),
+  /**
+   * The loudness the game's scenes should sit at (integrated LUFS) and how far one may be off it
+   * (dB). Hand-edited; the studio only reads it. Without it nothing is flagged.
+   */
+  loudness: z
+    .object({
+      target: z.number().min(-70).max(0),
+      tolerance: z.number().min(0),
+    })
+    .optional(),
 })
 
 /** The project file, `content-studio.json`, in the consumer repository's root. */

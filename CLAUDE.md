@@ -97,7 +97,7 @@ bundle breaks.
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
 - The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock
-  file and in `.content-studio/` (the sound effect descriptions in `.content-studio/effects.json`, their takes in `.content-studio/effect-boards/` and `.content-studio/effect-takes/`).
+  file and in `.content-studio/` (the sound effect descriptions in `.content-studio/effects.json`, their takes in `.content-studio/effect-boards/` and `.content-studio/effect-takes/`, the scenes' kept loudness in `.content-studio/scene-loudness.json`).
 - Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock).
 - Never delete clips without the user confirming it in the UI.
 - Only changes from the studio's own page are accepted (the Origin check on POST routes).

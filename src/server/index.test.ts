@@ -5751,3 +5751,59 @@ describe('server, saving a scene', () => {
     expect(scene.effects.map((e: { level: number }) => e.level)).toEqual([2])
   })
 })
+
+describe('server, measuring the loudness of scenes', () => {
+  const root = tempRepo({
+    'content-studio.json': projectJson({
+      scenes: {
+        paths: { declarations: 'tts/{part}/scenes.json', mix: 'game/scenes/{part}.mix.json' },
+        loudness: { target: -20, tolerance: 2 },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/scenes.json': [{ id: 'store', name: 'Store', states: [], triggers: [] }],
+  })
+  const studio = startServer({
+    projectFile: join(root, 'content-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const post = (path: string, body?: unknown, origin = studio.url.origin) =>
+    fetch(new URL(path, studio.url), {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('starts from the studio’s own page only', async () => {
+    expect((await post('/api/scene-loudness/act1', {}, 'https://evil.example')).status).toBe(403)
+    expect(existsSync(join(root, '.content-studio/scene-loudness.json'))).toBe(false)
+  })
+
+  it('answers 404 for an act it does not know and 400 for a body that is not an open scene', async () => {
+    expect((await post('/api/scene-loudness/act9', {})).status).toBe(404)
+    expect((await post('/api/scene-loudness/act1', { open: { scene: 'store' } })).status).toBe(400)
+  })
+
+  it('measures the act, which shows with the project and then is no longer being made', async () => {
+    const started = await post('/api/scene-loudness/act1', {
+      open: { scene: 'store', entry: { effects: [] } },
+    })
+    expect([started.status, await started.json()]).toEqual([200, { ok: true }])
+    const file = join(root, '.content-studio/scene-loudness.json')
+    for (let i = 0; i < 100 && !existsSync(file); i++) await Bun.sleep(20)
+    const kept = JSON.parse(readFileSync(file, 'utf8'))
+    expect(kept.act1.store.draft.states).toEqual([{ state: null, lufs: null }])
+    for (let i = 0; i < 100; i++) {
+      const making = await (await fetch(new URL('/api/scene-loudness', studio.url))).json()
+      if (Object.keys(making).length === 0) break
+      await Bun.sleep(20)
+    }
+    const body = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(body.summary.scenes.loudnessTarget).toEqual({ target: -20, tolerance: 2 })
+    expect(body.summary.scenes.acts[0].scenes[0].loudness.draft.entry).toEqual({ effects: [] })
+  })
+})

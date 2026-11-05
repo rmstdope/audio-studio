@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import type { SceneRow } from '../core/scenes'
-import { howItPlays, levelText, listCount, statesLine, trackProblemChip } from './scenesText'
+import {
+  howItPlays,
+  levelText,
+  listCount,
+  measuredLine,
+  statesLine,
+  trackProblemChip,
+} from './scenesText'
 
 describe('how an effect plays', () => {
   it('is written as the page words it', () => {
@@ -81,5 +88,82 @@ describe('the chip beside a track that plays nothing', () => {
       title: undefined,
       tone: 'warn',
     })
+  })
+})
+
+describe('what a scene list row says of its loudness', () => {
+  const target = { target: -20, tolerance: 2 }
+  const measure = (lufs: (number | null)[], error: string | null = null) => ({
+    measuredAt: '2026-11-05T14:02:00.000Z',
+    entry: null,
+    clips: {},
+    states: lufs.map((l, i) => ({ state: `s${i}`, lufs: l })),
+    without: [],
+    error,
+  })
+  const row = (over: Partial<SceneRow>, effects = 1) =>
+    ({
+      gone: 0,
+      silent: 0,
+      unreadable: false,
+      effects: new Array(effects),
+      loudness: { saved: null, draft: null },
+      ...over,
+    }) as SceneRow
+
+  it('says too loud, too quiet or off target in amber, in place of the count', () => {
+    const saved = (l: (number | null)[]) => row({ loudness: { saved: measure(l), draft: null } })
+    expect(listCount(saved([-15]), target)).toEqual({ text: 'too loud', red: false, warn: true })
+    expect(listCount(saved([-25]), target)).toEqual({ text: 'too quiet', red: false, warn: true })
+    expect(listCount(saved([-25, -15]), target)).toEqual({
+      text: 'off target',
+      red: false,
+      warn: true,
+    })
+  })
+
+  it('leaves the count when on target, with nothing playing, or never measured', () => {
+    const plain = { text: '1 effect', red: false }
+    expect(listCount(row({ loudness: { saved: measure([-19]), draft: null } }), target)).toEqual(
+      plain,
+    )
+    expect(listCount(row({ loudness: { saved: measure([null]), draft: null } }), target)).toEqual(
+      plain,
+    )
+    expect(listCount(row({}), target)).toEqual(plain)
+  })
+
+  it('lets a red problem win the column', () => {
+    const loud = { saved: measure([-10]), draft: null }
+    expect(listCount(row({ silent: 1, loudness: loud }), target)).toEqual({
+      text: '1 silent',
+      red: true,
+    })
+  })
+
+  it('flags nothing without a target', () => {
+    const loud = { saved: measure([-10]), draft: null }
+    expect(listCount(row({ loudness: loud }), null)).toEqual({ text: '1 effect', red: false })
+  })
+
+  it('falls back to the draft measure when the scene was never measured saved', () => {
+    expect(listCount(row({ loudness: { saved: null, draft: measure([-10]) } }), target).text).toBe(
+      'too loud',
+    )
+  })
+})
+
+describe('when a scene was measured', () => {
+  const now = new Date(2026, 10, 5, 15, 30)
+  it('says today and yesterday with the time, an older day with its date', () => {
+    expect(measuredLine(new Date(2026, 10, 5, 14, 2).toISOString(), now)).toBe(
+      'Measured today 14:02',
+    )
+    expect(measuredLine(new Date(2026, 10, 4, 16, 40).toISOString(), now)).toBe(
+      'Measured yesterday 16:40',
+    )
+    expect(measuredLine(new Date(2026, 10, 3, 9, 5).toISOString(), now)).toBe(
+      'Measured 3 Nov 09:05',
+    )
   })
 })

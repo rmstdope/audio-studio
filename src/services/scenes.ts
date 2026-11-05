@@ -15,6 +15,7 @@ import {
 } from '../core/scenes'
 import { sameMix } from '../core/sceneEdit'
 import { readJson, writeAtomic, writeFailure } from './files'
+import { readMeasures, sceneSaved } from './sceneMeasures'
 import { createSerial } from './serial'
 import { openProject } from './workspace'
 
@@ -63,6 +64,7 @@ export async function readScenes(
   const { scenes } = project
   if (!scenes) return null
   const acts = []
+  const measures = await readMeasures(root, problems)
   for (const part of project.narration.parts) {
     const mixFile = partPathFor(scenes.paths.mix, part.id)
     acts.push({
@@ -76,9 +78,15 @@ export async function readScenes(
         problems,
       ),
       mix: await readMix(root, mixFile, problems),
+      loudness: measures[part.id],
     })
   }
-  return summarizeScenes({ acts, effects: known.effects, music: known.music?.lists ?? [] })
+  return summarizeScenes({
+    acts,
+    effects: known.effects,
+    music: known.music?.lists ?? [],
+    target: scenes.loudness ?? null,
+  })
 }
 
 /** The widest a line of the mix may be before its object is written over several lines. */
@@ -200,6 +208,8 @@ export function saveScene(
     } catch (error) {
       return { ok: false, kind: 'failed', message: writeFailure(error) }
     }
+    // The figures kept for the scene follow the Save; failing to keep them is not failing to save.
+    await sceneSaved(projectFile, part, sceneId, checked.data).catch(() => {})
     return { ok: true }
   })
 }

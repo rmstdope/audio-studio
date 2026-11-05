@@ -65,6 +65,7 @@
     "paths": {
       "declarations": "tts/{part}/scenes.json",
       "mix": "web/scenes/{part}.mix.json"
-    }
+    },
+    "loudness": { "target": -20, "tolerance": 2 }
   }
 }

@@ -67,6 +67,7 @@ describe('adding and switching', () => {
     loops,
     silent: false,
     playable: true,
+    clip: null,
   })
 
   it('adds a loop as Round and round and a one-shot as Now and then 10–20 s', () => {
