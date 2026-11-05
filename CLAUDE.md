@@ -70,7 +70,8 @@ bundle breaks.
 
 - Read and write only the files the project file names and the studio's own files in
   `content-studio/` (narration's cast, edits and locks in `content-studio/narration/`, music's
-  edits and lock in `content-studio/music/`), through
+  edits and lock in `content-studio/music/`, images' edits, which hold the image style, the
+  studio's own and never a game file, and lock in `content-studio/images/`), through
   `resolveInRoot` and `writeAtomic`; nothing outside the project root. Clips are the one exception to `writeAtomic`: the encoder
   writes a hidden temporary file in the clips folder (through `resolveInRoot`), renamed into place
   only together with the manifest and lock update.
@@ -104,7 +105,8 @@ bundle breaks.
   loudness in `content-studio/cache/scene-loudness.json`, and the person's own settings, the Fish
   tier and the take fade, in `content-studio/cache/settings.json`, never in the project file).
 - Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock,
-  `formatMusicLock` and `formatBriefs` for music's).
+  `formatMusicLock` and `formatBriefs` for music's, `formatImageLock` and `formatImageEdits` for
+  images').
 - Never delete clips without the user confirming it in the UI.
 - Only changes from the studio's own page are accepted (the Origin check on POST routes).
 

@@ -53,6 +53,7 @@ retroquest/                      ← user runs `content-studio` here
 │   └── cache/                   ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard, settings
 │   └── narration/               ← cast.json (the cast), act1.edits.json (an act's cues), act1.lock.json (what its clips were made from)
 │   └── music/                   ← edits.json (the studio's changes to the tracks), lock.json (the chosen take of each track)
+│   └── images/                  ← edits.json (the style and the studio's changes to the images), lock.json (the chosen take of each image)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
 │   └── music.json               ← the act's loops, from the game (read; built, §8.5)
@@ -205,14 +206,13 @@ audio, network or disk.
 
 The format the studio is moving to, version 2, is described for the people who write the files in
 [docs/project-files.md](project-files.md) (epic as-6u9, §12 step 18), which is where the format of
-the project file's top level and of narration's files (the `narration` section, the dialog, the
-cast, the cues and the lock) is described. This section and §6 say how the studio uses them, and
+the project file's top level and of narration's, music's and images' files is described. This section and §6 say how the studio uses them, and
 describe the files of the sections that have not moved yet; each step of the move takes its part
 out of them.
 
 `content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
-an id and a title. Its top level, the studio folder and the cache (as-6u9.2) and the `narration`
-section (as-6u9.3) are version 2; the other sections keep their shape until their own step moves
+an id and a title. Its top level, the studio folder and the cache (as-6u9.2), the `narration`
+section (as-6u9.3), the `music` section (as-6u9.4) and the `images` section (as-6u9.5) are version 2; the other sections keep their shape until their own step moves
 them.
 
 ```json
@@ -1392,23 +1392,13 @@ never writes the game's lists. This section is the reading, the studio's own wor
 look every take is brought to (as-yag.5). The screens are drawn in `docs/ui/as-yag.3-images.html`,
 `docs/ui/as-yag.4-image-takes.html` and `docs/ui/as-yag.5-take-look.html`.
 
-**Project file.** An optional `images` section beside `narration` and `music`, its acts the
-narration's parts. No `{language}` in any path: images are the same in every language. Refresh from
-the game on an act's page runs `refresh.part`, as on Music's act pages.
-
-```json
-"images": {
-  "paths": {
-    "list": "tts/{part}/images.json",
-    "style": "images/style.json",
-    "prompts": "images/prompts.json",
-    "lock": "images/images.lock.json",
-    "clips": "web/public/images/generated",
-    "manifest": "web/public/images/generated/manifest.json"
-  },
-  "model": "klein"
-}
-```
+**Files.** The images files' format is in [docs/project-files.md](project-files.md): the `images`
+section of the project file (`from.part` for each act's images, `model`, `clips`, `manifest`), the
+image lists, the studio's edits (`content-studio/images/edits.json`, which hold the style every
+image shares and the studio's changes to images) and lock (`content-studio/images/lock.json`), and
+the manifest. This section says how the studio uses them. The acts are the narration's parts. No
+`{language}` in any path: images are the same in every language. Refresh from the game on an act's
+page runs `refresh.part`, as on Music's act pages.
 
 `model` is optional (`klein`, the default, or `z-image-turbo`): the image model an image's new takes
 start on. It is saved from the Images row of Setup's Models panel (`PUT /api/image-model`,
@@ -1417,26 +1407,35 @@ start on. It is saved from the Images row of Setup's Models panel (`PUT /api/ima
 `clips` is the folder the chosen pictures are written to (`<id>.png`, the studio's own folder) and
 `manifest` what the game reads there. Both are required.
 
-**The game's files** (read only, `core/images.ts`). `list` holds an act's images in the game's order:
-`{ id, title, description, width, height, file? }`, `file` the picture the game shows for it now when
-the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or `.webp`;
-read only, never moved or written, shown as "The game's own image" until a take is chosen); the id a slug. An id used twice in one list is a problem with
-both places, and neither image is shown. An id several acts list (as-94e) is one image, below. `style` holds `{ look, keepOut,
-palette, colourDepth, dithering, acts }`: `palette` is `#rrggbb` colours, `colourDepth` (`full`,
-`16-bit` or `8-bit`) and `dithering` (`flat`, `patterned` or `scattered`) are optional, and `acts` an
-optional addition per part id (an id the project does not have is a problem). A list that is not there yet is not a problem (the game
-has not written it); a missing style file means each prompt is only its words.
+**The game's lists** (read only, `core/images.ts`). `from.part` holds an act's images in the game's
+order: `{ id, title, text, width, height, file? }`; `text` is what the studio calls the image's
+**description**, in its pages, its API and its code. `file` is the picture the game shows for it now
+when the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or
+`.webp`; read only, never moved or written, shown as "The game's own image" until a take is chosen);
+the id a slug. An id used twice in one list is a problem with both places, and neither image is
+shown. An id several acts list (as-94e) is one image, below. A list that is not there yet is not a
+problem (the game has not written it).
+
+**The style** is the studio's own, the edits' `style`: `{ look, keepOut, palette, colourDepth,
+dithering, parts }`: `palette` is `#rrggbb` colours, `colourDepth` (`full`, `16-bit` or `8-bit`)
+and `dithering` (`flat`, `patterned` or `scattered`) are optional, and `parts` an optional addition
+per part id (an id the project does not have is a problem at `style.parts.<id>`). The Style page
+edits the look and what is kept out directly (`PATCH /api/image-style`, `{ look }` or `{ keepOut }`:
+an empty look is refused, an empty kept-out is none); the palette, colour depth, dithering and the
+parts' additions are changed in the file. Without a style each prompt is only its words, and the
+Style page says to add one; edits that cannot be read are a problem, and the style is then taken as
+none.
 
 **The prompt.** The image's words (the user's own, else the game's description), then the act's
 addition, the look, and `Kept out: …`, on separate lines; an empty part is left out. An image can
 leave its act's addition out (as-1au): a tick box on its page, "Add Act IV's style to this image",
 ticked by default and shown only while the act has an addition. The choice is saved at once
-(`PATCH /api/images/:id/act-style`, `{ on }`) as the image's id in `actStyleOff` in the prompts
-file, kept when the act later has no addition, and the prompt and staleness key then carry no
+(`PATCH /api/images/:id/act-style`, `{ on }`) as the image's `partStyle: null` in the edits,
+kept when the act later has no addition, and the prompt and staleness key then carry no
 addition. The screens are drawn in `docs/ui/as-1au-act-style.html`.
 
 **An image several acts list** (as-94e). A game may list one id in more than one act's list (a
-recurring character's portrait). When the copies agree on title, words (`description`) and size it is
+recurring character's portrait). When the copies agree on title, words (`text`) and size it is
 one image: one set of words, one board, one chosen picture and one clip, shown on every act's page
 (`ImageRow.sharedWith` names the other acts; the row of the first listing act is copied per act, and
 the notices count it once). The row says "also in Act I" under its id, the page "Shared with Act I:
@@ -1447,31 +1446,28 @@ reason, "—" for size and a "lists disagree" chip (`ImagesAct.conflicts`, with 
 in the game's order), the page of such an image shows only the reason, and the banner has one
 problem per list naming another list that differs. The act style of a shared image is one pick for
 all acts, not the tick box: the menu "Act style for this image" lists the listing acts that add a
-style and None. `actStyleOff` still means None; `actStyleFrom` (`{ <id>: <act id> }` in the prompts
-file) names the act, and a missing, unlisted or style-less pick is the first listing act (None when
-it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`. The
+style and None. `partStyle: null` in the image's edit means None; `partStyle: <act id>` names the
+act, and a missing, unlisted or style-less pick is the first listing act (None when it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`. The
 screens are drawn in `docs/ui/as-94e-shared-images.html`.
 
-**The studio's own words** are `paths.prompts`, committed like the music edits and joining the Changes
-panel: `{ images: { <id>: { words, gameWas } }, style: { look?, keepOut? }, actStyleOff?: [<id>], actStyleFrom?: { <id>: <act id> } }`. `gameWas` is the game's
-text when the words were written; a game description that differs from it raises the compare notice
-(**Keep mine** moves `gameWas`, **Use the game's** removes the words). Emptied words, or the game's
-own typed back, remove the entry. The palette and the acts' additions are never changed here.
+**The studio's own words** are the edits' `images`, committed like the music edits and joining the
+Changes panel: `{ <id>: { text, gameWas, partStyle } }`. `gameWas` is the game's text when the words
+were written; a game description that differs from it raises the compare notice (**Keep mine** moves
+`gameWas`, **Use the game's** removes the words). Emptied words, or the game's own typed back, remove
+them; an edit left with nothing is removed. The edits are written with the style first (its keys in
+a fixed order, those at their default left out), then the images by id (`formatImageEdits`).
 
 **Staleness.** A chosen take records what it was made from, `{ words, style, width, height }`
 (`style` is the look, what is kept out and the act's addition as one string; the palette, colour
 depth and dithering are not in it, since they decide how a take is brought to the game's look and
-not what the model is asked for), in
-`paths.lock` (`{ images: { <id>: { chosen } } }`; written by take-making, only read here; other keys
-are ignored). An image is out of date when what a new take would be made from differs: the words
+not what the model is asked for), in the lock, which writes it in the clear (`inputs.text`,
+`inputs.style: { look, keepOut, part }`, below) and reads it back into the same key
+(`ImageLockSchema`). An image is out of date when what a new take would be made from differs: the words
 (the user's included), the size or the style. The game changing a description under the user's own
 words changes nothing the prompt uses, so it does not make an image out of date.
 
-**The style notice.** The studio keeps the game's style as the user last saw it in
-`content-studio/cache/images-style-seen.json`, written the first time a style is read and moved by **Seen**, or at once when
-a change leaves no chosen image out of date (there is then no notice to put away). When the game's style differs from it and at least one chosen image was made with the old
-style, every Images page shows one notice naming what changed. The user's own change to the style
-shows no notice; the images made with the old style are marked out of date.
+There is no notice for a changed style: the style is the studio's, so the images made with the old
+one are marked out of date, each saying "the style".
 
 **Takes** (`services/imageTakes.ts`, `core/imageTakes.ts`). A take is the image's whole prompt made
 with the model asked for (`ImageModelId`, `core/imageModels.ts`: `klein` or `z-image-turbo`; a request
@@ -1496,19 +1492,20 @@ missing or neither model is installed.
 
 **The game's look** (as-yag.5; `core/imageLook.ts`, `core/imagePixels.ts`, `services/png.ts`). The
 game's version of a take is the model's stored picture (`<n>.png`, never changed) brought to the
-image's exact listed size and to the style file's colours, written beside it as `<n>.game.png`; the
+image's exact listed size and to the style's colours, written beside it as `<n>.game.png`; the
 same picture and look always give the same bytes, so it is redone from the stored picture and never
-made again. The look is read from the style file only: a listed `palette` wins; else `colourDepth`
+made again. The look is read from the style only: a listed `palette` wins; else `colourDepth`
 (`8-bit` is the one fixed set of 8 reds × 8 greens × 4 blues, `16-bit` 32 × 64 × 32, `full` no
 reduction, the default); `dithering` applies when colours are reduced (`patterned`, an 8 × 8 Bayer
 matrix, by default; `flat` is the nearest colour; `scattered` is Floyd–Steinberg). The size is a crop
 to fill (the middle kept) and a box average, in plain TypeScript over a small PNG codec on
 `node:zlib` (`Bun.Image` gives no pixel access), so nothing depends on the machine. `lookKey` (size,
 colours, dithering) is what a picture was brought to: it is noted on the board take (`look`) and in
-the lock's chosen entry (`look`), and an image is "old" when its chosen picture, or any take whose
+the lock's entry (`inputs.look`, as the style's own fields: the palette, else the colour depth, and
+the dithering unless full colour; the size is the entry's), and an image is "old" when its chosen picture, or any take whose
 model picture is there, was brought to another key (one with no key was never brought). A take is
 brought as soon as it is on the board (the view says `bringing` meanwhile, and Choose is off); a
-style file that cannot be read leaves the take as the model made it, with the sentence saying what to
+style that cannot be read leaves the take as the model made it, with the sentence saying what to
 fix (`explainStyleProblem`) and Choose refused. **Bring all** (`POST /api/images/bring-all`, one run
 per project in memory, polled by `GET`) brings every old image's takes and its chosen picture
 (clip, manifest at the listed size, lock `look`) from the stored pictures, counting `done` of
@@ -1519,10 +1516,10 @@ old look, and the run stays in view with **Try again** until it is started again
 manifest and the lock readable, or nothing is changed) writes the take's game's version (brought to
 the look first if its look is old) to `<clips>/<id>.png`, the manifest entry `{ file, width, height }`
 (the listed size) and last the lock entry
-`{ chosen: { words, style, width, height, take, seed, model, look, at } }`; other keys of the lock are kept
-and images are written one per line. **Accept**, in the out-of-date notice on an image's page when
+`{ model, seed, take, inputs: { text, width, height, style, look }, at }`, keyed by image id, one
+per line in id order (`formatImageLock`). **Accept**, in the out-of-date notice on an image's page when
 what changed is its words, style or act style (`POST /api/images/:id/accept`, in the image's board
-turn and the project's choice turn), writes the image's words and style now into the lock's chosen
+turn and the project's choice turn), writes the image's words and style now into the lock's
 entry, so the chosen picture counts as made from them and the image is up to date with the same
 picture; a changed size needs a new take, so the notice says so and offers no Accept, and the
 service refuses it (409), as it does an image with nothing changed or none chosen. **Un-choose**
@@ -1545,7 +1542,7 @@ stand one above the other. A box in the Takes heading, "What the game gets" (tic
 opens; the page's own, never saved), switches every take shown, on both sides and in the grid,
 between what the model made (with its size, and "cropped to fit" when it had another shape) and
 what the game gets (with the game's size; in its place, while a take has none, "Bringing to the
-game's look…", "Not brought to the game's look yet." or what to fix in the style file). On the two
+game's look…", "Not brought to the game's look yet." or what to fix in the style). On the two
 sides, a game picture brought to the look before the image's size changed (480 × 360 for an image
 now 1920 × 1080) is captioned with its own size, read from the picture once it loads, and keeps its
 own shape, drawn as wide as the image would be (with hard pixels when that enlarges it) until it is
@@ -1584,7 +1581,7 @@ new press or a hand start on an image of the act, and a quit forgets it. Mockup:
 
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
-`PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; for takes
+`PATCH /api/image-style` (`{ look }` or `{ keepOut }`); for takes
 `GET` and `POST /api/images/:id/takes` (`{ count, model? }` 1 to 4, or `{ retry }`), `PUT /api/image-model`, `GET /api/images/:id/takes/:n`
 (the model's picture), `…/:n/game` (the game's version), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
 `/unchoose`, `/accept`, `/stop`, `GET /api/images/:id/current`, `GET /api/images/making` and
@@ -2591,7 +2588,12 @@ Small, independently useful increments:
 seconds, bpm, key }`, the game's changed brief shown with Use the game's and Keep mine) and
        the lock (`inputs.text`, `list: "shared"`) at fixed places in `content-studio/music/`. The
        take hashes and the cache are unchanged, so a converted game's tracks stay as they stood.
-    5. **Images** (as-6u9.5): the lists, the style and rewordings as edits, the lock.
+    5. **Images** (as-6u9.5, built): the `images` section (`from.part`, `model`, `clips`,
+       `manifest`), images' words as `text`, the edits (the studio's own style, `parts` in place of
+       `acts`, edited directly with no notice for a changed style; rewordings `{ text, gameWas }`
+       and `partStyle`) and the lock (flat by id, `inputs` in the clear) at fixed places in
+       `content-studio/images/`. The staleness keys and the cache are unchanged, so a converted
+       game's images stay as they stood.
     6. **Sound effects** (as-6u9.6): the list, the rewordings committed as edits, the lock.
     7. **Scenes** (as-6u9.7): the declarations, the mix and the kept loudness as the scenes lock.
     8. **RetroQuest end to end** (as-6u9.8): the game and the studio shown working on the new files.

@@ -12,9 +12,10 @@ default, so that every field is shown.
 > (epic as-6u9). In effect now: the project file's top level (`$schema`, `version`, `partLabel`,
 > `parts`, `languages`, `refresh`), the studio folder `content-studio/` with its `.gitignore`, the
 > cache with your own settings, narration (the `narration` section, the dialog list, and
-> `narration/cast.json` with each part's edits and lock) and music (the `music` section, the track
-> lists, `music/edits.json` and `music/lock.json`). The other sections (`images`, `effects`,
-> `scenes`) and their edits and locks have not moved yet: until a section has, the
+> `narration/cast.json` with each part's edits and lock), music (the `music` section, the track
+> lists, `music/edits.json` and `music/lock.json`) and images (the `images` section, the image
+> lists, `images/edits.json` with the style, and `images/lock.json`). The other sections
+> (`effects`, `scenes`) and their edits and locks have not moved yet: until a section has, the
 > studio reads that section as `docs/architecture.md` §5 and §6 describe it, and this document is
 > the plan for it.
 
@@ -532,8 +533,11 @@ What `inputs` holds is each kind's own:
 - **Music**: `text`, `kind` (`loop` or `stinger`), `seconds`, `bpm`, `key`. A music entry also
   records `list`: the part whose list the track came from, or `shared` for a stinger.
 - **Images**: `text`, `width`, `height`, `style` (`{ look, keepOut, part }`: the words the take was
-  made with, `part` being the part's addition as written) and `look` (`{ palette, colourDepth,
-dithering }`, what the picture was brought to).
+  made with, `part` being the part's addition as written, `null` for none; absent for a take made
+  without a style) and `look` (`{ palette, colourDepth, dithering }`, what the picture was brought
+  to at the entry's size: `palette` when there is one, else `colourDepth`, and `dithering` unless
+  full colour; absent for a picture never brought to a look). An image entry has no `fp`: the
+  inputs are compared as they are.
 - **Effects**: `text`, `seconds`, `loops`.
 
 Two locks record something else, in the same layout:
