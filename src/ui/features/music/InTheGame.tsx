@@ -359,7 +359,7 @@ export function InTheGame({
           )}
         </div>
       )}
-      {hint}
+      {!(take && fading === take.n) && hint}
       {trimControl.failure}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
       {choose.data && !choose.data.ok && (
