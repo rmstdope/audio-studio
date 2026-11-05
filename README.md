@@ -4,7 +4,8 @@ Narration, music and images for games. Run it from inside a game repository: it 
 the repository's `content-studio.json`, and writes voice files and their metadata in place. Committing
 them is up to you.
 
-See [docs/architecture.md](docs/architecture.md) for the design.
+See [docs/architecture.md](docs/architecture.md) for the design. The files the studio reads and writes in a
+game are described in [docs/project-files.md](docs/project-files.md).
 
 ## Status
 

@@ -201,6 +201,10 @@ audio, network or disk.
 
 ## 5. The project file
 
+The format the studio is moving to, version 2, is described for the people who write the files in
+[docs/project-files.md](project-files.md) (epic as-6u9, §12 step 18). This section and §6 describe
+the files as the studio reads them today; each step of the move takes its part out of them.
+
 `content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
 an id and a title.
 
@@ -2600,6 +2604,19 @@ Small, independently useful increments:
     7. **Loudness of the scenes** (as-gdf.1, done: §8.11): a kept loudness per scene and state against
        the target in the project file, warnings in the Loudness panel and the scene list. Suggesting
        and applying a change (as-gdf.2, done) is in the same section.
+
+18. **One format for the project's files** (epic as-6u9), each step converting the studio, the sample
+    project and RetroQuest together, in this order:
+    1. **The reference** (as-6u9.1): `docs/project-files.md`, the format of version 2 for the people
+       who write the files.
+    2. **The project file** (as-6u9.2): `version` and `$schema`, the top-level parts, languages and
+       refresh, the studio folder with its cache, and the personal settings moved into the cache.
+    3. **Narration** (as-6u9.3): the dialog, the cast, the cues as edits and the lock.
+    4. **Music and stingers** (as-6u9.4): the lists, the edits in place of the briefs, the lock.
+    5. **Images** (as-6u9.5): the lists, the style and rewordings as edits, the lock.
+    6. **Sound effects** (as-6u9.6): the list, the rewordings committed as edits, the lock.
+    7. **Scenes** (as-6u9.7): the declarations, the mix and the kept loudness as the scenes lock.
+    8. **RetroQuest end to end** (as-6u9.8): the game and the studio shown working on the new files.
 
 ---
 
