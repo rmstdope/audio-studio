@@ -155,6 +155,22 @@ describe('fading a stinger take on its page', () => {
     expect(game.textContent).toContain('Saving puts the faded sound in the game at once.')
   })
 
+  it('marks the chosen take fading and takes its button row away while the editor is open', () => {
+    const { container, fadesButtons } = render('stinger', [take(1, { chosen: true }), take(2)])
+    act(() => fadesButtons()[0]!.click())
+    const game = container.querySelector('.track-in-game')!
+    expect(game.textContent).toContain('fading')
+    const names = [...game.querySelectorAll('button')].map((b) => b.textContent)
+    for (const gone of ['Fades…', 'Un-choose', 'Trim silence']) expect(names).not.toContain(gone)
+    expect(game.querySelector('.track-in-game-actions')).toBeNull()
+    const cancel = [...game.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!
+    act(() => cancel.click())
+    expect(game.textContent).not.toContain('fading')
+    expect(game.querySelector('.track-in-game-actions')).not.toBeNull()
+    expect(document.activeElement?.textContent).toBe('Fades…')
+    expect(game.contains(document.activeElement)).toBe(true)
+  })
+
   it('says one line under a take with fades, and nothing under one without', () => {
     const { container } = render('stinger', [
       take(1, { fades: { in: 0.3, out: 1.5, shape: 'smooth' } }),
