@@ -1912,6 +1912,87 @@ describe('the loudness suggestion', () => {
     )
   })
 
+  const drag = async (page: HTMLElement, value: string) => {
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(slider, value)
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      slider.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+  }
+
+  it('does not trust the kept figures once a level is moved by hand after a saved press', async () => {
+    const m = saved()
+    const after = summary('ok', true, {
+      target,
+      storeMix: scaleMix(m.entry!, 4),
+      loudness: { 'act1-store': { saved: { ...m, moved: { db: 4 } }, draft: null } },
+    })
+    const page = render(open, after)
+    await drag(page, '50')
+    expect(text(panel(page).querySelector('h2'))).toContain('· changed since measured')
+    expect(text(panel(page).querySelector('h2'))).not.toContain('expected')
+    expect(text(panel(page))).not.toContain('Save to keep it')
+    expect(text(panel(page))).toContain('The scene changed since it was measured.')
+  })
+
+  it('leaves the header alone for a hand edit on a measure nothing was pressed on', async () => {
+    const page = render(open, withMeasure(saved()))
+    await drag(page, '50')
+    expect(text(panel(page).querySelector('h2'))).not.toContain('changed since measured')
+  })
+
+  it('drops the amber marks once an effect is removed after a press', async () => {
+    const page = render(open, withMeasure(saved()))
+    await press(page, 'Make 4.0 dB louder')
+    const remove = page.querySelector('button[aria-label^="Remove"]') as HTMLButtonElement
+    await act(async () => remove.click())
+    expect(page.querySelectorAll('.scene-level-moved').length).toBe(0)
+  })
+
+  it('tells a screen reader what a moved level was', async () => {
+    const page = render(open, withMeasure(saved()))
+    await press(page, 'Make 4.0 dB louder')
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    expect(slider.getAttribute('aria-valuetext')).toBe('158% (was 100%)')
+  })
+
+  it('shows the levels the press moved as changed, and not once discarded', async () => {
+    const page = render(open, withMeasure(saved()))
+    await press(page, 'Make 4.0 dB louder')
+    expect(page.querySelectorAll('.scene-level-moved').length).toBe(5)
+    await act(async () => button(page, 'Discard').click())
+    expect(page.querySelectorAll('.scene-level-moved').length).toBe(0)
+  })
+
+  it('shows the expected figures after the press on a scene with no music', async () => {
+    const m = saved()
+    const entry = { music: { track: null, level: 1 }, effects: m.entry!.effects }
+    const page = render(
+      open,
+      summary('ok', true, {
+        target,
+        storeMix: entry,
+        loudness: {
+          'act1-store': {
+            saved: {
+              ...m,
+              entry,
+              clips: Object.fromEntries(
+                Object.entries(m.clips).filter(([k]) => !k.startsWith('music:')),
+              ),
+            },
+            draft: null,
+          },
+        },
+      }),
+    )
+    await press(page, 'Make 4.0 dB louder')
+    expect(text(panel(page).querySelector('h2'))).toContain('· expected after your change')
+    expect(text(panel(page))).toContain('Made 4.0 dB louder. Save to keep it, Discard to undo.')
+  })
+
   it('says it too when the scene was changed and saved since it was measured', () => {
     const page = render(open, withMeasure({ ...saved(), clips: { 'effect:shop-bell': 'take 9' } }))
     expect(panel(page).querySelector('.scene-suggest')).toBeNull()

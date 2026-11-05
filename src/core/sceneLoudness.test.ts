@@ -272,6 +272,21 @@ describe('expectedFigures', () => {
     const noMusic = measure([-24], { entry: { effects: [] } })
     expect(expectedFigures(noMusic, { db: 4 }, { entry: page, clips: {} })).toBe('expected')
   })
+  it('is expected for a scene with no music track, whose level the press leaves alone', () => {
+    const page = {
+      music: { track: null, level: 1 },
+      effects: [{ ...mixOf({ a: 0.6 }).effects[0]!, level: 0.95 }],
+    }
+    const m = measure([-24], { entry: { effects: mixOf({ a: 0.6 }).effects }, clips: { a: '1' } })
+    expect(expectedFigures(m, { db: 4 }, { entry: page, clips: { a: '1' } })).toBe('expected')
+  })
+  it('is not expected when the music was taken off after the press', () => {
+    const withMusic = { music: { track: 'theme', level: 1 }, effects: [] }
+    const page = { music: { track: null, level: 1 }, effects: [] }
+    expect(
+      expectedFigures(measure([-24], { entry: withMusic }), { db: 4 }, { entry: page, clips: {} }),
+    ).toBe('changed')
+  })
   it('shifts every figure and keeps what reads nothing', () => {
     const shifted = shiftStates(measure([-23.4, null as never]), 4)
     expect(shifted.states.map((s) => s.lufs)).toEqual([-19.4, null])

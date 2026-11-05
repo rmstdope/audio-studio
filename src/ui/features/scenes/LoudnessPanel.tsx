@@ -87,8 +87,12 @@ export function LoudnessPanel({
   const found = shown(scene, page, dirty, pressed)
   // What the measure was made from, against what is there now: the page's scene for an unsaved
   // measure, the saved scene otherwise.
-  // A measure a press was made on is compared with the page as well.
-  const onPage = found?.unsaved || (found && pressed?.measuredAt === found.measure.measuredAt)
+  // The page is the scene to compare with when the measure is an unsaved one, or when a press
+  // (unsaved, or kept with the saved scene) is on it and the page may have moved on from it.
+  const onPage =
+    found !== null &&
+    (found.unsaved ||
+      (dirty && (pressed?.measuredAt === found.measure.measuredAt || !!found.measure.moved)))
   const now = onPage
     ? {
         entry: page,
@@ -121,7 +125,7 @@ export function LoudnessPanel({
     (moved !== null || suggestChange(kept, target, now.entry ?? page) !== null)
   const line = suggestion ? suggestionLine(suggestion, target?.tolerance ?? 0) : null
   const justMade =
-    expected && dirty && moved
+    expected && dirty && moved && pressed?.measuredAt === kept?.measuredAt
       ? `Made ${changeWord(moved.db)}. Save to keep it, Discard to undo.`
       : null
   const when = measure

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { fixHeading, toMix } from '../../../core/sceneEdit'
+import { draftOf, fixHeading, toMix, type SceneDraft } from '../../../core/sceneEdit'
 import { expectedFigures, shiftStates, type SceneMeasure } from '../../../core/sceneLoudness'
-import type { SceneAct, ScenesSummary } from '../../../core/scenes'
+import type { SceneAct, SceneRow, ScenesSummary } from '../../../core/scenes'
 import { useRefreshDialog, useSceneLoudness } from '../../api'
 import { Problems } from '../../components/Problems'
 import { shortTitle } from '../../format'
@@ -15,6 +15,15 @@ import { LoudnessPanel } from './LoudnessPanel'
 import { PlayBar } from './PlayBar'
 import { SceneDetail } from './SceneDetail'
 import { SceneList } from './SceneList'
+
+/** The saved scene's draft, when it has the effects the page has (a press moved their levels, not their number). */
+function levelsBefore(scene: SceneRow, draft: SceneDraft): SceneDraft | null {
+  const before = draftOf(scene)
+  const same =
+    before.effects.length === draft.effects.length &&
+    before.effects.every((e, i) => e.id === draft.effects[i]!.id)
+  return same ? before : null
+}
 
 /**
  * An act's Scenes page: its scenes on the left, the open one on the right to change and save, and
@@ -250,6 +259,7 @@ export function ScenesPage({
                 draft={editor.draft}
                 player={player}
                 play={play}
+                was={editor.moved ? levelsBefore(scene, editor.draft) : null}
                 onChange={editor.change}
               />
             </>

@@ -2030,7 +2030,10 @@ figures (measured + dB). The page sends the move with Save (`moved: { db, measur
 measure made at `measuredAt`, moved by `db`, is exactly the scene saved, `sceneSaved` keeps that
 measure as the saved one with `moved: { db }`, and the figures stay the expected ones while the saved
 scene is still that (`expectedFigures`) until the act is measured again. A scene changed by hand
-after the press, or saved differently since the measure, gets no suggestion.
+after the press, or saved differently since the measure, gets no suggestion: while the scene has unsaved changes the
+page is what the measure is compared with, saved press or not. A music with no track has no level, so the
+press leaves it alone and the expected scene does too. The levels a press moved show in amber on the page
+(with "was N%" for a screen reader) until saved or discarded.
 
 ## 9. Server API
 

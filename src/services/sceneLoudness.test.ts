@@ -428,13 +428,23 @@ describe('the kept figures', () => {
 
   it('keep the expected figures when a scene is saved as the measured one moved', async () => {
     const { root, projectFile } = repo()
-    const entry: SceneMix = { music: { track: null, level: 1 }, effects: [] }
+    const entry: SceneMix = {
+      music: { track: null, level: 1 },
+      effects: [{ id: 'bell', play: { mode: 'loop' }, level: 0.6 }],
+    }
     const moved = scaleMix(entry, 4)
     await keepMeasure(projectFile, 'act1', 'a', measureOf(entry), false)
-    const answer = await saveScene(projectFile, 'act1', 'a', moved, null, {
-      db: 4,
-      measuredAt: '2026-11-05T14:02:00.000Z',
-    })
+    const answer = await saveScene(
+      projectFile,
+      'act1',
+      'a',
+      { ...moved, music: entry.music },
+      null,
+      {
+        db: 4,
+        measuredAt: '2026-11-05T14:02:00.000Z',
+      },
+    )
     expect(answer.ok).toBe(true)
     expect(kept(root).act1.a.saved.moved).toEqual({ db: 4 })
     expect(kept(root).act1.a.saved.entry).toEqual(entry)
@@ -442,9 +452,12 @@ describe('the kept figures', () => {
 
   it('ignore a move that is not what was saved', async () => {
     const { root, projectFile } = repo()
-    const entry: SceneMix = { music: { track: null, level: 1 }, effects: [] }
+    const entry: SceneMix = {
+      music: { track: null, level: 1 },
+      effects: [{ id: 'bell', play: { mode: 'loop' }, level: 0.6 }],
+    }
     await keepMeasure(projectFile, 'act1', 'a', measureOf(entry), true)
-    await saveScene(projectFile, 'act1', 'a', scaleMix(entry, 2), null, {
+    await saveScene(projectFile, 'act1', 'a', { ...scaleMix(entry, 2), music: entry.music }, null, {
       db: 4,
       measuredAt: '2026-11-05T14:02:00.000Z',
     })
