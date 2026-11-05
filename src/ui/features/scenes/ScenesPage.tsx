@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fixHeading, toMix } from '../../../core/sceneEdit'
+import { draftOf, fixHeading, toMix } from '../../../core/sceneEdit'
 import { expectedFigures, shiftStates, type SceneMeasure } from '../../../core/sceneLoudness'
 import type { SceneAct, ScenesSummary } from '../../../core/scenes'
 import { useRefreshDialog, useSceneLoudness } from '../../api'
@@ -250,6 +250,7 @@ export function ScenesPage({
                 draft={editor.draft}
                 player={player}
                 play={play}
+                was={editor.moved ? draftOf(scene) : null}
                 onChange={editor.change}
               />
             </>
