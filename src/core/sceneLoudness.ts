@@ -146,11 +146,17 @@ export const SceneMeasureSchema = z.object({
 /** What one measuring of a scene found. */
 export type SceneMeasure = z.infer<typeof SceneMeasureSchema>
 
-/** The kept measures of one scene: of the saved scene, and of the open scene with unsaved changes. */
-export const SceneKeptSchema = z.object({
-  saved: SceneMeasureSchema.nullable().default(null),
-  draft: SceneMeasureSchema.nullable().default(null),
-})
+/**
+ * The kept measures of one scene: of the saved scene, and of the open scene with unsaved changes.
+ * Both are written always (null for none), and nothing else: an entry of another shape is a
+ * problem, so the lock it is in is never written over.
+ */
+export const SceneKeptSchema = z
+  .object({
+    saved: SceneMeasureSchema.nullable(),
+    draft: SceneMeasureSchema.nullable(),
+  })
+  .strict()
 
 /** The kept measures of one scene. */
 export type SceneKept = z.infer<typeof SceneKeptSchema>
@@ -161,7 +167,7 @@ export const SceneLockSchema = z.record(z.string(), SceneKeptSchema)
 /** A part's scenes lock. */
 export type SceneLock = z.infer<typeof SceneLockSchema>
 
-/** The `scenes.loudness` figure as the panel writes it: "−19.4 LUFS". */
+/** A loudness figure (as `scenes.output.lufs` is) as the panel writes it: "−19.4 LUFS". */
 export function formatLufs(lufs: number): string {
   return `${minus(lufs.toFixed(1))} LUFS`
 }

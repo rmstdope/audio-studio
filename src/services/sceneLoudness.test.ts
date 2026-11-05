@@ -513,12 +513,34 @@ describe('the kept figures', () => {
     expect(Object.keys(kept(root, 'act2'))).toEqual(['c'])
   })
 
+  it('report a lock keyed by act, as the old cache file was, and never write over it', async () => {
+    const { root, projectFile } = repo()
+    const { writeFileSync, mkdirSync } = await import('node:fs')
+    mkdirSync(join(root, 'content-studio/scenes'), { recursive: true })
+    const old = JSON.stringify({ act1: { a: { saved: measureOf(null), draft: null } } })
+    writeFileSync(join(root, scenesLockFile('act1')), old)
+    const { loadProject } = await import('./workspace')
+    const loaded = await loadProject(projectFile)
+    if (!loaded.ok) throw new Error('project')
+    expect(loaded.summary.problems.map((p) => p.file)).toContain(
+      'content-studio/scenes/act1.lock.json',
+    )
+    await expect(keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)).rejects.toThrow(
+      'cannot be read',
+    )
+    expect(await startMeasure(projectFile, 'act1', null)).toMatchObject({ kind: 'unreadable' })
+    expect(lockText(root)).toBe(old)
+  })
+
   it('report a lock that cannot be read with the project, its act showing no figures', async () => {
     const { root, projectFile } = repo()
     await keepMeasure(projectFile, 'act2', 'c', measureOf(null), false)
     const { writeFileSync, mkdirSync } = await import('node:fs')
     mkdirSync(join(root, 'content-studio/scenes'), { recursive: true })
-    writeFileSync(join(root, scenesLockFile('act1')), JSON.stringify({ a: { saved: 3 } }))
+    writeFileSync(
+      join(root, scenesLockFile('act1')),
+      JSON.stringify({ a: { saved: 3, draft: null } }),
+    )
     const { loadProject } = await import('./workspace')
     const loaded = await loadProject(projectFile)
     if (!loaded.ok) throw new Error('project')

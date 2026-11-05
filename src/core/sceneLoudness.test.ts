@@ -17,6 +17,7 @@ import {
   type PlanEffect,
   type SceneMeasure,
   splitClipPaths,
+  SceneLockSchema,
 } from './sceneLoudness'
 import type { SceneMix } from './scenes'
 
@@ -420,5 +421,37 @@ describe('splitClipPaths', () => {
     ]) {
       expect(splitClipPaths(m)).toEqual([{ text: m, path: false }])
     }
+  })
+})
+
+describe('SceneLockSchema', () => {
+  const measure: SceneMeasure = {
+    measuredAt: '2026-11-05T08:59:21.728Z',
+    entry: { music: { track: 'hall', level: 0.64 }, effects: [] },
+    clips: { 'music:hall': 'take 17' },
+    states: [{ state: null, lufs: -20.01 }],
+    without: [],
+    error: null,
+  }
+
+  it('reads a part lock: scene id to its saved and draft measures', () => {
+    const lock = { hall: { saved: measure, draft: null }, yard: { saved: null, draft: measure } }
+    expect(SceneLockSchema.parse(lock)).toEqual(lock)
+  })
+
+  it('keeps the move of a saved press', () => {
+    const lock = { hall: { saved: { ...measure, moved: { db: 1 } }, draft: null } }
+    expect(SceneLockSchema.parse(lock)).toEqual(lock)
+  })
+
+  it('refuses an entry without saved or draft', () => {
+    expect(SceneLockSchema.safeParse({ hall: { saved: measure } }).success).toBe(false)
+    expect(SceneLockSchema.safeParse({ hall: { draft: null } }).success).toBe(false)
+  })
+
+  it('refuses the act-keyed file of the format before version 2', () => {
+    const old = { act1: { hall: { saved: measure, draft: null } } }
+    const read = SceneLockSchema.safeParse(old)
+    expect(read.success).toBe(false)
   })
 })
