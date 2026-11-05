@@ -17,8 +17,8 @@ import {
 } from './workspace'
 
 const script = [
-  { key: 'a', speaker: 'narrator', text: 'Once.' },
-  { key: 'b', speaker: 'mira', text: 'Welcome.' },
+  { id: 'a', speaker: 'narrator', text: 'Once.' },
+  { id: 'b', speaker: 'mira', text: 'Welcome.' },
 ]
 
 describe('locateProject', () => {
@@ -159,7 +159,7 @@ describe('loadProject', () => {
     const root = tempRepo({
       'content-studio.json': projectJson(),
       'content-studio/narration/cast.json': '{ not json',
-      'tts/act1/script.json': [{ key: 'a', text: 'no speaker' }],
+      'tts/act1/script.json': [{ id: 'a', text: 'no speaker' }],
     })
     const result = await loadProject(join(root, 'content-studio.json'))
     if (!result.ok) throw new Error('expected the project to load')
@@ -534,20 +534,20 @@ describe('review fixes', () => {
   it('reports a dialog key that could not be a file name', async () => {
     const root = tempRepo({
       ...files,
-      'tts/act1/script.json': [{ key: '../../x', speaker: 'narrator', text: 'Escape.' }],
+      'tts/act1/script.json': [{ id: '../../x', speaker: 'narrator', text: 'Escape.' }],
     })
     const result = await loadPart(join(root, 'content-studio.json'), 'act1')
-    expect(result?.ok && result.part.problems.map((p) => p.path)).toEqual(['[0].key'])
+    expect(result?.ok && result.part.problems.map((p) => p.path)).toEqual(['[0].id'])
   })
 
   it('reports a dialog that uses a key twice', async () => {
     const root = tempRepo({
       ...files,
-      'tts/act1/script.json': [...script, { key: 'a', speaker: 'mira', text: 'Again.' }],
+      'tts/act1/script.json': [...script, { id: 'a', speaker: 'mira', text: 'Again.' }],
     })
     const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(result?.ok && result.part.problems.map((p) => [p.file, p.message])).toEqual([
-      ['tts/act1/script.json', 'line keys must be unique; used more than once: a'],
+      ['tts/act1/script.json', 'line ids must be unique; used more than once: a'],
     ])
   })
 
@@ -599,8 +599,8 @@ describe('a part in several languages', () => {
     },
     'tts/act1/en/script.json': script,
     'tts/act1/sv/script.json': [
-      { key: 'a', speaker: 'narrator', text: 'En gång.' },
-      { key: 'z', speaker: 'mira', text: 'Bara här.' },
+      { id: 'a', speaker: 'narrator', text: 'En gång.' },
+      { id: 'z', speaker: 'mira', text: 'Bara här.' },
     ],
     'audio/act1/sv/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
     'audio/act1/sv/a.mp3': 'x',

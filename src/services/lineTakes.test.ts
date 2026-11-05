@@ -22,8 +22,8 @@ const files = {
     pronounce: { Elior: 'El-ee-or' },
   },
   'tts/act1/script.json': [
-    { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
-    { key: 'k3', speaker: 'tilda', text: 'No voice.' },
+    { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+    { id: 'k3', speaker: 'tilda', text: 'No voice.' },
   ],
 }
 
@@ -344,8 +344,8 @@ describe('takes of a line in a language besides the source', () => {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-sv' } } },
       },
     },
-    'tts/act1/en/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }],
-    'tts/act1/sv/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Elior vaknar.' }],
+    'tts/act1/en/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }],
+    'tts/act1/sv/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Elior vaknar.' }],
     'content-studio/narration/act1.edits.json': { k1: '[worried]' },
   }
 

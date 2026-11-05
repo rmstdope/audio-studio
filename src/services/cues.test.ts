@@ -13,8 +13,8 @@ const files = {
     pronounce: {},
   },
   'tts/act1/script.json': [
-    { key: 'a', speaker: 'mira', text: 'Hello.' },
-    { key: 'b', speaker: 'mira', text: 'Goodbye.' },
+    { id: 'a', speaker: 'mira', text: 'Hello.' },
+    { id: 'b', speaker: 'mira', text: 'Goodbye.' },
   ],
 }
 
@@ -98,8 +98,8 @@ describe('setCue', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': [
-        { key: 'b', speaker: 'mira', text: 'Goodbye.' },
-        { key: '10', speaker: 'mira', text: 'Ten.' },
+        { id: 'b', speaker: 'mira', text: 'Goodbye.' },
+        { id: '10', speaker: 'mira', text: 'Ten.' },
       ],
       'content-studio/narration/act1.edits.json': { b: '[sad]' },
     })
@@ -118,7 +118,7 @@ describe('setCue', () => {
   it('saves a cue for a line keyed like an object property', async () => {
     const root = tempRepo({
       ...files,
-      'tts/act1/script.json': [{ key: '__proto__', speaker: 'mira', text: 'Odd.' }],
+      'tts/act1/script.json': [{ id: '__proto__', speaker: 'mira', text: 'Odd.' }],
     })
     const projectFile = join(root, 'content-studio.json')
     expect(await setCue(projectFile, 'act1', '__proto__', '[odd]')).toEqual({ ok: true })
@@ -208,8 +208,8 @@ describe('cues in a language besides the source', () => {
     'content-studio/narration/cast.json': {
       speakers: { mira: { voice: 'v1', style: '[warm]', languages: { sv: { voice: 'v2' } } } },
     },
-    'tts/act1/en/script.json': [{ key: 'a', speaker: 'mira', text: 'Hello.' }],
-    'tts/act1/sv/script.json': [{ key: 'a', speaker: 'mira', text: 'Hej.' }],
+    'tts/act1/en/script.json': [{ id: 'a', speaker: 'mira', text: 'Hello.' }],
+    'tts/act1/sv/script.json': [{ id: 'a', speaker: 'mira', text: 'Hej.' }],
     'content-studio/narration/act1.edits.json': '{\n  "a": "[worried]"\n}\n',
   }
   const cueOf = async (projectFile: string, language: string) => {
@@ -254,8 +254,8 @@ describe('scene cues', () => {
   const scened = {
     ...files,
     'tts/act1/script.json': [
-      { key: 'a', speaker: 'narrator', text: 'Hello.', scene: 'Cave' },
-      { key: 'b', speaker: 'narrator', text: 'Goodbye.', scene: 'Meadow' },
+      { id: 'a', speaker: 'narrator', text: 'Hello.', scene: 'Cave' },
+      { id: 'b', speaker: 'narrator', text: 'Goodbye.', scene: 'Meadow' },
     ],
     'content-studio/narration/cast.json': {
       speakers: { narrator: { voice: 'v1', style: '[warm]' } },
@@ -330,8 +330,8 @@ describe('scene cues', () => {
       'content-studio/narration/cast.json': {
         speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v2' } } } },
       },
-      'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Hi.', scene: 'Cave' }],
-      'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'Hej.' }],
+      'tts/act1/en/script.json': [{ id: 'a', speaker: 'narrator', text: 'Hi.', scene: 'Cave' }],
+      'tts/act1/sv/script.json': [{ id: 'a', speaker: 'narrator', text: 'Hej.' }],
       'content-studio/narration/act1.edits.json': { 'scene:Cave': '[dark]' },
     })
     const projectFile = join(root, 'content-studio.json')
@@ -365,8 +365,8 @@ describe('cues inside a line', () => {
   const inside = {
     ...files,
     'tts/act1/script.json': [
-      { key: 'a', speaker: 'mira', text: 'I did it. I will fix it.' },
-      { key: 'b', speaker: 'mira', text: 'Goodbye.' },
+      { id: 'a', speaker: 'mira', text: 'I did it. I will fix it.' },
+      { id: 'b', speaker: 'mira', text: 'Goodbye.' },
     ],
   }
   const cuesAt = (root: string) =>
@@ -471,8 +471,8 @@ describe('cues inside a line', () => {
     const root = tempRepo({
       ...inside,
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'mira', text: 'I did it. I will fix it.' },
-        { key: 'b', speaker: 'mira', text: '[E] to open the door' },
+        { id: 'a', speaker: 'mira', text: 'I did it. I will fix it.' },
+        { id: 'b', speaker: 'mira', text: '[E] to open the door' },
       ],
     })
     const projectFile = join(root, 'content-studio.json')

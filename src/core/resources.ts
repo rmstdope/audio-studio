@@ -1,16 +1,22 @@
 import { z } from 'zod'
 
-/** One voiced line of a part's dialog: the game's stable key, who says it, and the words. */
-export const LineSchema = z.object({
-  // The key names the line's clip file (`<key>.mp3`), so it may only hold safe file-name characters.
-  key: z.string().regex(/^[A-Za-z0-9_-]+$/, 'a line key may only hold letters, digits, - and _'),
-  speaker: z.string().min(1),
-  text: z.string(),
-  /** The scene the line belongs to, as the game's dialog names it; lines without one are in none. */
-  scene: z.string().min(1).optional(),
-})
+/**
+ * One voiced line of a part's dialog as the game lists it: its id, who says it, and the words
+ * (`title` is the game's own and unused). The rest of the studio knows the id as the line's `key`.
+ */
+export const LineSchema = z
+  .object({
+    // The id names the line's clip file (`<id>.mp3`), so it may only hold safe file-name characters.
+    id: z.string().regex(/^[A-Za-z0-9_-]+$/, 'a line id may only hold letters, digits, - and _'),
+    title: z.string().optional(),
+    speaker: z.string().min(1),
+    text: z.string(),
+    /** The scene the line belongs to, as the game's dialog names it; lines without one are in none. */
+    scene: z.string().min(1).optional(),
+  })
+  .transform(({ id, title: _title, ...line }) => ({ key: id, ...line }))
 
-/** A part's dialog resource (RetroQuest: `tts/<act>/script.json`). Read only. Keys are unique. */
+/** A part's dialog list (RetroQuest: `tts/<act>/script.json`). Read only. Ids are unique. */
 export const DialogSchema = z.array(LineSchema).superRefine((lines, context) => {
   const seen = new Set<string>()
   const twice = new Set<string>()
@@ -18,7 +24,7 @@ export const DialogSchema = z.array(LineSchema).superRefine((lines, context) => 
   if (twice.size) {
     context.addIssue({
       code: 'custom',
-      message: `line keys must be unique; used more than once: ${[...twice].join(', ')}`,
+      message: `line ids must be unique; used more than once: ${[...twice].join(', ')}`,
     })
   }
 })
@@ -229,7 +235,7 @@ export const LockEntrySchema = z.looseObject({
 export const LockSchema = z.record(z.string(), LockEntrySchema)
 
 /** A voiced line of dialog. */
-export type Line = z.infer<typeof LineSchema>
+export type Line = z.output<typeof LineSchema>
 
 /** A character's entry in the cast. */
 export type Character = z.infer<typeof CharacterSchema>

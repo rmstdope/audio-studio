@@ -9,8 +9,8 @@ const files = {
   'content-studio.json': projectJson(),
   'content-studio/narration/cast.json': { speakers: { mira: { voice: 'v-m' } } },
   'tts/act1/script.json': [
-    { key: 'k1', speaker: 'mira', text: 'Welcome home.' },
-    { key: 'k2', speaker: 'mira', text: 'Sit.' },
+    { id: 'k1', speaker: 'mira', text: 'Welcome home.' },
+    { id: 'k2', speaker: 'mira', text: 'Sit.' },
   ],
 }
 

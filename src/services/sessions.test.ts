@@ -95,10 +95,10 @@ const files = {
   'audio/act1/manifest.json': { a1: { file: 'a1.mp3' } },
   'audio/act1/a1.mp3': 'clip',
   'tts/act1/script.json': [
-    { key: 'a1', speaker: 'mira', text: 'Welcome.' },
-    { key: 'a2', speaker: 'mira', text: 'Again.' },
+    { id: 'a1', speaker: 'mira', text: 'Welcome.' },
+    { id: 'a2', speaker: 'mira', text: 'Again.' },
   ],
-  'tts/act2/script.json': [{ key: 'b1', speaker: 'mira', text: 'Later.' }],
+  'tts/act2/script.json': [{ id: 'b1', speaker: 'mira', text: 'Later.' }],
 }
 
 /** An audition just started, then Bring in more pressed once: a, b, c to hear and d to g queued. */
@@ -908,10 +908,10 @@ describe('an audition per language', () => {
     'tts/act2/script.json': undefined,
     'audio/act1/manifest.json': undefined,
     'audio/act1/a1.mp3': undefined,
-    'tts/act1/en/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
+    'tts/act1/en/script.json': [{ id: 'a1', speaker: 'mira', text: 'Welcome.' }],
     'tts/act1/sv/script.json': [
-      { key: 'a1', speaker: 'mira', text: 'Välkommen.' },
-      { key: 'a2', speaker: 'mira', text: 'Igen och igen.' },
+      { id: 'a1', speaker: 'mira', text: 'Välkommen.' },
+      { id: 'a2', speaker: 'mira', text: 'Igen och igen.' },
     ],
     'audio/act1/sv/manifest.json': { a1: { file: 'a1.mp3' }, a2: { file: 'a2.mp3' } },
     'audio/act1/sv/a1.mp3': 'clip',

@@ -24,7 +24,7 @@ const files = {
     speakers: { mira: { voice: 'cur', style: '[low]', audition: { keywords: ['warm'] } } },
     pronounce: {},
   },
-  'tts/act1/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
+  'tts/act1/script.json': [{ id: 'a1', speaker: 'mira', text: 'Welcome.' }],
 }
 
 function voice(id: string, title = id): Voice {
@@ -329,8 +329,8 @@ describe('designs per language', () => {
       },
     },
     'tts/act1/script.json': undefined,
-    'tts/act1/en/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
-    'tts/act1/sv/script.json': [{ key: 'a1', speaker: 'mira', text: 'Välkommen.' }],
+    'tts/act1/en/script.json': [{ id: 'a1', speaker: 'mira', text: 'Welcome.' }],
+    'tts/act1/sv/script.json': [{ id: 'a1', speaker: 'mira', text: 'Välkommen.' }],
   }
 
   it('keeps the designs and the last description of each language apart', async () => {
@@ -355,8 +355,8 @@ describe('designs per language', () => {
 
 describe('designs with ElevenLabs', () => {
   const lines = [
-    { key: 'a1', speaker: 'mira', text: 'Welcome to the lighthouse, where the lamps never sleep.' },
-    { key: 'a2', speaker: 'mira', text: 'Sit by the fire and I will tell you of the sea.' },
+    { id: 'a1', speaker: 'mira', text: 'Welcome to the lighthouse, where the lamps never sleep.' },
+    { id: 'a2', speaker: 'mira', text: 'Sit by the fire and I will tell you of the sea.' },
   ]
   function elevenSetup(script = lines) {
     const root = tempRepo({ ...files, 'tts/act1/script.json': script })
@@ -388,7 +388,7 @@ describe('designs with ElevenLabs', () => {
     const text = (plan as { text: string }).text
     expect(text).toContain('Welcome to the lighthouse')
     expect(plan).toMatchObject({ credits: [...text].length })
-    const short = elevenSetup([{ key: 'a1', speaker: 'mira', text: 'Hi.' }])
+    const short = elevenSetup([{ id: 'a1', speaker: 'mira', text: 'Hi.' }])
     expect(await elevenDesignFor(short.projectFile, 'mira')).toEqual({
       ok: true,
       text: null,

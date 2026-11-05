@@ -68,8 +68,8 @@ const files = {
     pronounce: {},
   },
   'tts/act1/script.json': [
-    { key: 'a', speaker: 'grandmother', text: 'Hello.' },
-    { key: 'b', speaker: 'tilda', text: 'Hi.' },
+    { id: 'a', speaker: 'grandmother', text: 'Hello.' },
+    { id: 'b', speaker: 'tilda', text: 'Hi.' },
   ],
 }
 
@@ -737,7 +737,7 @@ describe('casting per language', () => {
           manifest: 'audio/{part}/{language}/manifest.json',
         },
       },
-      'tts/act1/en/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Hello.' }],
+      'tts/act1/en/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Hello.' }],
     }
   }
   const cast = (root: string) =>
@@ -839,8 +839,8 @@ describe('casting per language', () => {
       const root = tempRepo({
         ...f,
         'tts/act1/sv/script.json': [
-          { key: 'a', speaker: 'grandmother', text: 'Kort.' },
-          { key: 'b', speaker: 'grandmother', text: 'En längre rad.' },
+          { id: 'a', speaker: 'grandmother', text: 'Kort.' },
+          { id: 'b', speaker: 'grandmother', text: 'En längre rad.' },
         ],
       })
       const result = await findCandidates(

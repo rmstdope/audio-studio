@@ -15,7 +15,7 @@ const ruleOutVoices = (
 const files = {
   'content-studio.json': projectJson(),
   'content-studio/narration/cast.json': { speakers: { mira: { voice: 'cur' } } },
-  'tts/act1/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
+  'tts/act1/script.json': [{ id: 'a1', speaker: 'mira', text: 'Welcome.' }],
 }
 
 function project() {

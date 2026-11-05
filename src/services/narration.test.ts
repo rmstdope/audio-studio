@@ -63,14 +63,14 @@ const files = {
     pronounce: { Elior: 'El-ee-or' },
   },
   'tts/act1/script.json': [
-    { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+    { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
     {
-      key: 'k2',
+      id: 'k2',
       speaker: 'narrator',
       text: `${'A long sentence that goes on. '.repeat(4)}The end.`,
     },
-    { key: 'k3', speaker: 'tilda', text: 'No voice.' },
-    { key: 'k4', speaker: 'mira', text: 'Welcome.' },
+    { id: 'k3', speaker: 'tilda', text: 'No voice.' },
+    { id: 'k4', speaker: 'mira', text: 'Welcome.' },
   ],
   'audio/act1/manifest.json': manifestText,
 }
@@ -1177,13 +1177,13 @@ describe('recording in a language besides the source', () => {
       pronounce: { Elior: 'El-ee-or' },
     },
     'tts/act1/en/script.json': [
-      { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
-      { key: 'k2', speaker: 'mira', text: 'Welcome.' },
-      { key: 'k3', speaker: 'narrator', text: 'Not translated.' },
+      { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+      { id: 'k2', speaker: 'mira', text: 'Welcome.' },
+      { id: 'k3', speaker: 'narrator', text: 'Not translated.' },
     ],
     'tts/act1/sv/script.json': [
-      { key: 'k1', speaker: 'narrator', text: 'Elior vaknar.' },
-      { key: 'k2', speaker: 'mira', text: 'Välkommen.' },
+      { id: 'k1', speaker: 'narrator', text: 'Elior vaknar.' },
+      { id: 'k2', speaker: 'mira', text: 'Välkommen.' },
     ],
     'content-studio/narration/act1.edits.json': { k1: '[worried]' },
   }

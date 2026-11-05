@@ -9,7 +9,7 @@ const root = () =>
   tempRepo({
     'content-studio.json': projectJson(),
     'content-studio/narration/cast.json': { speakers: { mira: { voice: 'cur' } } },
-    'tts/act1/script.json': [{ key: 'a', speaker: 'mira', text: 'Hi.' }],
+    'tts/act1/script.json': [{ id: 'a', speaker: 'mira', text: 'Hi.' }],
   })
 
 const file = (name: string) => ({ name, type: 'audio/wav', bytes: new Uint8Array([1]) })

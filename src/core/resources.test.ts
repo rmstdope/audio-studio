@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { problemsFrom } from './project'
-import { CastSchema, pronounceOf, projectCast, ttsFor, voiceOf } from './resources'
+import { CastSchema, DialogSchema, pronounceOf, projectCast, ttsFor, voiceOf } from './resources'
 
 describe('CastSchema', () => {
   it('explains a pronunciation without the word it replaces', () => {
@@ -132,5 +132,32 @@ describe('a character per language', () => {
     expect(problemsFrom('content-studio/narration/cast.json', result.error)[0]?.path).toBe(
       'languages.sv.pronounce',
     )
+  })
+})
+
+describe('DialogSchema', () => {
+  it('reads each line by its id, the rest as the game wrote it, and leaves an optional title out', () => {
+    const lines = DialogSchema.parse([
+      { id: 'a1', title: 'Opening', speaker: 'narrator', text: 'Hello.', scene: 'hall' },
+      { id: 'a2', speaker: 'mira', text: 'Hi.' },
+    ])
+    expect(lines).toEqual([
+      { key: 'a1', speaker: 'narrator', text: 'Hello.', scene: 'hall' },
+      { key: 'a2', speaker: 'mira', text: 'Hi.' },
+    ])
+  })
+
+  it('needs an id that is a safe file name, used once', () => {
+    const problems = (value: unknown) => {
+      const read = DialogSchema.safeParse(value)
+      return read.success ? [] : read.error.issues.map((issue) => issue.path.join('.'))
+    }
+    expect(problems([{ key: 'a1', speaker: 'n', text: 'x' }])).toEqual(['0.id'])
+    expect(problems([{ id: 'a 1', speaker: 'n', text: 'x' }])).toEqual(['0.id'])
+    const twice = DialogSchema.safeParse([
+      { id: 'a', speaker: 'n', text: 'x' },
+      { id: 'a', speaker: 'n', text: 'y' },
+    ])
+    expect(twice.success ? '' : twice.error.issues[0]!.message).toContain('used more than once: a')
   })
 })

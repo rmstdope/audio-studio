@@ -28,10 +28,10 @@ describe('modelsView', () => {
         speakers: { narrator: { voice: 'v1', style: '[warm]' } },
       },
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'narrator', text: 'Once.' },
-        { key: 'b', speaker: 'narrator', text: 'Twice.' },
+        { id: 'a', speaker: 'narrator', text: 'Once.' },
+        { id: 'b', speaker: 'narrator', text: 'Twice.' },
       ],
-      'tts/act2/script.json': [{ key: 'c', speaker: 'narrator', text: 'Thrice.' }],
+      'tts/act2/script.json': [{ id: 'c', speaker: 'narrator', text: 'Thrice.' }],
       'audio/act1/a.mp3': 'x',
       'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
       'content-studio/narration/act1.lock.json': { a: entry('s2.1-pro-free') },
@@ -53,7 +53,7 @@ describe('modelsView', () => {
       'content-studio/narration/cast.json': {
         speakers: { narrator: { voice: 'v1', style: '[warm]' } },
       },
-      'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
+      'tts/act1/script.json': [{ id: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
       'content-studio/narration/act1.edits.json': cues,
     })
     const bytes = async (cues: object) => {
@@ -85,8 +85,8 @@ describe('modelsView', () => {
     const root = tempRepo({
       'content-studio.json': json,
       'content-studio/narration/cast.json': { speakers: { narrator: { voice: 'v1' } } },
-      'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
-      'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'En gång.' }],
+      'tts/act1/en/script.json': [{ id: 'a', speaker: 'narrator', text: 'Once.' }],
+      'tts/act1/sv/script.json': [{ id: 'a', speaker: 'narrator', text: 'En gång.' }],
       'audio/act1/sv/a.mp3': 'x',
       'audio/act1/sv/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
       'content-studio/narration/act1.sv.lock.json': { a: entry('drama-3') },
@@ -182,7 +182,7 @@ describe('modelsView, with ElevenLabs', () => {
       'content-studio/narration/cast.json': {
         speakers: { narrator: { voice: 'eleven:g1', style: '[warm]' } },
       },
-      'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+      'tts/act1/script.json': [{ id: 'a', speaker: 'narrator', text: 'Once.' }],
       'audio/act1/a.mp3': 'x',
       'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
       'content-studio/narration/act1.lock.json': { a: entry('eleven_v3') },

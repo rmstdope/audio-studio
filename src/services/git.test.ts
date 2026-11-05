@@ -18,7 +18,7 @@ function git(cwd: string, ...args: string[]) {
 const files = {
   'content-studio.json': projectJson(),
   'content-studio/narration/cast.json': { speakers: {}, pronounce: {} },
-  'tts/act1/script.json': [{ key: 'a', speaker: 'mira', text: 'Hi.' }],
+  'tts/act1/script.json': [{ id: 'a', speaker: 'mira', text: 'Hi.' }],
   'audio/act1/a.mp3': 'clip',
   'notes.txt': 'not the studio’s',
 }

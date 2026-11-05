@@ -28,7 +28,7 @@ const files = {
     },
     pronounce: { Elior: 'El-ee-or' },
   },
-  'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Hello.' }],
+  'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Hello.' }],
 }
 
 function fakeFish() {
@@ -272,7 +272,7 @@ describe('tryLine', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'grandmother', text: 'Elior, dear. Come here. Sit down now.' },
+        { id: 'a', speaker: 'grandmother', text: 'Elior, dear. Come here. Sit down now.' },
       ],
       'content-studio/narration/act1.edits.json': {
         a: '[soft] Elior, dear. Come [low] here. Sit down now.',
@@ -297,7 +297,7 @@ describe('tryLine', () => {
   it('keeps the saved cues inside when only the opening cue is tried', async () => {
     const root = tempRepo({
       ...files,
-      'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+      'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Come here now.' }],
       'content-studio/narration/act1.edits.json': { a: 'Come [low] here now.' },
     })
     const { fish } = fakeFish()
@@ -417,8 +417,8 @@ describe('tryLine', () => {
         },
       }),
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'grandmother', text: 'Hello.', scene: 'Cave' },
-        { key: 'b', speaker: 'grandmother', text: 'Bye.', scene: 'Cave' },
+        { id: 'a', speaker: 'grandmother', text: 'Hello.', scene: 'Cave' },
+        { id: 'b', speaker: 'grandmother', text: 'Bye.', scene: 'Cave' },
       ],
       'content-studio/narration/act1.edits.json': { 'scene:Cave': '[dark]', b: '[own]' },
     })
@@ -435,8 +435,8 @@ describe('tryLine', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'grandmother', text: 'Hello.' },
-        { key: 'b', speaker: 'stranger', text: 'Who?' },
+        { id: 'a', speaker: 'grandmother', text: 'Hello.' },
+        { id: 'b', speaker: 'stranger', text: 'Who?' },
       ],
     })
     const { fish, requests } = fakeFish()
@@ -492,7 +492,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
       },
       pronounce: { Elior: 'El-ee-or' },
     },
-    'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+    'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Come here now.' }],
   })
   const spending = (root: string) => {
     const file = join(root, 'content-studio/cache/spending.json')
@@ -893,8 +893,8 @@ describe('tryLine in a language besides the source', () => {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-sv' } } },
       },
     },
-    'tts/act1/en/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Hello.' }],
-    'tts/act1/sv/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Hej.' }],
+    'tts/act1/en/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Hello.' }],
+    'tts/act1/sv/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Hej.' }],
     'content-studio/narration/act1.edits.json': { k1: '[worried]' },
   }
   const tryIt = async (cue: string) => {
