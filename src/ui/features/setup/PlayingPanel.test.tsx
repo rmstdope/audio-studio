@@ -79,7 +79,7 @@ describe('the Playing takes panel', () => {
     try {
       expect(container.querySelector('h2')?.textContent).toBe('Playing takes')
       expect(container.textContent).toContain(
-        'How music takes sound when you play them in the studio. Saved in content-studio.json for everyone on the project.',
+        'How music takes sound when you play them in the studio. Saved for you alone, in content-studio/cache/settings.json.',
       )
       expect(container.querySelector('.mname')?.textContent).toBe('Fade in and out')
       expect(container.textContent).toContain(

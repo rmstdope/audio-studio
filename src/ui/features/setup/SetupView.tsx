@@ -4,6 +4,7 @@ import { ModelsPanel } from './ModelsPanel'
 import { PlayingPanel } from './PlayingPanel'
 import { AlertIcon, CheckIcon } from '../../components/icons'
 import { dollars } from '../../format'
+import { SETTINGS_FILE } from '../../../core/settings'
 
 const STATE: Record<SetupCheck['state'], string> = {
   ok: 'Ready',
@@ -159,7 +160,7 @@ export function TierMenu({ chosen }: { chosen: FishTier | null }) {
         </select>
       </label>
       <span className="muted setup-hint">
-        Saved in the project file for everyone on the project.
+        Saved for you alone, in <span className="mono">{SETTINGS_FILE}</span>.
       </span>
       {save.isError && (
         <span className="adopt-error setup-hint" role="alert">

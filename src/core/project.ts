@@ -10,7 +10,7 @@ import { SOUND_ALIKE_WORD } from './soundAlikeEdit'
 /** Fish Audio's free model: the only one for auditions, for now. */
 export const FREE_MODELS = ['s2.1-pro-free'] as const
 
-/** What the user has paid Fish in total, as the project file names it (sets its limit at once). */
+/** What the user has paid Fish in total, as the settings name it (sets its limit at once). */
 export const FishTierSchema = z.enum(['under-100', '100', '1000'])
 
 /** The smallest `quality.chunkLimit` allowed. */
@@ -152,11 +152,6 @@ const NarrationSchema = z
         // At least 100, so the built-in audition phrase always fits in one take.
         chunkLimit: z.number().int().min(MIN_CHUNK).default(400),
         parallel: z.number().int().min(1).default(4),
-        /**
-         * What the user has paid Fish in total, which sets how many requests it takes at once
-         * (Setup compares it with `parallel`). Absent: not told.
-         */
-        fishTier: FishTierSchema.optional(),
         /**
          * How takes are checked: mlx-whisper (Apple silicon, through uv), or none (one take each,
          * word timings spread evenly).
@@ -379,11 +374,6 @@ export const ProjectSchema = z
     images: ImagesSchema.optional(),
     effects: EffectsSchema.optional(),
     scenes: ScenesSchema.optional(),
-    /**
-     * How long a take fades in and out when played in the studio, in seconds (0: no fade); absent is
-     * 0.2. Saved from Setup's Playing takes panel; the game's own file never fades.
-     */
-    takeFade: z.number().min(0).optional(),
   })
   .superRefine(({ languages, narration }, context) => {
     if (languages.length > 1) {

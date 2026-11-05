@@ -198,27 +198,9 @@ describe('ProjectSchema', () => {
     ])
   })
 
-  it('takes the Fish tier the user chose, or none', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const tier = (fishTier: unknown) => ({
-      ...base,
-      narration: { ...narration, quality: { fishTier } },
-    })
-    expect(parse(base).data!.narration.quality.fishTier).toBeUndefined()
-    for (const t of ['under-100', '100', '1000'] as const) {
-      expect(parse(tier(t)).data!.narration.quality.fishTier).toBe(t)
-    }
-    expect(problems(tier('50')).map((p) => p.path)).toEqual(['narration.quality.fishTier'])
-  })
-
-  it('takes the length of a take fade in seconds, or none', () => {
-    const base = projectJson()
-    expect(parse(base).data!.takeFade).toBeUndefined()
-    expect(parse({ ...base, takeFade: 0 }).data!.takeFade).toBe(0)
-    expect(parse({ ...base, takeFade: 0.3 }).data!.takeFade).toBe(0.3)
-    expect(problems({ ...base, takeFade: -1 }).map((p) => p.path)).toEqual(['takeFade'])
-    expect(problems({ ...base, takeFade: 'long' }).map((p) => p.path)).toEqual(['takeFade'])
+  it('holds no setting of the person’s own: those are in the cache', () => {
+    const project = parse({ ...projectJson(), takeFade: 1 }).data!
+    expect('takeFade' in project).toBe(false)
   })
 
   it('requires {part} in part paths', () => {
@@ -500,13 +482,21 @@ describe('problemsFrom wording', () => {
   const base = projectJson()
   const messages = (value: unknown) => problems(value).map((p) => p.message)
 
+  const narration = base.narration as Record<string, unknown>
+  const quality = (value: Record<string, unknown>) => ({
+    ...base,
+    narration: { ...narration, quality: value },
+  })
+
   it('says a number that is too small in plain words', () => {
-    expect(messages({ ...base, takeFade: -1 })).toEqual(['takeFade must be 0 or more'])
+    expect(messages(quality({ parallel: 0 }))).toEqual([
+      'narration.quality.parallel must be 1 or more',
+    ])
   })
 
   it('says a wrong type in plain words', () => {
-    expect(messages({ ...base, takeFade: 'long' })).toEqual([
-      'takeFade must be a number (it is text)',
+    expect(messages(quality({ minHeard: 'long' }))).toEqual([
+      'narration.quality.minHeard must be a number (it is text)',
     ])
   })
 

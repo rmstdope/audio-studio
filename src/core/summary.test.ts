@@ -30,10 +30,10 @@ describe('summarize', () => {
     })
   })
 
-  it('carries the take fade, 0.2 s until one is saved', () => {
+  it('carries the take fade from the person’s settings, 0.2 s until one is saved', () => {
     expect(summarize(input()).takeFade).toBe(0.2)
-    expect(summarize(input({ project: { ...project, takeFade: 0 } })).takeFade).toBe(0)
-    expect(summarize(input({ project: { ...project, takeFade: 1 } })).takeFade).toBe(1)
+    expect(summarize(input({ settings: { takeFade: 0 } })).takeFade).toBe(0)
+    expect(summarize(input({ settings: { takeFade: 1 } })).takeFade).toBe(1)
   })
 
   it('reports a part whose dialog is gone with what was recorded for it', () => {

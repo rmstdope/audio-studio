@@ -21,8 +21,8 @@ describe('the tier menu', () => {
           ok: false,
           problems: [
             {
-              file: 'content-studio.json',
-              path: 'narration.quality.fishTier',
+              file: 'content-studio/cache/settings.json',
+              path: 'fishTier',
               message: 'permission denied',
             },
           ],
@@ -56,6 +56,28 @@ describe('the tier menu', () => {
     } finally {
       act(() => root.unmount())
       globalThis.fetch = realFetch
+    }
+  })
+
+  it('says the tier is saved for this person alone', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      act(() =>
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: new QueryClient() },
+            createElement(TierMenu, { chosen: null }),
+          ),
+        ),
+      )
+      expect(container.querySelector('.setup-hint')?.textContent).toBe(
+        'Saved for you alone, in content-studio/cache/settings.json.',
+      )
+    } finally {
+      act(() => root.unmount())
     }
   })
 })

@@ -69,7 +69,7 @@ export interface SetupFacts {
   refreshPart: boolean
   /** The project's `quality.parallel`: requests recording sends to Fish at a time. */
   parallel: number
-  /** The tier the user told the studio (`quality.fishTier`), or none. */
+  /** The tier the user told the studio (the setting `fishTier`), or none. */
   fishTier: FishTier | null
   /** The music generator, or null when the project has no `music` section. */
   music: {

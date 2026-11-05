@@ -5,6 +5,7 @@ import type { EffectsSummary } from './effects'
 import type { MusicSummary } from './music'
 import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
+import type { Settings } from './settings'
 import { DEFAULT_TAKE_FADE } from './takeFade'
 import { pronounceOf, voiceOf, type Cast, type Line } from './resources'
 
@@ -126,7 +127,7 @@ export interface ProjectSummary {
   models: { draft: string; final: string }
   /** The project's speaking speed (`tts.speed`), which a character may have its own in place of. */
   speed: number
-  /** How long a take fades when played in the studio, in seconds (`takeFade`, 0.2 if unset). */
+  /** How long a take fades when played in the studio, in seconds (the setting `takeFade`, 0.2 if unset). */
   takeFade: number
   /** The project file's name, where `soundAlike` is saved. */
   projectFile: string
@@ -159,6 +160,8 @@ export interface SummaryInput {
   effects?: EffectsSummary | null
   /** The Scenes pages, from `summarizeScenes`; absent or null without a `scenes` section. */
   scenes?: ScenesSummary | null
+  /** The person's own settings, from the cache; absent is none chosen. */
+  settings?: Settings
   problems: Problem[]
 }
 
@@ -182,6 +185,7 @@ export function summarize({
   images = null,
   effects = null,
   scenes = null,
+  settings = {},
   problems,
 }: SummaryInput): ProjectSummary {
   const { narration } = project
@@ -296,7 +300,7 @@ export function summarize({
     ),
     models: { draft: narration.models.draft, final: narration.models.final },
     speed: narration.tts.speed,
-    takeFade: project.takeFade ?? DEFAULT_TAKE_FADE,
+    takeFade: settings.takeFade ?? DEFAULT_TAKE_FADE,
     projectFile,
     music,
     images,

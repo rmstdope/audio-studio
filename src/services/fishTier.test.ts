@@ -1,82 +1,75 @@
 import { describe, expect, it } from 'bun:test'
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setFishTier } from './fishTier'
 
-function repo(project: Record<string, unknown> = projectJson(), indent = 2, eol = '\n') {
-  const root = tempRepo({})
+const SETTINGS = 'content-studio/cache/settings.json'
+
+function repo(files: Record<string, unknown> = {}) {
+  const root = tempRepo({ 'content-studio.json': projectJson(), ...files })
   const projectFile = join(root, 'content-studio.json')
-  writeFileSync(projectFile, `${JSON.stringify(project, null, indent)}\n`.replace(/\n/g, eol))
-  return { projectFile, read: () => readFileSync(projectFile, 'utf8') }
+  return {
+    root,
+    projectFile,
+    project: () => readFileSync(projectFile, 'utf8'),
+    settings: () => readFileSync(join(root, SETTINGS), 'utf8'),
+  }
 }
 
 describe('setFishTier', () => {
-  it('saves the tier in the project file, the rest of it as it was', async () => {
-    const project = projectJson()
-    ;(project.narration as { quality?: unknown }).quality = { minHeard: 0.8 }
-    const { projectFile, read } = repo(project, 4)
+  it('saves the tier in the settings in the cache, never in the project file', async () => {
+    const { projectFile, project, settings } = repo()
+    const before = project()
     expect(await setFishTier(projectFile, '100')).toEqual({ ok: true })
-    const quality = { minHeard: 0.8, fishTier: '100' }
-    const narration = { ...(project.narration as object), quality }
-    expect(read()).toBe(`${JSON.stringify({ ...project, narration }, null, 4)}\n`)
+    expect(JSON.parse(settings())).toEqual({ fishTier: '100' })
+    expect(project()).toBe(before)
   })
 
-  it('keeps CRLF line endings', async () => {
-    const { projectFile, read } = repo(projectJson(), 2, '\r\n')
+  it('keeps the other settings', async () => {
+    const { projectFile, settings } = repo({ [SETTINGS]: { takeFade: 0.5 } })
     await setFishTier(projectFile, '1000')
-    expect(read()).toContain('\r\n')
-    expect(read().replace(/\r\n/g, '')).not.toContain('\n')
+    expect(JSON.parse(settings())).toEqual({ takeFade: 0.5, fishTier: '1000' })
   })
 
-  it('clears the tier, and quality too when nothing else is in it', async () => {
-    const project = projectJson()
-    const { projectFile, read } = repo(project)
-    await setFishTier(projectFile, 'under-100')
+  it('clears the tier', async () => {
+    const { projectFile, settings } = repo({ [SETTINGS]: { fishTier: '100', takeFade: 0 } })
     expect(await setFishTier(projectFile, null)).toEqual({ ok: true })
-    expect(read()).toBe(`${JSON.stringify(project, null, 2)}\n`)
+    expect(JSON.parse(settings())).toEqual({ takeFade: 0 })
   })
 
-  it('keeps the sound-alike groups on one line each', async () => {
-    const project = projectJson()
-    ;(project.narration as { quality?: unknown }).quality = { soundAlike: [['inn', 'in']] }
-    const { projectFile, read } = repo(project)
-    await setFishTier(projectFile, '100')
-    expect(read()).toContain('["inn", "in"]')
+  it('refuses a settings file that cannot be read, and writes nothing', async () => {
+    const { projectFile, settings } = repo({ [SETTINGS]: '{ broken' })
+    const result = await setFishTier(projectFile, '100')
+    expect(result).toMatchObject({ ok: false, problems: [{ file: SETTINGS, path: '' }] })
+    expect(settings()).toBe('{ broken')
   })
 
   it('refuses a project file that cannot be read, and writes nothing', async () => {
-    const { projectFile, read } = repo()
+    const { root, projectFile } = repo()
     writeFileSync(projectFile, '{ broken')
-    const result = await setFishTier(projectFile, '100')
-    expect(result.ok).toBe(false)
-    expect(read()).toBe('{ broken')
+    expect((await setFishTier(projectFile, '100')).ok).toBe(false)
+    expect(existsSync(join(root, SETTINGS))).toBe(false)
   })
 
   it('saves two changes made together one after the other', async () => {
-    const { projectFile, read } = repo()
+    const { projectFile, settings } = repo()
     await Promise.all([setFishTier(projectFile, '100'), setFishTier(projectFile, '1000')])
-    expect(JSON.parse(read()).narration.quality.fishTier).toBe('1000')
+    expect(JSON.parse(settings()).fishTier).toBe('1000')
   })
 
   it('says why the file could not be written when the disk refuses it', async () => {
-    const { projectFile, read } = repo()
-    const before = read()
-    chmodSync(dirname(projectFile), 0o555)
+    const { root, projectFile } = repo()
+    const cache = join(root, 'content-studio/cache')
+    mkdirSync(cache, { recursive: true })
+    chmodSync(cache, 0o555)
     try {
       expect(await setFishTier(projectFile, '100')).toEqual({
         ok: false,
-        problems: [
-          {
-            file: 'content-studio.json',
-            path: 'narration.quality.fishTier',
-            message: 'permission denied',
-          },
-        ],
+        problems: [{ file: SETTINGS, path: 'fishTier', message: 'permission denied' }],
       })
     } finally {
-      chmodSync(dirname(projectFile), 0o755)
+      chmodSync(cache, 0o755)
     }
-    expect(read()).toBe(before)
   })
 })

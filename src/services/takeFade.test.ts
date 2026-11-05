@@ -1,58 +1,54 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setTakeFade } from './takeFade'
 
-function repo(project: Record<string, unknown> = projectJson(), indent = 2, eol = '\n') {
-  const root = tempRepo({})
+const SETTINGS = 'content-studio/cache/settings.json'
+
+function repo(files: Record<string, unknown> = {}) {
+  const root = tempRepo({ 'content-studio.json': projectJson(), ...files })
   const projectFile = join(root, 'content-studio.json')
-  writeFileSync(projectFile, `${JSON.stringify(project, null, indent)}\n`.replace(/\n/g, eol))
-  return { projectFile, read: () => readFileSync(projectFile, 'utf8') }
+  return {
+    root,
+    projectFile,
+    project: () => readFileSync(projectFile, 'utf8'),
+    settings: () => readFileSync(join(root, SETTINGS), 'utf8'),
+  }
 }
 
 describe('setTakeFade', () => {
-  it('saves the length in the project file, the rest of it as it was', async () => {
-    const project = projectJson()
-    const { projectFile, read } = repo(project, 4)
+  it('saves the length in the settings in the cache, never in the project file', async () => {
+    const { projectFile, project, settings } = repo()
+    const before = project()
     expect(await setTakeFade(projectFile, 1)).toEqual({ ok: true })
-    expect(read()).toBe(`${JSON.stringify({ ...project, takeFade: 1 }, null, 4)}\n`)
+    expect(JSON.parse(settings())).toEqual({ takeFade: 1 })
+    expect(project()).toBe(before)
   })
 
-  it('saves no fade as 0, and changes a length already there in its place', async () => {
-    const project = { ...projectJson(), takeFade: 0.3 }
-    const { projectFile, read } = repo(project)
+  it('saves no fade as 0, and keeps the other settings', async () => {
+    const { projectFile, settings } = repo({ [SETTINGS]: { fishTier: '100', takeFade: 0.3 } })
     await setTakeFade(projectFile, 0)
-    expect(JSON.parse(read()).takeFade).toBe(0)
-    expect(Object.keys(JSON.parse(read()))).toEqual(Object.keys(project))
-  })
-
-  it('keeps CRLF line endings', async () => {
-    const { projectFile, read } = repo(projectJson(), 2, '\r\n')
-    await setTakeFade(projectFile, 0.5)
-    expect(read()).toContain('\r\n')
-    expect(read().replace(/\r\n/g, '')).not.toContain('\n')
+    expect(JSON.parse(settings())).toEqual({ fishTier: '100', takeFade: 0 })
   })
 
   it('refuses a length that cannot be one, and writes nothing', async () => {
-    const { projectFile, read } = repo()
-    const before = read()
+    const { root, projectFile } = repo()
     const result = await setTakeFade(projectFile, -1)
-    expect(result.ok).toBe(false)
-    expect(result).toMatchObject({ problems: [{ path: 'takeFade' }] })
-    expect(read()).toBe(before)
+    expect(result).toMatchObject({ ok: false, problems: [{ file: SETTINGS, path: 'takeFade' }] })
+    expect(existsSync(join(root, SETTINGS))).toBe(false)
   })
 
   it('refuses a project file that cannot be read, and writes nothing', async () => {
-    const { projectFile, read } = repo()
+    const { root, projectFile } = repo()
     writeFileSync(projectFile, '{ broken')
     expect((await setTakeFade(projectFile, 1)).ok).toBe(false)
-    expect(read()).toBe('{ broken')
+    expect(existsSync(join(root, SETTINGS))).toBe(false)
   })
 
   it('saves two changes made together one after the other', async () => {
-    const { projectFile, read } = repo()
+    const { projectFile, settings } = repo()
     await Promise.all([setTakeFade(projectFile, 0.1), setTakeFade(projectFile, 2)])
-    expect(JSON.parse(read()).takeFade).toBe(2)
+    expect(JSON.parse(settings()).takeFade).toBe(2)
   })
 })

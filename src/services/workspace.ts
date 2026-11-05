@@ -59,6 +59,7 @@ import { readScenes } from './scenes'
 import { readEffects } from './effectsLists'
 import { gameFilePath, readMusic } from './musicLists'
 import { inPartTurn } from './partFiles'
+import { readSettings } from './settings'
 
 /** Where the project file is, or the message to print instead of starting the studio. */
 export type Located = { ok: true; file: string } | { ok: false; message: string }
@@ -220,6 +221,7 @@ export async function loadWorkspace(projectFile: string): Promise<
       images,
       effects,
       scenes,
+      settings: await readSettings(root, problems),
       problems,
     }),
   }
