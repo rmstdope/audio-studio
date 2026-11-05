@@ -16,6 +16,7 @@ import {
   WINDOW_SECONDS,
   type PlanEffect,
   type SceneMeasure,
+  splitClipPaths,
 } from './sceneLoudness'
 import type { SceneMix } from './scenes'
 
@@ -378,5 +379,45 @@ describe('withoutName', () => {
     expect(withoutName('rain', ['calm', 'rainy', 'storm'], ['calm', 'rainy', 'storm', 'dry'])).toBe(
       'rain in calm, rainy and storm',
     )
+  })
+})
+
+describe('splitClipPaths', () => {
+  const paths = (m: string) =>
+    splitClipPaths(m)
+      .filter((p) => p.path)
+      .map((p) => p.text)
+  it('marks the one clip a tool could not read', () => {
+    const m = 'ffprobe could not read audio/effects/wind-howl.mp3: Invalid data'
+    expect(splitClipPaths(m)).toEqual([
+      { text: 'ffprobe could not read ', path: false },
+      { text: 'audio/effects/wind-howl.mp3', path: true },
+      { text: ': Invalid data', path: false },
+    ])
+  })
+  it('marks each clip of a list and leaves the commas plain', () => {
+    const m = 'ffmpeg could not read a/b.mp3, c/d.mp3, .content-studio/effect-takes/x/3.mp3: bad'
+    expect(paths(m)).toEqual(['a/b.mp3', 'c/d.mp3', '.content-studio/effect-takes/x/3.mp3'])
+    expect(
+      splitClipPaths(m)
+        .map((p) => p.text)
+        .join(''),
+    ).toBe(m)
+    expect(splitClipPaths(m)[2]).toEqual({ text: ', ', path: false })
+  })
+  it('marks the clip with no length', () => {
+    expect(splitClipPaths('audio/effects/wind-howl.mp3 has no length')).toEqual([
+      { text: 'audio/effects/wind-howl.mp3', path: true },
+      { text: ' has no length', path: false },
+    ])
+  })
+  it('marks nothing when no clip is involved', () => {
+    for (const m of [
+      'ffmpeg wasn’t found',
+      'ffprobe took too long and was stopped',
+      'ffmpeg fell over',
+    ]) {
+      expect(splitClipPaths(m)).toEqual([{ text: m, path: false }])
+    }
   })
 })

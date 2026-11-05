@@ -384,3 +384,34 @@ export function movedEntry(entry: SceneMix | null, db: number, like: SceneMix): 
     ? { ...moved, music: { track: like.music.track, level: scaleLevel(1, db) } }
     : moved
 }
+
+/**
+ * A measuring error cut into pieces, the project paths of the clips it names marked so the panel
+ * can set them in the code font. The two shapes that name clips are the ones the scene audio
+ * service writes ("<tool> could not read <a>, <b>: <why>" and "<a> has no length"); any other
+ * message is one plain piece. The pieces always join back into the message. A file name that
+ * itself holds ", " or ": " is cut at it (the font is wrong, never the words), since the message
+ * carries no other mark.
+ */
+export function splitClipPaths(message: string): { text: string; path: boolean }[] {
+  const read = /^(\S+ could not read )(.+?)(: |$)/.exec(message)
+  if (read) {
+    const lead = read[1]!
+    const rest = message.slice(lead.length + read[2]!.length)
+    const pieces: { text: string; path: boolean }[] = [{ text: lead, path: false }]
+    read[2]!.split(', ').forEach((path, i) => {
+      if (i > 0) pieces.push({ text: ', ', path: false })
+      pieces.push({ text: path, path: true })
+    })
+    if (rest) pieces.push({ text: rest, path: false })
+    return pieces
+  }
+  const tail = ' has no length'
+  if (message.endsWith(tail) && message.length > tail.length) {
+    return [
+      { text: message.slice(0, -tail.length), path: true },
+      { text: tail, path: false },
+    ]
+  }
+  return [{ text: message, path: false }]
+}
