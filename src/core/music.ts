@@ -462,11 +462,12 @@ export function applyBriefChange(
 
 /**
  * The briefs after "Keep mine": the studio's brief for the track stays, now written over the game's
- * brief as it is (`gameBrief`). Unchanged when the track has no brief of the studio's.
+ * brief as it is (`gameBrief`). Unchanged when the track has no brief of the studio's, or its
+ * brief is already over those words.
  */
 export function keepMineBrief(briefs: Briefs, id: string, gameBrief: string): Briefs {
   const own = briefs[id]
-  if (own?.brief === undefined) return briefs
+  if (own?.brief === undefined || own.gameWas === gameBrief) return briefs
   return { ...briefs, [id]: { ...own, gameWas: gameBrief } }
 }
 

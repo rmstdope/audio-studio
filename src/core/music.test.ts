@@ -469,6 +469,11 @@ describe('the game’s brief changed under the studio’s', () => {
     })
     expect(keepMineBrief(briefs, 'b', 'x')).toEqual(briefs)
   })
+
+  it('leaves the edits as they are when the studio’s brief is already over the game’s words', () => {
+    const briefs = { a: { brief: 'ours', gameWas: 'a brief' } }
+    expect(keepMineBrief(briefs, 'a', 'a brief')).toBe(briefs)
+  })
 })
 
 describe('BriefChangeBody', () => {
