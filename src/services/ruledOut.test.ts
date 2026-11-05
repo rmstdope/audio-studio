@@ -14,7 +14,7 @@ const ruleOutVoices = (
 
 const files = {
   'content-studio.json': projectJson(),
-  'tts/cast.json': { speakers: { mira: { voice: 'cur' } } },
+  'content-studio/narration/cast.json': { speakers: { mira: { voice: 'cur' } } },
   'tts/act1/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
 }
 
@@ -140,13 +140,9 @@ describe('ruled-out voices per language', () => {
       languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        paths: {
-          dialog: 'tts/{part}/{language}/script.json',
-          cues: 'tts/{part}/{language}/cues.json',
-          lock: 'tts/{part}/{language}/narration.lock.json',
-          clips: 'audio/{part}/{language}',
-          manifest: 'audio/{part}/{language}/manifest.json',
-        },
+        from: { part: 'tts/{part}/{language}/script.json' },
+        clips: 'audio/{part}/{language}',
+        manifest: 'audio/{part}/{language}/manifest.json',
       },
     },
   }

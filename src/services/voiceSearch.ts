@@ -11,7 +11,7 @@ export interface SearchOptions {
   pageSize?: number
   /** Pages to read per term at most. */
   pages?: number
-  /** Requests to Fish at once (the project's `quality.parallel`). */
+  /** Requests to Fish at once (the project's `generate.parallel`). */
   parallel?: number
 }
 

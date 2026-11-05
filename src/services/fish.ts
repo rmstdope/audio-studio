@@ -187,7 +187,7 @@ export function createFishClient(
           }
           throw new FishError(
             429,
-            `${error.detail} (${attempt + 1} tries over a minute): lower quality.parallel, or wait for other work on this key`,
+            `${error.detail} (${attempt + 1} tries over a minute): lower generate.parallel, or wait for other work on this key`,
           )
         }
         throw error

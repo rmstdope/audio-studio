@@ -25,8 +25,8 @@ function input(overrides: Partial<SummaryInput> = {}): SummaryInput {
 describe('summarize', () => {
   it('carries the draft and final models', () => {
     expect(summarize(input()).models).toEqual({
-      draft: project.narration.models.draft,
-      final: project.narration.models.final,
+      draft: project.narration.models.fish.draft,
+      final: project.narration.models.fish.final,
     })
   })
 
@@ -110,12 +110,12 @@ describe('summarize', () => {
   })
 
   it('carries the project’s labels and problems', () => {
-    const problem = { file: 'tts/cast.json', path: 'speakers', message: 'bad' }
+    const problem = { file: 'content-studio/narration/cast.json', path: 'speakers', message: 'bad' }
     const summary = summarize(input({ problems: [problem] }))
     expect(summary).toMatchObject({
       name: 'Test Game',
       partLabel: 'Act',
-      charactersPath: 'tts/cast.json',
+      charactersPath: 'content-studio/narration/cast.json',
       root: '/repo',
       problems: [problem],
     })
@@ -136,7 +136,9 @@ describe('summarize, pronunciations', () => {
 describe('summarize, words that sound the same', () => {
   it("gives the project's own groups and the file they are saved in", () => {
     const json = projectJson()
-    ;(json.narration as { quality?: unknown }).quality = { soundAlike: [['Lyria', 'Liria']] }
+    ;(json.narration as { generate?: unknown }).generate = {
+      soundAlike: { en: [['Lyria', 'Liria']] },
+    }
     const own = ProjectSchema.parse(json)
     expect(summarize(input({ project: own }))).toMatchObject({
       soundAlike: [['Lyria', 'Liria']],
@@ -189,13 +191,9 @@ describe('a character per language', () => {
     languages,
     narration: {
       ...project.narration,
-      paths: {
-        dialog: 'tts/{part}/{language}/script.json',
-        cues: 'c/{language}/{part}',
-        lock: 'l/{language}/{part}',
-        clips: 'a/{language}/{part}',
-        manifest: 'm/{language}/{part}',
-      },
+      from: { part: 'tts/{part}/{language}/script.json' },
+      clips: 'a/{language}/{part}',
+      manifest: 'm/{language}/{part}',
     },
   }
   const cast = CastSchema.parse({

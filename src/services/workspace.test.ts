@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { narrationInLanguages, projectJson, tempRepo } from '../../test/helpers'
 import { clipInputs, fingerprint } from '../core/fingerprint'
 import { ProjectSchema } from '../core/project'
 import { noProjectMessage, renameNotice } from '../core/renames'
@@ -131,7 +131,9 @@ describe('loadProject', () => {
   it('summarises the project from its resources', async () => {
     const root = tempRepo({
       'content-studio.json': projectJson(),
-      'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
+      'content-studio/narration/cast.json': {
+        speakers: { narrator: { voice: 'v1', style: '[warm]' } },
+      },
       'tts/act1/script.json': script,
     })
     const result = await loadProject(join(root, 'content-studio.json'))
@@ -156,14 +158,14 @@ describe('loadProject', () => {
   it('reports broken resources as problems but still loads', async () => {
     const root = tempRepo({
       'content-studio.json': projectJson(),
-      'tts/cast.json': '{ not json',
+      'content-studio/narration/cast.json': '{ not json',
       'tts/act1/script.json': [{ key: 'a', text: 'no speaker' }],
     })
     const result = await loadProject(join(root, 'content-studio.json'))
     if (!result.ok) throw new Error('expected the project to load')
     expect(result.summary.parts[0]!.dialog).toBe('invalid')
     expect(result.summary.problems.map((p) => [p.file, p.path])).toEqual([
-      ['tts/cast.json', ''],
+      ['content-studio/narration/cast.json', ''],
       ['tts/act1/script.json', '[0].speaker'],
     ])
     expect(result.summary.problems[0]!.message).toStartWith('not valid JSON')
@@ -201,15 +203,20 @@ describe('loadProject', () => {
   it('refuses paths outside the project folder', async () => {
     const root = tempRepo({
       'content-studio.json': projectJson({
-        narration: { ...(projectJson().narration as object), characters: '../elsewhere/cast.json' },
+        narration: { ...(projectJson().narration as object), manifest: '../{part}/manifest.json' },
       }),
     })
     const result = await loadProject(join(root, 'content-studio.json'))
     expect(!result.ok && result.problems).toEqual([
       {
         file: 'content-studio.json',
-        path: 'narration.characters',
-        message: '../elsewhere/cast.json is outside the project folder',
+        path: 'narration.manifest',
+        message: '../act1/manifest.json is outside the project folder',
+      },
+      {
+        file: 'content-studio.json',
+        path: 'narration.manifest',
+        message: '../act2/manifest.json is outside the project folder',
       },
     ])
   })
@@ -218,7 +225,9 @@ describe('loadProject', () => {
 describe('narrationProgress', () => {
   const files = {
     'content-studio.json': projectJson(),
-    'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
+    'content-studio/narration/cast.json': {
+      speakers: { narrator: { voice: 'v1', style: '[warm]' } },
+    },
     'tts/act1/script.json': script,
     'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1.2 } },
     'audio/act1/a.mp3': 'audio',
@@ -247,7 +256,9 @@ describe('narrationProgress', () => {
 describe('loadPart', () => {
   const files = {
     'content-studio.json': projectJson(),
-    'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
+    'content-studio/narration/cast.json': {
+      speakers: { narrator: { voice: 'v1', style: '[warm]' } },
+    },
     'tts/act1/script.json': script,
     'audio/act1/manifest.json': {
       a: { file: 'a.mp3', speaker: 'narrator', duration: 1.2 },
@@ -265,7 +276,7 @@ describe('loadPart', () => {
       id: 'act1',
       dialog: 'ok',
       clipsPath: 'audio/act1',
-      lockPath: 'tts/act1/narration.lock.json',
+      lockPath: 'content-studio/narration/act1.lock.json',
       problems: [],
     })
     expect(part.lines.map((l) => [l.key, l.status])).toEqual([
@@ -290,7 +301,7 @@ describe('loadPart', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': '[not json',
-      'tts/act1/cues.json': { a: '[softly]' },
+      'content-studio/narration/act1.edits.json': { a: '[softly]' },
     })
     const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     if (!result?.ok) throw new Error('expected the part to load')
@@ -303,7 +314,10 @@ describe('loadPart', () => {
 
 describe('loadPart, a dialog that is gone', () => {
   const entry = { file: 'a.mp3', speaker: 'narrator' }
-  const base = { 'content-studio.json': projectJson(), 'tts/cast.json': { speakers: {} } }
+  const base = {
+    'content-studio.json': projectJson(),
+    'content-studio/narration/cast.json': { speakers: {} },
+  }
   const load = async (files: Record<string, unknown>) => {
     const root = tempRepo(files)
     const result = await loadPart(join(root, 'content-studio.json'), 'act1')
@@ -315,7 +329,7 @@ describe('loadPart, a dialog that is gone', () => {
     const part = await load({
       ...base,
       'audio/act1/manifest.json': { a: entry, b: entry },
-      'tts/act1/cues.json': { a: '[softly]' },
+      'content-studio/narration/act1.edits.json': { a: '[softly]' },
     })
     expect([part.dialog, part.recorded]).toEqual(['gone', { clips: 2, cues: 1 }])
     expect([part.orphans, part.orphanCues, part.lines]).toEqual([[], [], []])
@@ -326,7 +340,9 @@ describe('loadPart, a dialog that is gone', () => {
       clips: 1,
       cues: 0,
     })
-    expect((await load({ ...base, 'tts/act1/cues.json': { a: 'x' } })).recorded).toEqual({
+    expect(
+      (await load({ ...base, 'content-studio/narration/act1.edits.json': { a: 'x' } })).recorded,
+    ).toEqual({
       clips: 0,
       cues: 1,
     })
@@ -353,13 +369,9 @@ describe('loadPart, a dialog that is gone', () => {
       languages: ['en', 'sv'],
       narration: {
         ...(projectJson().narration as object),
-        paths: {
-          dialog: 'tts/{part}/{language}/script.json',
-          cues: 'tts/{part}/{language}/cues.json',
-          lock: 'tts/{part}/{language}/narration.lock.json',
-          clips: 'audio/{part}/{language}',
-          manifest: 'audio/{part}/{language}/manifest.json',
-        },
+        from: { part: 'tts/{part}/{language}/script.json' },
+        clips: 'audio/{part}/{language}',
+        manifest: 'audio/{part}/{language}/manifest.json',
       },
     }
     const root = tempRepo({
@@ -396,7 +408,7 @@ describe('loadPart, a dialog that is gone', () => {
 describe('adoptPart', () => {
   const files = {
     'content-studio.json': projectJson(),
-    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'content-studio/narration/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': script,
     'audio/act1/manifest.json': { a: { file: 'a.mp3' } },
     'audio/act1/a.mp3': 'audio',
@@ -406,8 +418,14 @@ describe('adoptPart', () => {
     const root = tempRepo(files)
     const projectFile = join(root, 'content-studio.json')
     const result = await adoptPart(projectFile, 'act1', new Date('2026-10-23T12:00:00Z'))
-    expect(result).toEqual({ ok: true, adopted: 1, lockPath: 'tts/act1/narration.lock.json' })
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(result).toEqual({
+      ok: true,
+      adopted: 1,
+      lockPath: 'content-studio/narration/act1.lock.json',
+    })
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock.a).toMatchObject({ voice: 'v1', adopted: true, at: '2026-10-23T12:00:00.000Z' })
     const after = await loadPart(projectFile, 'act1')
     expect(after?.ok && after.part.lines[0]!.status).toBe('ok')
@@ -417,23 +435,25 @@ describe('adoptPart', () => {
     const root = tempRepo({ ...files, 'audio/act1/manifest.json': {} })
     const result = await adoptPart(join(root, 'content-studio.json'), 'act1')
     expect(result).toMatchObject({ ok: true, adopted: 0 })
-    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/narration/act1.lock.json'))).toBe(false)
   })
 
   it('refuses while a file of the part is broken', async () => {
-    const root = tempRepo({ ...files, 'tts/act1/narration.lock.json': '{ broken' })
+    const root = tempRepo({ ...files, 'content-studio/narration/act1.lock.json': '{ broken' })
     const result = await adoptPart(join(root, 'content-studio.json'), 'act1')
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
-      'tts/act1/narration.lock.json',
+      'content-studio/narration/act1.lock.json',
     )
-    expect(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8')).toBe('{ broken')
+    expect(readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8')).toBe(
+      '{ broken',
+    )
   })
 })
 
 describe('review fixes', () => {
   const files = {
     'content-studio.json': projectJson(),
-    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'content-studio/narration/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': script,
     'audio/act1/manifest.json': { a: { file: 'a.mp3' }, b: { file: 'b.mp3' } },
     'audio/act1/a.mp3': 'audio',
@@ -442,9 +462,11 @@ describe('review fixes', () => {
   it('keeps fields it does not know on existing lock entries when adopting', async () => {
     const root = tempRepo({
       ...files,
-      'tts/cast.json': { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } },
+      'content-studio/narration/cast.json': {
+        speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } },
+      },
       'audio/act1/b.mp3': 'audio',
-      'tts/act1/narration.lock.json': {
+      'content-studio/narration/act1.lock.json': {
         a: {
           fp: 'x',
           voice: 'v1',
@@ -457,7 +479,9 @@ describe('review fixes', () => {
     })
     const result = await adoptPart(join(root, 'content-studio.json'), 'act1')
     expect(result).toMatchObject({ ok: true, adopted: 1 })
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock.a.future).toBe(42)
   })
 
@@ -477,7 +501,7 @@ describe('review fixes', () => {
     const elevenFinal = projectJson({
       narration: {
         ...(projectJson().narration as object),
-        elevenlabs: { models: { final: 'eleven_multilingual_v2' } },
+        models: { elevenlabs: { final: 'eleven_multilingual_v2' } },
       },
     })
     // A project whose ElevenLabs stages differ, but whose part has Fish voices alone.
@@ -496,7 +520,7 @@ describe('review fixes', () => {
     const root = tempRepo({
       ...files,
       'content-studio.json': elevenFinal,
-      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1' } } },
+      'content-studio/narration/cast.json': { speakers: { narrator: { voice: 'eleven:g1' } } },
     })
     const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(result?.ok && result.part.stages).toEqual({
@@ -562,20 +586,12 @@ describe('projectFileProblem', () => {
 })
 
 describe('a part in several languages', () => {
-  const paths = {
-    dialog: 'tts/{part}/{language}/script.json',
-    cues: 'tts/{part}/{language}/cues.json',
-    lock: 'tts/{part}/{language}/narration.lock.json',
-    clips: 'audio/{part}/{language}',
-    manifest: 'audio/{part}/{language}/manifest.json',
-  }
   function project(languages: string[]) {
-    const base = projectJson()
-    return { ...base, languages, narration: { ...(base.narration as object), paths } }
+    return { ...projectJson(), languages, narration: narrationInLanguages() }
   }
   const files = {
     'content-studio.json': project(['en', 'sv', 'de']),
-    'tts/cast.json': {
+    'content-studio/narration/cast.json': {
       speakers: {
         narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } },
         mira: { voice: 'v2', languages: { sv: { voice: 'v2-sv' } } },
@@ -610,15 +626,16 @@ describe('a part in several languages', () => {
 
   it('plans a language with the voices cast for it, not the source language’s', async () => {
     const cast = { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } }
-    const { part } = await open('sv', 'act1', { 'tts/cast.json': cast })
+    const { part } = await open('sv', 'act1', { 'content-studio/narration/cast.json': cast })
     expect(part.lines.map((l) => [l.key, l.status])).toEqual([
       ['a', 'uncast'],
       ['b', 'untranslated'],
       ['z', 'uncast'],
     ])
-    expect((await open('en', 'act1', { 'tts/cast.json': cast })).part.lines[0]?.status).toBe(
-      'missing',
-    )
+    expect(
+      (await open('en', 'act1', { 'content-studio/narration/cast.json': cast })).part.lines[0]
+        ?.status,
+    ).toBe('missing')
   })
 
   it('reads every language’s dialog into the summary, a missing one is no problem', async () => {
@@ -660,13 +677,13 @@ describe('a part in several languages', () => {
 
   it('has a line follow the source language’s cue until it has its own', async () => {
     const { part } = await open('sv', 'act1', {
-      'tts/cast.json': {
+      'content-studio/narration/cast.json': {
         speakers: {
           narrator: { voice: 'v1', style: '[warm]', languages: { sv: { voice: 'v1-sv' } } },
         },
       },
-      'tts/act1/en/cues.json': { a: '[worried]', b: '[soft]' },
-      'tts/act1/sv/cues.json': { b: '[mjukt]', gone: '[x]' },
+      'content-studio/narration/act1.edits.json': { a: '[worried]', b: '[soft]' },
+      'content-studio/narration/act1.sv.edits.json': { b: '[mjukt]', gone: '[x]' },
     })
     const by = Object.fromEntries(part.lines.map((l) => [l.key, [l.cue, l.cueFrom]]))
     expect(by.a).toEqual(['[worried]', 'source'])
@@ -688,11 +705,11 @@ describe('a part in several languages', () => {
     const { fp, parts } = fingerprint(inputs)
     const made = { a: { fp, voice: 'v1-sv', model: inputs.model, parts, at: 'then' } }
     const { part } = await open('sv', 'act1', {
-      'tts/cast.json': {
+      'content-studio/narration/cast.json': {
         speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } } },
       },
-      'tts/act1/sv/narration.lock.json': made,
-      'tts/act1/en/cues.json': { a: '[worried]' },
+      'content-studio/narration/act1.sv.lock.json': made,
+      'content-studio/narration/act1.edits.json': { a: '[worried]' },
     })
     expect(part.lines.find((l) => l.key === 'a')).toMatchObject({
       status: 'stale',
@@ -706,10 +723,7 @@ describe('a part in several languages', () => {
       ...project(['en', 'sv', 'de']),
       narration: {
         ...narration,
-        quality: {
-          soundAlike: [['Lyra', 'Lira']],
-          soundAlikeByLanguage: { sv: [['Lyria', 'Liria']] },
-        },
+        generate: { soundAlike: { en: [['Lyra', 'Lira']], sv: [['Lyria', 'Liria']] } },
       },
     }
     const root = tempRepo({ ...files, 'content-studio.json': withGroups })

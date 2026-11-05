@@ -82,24 +82,16 @@ export async function saveProject(
  * the groups would be written by hand: every save of the file lays it out the same way.
  */
 export function projectJson(raw: unknown, indent: string): string {
-  const quality = (
-    raw as {
-      narration?: {
-        quality?: { soundAlike?: unknown; soundAlikeByLanguage?: Record<string, unknown> }
-      }
-    }
-  ).narration?.quality
-  // Every list of groups in the file, the source language's and each language's, by where it is.
+  const table = (raw as { narration?: { generate?: { soundAlike?: unknown } } }).narration?.generate
+    ?.soundAlike
+  // Every language's list of groups in the file.
   const lists: { get: () => unknown; set: (value: unknown) => void }[] = []
-  if (quality && Array.isArray(quality.soundAlike)) {
-    lists.push({ get: () => quality.soundAlike, set: (v) => (quality.soundAlike = v) })
-  }
-  const byLanguage = quality?.soundAlikeByLanguage
-  for (const language of byLanguage && typeof byLanguage === 'object'
-    ? Object.keys(byLanguage)
-    : []) {
-    if (Array.isArray(byLanguage![language])) {
-      lists.push({ get: () => byLanguage![language], set: (v) => (byLanguage![language] = v) })
+  if (table !== null && typeof table === 'object') {
+    const byLanguage = table as Record<string, unknown>
+    for (const language of Object.keys(byLanguage)) {
+      if (Array.isArray(byLanguage[language])) {
+        lists.push({ get: () => byLanguage[language], set: (v) => (byLanguage[language] = v) })
+      }
     }
   }
   const mark = (list: number, i: number) => `\u0000group ${list}.${i}`

@@ -17,6 +17,8 @@ import {
 } from '../core/planner'
 import {
   CACHE_DIR,
+  CAST_FILE,
+  narrationFile,
   OLD_CACHE_DIR,
   OLD_PROJECT_FILE,
   OLD_STATE_DIR,
@@ -197,7 +199,7 @@ export async function loadWorkspace(projectFile: string): Promise<
   const { project } = opened
   const problems: Problem[] = []
 
-  const cast = await readCast(root, project, problems)
+  const cast = await readCast(root, problems)
   const dialogs: Record<string, DialogState> = {}
   for (const part of project.parts) {
     dialogs[part.id] = await readDialog(root, project, part, problems)
@@ -355,10 +357,10 @@ export async function loadPart(
       ...read.paths,
       language: read.language,
       languages,
-      minHeard: project.narration.quality.minHeard,
-      chunkLimit: project.narration.quality.chunkLimit,
-      sceneCueSpeakers: project.narration.sceneCueSpeakers,
-      draftModel: project.narration.models.draft,
+      minHeard: project.narration.generate.minHeard,
+      chunkLimit: project.narration.generate.chunkLimit,
+      sceneCueSpeakers: project.narration.generate.sceneCueSpeakers,
+      draftModel: project.narration.models.fish.draft,
       stages: {
         draft: stageWords(project.narration, 'draft', eleven),
         final: stageWords(project.narration, 'final', eleven),
@@ -420,7 +422,7 @@ export async function clipFile(
   if (!project.parts.some((p) => p.id === partId) || file.startsWith('.')) return null
   const folder = resolveInRoot(
     dirname(projectFile),
-    partPathFor(narration.paths.clips, partId, declaredLanguage(project, language)),
+    partPathFor(narration.clips, partId, declaredLanguage(project, language)),
   )
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
@@ -505,9 +507,11 @@ export async function readPart(
   if (!part) return null
 
   const problems: Problem[] = []
-  const templates = project.narration.paths
+  const { narration } = project
   const language = declaredLanguage(project, asked)
   const at = (template: string) => partPathFor(template, part.id, language)
+  const editsPath = narrationFile(project, part.id, language, 'edits')
+  const lockPath = narrationFile(project, part.id, language, 'lock')
 
   const dialog = await readDialog(root, project, part, problems, language)
   // Another language is shown beside the source language's lines, so those are read too.
@@ -518,13 +522,13 @@ export async function readPart(
       : null
   if (source?.status === 'missing' || source?.status === 'gone') {
     problems.push({
-      file: partPathFor(templates.dialog, part.id, sourceLanguage),
+      file: partPathFor(narration.from.part, part.id, sourceLanguage),
       path: '',
       message: `the ${languageName(sourceLanguage)} dialog is missing, so lines cannot be matched with it`,
     })
   }
-  const cast = await readCast(root, project, problems)
-  const ownCues = usable(await readResource(root, at(templates.cues), CuesSchema, problems)) ?? {}
+  const cast = await readCast(root, problems)
+  const ownCues = usable(await readResource(root, editsPath, CuesSchema, problems)) ?? {}
   // Another language follows the source language's opening cue for a line until it has one of its
   // own; the cues inside a source line stay with it.
   const sourceEntries =
@@ -533,7 +537,7 @@ export async function readPart(
       : (usable(
           await readResource(
             root,
-            partPathFor(templates.cues, part.id, sourceLanguage),
+            narrationFile(project, part.id, sourceLanguage, 'edits'),
             CuesSchema,
             problems,
           ),
@@ -544,11 +548,11 @@ export async function readPart(
     sourceEntries,
     source?.status === 'ok' ? source.lines : [],
   )
-  const lock = usable(await readResource(root, at(templates.lock), LockSchema, problems))
+  const lock = usable(await readResource(root, lockPath, LockSchema, problems))
   const manifest = usable(
-    await readResource(root, at(templates.manifest), ManifestSchema, problems),
+    await readResource(root, at(narration.manifest), ManifestSchema, problems),
   )
-  const files = await listFiles(resolveInRoot(root, at(templates.clips)))
+  const files = await listFiles(resolveInRoot(root, at(narration.clips)))
 
   return {
     ok: true,
@@ -583,11 +587,11 @@ export async function readPart(
       held: dialog.status === 'invalid' || dialog.status === 'gone',
     },
     paths: {
-      dialogPath: at(templates.dialog),
-      cuesPath: at(templates.cues),
-      clipsPath: at(templates.clips),
-      lockPath: at(templates.lock),
-      manifestPath: at(templates.manifest),
+      dialogPath: at(narration.from.part),
+      cuesPath: editsPath,
+      clipsPath: at(narration.clips),
+      lockPath,
+      manifestPath: at(narration.manifest),
     },
     problems,
   }
@@ -599,8 +603,8 @@ function usable<T>(read: T | 'missing' | 'invalid'): T | null {
 }
 
 /** The project's cast: empty if there is none yet, null (with the problem added) if it is broken. */
-async function readCast(root: string, project: Project, problems: Problem[]): Promise<Cast | null> {
-  const read = await readResource(root, project.narration.characters, CastSchema, problems)
+async function readCast(root: string, problems: Problem[]): Promise<Cast | null> {
+  const read = await readResource(root, CAST_FILE, CastSchema, problems)
   if (read === 'invalid') return null
   return read === 'missing' ? { speakers: {}, pronounce: {} } : read
 }
@@ -612,16 +616,16 @@ async function readDialog(
   problems: Problem[],
   language: string = project.languages[0]!,
 ): Promise<DialogState> {
-  const path = partPathFor(project.narration.paths.dialog, part.id, language)
+  const path = partPathFor(project.narration.from.part, part.id, language)
   const read = await readResource(root, path, DialogSchema, problems)
   if (read === 'invalid') return { status: 'invalid' }
   if (read !== 'missing') return { status: 'ok', lines: read }
   // No file: gone if recordings were made with it, so they are held and not orphaned.
-  const templates = project.narration.paths
-  const at = (template: string) => partPathFor(template, part.id, language)
   const quiet: Problem[] = []
-  const clips = usable(await readResource(root, at(templates.manifest), ManifestSchema, quiet))
-  const cues = usable(await readResource(root, at(templates.cues), CuesSchema, quiet))
+  const manifest = partPathFor(project.narration.manifest, part.id, language)
+  const clips = usable(await readResource(root, manifest, ManifestSchema, quiet))
+  const edits = narrationFile(project, part.id, language, 'edits')
+  const cues = usable(await readResource(root, edits, CuesSchema, quiet))
   const recorded = { clips: Object.keys(clips ?? {}).length, cues: Object.keys(cues ?? {}).length }
   return recorded.clips || recorded.cues ? { status: 'gone', ...recorded } : { status: 'missing' }
 }
@@ -657,14 +661,16 @@ export async function openProject(
 /** Every path the project file names, with its JSON path, for the outside-the-root check. */
 function projectPaths(project: Project): [string, string][] {
   const { narration } = project
-  const paths: [string, string][] = [
-    ['env', project.env],
-    ['narration.characters', narration.characters],
+  const paths: [string, string][] = [['env', project.env]]
+  const templates: [string, string][] = [
+    ['narration.from.part', narration.from.part],
+    ['narration.clips', narration.clips],
+    ['narration.manifest', narration.manifest],
   ]
-  for (const [name, template] of Object.entries(narration.paths)) {
+  for (const [name, template] of templates) {
     for (const part of project.parts) {
       for (const language of project.languages) {
-        paths.push([`narration.paths.${name}`, partPathFor(template, part.id, language)])
+        paths.push([name, partPathFor(template, part.id, language)])
       }
     }
   }

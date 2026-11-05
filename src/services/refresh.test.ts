@@ -23,7 +23,7 @@ function project(part?: string) {
   const json = projectJson(part === undefined ? {} : { refresh: { part: forPart(part) } })
   return {
     'content-studio.json': json,
-    'tts/cast.json': { speakers: {}, pronounce: {} },
+    'content-studio/narration/cast.json': { speakers: {}, pronounce: {} },
     'tts/act1/script.json': before,
   }
 }
@@ -176,7 +176,7 @@ describe('refreshing the music lists', () => {
     const json = projectJson({ music: music(), refresh: { part: forPart(command), shared } })
     return {
       'content-studio.json': json,
-      'tts/cast.json': { speakers: {}, pronounce: {} },
+      'content-studio/narration/cast.json': { speakers: {}, pronounce: {} },
       'tts/act1/script.json': before,
       ...files,
     }

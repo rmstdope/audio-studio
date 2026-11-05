@@ -91,13 +91,13 @@ export async function checkSetup(
     ffmpeg: machine.which('ffmpeg'),
     uv: machine.which('uv'),
     appleSilicon: machine.platform === 'darwin' && machine.arch === 'arm64',
-    transcriber: narration.quality.transcriber,
-    whisperModel: narration.quality.whisperModel,
+    transcriber: narration.generate.transcriber,
+    whisperModel: narration.generate.whisperModel,
     envPath: project.env,
     key,
     fish: fishAnswer,
     refreshPart: Boolean(project.refresh?.part),
-    parallel: narration.quality.parallel,
+    parallel: narration.generate.parallel,
     fishTier: (await readSettings(root, [])).fishTier ?? null,
     music: project.music
       ? {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { projectJson } from '../../test/helpers'
-import { ProjectSchema } from './project'
+import { DEFAULT_PHRASE, ProjectSchema } from './project'
 import { auditionText, takeKey } from './takes'
 import { ttsFor } from './resources'
 
@@ -10,9 +10,9 @@ const { narration } = project
 describe('auditionText', () => {
   it('uses the project’s phrase, in the character’s style, said as the cast asks', () => {
     const text = auditionText({ style: '[warm]' }, { Elior: 'El-ee-or' }, project)
-    expect(text.phrase).toBe(narration.audition.phrase)
+    expect(text.phrase).toBe(DEFAULT_PHRASE)
     expect(text.from).toBe('standard')
-    expect(text.spoken).toBe(`[warm] ${narration.audition.phrase}`)
+    expect(text.spoken).toBe(`[warm] ${DEFAULT_PHRASE}`)
     const named = auditionText(
       { style: '', audition: { phrase: 'Elior, come here.' } },
       { Elior: 'El-ee-or' },
@@ -33,7 +33,7 @@ describe('auditionText in another language', () => {
     languages: ['en', 'sv'],
     narration: {
       ...narration,
-      audition: { ...narration.audition, phrases: { sv: 'Kom in, barn.' } },
+      audition: { ...narration.audition, phrase: { sv: 'Kom in, barn.' } },
     },
   }
   const unphrased = { ...several, narration }
@@ -78,11 +78,16 @@ describe('auditionText in another language', () => {
 
 describe('takeKey', () => {
   it('differs for a character with its own speed', () => {
-    const own = { ...base, tts: ttsFor(narration.tts, { speed: 0.9 }) }
+    const own = { ...base, tts: ttsFor(narration.generate.fish, { speed: 0.9 }) }
     expect(takeKey(own)).not.toBe(takeKey(base))
   })
 
-  const base = { model: 's2.1-pro-free', voice: 'v1', spoken: '[warm] Hello.', tts: narration.tts }
+  const base = {
+    model: 's2.1-pro-free',
+    voice: 'v1',
+    spoken: '[warm] Hello.',
+    tts: narration.generate.fish,
+  }
 
   it('keeps a Fish take’s key as it was, so takes already cached are found', () => {
     expect(takeKey(base)).toBe('07a90e3cc871d96f')

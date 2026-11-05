@@ -10,7 +10,7 @@ import { startServer } from '../../../server/index'
 // voice that is a number.
 const root = tempRepo({})
 cpSync(join(import.meta.dir, '../../../../test/fixtures/sample'), root, { recursive: true })
-const castFile = join(root, 'tts/cast.json')
+const castFile = join(root, 'content-studio/narration/cast.json')
 const cast = JSON.parse(readFileSync(castFile, 'utf8')) as {
   speakers: Record<string, Record<string, unknown>>
 }

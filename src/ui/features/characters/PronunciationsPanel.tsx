@@ -28,9 +28,12 @@ export function PronunciationsPanel({
   table,
   castPath,
   language = null,
+  code,
 }: {
   table: Pronunciation[]
   castPath: string
+  /** The code of the language whose table this is, the source included. */
+  code: string
   /** A language besides the source, whose own table this is; null: the source language's. */
   language?: { id: string; name: string } | null
 }) {
@@ -181,7 +184,7 @@ export function PronunciationsPanel({
           problems={[
             {
               file: castPath,
-              path: language ? `languages.${language.id}.pronounce` : 'pronounce',
+              path: `pronounce.${code}`,
               message: tableProblem,
             },
           ]}

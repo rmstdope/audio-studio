@@ -29,7 +29,7 @@ const summary: ProjectSummary = {
   root: '/game',
   partLabel: 'Act',
   languages: [{ id: 'en', name: 'English' }],
-  charactersPath: 'tts/cast.json',
+  charactersPath: 'content-studio/narration/cast.json',
   parts: [],
   characters: [
     {

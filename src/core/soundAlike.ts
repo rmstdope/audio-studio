@@ -2,7 +2,7 @@
  * Common English words that sound the same, one group each, so Whisper writing one for another
  * ("in" for "inn", "weakly" for "weekly") still counts as heard (see `soundAlikes` in `align`).
  * Only words that sound the same in most accents; a project adds its own in
- * `narration.quality.soundAlike`.
+ * `narration.generate.soundAlike`.
  */
 export const SOUND_ALIKE: readonly (readonly string[])[] = [
   ['in', 'inn'],

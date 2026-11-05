@@ -7,7 +7,7 @@ import { loadPart } from './workspace'
 
 const files = {
   'content-studio.json': projectJson(),
-  'tts/cast.json': { speakers: { mira: { voice: 'v-m' } } },
+  'content-studio/narration/cast.json': { speakers: { mira: { voice: 'v-m' } } },
   'tts/act1/script.json': [
     { key: 'k1', speaker: 'mira', text: 'Welcome home.' },
     { key: 'k2', speaker: 'mira', text: 'Sit.' },
@@ -49,7 +49,7 @@ describe('setNote', () => {
     expect(await setNote(projectFile, 'act9', 'k1', 'x')).toBeNull()
     expect(await setNote(projectFile, 'act1', 'zz', 'x')).toBeNull()
     expect(existsSync(join(root, 'content-studio/cache'))).toBe(false)
-    expect(existsSync(join(root, 'tts/act1/cues.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/narration/act1.edits.json'))).toBe(false)
   })
 
   it('names a notes file that does not fit, shows none, and never writes over it', async () => {

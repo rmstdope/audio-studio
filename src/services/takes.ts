@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import {
   CACHE_DIR,
+  CAST_FILE,
   declaredLanguage,
   FREE_MODELS,
   phraseProblem,
@@ -116,7 +117,7 @@ export interface TakeOptions extends ElevenTakeOptions {
 /**
  * Has `voiceId` say the character's audition phrase, in its style, and keeps the audio in the tool
  * cache. A take already recorded is not recorded again (and costs nothing), and requests for the
- * same take share one recording; at most `quality.parallel` are recorded at once. See `TakeOptions`
+ * same take share one recording; at most `generate.parallel` are recorded at once. See `TakeOptions`
  * for the model.
  */
 export async function recordTake(
@@ -132,7 +133,7 @@ export async function recordTake(
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
   const { project, cast, summary } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
 
   const root = dirname(projectFile)
   const {
@@ -144,20 +145,18 @@ export async function recordTake(
     return { ok: false, reason: 'no-phrase', message: 'There is no audition phrase to record.' }
   }
   // A phrase edited into the cast by hand is checked too: never pay for a take that is too long.
-  const tooLong = phraseProblem(text.phrase, project.narration.quality.chunkLimit)
+  const tooLong = phraseProblem(text.phrase, project.narration.generate.chunkLimit)
   if (tooLong) {
     const source = language === project.languages[0]
     const where =
       text.from === 'own'
         ? phrasePath(characterId, source ? undefined : language)
-        : source
-          ? 'narration.audition.phrase'
-          : `narration.audition.phrases.${language}`
-    const file = text.from === 'own' ? project.narration.characters : basename(projectFile)
+        : `narration.audition.phrase.${language}`
+    const file = text.from === 'own' ? CAST_FILE : basename(projectFile)
     return { ok: false, problems: [{ file, path: where, message: tooLong }] }
   }
   const character = seen.speakers[characterId]
-  const tts = ttsFor(project.narration.tts, character)
+  const tts = ttsFor(project.narration.generate.fish, character)
   if (providerOf(voiceId) === 'elevenlabs') {
     return speakEleven(projectFile, project, voiceId, tts, options, {
       kind: options.board ? 'audition' : 'take',
@@ -166,7 +165,7 @@ export async function recordTake(
       ...pageText(text, seen, characterId),
     })
   }
-  const model = options.board ? project.narration.models.audition : FREE_MODELS[0]
+  const model = options.board ? project.narration.models.fish.audition : FREE_MODELS[0]
   return speak(root, project, voiceId, text.spoken, tts, model, fishFor, limiter, options)
 }
 
@@ -192,7 +191,7 @@ export async function tryLine(
   if (!read || !read.ok) return read
   // Only the cast is needed besides the dialog (a line of a broken dialog is not found): a broken
   // manifest or lock, which the lines page lists lines under, does not stop a try.
-  const problems = castProblems(read.project, read.problems)
+  const problems = castProblems(read.problems)
   if (problems.length) return { ok: false, problems }
   const line = read.input.lines.find((l) => l.key === key)
   if (!line) return null
@@ -247,7 +246,7 @@ export async function tryLine(
     const inside = withInside(inputs.inside, at, normalizeCue(cue))
     spoken = spokenPieces(line.text, inputs.cue, cast.pronounce, Infinity, inside)[0]!
   }
-  const tts = ttsFor(read.project.narration.tts, character)
+  const tts = ttsFor(read.project.narration.generate.fish, character)
   if (providerOf(character.voice) === 'elevenlabs') {
     const bare = spokenPieces(line.text, '', cast.pronounce, Infinity)[0]!
     return speakEleven(projectFile, read.project, character.voice, tts, eleven, {
@@ -282,13 +281,13 @@ async function speak(
   project: Project,
   voice: string,
   spoken: string,
-  tts: Project['narration']['tts'],
+  tts: Project['narration']['generate']['fish'],
   model: string,
   fishFor: FishFactory,
   limiter: Limiter,
   options: TakeOptions = {},
 ): Promise<TakeResult> {
-  const { quality } = project.narration
+  const { generate } = project.narration
   const key = takeKey({ model, voice, spoken, tts })
   const file = resolveInRoot(root, takePath(key))
   const recorded = { ok: true as const, key, spoken }
@@ -313,7 +312,7 @@ async function speak(
   let waits: string | null = null
   let ended = false
   try {
-    const cached = await limiter.run(key, quality.parallel, async () => {
+    const cached = await limiter.run(key, generate.parallel, async () => {
       // Another request may have recorded it while this one waited: never pay for it twice.
       if (existsSync(file)) return true
       // Charged now, as late as it can be: the budget may have been spent while this one waited.
@@ -408,7 +407,7 @@ async function speakEleven(
   projectFile: string,
   project: Project,
   voice: string,
-  tts: Project['narration']['tts'],
+  tts: Project['narration']['generate']['fish'],
   options: ElevenTakeOptions & Pick<TakeOptions, 'credits' | 'open' | 'flight' | 'speakAs'>,
   text: ElevenText,
 ): Promise<TakeResult> {
@@ -417,7 +416,7 @@ async function speakEleven(
   const { model, spoken, key, cues } = elevenTake(project, voice, tts, text, text.language)
   // `asked` is the text as the page shows it, by which it knows the take for its own.
   const said = { model, cuesLeftOut: !cues && text.cued, asked: text.withCues }
-  const settings = narration.elevenlabs.tts
+  const settings = narration.generate.elevenlabs
   const file = resolveInRoot(root, takePath(key))
   if (existsSync(file)) return { ok: true, key, spoken, cached: true, ...said }
   const slow = speedProblem(tts.speed)
@@ -452,7 +451,7 @@ async function speakEleven(
   const run = () =>
     limiter.run(
       key,
-      requestsAtOnce(narration.quality.parallel, voice),
+      requestsAtOnce(narration.generate.parallel, voice),
       async (): Promise<Outcome> => {
         ran = true
         // Another request may have made it while this one waited: never pay for it twice.
@@ -550,7 +549,7 @@ export async function auditionTakes(
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
   const { project, cast, summary } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const seen = auditionIn(project, cast, summary, characterId, asked)
   return {
     ok: true,
@@ -606,7 +605,7 @@ export function recordedTakes(
   characterId: string,
   text: AuditionText,
   voiceIds: string[],
-  model: string = project.narration.models.audition,
+  model: string = project.narration.models.fish.audition,
   language: string = project.languages[0]!,
 ): Record<string, string> {
   const takes: Record<string, string> = {}
@@ -625,8 +624,8 @@ export async function takeFile(projectFile: string, key: string): Promise<string
 }
 
 /** The problems of the cast file, out of all the project's. */
-export function castProblems(project: Project, problems: Problem[]): Problem[] {
-  return problems.filter((problem) => problem.file === project.narration.characters)
+export function castProblems(problems: Problem[]): Problem[] {
+  return problems.filter((problem) => problem.file === CAST_FILE)
 }
 
 /** Where a character's own phrase is in the cast, as a problem path. */
@@ -652,8 +651,7 @@ function takeOf(
   model: string,
   language: string,
 ): string {
-  const { tts } = project.narration
-  const settings = ttsFor(tts, cast.speakers[characterId])
+  const settings = ttsFor(project.narration.generate.fish, cast.speakers[characterId])
   if (providerOf(voice) === 'elevenlabs') {
     // An ElevenLabs voice's page take, as `speakEleven` keeps it.
     return elevenTake(project, voice, settings, pageText(text, cast, characterId), language).key
@@ -691,7 +689,7 @@ export function elevenPageTake(
   voice: string,
   language: string,
 ): { model: string; credits: number; cuesLeftOut: boolean } {
-  const tts = ttsFor(project.narration.tts, cast.speakers[characterId])
+  const tts = ttsFor(project.narration.generate.fish, cast.speakers[characterId])
   const page = pageText(text, cast, characterId)
   const { model, spoken, cues } = elevenTake(project, voice, tts, page, language)
   return { model, credits: elevenCredits(model, spoken)!, cuesLeftOut: !cues && page.cued }
@@ -705,12 +703,12 @@ export function elevenPageTake(
 function elevenTake(
   project: Project,
   voice: string,
-  tts: Project['narration']['tts'],
+  tts: Project['narration']['generate']['fish'],
   { withCues, bare }: Pick<ElevenText, 'withCues' | 'bare'>,
   language: string,
 ): { model: string; spoken: string; key: string; cues: boolean } {
-  const { elevenlabs } = project.narration
-  const model = elevenlabs.models.audition
+  const { models, generate } = project.narration
+  const model = models.elevenlabs.audition
   const cues = readsCues(model)
   const spoken = cues ? withCues : bare
   const told = takesLanguage(model) ? { language } : {}
@@ -718,6 +716,6 @@ function elevenTake(
     model,
     spoken,
     cues,
-    key: takeKey({ model, voice, spoken, tts, eleven: elevenlabs.tts, ...told }),
+    key: takeKey({ model, voice, spoken, tts, eleven: generate.elevenlabs, ...told }),
   }
 }

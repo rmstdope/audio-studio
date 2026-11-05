@@ -181,7 +181,7 @@ export function planPart(input: PlanInput): PartState {
     const scene = line.scene ?? null
     const followsScene =
       scene !== null &&
-      narration.sceneCueSpeakers.includes(line.speaker) &&
+      narration.generate.sceneCueSpeakers.includes(line.speaker) &&
       openingFor(cues, line.key, line.text) === undefined
     if (line.text.trim() === '' && english !== null) {
       counts.untranslated++
@@ -247,7 +247,7 @@ export function planPart(input: PlanInput): PartState {
       )
     } else if (
       entry.heard !== undefined &&
-      entry.heard < narration.quality.minHeard &&
+      entry.heard < narration.generate.minHeard &&
       !entry.accepted
     )
       status = 'weak'

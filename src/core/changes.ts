@@ -1,5 +1,5 @@
 import { posix } from 'node:path'
-import { partPathFor, type Project } from './project'
+import { CAST_FILE, narrationFile, partPathFor, type Project } from './project'
 
 /** How git sees a changed file; a conflict is a merge left to resolve before committing. */
 export type ChangeKind = 'new' | 'modified' | 'deleted' | 'renamed' | 'conflict'
@@ -106,7 +106,7 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
           clips: `${normal(music.paths.clips)}/`,
         }
       : null,
-    own: [normal(projectPath), normal(narration.characters)],
+    own: [normal(projectPath), CAST_FILE],
     parts: project.parts.map((part) => {
       const at = (template: string, language: string) =>
         normal(partPathFor(template, part.id, language))
@@ -115,13 +115,13 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
         title: part.title,
         files: Object.fromEntries(
           project.languages.flatMap((language) => [
-            [at(narration.paths.dialog, language), 'dialog'],
-            [at(narration.paths.cues, language), 'cues'],
-            [at(narration.paths.lock, language), 'lock'],
-            [at(narration.paths.manifest, language), 'manifest'],
+            [at(narration.from.part, language), 'dialog'],
+            [narrationFile(project, part.id, language, 'edits'), 'cues'],
+            [narrationFile(project, part.id, language, 'lock'), 'lock'],
+            [at(narration.manifest, language), 'manifest'],
           ]),
         ),
-        clips: project.languages.map((language) => `${at(narration.paths.clips, language)}/`),
+        clips: project.languages.map((language) => `${at(narration.clips, language)}/`),
       }
     }),
   }

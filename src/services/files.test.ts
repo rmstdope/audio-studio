@@ -19,9 +19,9 @@ describe('formatEntriesPerLine', () => {
 describe('writeAtomic', () => {
   it('creates the folder, writes the file and leaves no temporary file', async () => {
     const root = tempRepo({})
-    await writeAtomic(root, 'tts/act1/narration.lock.json', '{}\n')
-    expect(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8')).toBe('{}\n')
-    expect(readdirSync(join(root, 'tts/act1'))).toEqual(['narration.lock.json'])
+    await writeAtomic(root, 'content-studio/narration/act1.lock.json', '{}\n')
+    expect(readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8')).toBe('{}\n')
+    expect(readdirSync(join(root, 'content-studio/narration'))).toEqual(['act1.lock.json'])
   })
 
   it('refuses to write outside the root', async () => {

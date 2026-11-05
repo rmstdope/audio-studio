@@ -43,7 +43,7 @@ export const CharacterSchema = z.looseObject({
   voice: z.string().min(1).optional(),
   voiceName: z.string().optional(),
   style: z.string().optional(),
-  /** The character's own speaking speed, in place of the project's `tts.speed`. */
+  /** The character's own speaking speed, in place of the project's `generate.fish.speed`. */
   speed: z.number().min(SPEED.min).max(SPEED.max).optional(),
   audition: z
     .looseObject({

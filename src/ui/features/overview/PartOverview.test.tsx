@@ -26,7 +26,7 @@ describe('the cast on a part’s overview', () => {
       cpSync(join(import.meta.dir, '../../../../test/fixtures/sample'), root, { recursive: true })
       breakDialog(join(root, 'tts/act1/sv/script.json'))
       // Both speakers cast in Svenska, as when the bug was seen, so a card would show how lines stand.
-      const castFile = join(root, 'tts/cast.json')
+      const castFile = join(root, 'content-studio/narration/cast.json')
       const cast = JSON.parse(readFileSync(castFile, 'utf8')) as {
         speakers: Record<string, Record<string, unknown>>
       }

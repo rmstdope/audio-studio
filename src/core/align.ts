@@ -53,7 +53,7 @@ export type SoundAlike = ReadonlyMap<string, string>
 /**
  * The words that sound the same in `language`: the numbers 0 to 99 as its words and as digits,
  * since Whisper writes "20" for "twenty" (`numberWords`), the built-in English groups
- * (`SOUND_ALIKE`) in English only, and `extra` ones (a project's `quality.soundAlike`), groups
+ * (`SOUND_ALIKE`) in English only, and `extra` ones (a project's `generate.soundAlike`), groups
  * that share a word joined into one ("two", "2", "to" and "too"). Each word maps to one word of
  * its group, the same for all, as `plain` writes them.
  */

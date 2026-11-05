@@ -13,10 +13,10 @@ import type { ProjectFailure } from './workspace'
 /** A switch of the retired model, or why nothing was written. */
 export type ModelsChange = { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure
 
-const PATH = 'narration.models'
+const PATH = 'narration.models.fish'
 
 /**
- * Moves the takes in `takes` from `s1` to `s2.1-pro` in the project file (`narration.models`).
+ * Moves the takes in `takes` from `s1` to `s2.1-pro` in the project file (`narration.models.fish`).
  * `takes` is what the page showed: if the file's models on s1 are any others, someone changed it
  * meanwhile and nothing is written. Only those keys change; the audition model, a model that is
  * not s1 and the rest of the file stay as they were, in its own indentation and line endings.
@@ -27,7 +27,7 @@ export function switchRetiredModels(projectFile: string, takes: Take[]): Promise
     const opened = await openProject(projectFile)
     if (!opened.ok) return opened
     const file = basename(projectFile)
-    const now = retiringTakes(opened.project.narration.models)
+    const now = retiringTakes(opened.project.narration.models.fish)
     if (now.length === 0 || now.join() !== [...takes].sort().join()) {
       return {
         ok: false,
@@ -40,8 +40,7 @@ export function switchRetiredModels(projectFile: string, takes: Take[]): Promise
         ],
       }
     }
-    const models = (opened.raw as { narration: { models: Record<string, unknown> } }).narration
-      .models
+    const models = within(within(rawNarration(opened.raw), 'models'), 'fish')
     for (const take of now) models[take] = REPLACEMENT_MODEL
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
@@ -50,7 +49,7 @@ export function switchRetiredModels(projectFile: string, takes: Take[]): Promise
 }
 
 /**
- * Saves the model one stage uses (`narration.models.<stage>` in the project file). `was` is the
+ * Saves the model one stage uses (`narration.models.fish.<stage>` in the project file). `was` is the
  * model the page showed: if the file names another, someone changed it meanwhile and nothing is
  * written. Only a model the studio has a price for is accepted, and not `s1`, which is going
  * away. A file that named no models gets all three written, as they were. The rest of the file
@@ -71,14 +70,18 @@ export function setStageModel(
       ok: false,
       problems: [{ file, path, message }],
     })
-    if (opened.project.narration.models[stage] !== was) {
+    if (opened.project.narration.models.fish[stage] !== was) {
       return refuse('the model in the file changed since the page was read; reload the studio')
     }
     if (!isPriced(model) || model === RETIRED_MODEL) {
       return refuse(`${model} is not a model the studio can switch to`)
     }
-    const narration = (opened.raw as { narration: { models?: Record<string, unknown> } }).narration
-    narration.models = { ...opened.project.narration.models, ...narration.models, [stage]: model }
+    const models = within(rawNarration(opened.raw), 'models')
+    models.fish = {
+      ...opened.project.narration.models.fish,
+      ...within(models, 'fish'),
+      [stage]: model,
+    }
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
     return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
@@ -204,7 +207,7 @@ export function setEffectModel(
 
 /**
  * Saves the ElevenLabs model one stage uses for characters with ElevenLabs voices
- * (`narration.elevenlabs.models.<stage>` in the project file). `was` is the model the page showed
+ * (`narration.models.elevenlabs.<stage>` in the project file). `was` is the model the page showed
  * (Eleven v3 when the file names none): if the file names another, someone changed it meanwhile
  * and nothing is written. Only ElevenLabs' speech models are accepted. A file that named no
  * ElevenLabs models gets all three written, as they were. The rest of the file stays as it was, in
@@ -220,7 +223,7 @@ export function setElevenModel(
     const opened = await openProject(projectFile)
     if (!opened.ok) return opened
     const file = basename(projectFile)
-    const path = `narration.elevenlabs.models.${stage}`
+    const path = `narration.models.elevenlabs.${stage}`
     const refuse = (message: string): ModelsChange => ({
       ok: false,
       problems: [{ file, path, message }],
@@ -228,15 +231,12 @@ export function setElevenModel(
     if (!isElevenModel(model)) {
       return refuse(`${model} is not an ElevenLabs speech model the studio knows`)
     }
-    const { elevenlabs } = opened.project.narration
-    if (elevenlabs.models[stage] !== was) {
+    const { elevenlabs } = opened.project.narration.models
+    if (elevenlabs[stage] !== was) {
       return refuse('the model in the file changed since the page was read; reload the studio')
     }
-    const narration = (opened.raw as { narration: { elevenlabs?: { models?: object } } }).narration
-    narration.elevenlabs = {
-      ...narration.elevenlabs,
-      models: { ...elevenlabs.models, ...narration.elevenlabs?.models, [stage]: model },
-    }
+    const models = within(rawNarration(opened.raw), 'models')
+    models.elevenlabs = { ...elevenlabs, ...within(models, 'elevenlabs'), [stage]: model }
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
     return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
@@ -244,7 +244,7 @@ export function setElevenModel(
 }
 
 /**
- * Saves the voice settings every ElevenLabs voice speaks with (`narration.elevenlabs.tts` in the
+ * Saves the voice settings every ElevenLabs voice speaks with (`narration.generate.elevenlabs` in the
  * project file), all three written. `was` is what the page showed (ElevenLabs' defaults when the
  * file names none): if the file holds others, someone changed it meanwhile and nothing is written.
  * Settings the project file does not take (a stability other than Eleven v3's three, or a
@@ -260,8 +260,8 @@ export function setElevenSettings(
     const opened = await openProject(projectFile)
     if (!opened.ok) return opened
     const file = basename(projectFile)
-    const path = 'narration.elevenlabs.tts'
-    const { tts: now } = opened.project.narration.elevenlabs
+    const path = 'narration.generate.elevenlabs'
+    const now = opened.project.narration.generate.elevenlabs
     if (!sameSettings(now, was)) {
       return {
         ok: false,
@@ -276,13 +276,30 @@ export function setElevenSettings(
     }
     // Nothing to change: the file stays as it is, without a section it never named.
     if (sameSettings(now, tts)) return { ok: true }
-    const narration = (opened.raw as { narration: { elevenlabs?: object } }).narration
-    narration.elevenlabs = {
-      ...narration.elevenlabs,
-      tts: { stability: tts.stability, similarityBoost: tts.similarityBoost, style: tts.style },
+    const generate = within(rawNarration(opened.raw), 'generate')
+    generate.elevenlabs = {
+      stability: tts.stability,
+      similarityBoost: tts.similarityBoost,
+      style: tts.style,
     }
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
     return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
   })
+}
+
+/** The project file's `narration` section as read, to change in place. */
+function rawNarration(raw: unknown): Record<string, unknown> {
+  return (raw as { narration: Record<string, unknown> }).narration
+}
+
+/** `parent[key]` as an object to change in place, made (and set) when the file has none. */
+function within(parent: Record<string, unknown>, key: string): Record<string, unknown> {
+  const value = parent[key]
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  const made: Record<string, unknown> = {}
+  parent[key] = made
+  return made
 }

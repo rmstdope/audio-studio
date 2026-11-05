@@ -16,16 +16,21 @@ export function projectJson(overrides: Record<string, unknown> = {}): Record<str
       { id: 'act2', title: 'Act II' },
     ],
     narration: {
-      characters: 'tts/cast.json',
-      paths: {
-        dialog: 'tts/{part}/script.json',
-        cues: 'tts/{part}/cues.json',
-        lock: 'tts/{part}/narration.lock.json',
-        clips: 'audio/{part}',
-        manifest: 'audio/{part}/manifest.json',
-      },
+      from: { part: 'tts/{part}/script.json' },
+      clips: 'audio/{part}',
+      manifest: 'audio/{part}/manifest.json',
     },
     ...overrides,
+  }
+}
+
+/** The narration section of a project in several languages, with `{language}` in every path. */
+export function narrationInLanguages(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    from: { part: 'tts/{part}/{language}/script.json' },
+    clips: 'audio/{part}/{language}',
+    manifest: 'audio/{part}/{language}/manifest.json',
+    ...extra,
   }
 }
 

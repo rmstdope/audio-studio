@@ -25,7 +25,7 @@ import {
 } from '../core/musicTake'
 import { FadesSchema, applyFades } from '../core/fades'
 import { readWav, writeWav } from '../core/wav'
-import { FishTierSchema } from '../core/project'
+import { CAST_FILE, FishTierSchema } from '../core/project'
 import { FISH_VOICE_ID, providerOf, VOICE_ID } from '../core/voices'
 import { finalStepFor, modelForStage, voicesOf } from '../core/elevenSpeech'
 import type { ElevenAnswer } from '../core/setup'
@@ -641,7 +641,7 @@ export function startServer({
     return opened.ok ? declaredLanguage(opened.project, languageOf(request)) : undefined
   }
 
-  /** Fish TTS requests (audition takes and lines alike): `quality.parallel` at a time, each once. */
+  /** Fish TTS requests (audition takes and lines alike): `generate.parallel` at a time, each once. */
   const fishWork = createLimiter()
   /** ElevenLabs' requests wait for each other only, never for Fish's. */
   const elevenWork = createLimiter()
@@ -953,7 +953,7 @@ export function startServer({
   /** The refusal to offer or remove voices while what is in use cannot be read, naming the files. */
   async function unknownUse(): Promise<Response> {
     const opened = await openProject(projectFile)
-    const cast = opened.ok ? opened.project.narration.characters : 'The cast'
+    const cast = opened.ok ? CAST_FILE : 'The cast'
     return Response.json(
       {
         ok: false,
@@ -1137,23 +1137,23 @@ export function startServer({
     }
     const pricing = {
       at: new Date(),
-      model: narration.models[stage],
+      model: narration.models.fish[stage],
       // What is sent: each piece of a line with its cue (for a model that reads cues) and the
       // cast's pronunciations.
       sent: (line: LineState) =>
         sentPieces(
           line,
-          elevenModelOf(line) ?? narration.models[stage],
+          elevenModelOf(line) ?? narration.models.fish[stage],
           pronounce,
-          narration.quality.chunkLimit,
+          narration.generate.chunkLimit,
         ),
-      takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
+      takes: narration.generate.transcriber === 'none' ? 1 : narration.generate.takes,
       elevenModelOf,
     }
     const plan = planGeneration(state, {
       ...pricing,
       speaker,
-      checked: narration.quality.transcriber !== 'none',
+      checked: narration.generate.transcriber !== 'none',
       includeWeak,
       final: stage === 'final',
     })
@@ -1168,10 +1168,10 @@ export function startServer({
       plan,
       model: pricing.model,
       // The stage's ElevenLabs model, which every ElevenLabs line of the part is recorded with.
-      elevenModel: narration.elevenlabs.models[stage],
+      elevenModel: narration.models.elevenlabs[stage],
       ceilingOf,
       creditsOf,
-      parallel: narration.quality.parallel,
+      parallel: narration.generate.parallel,
       stage,
       // Recording is in the source language.
       language: project.languages[0] ?? 'en',
@@ -2274,7 +2274,7 @@ export function startServer({
           putStageModel(
             request,
             request.params.stage,
-            'narration.elevenlabs.models',
+            'narration.models.elevenlabs',
             setElevenModel,
           ),
         ),
@@ -2328,7 +2328,7 @@ export function startServer({
           if (!body.success) {
             return Response.json({ error: 'expected { tts, was }' }, { status: 400 })
           }
-          const busy = await busyRefusal('narration.elevenlabs.tts')
+          const busy = await busyRefusal('narration.generate.elevenlabs')
           if (busy) return busy
           const result = await setElevenSettings(projectFile, body.data.tts, body.data.was)
           return Response.json(result, { status: result.ok ? 200 : 409 })

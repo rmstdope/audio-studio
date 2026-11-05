@@ -2,6 +2,7 @@ import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
 import { resolveInRoot } from '../core/paths'
 import {
+  CAST_FILE,
   declaredLanguage,
   FREE_MODELS,
   phraseProblem,
@@ -92,7 +93,7 @@ export async function findCandidates(
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
   // Without the cast the phrase, style and pronunciations are unknown: say so, don't guess.
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const fish = await fishFor(dirname(projectFile), project)
   const keywords = options.keywords ?? character.keywords
   const searching = keywords.length > 0 && options.search !== false
@@ -132,7 +133,7 @@ export async function findCandidates(
         ? await searchVoices(fish, keywords, {
             language,
             exclude,
-            parallel: project.narration.quality.parallel,
+            parallel: project.narration.generate.parallel,
           })
         : []
     const candidates = found.slice(0, CANDIDATE_LIMIT)
@@ -182,7 +183,7 @@ export function unknownVoice(id: string, name: string | null): Voice {
 
 /** The language a library is searched in for voices of `language`: the source language as the project says, another by its code. */
 export function searchLanguage(project: Project, language: string): string {
-  return language === project.languages[0] ? project.narration.audition.language : language
+  return language === project.languages[0] ? project.narration.audition.searchLanguage : language
 }
 
 /**
@@ -246,7 +247,7 @@ export async function characterVoice(
   const { project, summary, cast } = loaded
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const seen = auditionIn(project, cast, summary, characterId, asked)
   const { audition } = seen
   const language = searchLanguage(project, seen.language)
@@ -352,7 +353,7 @@ export function setStyle(
 
 /**
  * Saves a character's own speaking speed in the cast (its lines and takes are spoken at it instead
- * of the project's `tts.speed`); null removes it. Its recorded lines go stale. For a language other
+ * of the project's `generate.fish.speed`); null removes it. Its recorded lines go stale. For a language other
  * than the source language it is that language's own speed.
  */
 export function setSpeed(
@@ -392,10 +393,10 @@ export async function setPhrase(
   const { project } = loaded
   const { narration } = project
   const which = declaredLanguage(project, language)
-  const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
+  const tooLong = own ? phraseProblem(own, narration.generate.chunkLimit) : null
   if (tooLong) {
     const path = phrasePath(characterId, which === project.languages[0] ? undefined : which)
-    return { ok: false, problems: [{ file: narration.characters, path, message: tooLong }] }
+    return { ok: false, problems: [{ file: CAST_FILE, path, message: tooLong }] }
   }
   return updateCharacter(
     projectFile,
@@ -589,7 +590,7 @@ async function writeCast(
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
   const root = dirname(projectFile)
-  const path = opened.project.narration.characters
+  const path = CAST_FILE
 
   const json = await readJson(resolveInRoot(root, path))
   if (json.status === 'invalid') {

@@ -104,7 +104,7 @@ export async function modelsView(
           line.text,
           line.cue,
           input.cast.pronounce,
-          project.narration.quality.chunkLimit,
+          project.narration.generate.chunkLimit,
           line.inside,
         ).reduce((sum, text) => sum + encoder.encode(text).length, 0)
         dialog.lines++
@@ -116,10 +116,10 @@ export async function modelsView(
             line,
             made,
             input.cast.pronounce,
-            project.narration.quality.chunkLimit,
+            project.narration.generate.chunkLimit,
           )
           const { pronounce } = input.cast
-          const { chunkLimit } = project.narration.quality
+          const { chunkLimit } = project.narration.generate
           const count = (texts: string[]) => texts.reduce((sum, text) => sum + [...text].length, 0)
           const got = (recorded[made] ??= { lines: 0, bytes: 0, characters: 0, bare: 0 })
           got.lines++
@@ -135,9 +135,9 @@ export async function modelsView(
   return {
     ok: true,
     file: basename(projectFile),
-    models: project.narration.models,
-    elevenlabs: project.narration.elevenlabs.models,
-    elevenTts: project.narration.elevenlabs.tts,
+    models: project.narration.models.fish,
+    elevenlabs: project.narration.models.elevenlabs,
+    elevenTts: project.narration.generate.elevenlabs,
     castsEleven,
     dialog,
     recorded,

@@ -28,14 +28,11 @@
     "shared": "sh tools/refresh-shared.sh"
   },
   "narration": {
-    "characters": "tts/cast.json",
-    "paths": {
-      "dialog": "tts/{part}/{language}/script.json",
-      "cues": "tts/{part}/{language}/cues.json",
-      "lock": "tts/{part}/{language}/narration.lock.json",
-      "clips": "audio/narration/{part}/{language}",
-      "manifest": "audio/narration/{part}/{language}/manifest.json"
-    }
+    "from": {
+      "part": "tts/{part}/{language}/script.json"
+    },
+    "clips": "audio/narration/{part}/{language}",
+    "manifest": "audio/narration/{part}/{language}/manifest.json"
   },
   "music": {
     "paths": {

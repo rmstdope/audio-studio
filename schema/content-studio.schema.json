@@ -77,72 +77,42 @@
     "narration": {
       "type": "object",
       "properties": {
-        "characters": {
-          "type": "string",
-          "minLength": 1
-        },
-        "paths": {
+        "from": {
           "type": "object",
           "properties": {
-            "dialog": {
-              "type": "string"
-            },
-            "cues": {
-              "type": "string"
-            },
-            "lock": {
-              "type": "string"
-            },
-            "clips": {
-              "type": "string"
-            },
-            "manifest": {
+            "part": {
               "type": "string"
             }
           },
           "required": [
-            "dialog",
-            "cues",
-            "lock",
-            "clips",
-            "manifest"
+            "part"
           ],
           "additionalProperties": false
-        },
-        "sceneCueSpeakers": {
-          "default": [
-            "narrator"
-          ],
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
         },
         "models": {
           "default": {},
           "type": "object",
           "properties": {
-            "audition": {
-              "default": "s2.1-pro-free",
-              "type": "string"
+            "fish": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "audition": {
+                  "default": "s2.1-pro-free",
+                  "type": "string"
+                },
+                "draft": {
+                  "default": "s2.1-pro-free",
+                  "type": "string"
+                },
+                "final": {
+                  "default": "s2.1-pro-free",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             },
-            "draft": {
-              "default": "s2.1-pro-free",
-              "type": "string"
-            },
-            "final": {
-              "default": "s2.1-pro-free",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "elevenlabs": {
-          "default": {},
-          "type": "object",
-          "properties": {
-            "models": {
+            "elevenlabs": {
               "default": {},
               "type": "object",
               "properties": {
@@ -160,66 +130,6 @@
                 }
               },
               "additionalProperties": false
-            },
-            "tts": {
-              "default": {},
-              "type": "object",
-              "properties": {
-                "stability": {
-                  "default": 0.5,
-                  "anyOf": [
-                    {
-                      "type": "number",
-                      "const": 0
-                    },
-                    {
-                      "type": "number",
-                      "const": 0.5
-                    },
-                    {
-                      "type": "number",
-                      "const": 1
-                    }
-                  ]
-                },
-                "similarityBoost": {
-                  "default": 0.75,
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                "style": {
-                  "default": 0,
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "additionalProperties": false
-        },
-        "tts": {
-          "default": {},
-          "type": "object",
-          "properties": {
-            "temperature": {
-              "default": 0.7,
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "topP": {
-              "default": 0.7,
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "speed": {
-              "default": 1,
-              "type": "number",
-              "exclusiveMinimum": 0
             }
           },
           "additionalProperties": false
@@ -266,10 +176,70 @@
           },
           "additionalProperties": false
         },
-        "quality": {
+        "generate": {
           "default": {},
           "type": "object",
           "properties": {
+            "fish": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "temperature": {
+                  "default": 0.7,
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "topP": {
+                  "default": 0.7,
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "speed": {
+                  "default": 1,
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "elevenlabs": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "stability": {
+                  "default": 0.5,
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "const": 0
+                    },
+                    {
+                      "type": "number",
+                      "const": 0.5
+                    },
+                    {
+                      "type": "number",
+                      "const": 1
+                    }
+                  ]
+                },
+                "similarityBoost": {
+                  "default": 0.75,
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "style": {
+                  "default": 0,
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "additionalProperties": false
+            },
             "minHeard": {
               "default": 0.9,
               "type": "number",
@@ -308,18 +278,7 @@
               "minLength": 1
             },
             "soundAlike": {
-              "default": [],
-              "type": "array",
-              "items": {
-                "minItems": 2,
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "pattern": "^[^\\s,]*[\\p{L}\\p{N}][^\\s,]*(?: [^\\s,]*[\\p{L}\\p{N}][^\\s,]*)*$"
-                }
-              }
-            },
-            "soundAlikeByLanguage": {
+              "default": {},
               "type": "object",
               "propertyNames": {
                 "type": "string"
@@ -335,6 +294,16 @@
                   }
                 }
               }
+            },
+            "sceneCueSpeakers": {
+              "default": [
+                "narrator"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
           "additionalProperties": false
@@ -344,11 +313,7 @@
           "type": "object",
           "properties": {
             "phrase": {
-              "default": "Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.",
-              "type": "string",
-              "minLength": 1
-            },
-            "phrases": {
+              "default": {},
               "type": "object",
               "propertyNames": {
                 "type": "string"
@@ -364,17 +329,24 @@
               "minimum": 1,
               "maximum": 9007199254740991
             },
-            "language": {
+            "searchLanguage": {
               "default": "en",
               "type": "string"
             }
           },
           "additionalProperties": false
+        },
+        "clips": {
+          "type": "string"
+        },
+        "manifest": {
+          "type": "string"
         }
       },
       "required": [
-        "characters",
-        "paths"
+        "from",
+        "clips",
+        "manifest"
       ],
       "additionalProperties": false
     },

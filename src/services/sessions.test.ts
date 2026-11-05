@@ -87,7 +87,7 @@ const project = projectJson()
 
 const files = {
   'content-studio.json': project,
-  'tts/cast.json':
+  'content-studio/narration/cast.json':
     '{\n  "speakers": {\n' +
     '    "mira": { "voice": "cur", "style": "[low]", "audition": { "keywords": ["warm"] } },\n' +
     '    "tilda": { "voice": "t1" }\n' +
@@ -189,7 +189,7 @@ describe('startAudition, for a character cast with an ElevenLabs voice', () => {
   it('shows its voice as ElevenLabs knows it, and asks Fish nothing about it', async () => {
     const root = tempRepo({
       ...files,
-      'tts/cast.json': {
+      'content-studio/narration/cast.json': {
         speakers: { mira: { voice: 'eleven:g1', audition: { keywords: ['warm'] } } },
         pronounce: {},
       },
@@ -217,7 +217,7 @@ describe('startAudition, for a character cast with an ElevenLabs voice', () => {
   it('asks Fish nothing about it without an ElevenLabs client either', async () => {
     const root = tempRepo({
       ...files,
-      'tts/cast.json': {
+      'content-studio/narration/cast.json': {
         speakers: { mira: { voice: 'eleven:g1', audition: { keywords: ['warm'] } } },
         pronounce: {},
       },
@@ -521,7 +521,8 @@ describe('castOwnVoice', () => {
       stale: [{ part: 'act1', lines: 1 }],
     })
     expect(
-      JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira,
+      JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).speakers
+        .mira,
     ).toMatchObject({
       voice: 'mine',
       voiceName: 'My Mira',
@@ -566,7 +567,7 @@ describe('castVoice', () => {
       changed: true,
       stale: [{ part: 'act1', lines: 1 }],
     })
-    expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(
+    expect(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).toBe(
       '{\n  "speakers": {\n' +
         '    "mira": { "voice": "b", "voiceName": "Warm b", "style": "[low]", "audition": { "keywords": ["warm"] } },\n' +
         '    "tilda": { "voice": "t1" }\n' +
@@ -628,7 +629,7 @@ describe('castVoice', () => {
       castVoice(projectFile, 'mira', 'b'),
       setKeywords(projectFile, 'mira', ['old']),
     ])
-    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    const cast = JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8'))
     expect(cast.speakers.mira).toMatchObject({ voice: 'b', audition: { keywords: ['old'] } })
   })
 
@@ -665,7 +666,7 @@ describe('discardSession', () => {
     await discardSession(projectFile, 'mira')
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
     expect(readdirSync(join(root, 'content-studio/cache/auditions'))).toEqual([])
-    expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/narration/cast.json'))).toBe(true)
     expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
   })
 })
@@ -773,7 +774,7 @@ describe('the money of an audition', () => {
     ...files,
     'content-studio.json': {
       ...project,
-      narration: { ...(project.narration as object), models: { audition: 's2.1-pro' } },
+      narration: { ...(project.narration as object), models: { fish: { audition: 's2.1-pro' } } },
     },
   }
 
@@ -898,13 +899,9 @@ describe('an audition per language', () => {
       narration: {
         ...(base.narration as object),
         audition: { candidatesPerRound: 3 },
-        paths: {
-          dialog: 'tts/{part}/{language}/script.json',
-          cues: 'tts/{part}/{language}/cues.json',
-          lock: 'tts/{part}/{language}/narration.lock.json',
-          clips: 'audio/{part}/{language}',
-          manifest: 'audio/{part}/{language}/manifest.json',
-        },
+        from: { part: 'tts/{part}/{language}/script.json' },
+        clips: 'audio/{part}/{language}',
+        manifest: 'audio/{part}/{language}/manifest.json',
       },
     },
     'tts/act1/script.json': undefined,
@@ -929,7 +926,8 @@ describe('an audition per language', () => {
     if (!result?.ok) throw new Error(JSON.stringify(result))
     return { root, projectFile, session: result.session }
   }
-  const castFile = (root: string) => JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+  const castFile = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8'))
 
   it('counts the voices on an audition in another language as in use', async () => {
     const { projectFile, session } = await begin()
@@ -1061,7 +1059,7 @@ describe('voicesInUse', () => {
     // One of an earlier version is no audition in progress.
     writeFileSync(join(root, 'content-studio/cache/auditions', file!), '{"version": 1}')
     expect([...(await voicesInUse(projectFile))!].sort()).toEqual(['cur', 't1'])
-    const broken = tempRepo({ ...files, 'tts/cast.json': '{ not json' })
+    const broken = tempRepo({ ...files, 'content-studio/narration/cast.json': '{ not json' })
     expect(await voicesInUse(join(broken, 'content-studio.json'))).toBeNull()
   })
 

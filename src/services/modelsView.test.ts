@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { narrationInLanguages, projectJson, tempRepo } from '../../test/helpers'
 import { createImageHealth } from './imageHealth'
 import { modelsView } from './modelsView'
 
@@ -14,7 +14,7 @@ const entry = (model: string) => ({
 
 function project(models: Record<string, string>) {
   const json = projectJson()
-  ;(json.narration as Record<string, unknown>).models = models
+  ;(json.narration as Record<string, unknown>).models = { fish: models }
   return json
 }
 
@@ -24,7 +24,9 @@ describe('modelsView', () => {
   it('totals every line of every part, and what the recorded clips were made with', async () => {
     const root = tempRepo({
       'content-studio.json': project(models),
-      'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
+      'content-studio/narration/cast.json': {
+        speakers: { narrator: { voice: 'v1', style: '[warm]' } },
+      },
       'tts/act1/script.json': [
         { key: 'a', speaker: 'narrator', text: 'Once.' },
         { key: 'b', speaker: 'narrator', text: 'Twice.' },
@@ -32,7 +34,7 @@ describe('modelsView', () => {
       'tts/act2/script.json': [{ key: 'c', speaker: 'narrator', text: 'Thrice.' }],
       'audio/act1/a.mp3': 'x',
       'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
-      'tts/act1/narration.lock.json': { a: entry('s2.1-pro-free') },
+      'content-studio/narration/act1.lock.json': { a: entry('s2.1-pro-free') },
     })
     const view = await modelsView(join(root, 'content-studio.json'))
     if (!view.ok) throw new Error(JSON.stringify(view.problems))
@@ -48,9 +50,11 @@ describe('modelsView', () => {
   it('counts the cues inside a line in the bytes it sends', async () => {
     const files = (cues: object) => ({
       'content-studio.json': project(models),
-      'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
+      'content-studio/narration/cast.json': {
+        speakers: { narrator: { voice: 'v1', style: '[warm]' } },
+      },
       'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
-      'tts/act1/cues.json': cues,
+      'content-studio/narration/act1.edits.json': cues,
     })
     const bytes = async (cues: object) => {
       const view = await modelsView(join(tempRepo(files(cues)), 'content-studio.json'))
@@ -77,21 +81,15 @@ describe('modelsView', () => {
     const json = project(models)
     const narration = json.narration as Record<string, unknown>
     json.languages = ['en', 'sv']
-    narration.paths = {
-      dialog: 'tts/{part}/{language}/script.json',
-      cues: 'tts/{part}/{language}/cues.json',
-      lock: 'tts/{part}/{language}/narration.lock.json',
-      clips: 'audio/{part}/{language}',
-      manifest: 'audio/{part}/{language}/manifest.json',
-    }
+    Object.assign(narration, narrationInLanguages())
     const root = tempRepo({
       'content-studio.json': json,
-      'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+      'content-studio/narration/cast.json': { speakers: { narrator: { voice: 'v1' } } },
       'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
       'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'En gång.' }],
       'audio/act1/sv/a.mp3': 'x',
       'audio/act1/sv/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
-      'tts/act1/sv/narration.lock.json': { a: entry('drama-3') },
+      'content-studio/narration/act1.sv.lock.json': { a: entry('drama-3') },
     })
     const view = await modelsView(join(root, 'content-studio.json'))
     expect(view).toMatchObject({
@@ -181,11 +179,13 @@ describe('modelsView, with ElevenLabs', () => {
   it('gives ElevenLabs’ stage models, and the characters each model’s recorded lines were sent', async () => {
     const root = tempRepo({
       'content-studio.json': project(models),
-      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1', style: '[warm]' } } },
+      'content-studio/narration/cast.json': {
+        speakers: { narrator: { voice: 'eleven:g1', style: '[warm]' } },
+      },
       'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
       'audio/act1/a.mp3': 'x',
       'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
-      'tts/act1/narration.lock.json': { a: entry('eleven_v3') },
+      'content-studio/narration/act1.lock.json': { a: entry('eleven_v3') },
     })
     const view = await modelsView(join(root, 'content-studio.json'))
     if (!view.ok) throw new Error(JSON.stringify(view.problems))

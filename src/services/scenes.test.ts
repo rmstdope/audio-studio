@@ -14,7 +14,7 @@ const scenes = {
 async function load(files: Record<string, unknown>, section: unknown = scenes) {
   const root = tempRepo({
     'content-studio.json': projectJson(section === null ? {} : { scenes: section }),
-    'tts/cast.json': { speakers: {} },
+    'content-studio/narration/cast.json': { speakers: {} },
     ...files,
   })
   const loaded = await loadProject(join(root, 'content-studio.json'))
@@ -117,7 +117,7 @@ describe('saving a scene', () => {
   async function repo(mix?: unknown) {
     const root = tempRepo({
       'content-studio.json': projectJson({ scenes }),
-      'tts/cast.json': { speakers: {} },
+      'content-studio/narration/cast.json': { speakers: {} },
       'tts/act1/scenes.json': [store, other],
       ...(mix === undefined ? {} : { [MIX]: mix }),
     })

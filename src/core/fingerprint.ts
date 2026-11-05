@@ -45,11 +45,11 @@ export interface CueLine {
 export function sceneCueFor(
   line: CueLine,
   cues: Record<string, string>,
-  narration: Pick<Project['narration'], 'sceneCueSpeakers'>,
+  narration: { generate: Pick<Project['narration']['generate'], 'sceneCueSpeakers'> },
 ): string | undefined {
   if (!line.scene || !line.speaker || openingFor(cues, line.key, line.text ?? '') !== undefined)
     return undefined
-  if (!narration.sceneCueSpeakers.includes(line.speaker)) return undefined
+  if (!narration.generate.sceneCueSpeakers.includes(line.speaker)) return undefined
   return cueFor(cues, sceneKey(line.scene))
 }
 
@@ -85,10 +85,10 @@ export function clipInputs(
   model?: string,
 ): ClipInputs | null {
   if (!character?.voice) return null
-  const { output, quality } = narration
-  const tts = ttsFor(narration.tts, character)
+  const { output, generate } = narration
+  const tts = ttsFor(narration.generate.fish, character)
   const voice = character.voice
-  const eleven = narration.elevenlabs.tts
+  const eleven = narration.generate.elevenlabs
   const delivery =
     providerOf(voice) === 'elevenlabs'
       ? [eleven.stability, eleven.similarityBoost, eleven.style, tts.speed]
@@ -107,7 +107,7 @@ export function clipInputs(
     said: saidText(line.text, pronounce),
     settings: JSON.stringify([
       ...delivery,
-      quality.chunkLimit,
+      generate.chunkLimit,
       output.codec,
       output.bitrate,
       output.channels,

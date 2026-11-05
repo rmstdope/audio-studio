@@ -322,7 +322,7 @@ const scenesSection = {
 function repo() {
   const root = tempRepo({
     'content-studio.json': projectJson({ scenes: scenesSection }),
-    'tts/cast.json': { speakers: {} },
+    'content-studio/narration/cast.json': { speakers: {} },
     'tts/act1/scenes.json': [
       { id: 'a', name: 'A', states: [], triggers: [] },
       { id: 'b', name: 'B', states: [], triggers: [] },

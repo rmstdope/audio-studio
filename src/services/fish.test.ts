@@ -357,7 +357,7 @@ describe('rate limit', () => {
     const { fetch, calls } = limitedFetch(100)
     const failing = createFishClient('k', { fetch, sleep }).tts(request)
     await expect(failing).rejects.toThrow(
-      'Fish Audio answered 429: Too many requests (7 tries over a minute): lower quality.parallel, or wait for other work on this key',
+      'Fish Audio answered 429: Too many requests (7 tries over a minute): lower generate.parallel, or wait for other work on this key',
     )
     expect(waits).toEqual([1000, 2000, 4000, 8000, 16000, 32000])
     expect(calls()).toBe(7)

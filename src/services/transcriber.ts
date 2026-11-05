@@ -33,7 +33,7 @@ export function createWhisperWorker({
     timeoutMs,
     couldNotStart: (why) =>
       `Whisper could not start (${why}). It needs uv and Apple silicon; set ` +
-      'quality.transcriber to "none" in the project file to record without checking.',
+      'generate.transcriber to "none" in the project file to record without checking.',
   })
   return {
     async transcribe(model, path, language) {

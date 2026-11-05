@@ -67,6 +67,7 @@ export function CharactersView({
           table={own.pronounce}
           castPath={summary.charactersPath}
           language={inOther}
+          code={language}
         />
       )}
       <SoundAlikePanel
@@ -74,6 +75,7 @@ export function CharactersView({
         groups={own?.soundAlike ?? summary.soundAlike}
         projectFile={summary.projectFile}
         language={inOther}
+        code={language}
         builtIn={language === 'en'}
       />
       {summary.characters.length ? (
