@@ -1,4 +1,5 @@
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { access, mkdir, rename, rm } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { pyFixed } from '../core/pyformat'
 import { readWav } from '../core/wav'
@@ -15,15 +16,30 @@ export interface EncodeOptions {
 export type Encoder = (wav: Uint8Array, file: string, options: EncodeOptions) => Promise<void>
 
 /**
+ * An encoder could not write the file it was asked for (a folder it may not write in), said plainly
+ * so the caller can name whose file it was rather than show ffmpeg's log.
+ */
+export class FileNotWritten extends Error {
+  constructor() {
+    super('The file could not be written.')
+  }
+}
+
+/**
  * An ffmpeg encoder (as RetroQuest's narrate.py uses) writing into `file`, then levelling it to
  * `lufs` when that is set (see `levelClip`). On failure nothing is left at `file`, and the error is
- * ffmpeg's own, even when it stops reading its input early. The encode, and the levelling, each
- * get `timeoutMs`, and are killed after it (ffmpeg ignores a polite stop while it waits for
- * input).
+ * ffmpeg's own, even when it stops reading its input early; a folder it may not write in is a
+ * `FileNotWritten`, found before ffmpeg runs. The encode, and the levelling, each get `timeoutMs`,
+ * and are killed after it (ffmpeg ignores a polite stop while it waits for input).
  */
 export function createFfmpegEncoder({ timeoutMs }: { timeoutMs: number }): Encoder {
   return async (wav, file, { bitrate, channels, lufs = null }) => {
-    await mkdir(dirname(file), { recursive: true })
+    try {
+      await mkdir(dirname(file), { recursive: true })
+      await access(dirname(file), constants.W_OK)
+    } catch {
+      throw new FileNotWritten()
+    }
     let child
     try {
       child = Bun.spawn(

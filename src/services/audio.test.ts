@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
 import { readWav, writeWav } from '../core/wav'
-import { createFfmpegEncoder, decodeClip, ffmpegEncoder, levelClip } from './audio'
+import { createFfmpegEncoder, decodeClip, ffmpegEncoder, FileNotWritten, levelClip } from './audio'
 
 const hasFfmpeg = Bun.which('ffmpeg') !== null
 
@@ -32,6 +32,31 @@ describe.skipIf(!hasFfmpeg)('ffmpegEncoder', () => {
     await expect(failing).rejects.toThrow('ffmpeg could not encode')
     await expect(failing).rejects.not.toThrow('EPIPE')
   })
+
+  it('says ffmpeg’s own reason, not that the file could not be written, for a bad option', async () => {
+    const root = tempRepo({})
+    const failing = ffmpegEncoder(tone, join(root, 'k5.mp3'), { bitrate: 'zzz', channels: 1 })
+    await expect(failing).rejects.toThrow('ffmpeg could not encode')
+    await expect(failing).rejects.not.toBeInstanceOf(FileNotWritten)
+  })
+
+  it.skipIf(process.getuid?.() === 0)(
+    'says plainly that the file could not be written into a folder it may not write in',
+    async () => {
+      const root = tempRepo({})
+      const folder = join(root, 'clips')
+      mkdirSync(folder)
+      chmodSync(folder, 0o555)
+      try {
+        const failing = ffmpegEncoder(tone, join(folder, 'k6.mp3'), { bitrate: '64k', channels: 1 })
+        await expect(failing).rejects.toBeInstanceOf(FileNotWritten)
+        await expect(failing).rejects.toThrow(/^The file could not be written\.$/)
+      } finally {
+        chmodSync(folder, 0o755)
+      }
+      expect(readdirSync(folder)).toEqual([])
+    },
+  )
 
   it('stops an encode that takes too long, keeping no file', async () => {
     const root = tempRepo({})

@@ -16,7 +16,7 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import { setTrackBrief } from './briefs'
 import { createSerial } from './serial'
 import type { MusicGenerator, MusicReady, MusicRequest } from './music'
-import type { Encoder } from './audio'
+import { FileNotWritten, type Encoder } from './audio'
 import { loadProject } from './workspace'
 import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
 import { GPU, gpuInUse } from './gpu'
@@ -1621,8 +1621,9 @@ describe('trimming a stinger take', () => {
   }
   async function made(failEncode = false) {
     const encoded: Uint8Array[] = []
-    let failing = failEncode
+    let failing: boolean | Error = failEncode
     const encoder: Encoder = async (wav, out) => {
+      if (failing instanceof Error) throw failing
       if (failing) throw new Error('the encoder broke')
       encoded.push(wav)
       mkdirSync(dirname(out), { recursive: true })
@@ -1633,7 +1634,7 @@ describe('trimming a stinger take', () => {
     await m.settled('victory')
     const folder = join(m.root, '.content-studio/music-takes/victory')
     for (const name of readdirSync(folder)) writeFileSync(join(folder, name), padded())
-    return { ...m, encoded, folder, fail: (on: boolean) => (failing = on) }
+    return { ...m, encoded, folder, fail: (on: boolean | Error) => (failing = on) }
   }
   type Made = Awaited<ReturnType<typeof made>>
   const viewOf = async (m: Made, id = 'victory') => {
@@ -1780,6 +1781,20 @@ describe('trimming a stinger take', () => {
     expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
     expect(readFileSync(join(m.root, 'audio/music/victory.mp3'), 'utf8')).toBe('mp3 1')
     expect(manifestOf(m.root).victory.duration).toBe(6)
+  })
+
+  it('says the game’s file could not be written when the take in the game cannot be trimmed or untrimmed there', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    m.fail(new FileNotWritten())
+    const reason = { ok: false, message: 'The game’s file could not be written' } as const
+    expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual(reason)
+    m.fail(false)
+    expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual({ ok: true })
+    m.fail(new FileNotWritten())
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual(reason)
   })
 
   it('keeps an accepted brief change and the time of the choice when the take in the game is trimmed', async () => {
