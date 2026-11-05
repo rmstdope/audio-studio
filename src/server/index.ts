@@ -90,6 +90,7 @@ import { setFishTier } from '../services/fishTier'
 import { setTakeFade } from '../services/takeFade'
 import { setSoundAlike } from '../services/soundAlike'
 import { saveScene } from '../services/scenes'
+import { making as measuring, startMeasure } from '../services/sceneLoudness'
 import { SceneMixSchema } from '../core/scenes'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
@@ -308,6 +309,11 @@ function imageAnswer(result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAn
 
 /** A scene as the page saves it, and the entry it was read as (null: the mix had none). */
 const SceneBody = z.object({ scene: SceneMixSchema, was: SceneMixSchema.nullable() }).strict()
+
+/** Measuring an act's scenes, with the open scene as the page has it (unsaved changes included). */
+const MeasureBody = z
+  .object({ open: z.object({ scene: z.string(), entry: SceneMixSchema }).strict().optional() })
+  .strict()
 
 /** The new description of a sound effect: text, or null to take the game's back. */
 const EffectDescriptionBody = z.object({ description: z.string().nullable() }).strict()
@@ -1796,6 +1802,25 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const result = await effectTakes.stop(projectFile, request.params.id)
           return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/scene-loudness': {
+        GET: guard(async () => Response.json(measuring(projectFile))),
+      },
+      '/api/scene-loudness/:part': {
+        POST: fromOwnPage(async (request) => {
+          const body = MeasureBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { open?: { scene, entry } }' }, { status: 400 })
+          }
+          const result = await startMeasure(
+            projectFile,
+            request.params.part,
+            body.data.open ?? null,
+          )
+          if (result.ok) return Response.json({ ok: true })
+          if (result.kind === 'unknown') return notFound()
+          return Response.json({ ok: false, message: result.message }, { status: 409 })
         }),
       },
       '/api/scenes/:part/:id': {
