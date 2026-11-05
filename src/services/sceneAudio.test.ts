@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
 import { writeWav } from '../core/wav'
@@ -38,7 +38,8 @@ const part = (file: string, over: Partial<RenderPart> = {}): RenderPart => ({
 })
 
 describe.skipIf(!hasFfmpeg)('ffmpegSceneAudio', () => {
-  const audio = ffmpegSceneAudio()
+  const root = tempRepo({})
+  const audio = ffmpegSceneAudio(root)
 
   it('reads a clip’s length', async () => {
     const root = tempRepo({})
@@ -79,7 +80,26 @@ describe.skipIf(!hasFfmpeg)('ffmpegSceneAudio', () => {
     expect(await audio.loudness([part(file, { level: 0 })], 60)).toBeNull()
   })
 
-  it('says which file it could not read', async () => {
-    await expect(audio.loudness([part('/nowhere/x.mp3')], 60)).rejects.toThrow('x.mp3')
+  it('names an unreadable clip by its path from the project root, never the absolute one', async () => {
+    mkdirSync(join(root, 'audio/effects'), { recursive: true })
+    const bad = join(root, 'audio/effects/wind-howl.mp3')
+    writeFileSync(bad, 'not audio')
+    const one = await audio.seconds(bad).catch((e: Error) => e.message)
+    expect(one).toContain('ffprobe could not read audio/effects/wind-howl.mp3: Invalid data')
+    expect(one).not.toContain(root)
+    const mix = await audio.loudness([part(bad)], 60).catch((e: Error) => e.message)
+    expect(mix).toContain('ffmpeg could not read audio/effects/wind-howl.mp3')
+    expect(mix).not.toContain(root)
+  })
+
+  it('names every clip of a mix, in order, in full', async () => {
+    mkdirSync(join(root, '.content-studio/effect-takes'), { recursive: true })
+    const a = join(root, '.content-studio/effect-takes/a.mp3')
+    const b = join(root, 'b.mp3')
+    writeFileSync(a, 'x')
+    writeFileSync(b, 'x')
+    const mix = await audio.loudness([part(a), part(b)], 60).catch((e: Error) => e.message)
+    expect(mix).toContain('could not read .content-studio/effect-takes/a.mp3, b.mp3:')
+    expect(mix).not.toContain(root)
   })
 })
