@@ -302,11 +302,9 @@ section (as-6u9.3), the `music` section (as-6u9.4), the `images` section (as-6u9
 
 ## 6. Resources
 
-The formats are the ones RetroQuest uses today, so existing files work unchanged. The studio only
-**adds** fields; the game ignores what it doesn't know.
-
-The formats of narration's files are in [docs/project-files.md](project-files.md); this section
-says how the studio uses them.
+The studio defines the format of every file it reads and writes, in
+[docs/project-files.md](project-files.md) (version 2); the game's lists and what the game plays
+follow it. This section says how the studio uses narration's files.
 
 **Dialog** (`narration.from.part`, read only; one per part and language): `[{ id, speaker, text, scene? }]`. `id` is the game's stable id for
 the line (RetroQuest: a hash of speaker and words, so new wording gets a new id). Inside the studio
@@ -596,7 +594,8 @@ An audition is for a character, not for a part: the result applies to every part
   pools the results, keeps voices whose title, description or tags contain the keywords, and ranks
   by match, then popularity (the search `fish_tts.py` already does, ported). Ruled-out voices,
   voices the audition has shown, and the current voice are left out of new candidates.
-- **Takes** of the board use `models.audition`. On the free model an audition costs nothing, and
+- **Takes** of the board use `narration.models.fish.audition` (`narration.models.elevenlabs.audition`
+  for an ElevenLabs voice). On the free model an audition costs nothing, and
   takes record by themselves for every voice shown, each once; one that fails is recorded again
   only when asked. Each voice also offers Fish's own sample clip.
 - **A paid audition model** is paid from one budget per _sitting_. **Start audition** (and
@@ -634,7 +633,8 @@ An audition is for a character, not for a part: the result applies to every part
    orphans it showed;
    the server does only those that are still in its own fresh plan, and a line recorded meanwhile
    is skipped (as is one that became weak meanwhile, unless weak lines were to be retaken). Lines
-   are recorded with `models.draft`. Up-to-date clips Whisper never checked can be measured
+   are recorded with `narration.models.fish.draft` (`narration.models.elevenlabs.draft` for a
+   character cast with an ElevenLabs voice). Up-to-date clips Whisper never checked can be measured
    instead, without new audio (a job of kind `measure`), and weak lines checked again with
    today's rules (a job of kind `check`: Check N weak lines again on the Generate panel).
 3. **Generate** queues one job per line. For each line:
@@ -714,9 +714,10 @@ An audition is for a character, not for a part: the result applies to every part
   changed since editing began. The project file is otherwise only read; the save keeps the rest of
   it, in its own indentation (a hand-compacted object is written out). Takes already recorded keep
   their heard share; the groups count from the next take on.
-- Warn that `s1` retires (built): while the project file names `s1` for `models.draft` or
-  `models.final`, a banner on every page says so (past tense from 1 January 2027, UTC) with Not now
-  (until the page is reopened; nothing stored) and Switch to s2.1-pro. Switch asks first, then
+- Warn that `s1` retires (built): while the project file names `s1` for
+  `narration.models.fish.draft` or `narration.models.fish.final`, a banner on every page says so
+  (past tense from 1 January 2027, UTC) with Not now (until the page is reopened; nothing stored)
+  and Switch to s2.1-pro. Switch asks first, then
   rewrites only the models that are `s1` to `s2.1-pro` in the project file, the same careful way
   as the sound-alike save (the second change the studio makes to the project file). The audition
   model and recorded lines are not touched. A clip made with `s1` counts as up to date under
@@ -2083,7 +2084,7 @@ POST   /api/music/tracks/:id/move                { file, to } move a take to the
 DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
 GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
 GET    /api/music/tracks/:id/takes/:file         a take's WAV (?seam=1: its seam)
-PATCH  /api/fish-tier                            { tier } the Fish tier (or null) in the project file
+PATCH  /api/fish-tier                            { tier } the Fish tier (or null) in content-studio/cache/settings.json
 GET    /api/parts/:part?language=                the part in a language (default: the first), every line
                                                  with its status and reason, and each language's progress
 GET    /api/parts/:part/clips/:file?language=    a clip from the part's clips folder (that language's)
@@ -2261,9 +2262,10 @@ Small, independently useful increments:
    1. **Checked takes**: a Whisper worker (`worker/transcribe.py`, mlx-whisper through uv, the
       model loaded once; it exits when the studio does), narrate.py's alignment ported exactly
       (difflib's matching and Python's rounding; fuzz-compared on 300 cases), and up to
-      `quality.takes` takes per line until one is heard at `minHeard`, keeping the best: real
-      word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
-"none"` records one unchecked take, as before.
+      `quality.takes` (`generate.takes` since as-6u9.3) takes per line until one is heard at
+      `minHeard`, keeping the best: real word timings in the manifest, the heard share and takes in
+      the lock. `quality.transcriber: "none"` (`generate.transcriber` since as-6u9.3) records one
+      unchecked take, as before.
    2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when asked,
       accepted as they are (Accept, until recorded again), or checked again by Whisper without new
       audio (Check again); clips never checked (adopted from narrate.py, or recorded unchecked)
@@ -2285,7 +2287,8 @@ Small, independently useful increments:
       among others. The table is shown in the order the studio applies it.
       Under it, **Words that sound the same** (built): the project's own sound-alike groups,
       one a row, words separated by commas, saved as a whole in the project file's
-      `narration.quality.soundAlike`, refused if the file's groups changed since editing began.
+      `narration.quality.soundAlike` (`narration.generate.soundAlike` since as-6u9.3), refused if
+      the file's groups changed since editing began.
    3. **Changes panel** (built): `git status` for the project's own files only (the project file,
       the cast, each part's dialog, cues, lock, manifest and clips), grouped by part with clips
       counted, merge conflicts marked; read again every few seconds, and counted in the sidebar.
@@ -2314,7 +2317,8 @@ Small, independently useful increments:
    2. **Loudness** (built): `output.lufs` levels each new clip as `level.py` does, command for
       command (`pyFixed` formats numbers as Python does); clips come out byte-identical. Not in
       the fingerprint: changing the target does not make clips stale.
-   3. **The switch** (built, RetroQuest #508): in RetroQuest, one shared `tts/cast.json` from the four act casts (the
+   3. **The switch** (built, RetroQuest #508): in RetroQuest, one shared `tts/cast.json`
+      (`content-studio/narration/cast.json` since as-6u9.3) from the four act casts (the
       grandmother's recast everywhere; the mother's Act III style as cues on her Act III lines),
       `content-studio.json` for all four acts with the new extractor, every act's clips adopted,
       `.content-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
@@ -2388,7 +2392,8 @@ Small, independently useful increments:
     2. **Track lists** (built): the project file's `music` section, the game's loop and stinger lists and
        the studio's briefs (schemas, problems with file and path), and the Music pages, a page per
        act and one for the stingers, listing the tracks, read only; Refresh from the game on an
-       act's page, and on the Stingers page running `refreshShared` (CLAUDE.md's consumer rules
+       act's page, and on the Stingers page running `refreshShared` (`refresh.shared` since
+       as-6u9.2; CLAUDE.md's consumer rules
        updated in that step to name both buttons and the new command); the sample project in
        `test/fixtures/sample` gains loop and stinger lists.
     3. **Briefs** (built): a track's page (a track opens from its row), its brief, length, tempo
@@ -2620,7 +2625,12 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
        `content-studio/scenes/<part>.lock.json`.
        The mix's format and the measures' fields are unchanged, so a converted game's figures stay
        as they stood.
-    8. **RetroQuest end to end** (as-6u9.8): the game and the studio shown working on the new files.
+    8. **RetroQuest end to end** (as-6u9.8, built): the studio run on RetroQuest through every
+       section's pages, with no problems listed and a narration clip, a track, a stinger, an effect
+       and a scene mix played, and the game playing its narration, music, stingers, images, effects
+       and scene mixes in Act I from the converted files. No file of the old format is left in
+       either repository; a few delivery-plan steps above name the old places they were built with,
+       with the new name beside them.
 
 ---
 

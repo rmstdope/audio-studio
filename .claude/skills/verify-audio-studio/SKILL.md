@@ -75,29 +75,45 @@ answers split a batch, record each bead by its own recipe.
 The declared launch serves the sample with the merged build, without reloading (`launch_web` in
 `.cerebro/project.conf`, no `--dev`). The sample is small on purpose:
 
-- the project "Sample Quest": two parts (`act1`, `act2`), three languages (`en`, `sv`, `de`), no
-  `quality` or `models` set, so every stage uses the free model, `quality.parallel` is 4 and the
-  transcriber is mlx-whisper;
+- the project "Sample Quest": three parts (`act1`, `act2`, `act3`), three languages (`en`, `sv`,
+  `de`), no `narration.generate` or `narration.models` set, so every stage uses the free model,
+  `generate.parallel` is 4 and the transcriber is mlx-whisper;
 - dialog for `act1` only, in `en` (lines `a1`–`a5`) and `sv` (no `a2`, and an `sv`-only line
   `only-sv`); none for `act2` or `de`;
 - a narrator and a keeper in the cast, both with a voice, and a line by `wren`, who is not in the
   cast;
-- nothing recorded, and no cues, lock, manifest or `content-studio/cache/` until the studio writes them
-  (the studio folder's `.gitignore`, `content-studio/.gitignore`, is checked in).
+- music: `act1`'s loops `lantern-hall` and `village-lane` (each naming a game file; only
+  `audio/game-music/lantern-hall.wav` exists), an empty list for `act2` and none for `act3`, and
+  three stingers (`victory`, `game-over`, `level-up`);
+- images: four for `act1` (`silver-stag-inn`, `lantern-hall`, `cellar-door`, `old-map`), an empty
+  list for `act2`, and the style in `content-studio/images/edits.json` (look, keepOut, palette and
+  an addition per act; no rewordings);
+- effects: one shared list of four (`door-creak`, `coins`, `wind-howl`, `rain`);
+- scenes: four for `act1` (`lantern-hall` with states and a trigger, `village-lane`, `old-cellar`,
+  `empty-room`), its mix in `web/scenes/act1.mix.json`, and the `output` target -20 LUFS ± 2;
+- `refresh.part` (`tools/refresh.sh`) copies an act's loops from `tools/loops/` and its scenes from
+  `tools/scenes/` (only `act1`'s loops, with `river-road` added, and `act2`'s scenes, `road-bend`),
+  and fails for an act without English dialog; `refresh.shared` (`tools/refresh-shared.sh`) copies
+  `tools/stingers.json`, one stinger fewer, over the stingers, and leaves the effects list as it is.
+  Both change tracked sample files: put them back afterwards;
+- checked in from the studio folder: `content-studio/.gitignore`, the cast and the images edits.
+  Nothing is recorded or chosen: no edits or lock of narration, music, effects or scenes, no
+  manifest or clip, and no `content-studio/cache/` until the studio writes them.
 
 To reach the state a bead needs, **edit the sample in the tree** by hand, and only there. Do it
 before launching where you can; the studio reads the files again on every request, so an edit while
 it runs shows on the next reload.
 
-- the project file: the top-level `languages`, `parts` and `refresh`, `narration.models` (`s1` for
-  the retirement banner, a paid model for a paid flow), `narration.quality` (`parallel`,
-  `transcriber`), `soundAlike`;
-- `tts/cast.json`: a speaker added, cast or left uncast, a style, `pronounce` entries;
+- the project file: the top-level `languages`, `parts` and `refresh`, `narration.models.fish` (`s1`
+  for the retirement banner, a paid model for a paid flow), `narration.generate` (`parallel`,
+  `transcriber`, `soundAlike`);
+- `content-studio/narration/cast.json`: a speaker added, cast or left uncast, a style, `pronounce`
+  entries;
 - a part's `script.json`: a line added, changed (to make a recorded clip stale) or removed (to make
   an orphan clip);
 - a broken file, to see the error page that names the file and the JSON path.
 
-**Set `narration.quality.transcriber` to `none`** unless the bead touches what Whisper checks (takes
+**Set `narration.generate.transcriber` to `none`** unless the bead touches what Whisper checks (takes
 checked by ear, heard shares, word timings). If it does, ask first, under `prepare`: the first run
 installs mlx-whisper through uv and downloads a model of over a gigabyte onto the navigator's
 machine.
@@ -170,7 +186,7 @@ every call.
   to the confirmation yourself and screenshot it: the amount, the credit beside it and the Cancel are
   evidence too. Then either ask ("as-5gk.1 needs one paid audition: Pay up to $0.05 on s2.1-pro. Pay
   it?"), or press Cancel and record the paid half as a gap.
-- **Keep `quality.parallel` at or below 4**, the default the sample uses, and run one recording job
+- **Keep `generate.parallel` at or below 4**, the default the sample uses, and run one recording job
   at a time: other work may share the key, and a 429 storm is a finding only when the bead touched
   the limiter.
 
@@ -226,13 +242,26 @@ git -C .cerebro/worktrees/psylocke diff --cached --quiet                        
 
 Subtract your own edits to the sample, then check:
 
-- **Only the sample changed**, and inside it only the files the project file names (cast, cues,
-  lock, clips and manifest, per part and language, and dialog only through Refresh's command),
-  `content-studio/cache/`, and the project file itself. Anything else is a finding against the bead whose
-  journey wrote it.
-- **The project file** changed only in `narration.quality.soundAlike`, or in
-  `narration.models.draft` / `final` moved from `s1` to `s2.1-pro` after the banner was confirmed,
-  and kept its indentation and line endings.
+- **Only the sample changed**, and inside it only:
+  - the files the project file names: each section's `clips` and `manifest` (narration's per part
+    and language), each act's `scenes.mix`, and the game's lists only through a Refresh command;
+  - the studio folder's own files: `content-studio/narration/` (the cast, each part's edits and
+    lock), `content-studio/music/`, `content-studio/images/` and `content-studio/effects/` (each
+    `edits.json` and `lock.json`), `content-studio/scenes/<part>.lock.json`, and
+    `content-studio/cache/`;
+  - the project file itself.
+
+  Anything else is a finding against the bead whose journey wrote it.
+- **The project file** changed only in the seven places CLAUDE.md allows, and kept its indentation
+  and line endings:
+  - `narration.generate.soundAlike.<language>`, from the Words that sound the same panel;
+  - `narration.models.fish.draft` / `final` moved from `s1` to `s2.1-pro` after the retirement
+    banner was confirmed;
+  - `narration.models.fish.audition` / `draft` / `final`, from the Models panel on Setup;
+  - `narration.models.elevenlabs.audition` / `draft` / `final` and `narration.generate.elevenlabs`,
+    from that panel's ElevenLabs rows;
+  - `music.model`, `images.model` and `effects.model`, from that panel's Music, Images and Sound
+    effects rows.
 - **A manifest** keeps the game's format: open one and compare its shape with
   `docs/architecture.md` §6. The lock is written one entry per line, in stable key order.
 - **No clip was deleted** without the confirmation in the UI, and no hidden temporary file is left
