@@ -10,6 +10,8 @@ export function StylePage({ images }: { images: ImagesSummary }) {
   const [saved, setSaved] = useState(false)
   const look = useSetStyleField('look')
   const keepOut = useSetStyleField('keepOut')
+  // A refused field keeps its draft and its refusal, so the card says Saved only when neither is.
+  const refused = [look, keepOut].some((save) => save.isError || save.data?.ok === false)
   return (
     <>
       <header className="page-header">
@@ -44,7 +46,7 @@ export function StylePage({ images }: { images: ImagesSummary }) {
           <section className="panel brief-panel">
             <div className="brief-panel-head">
               <h2>Style</h2>
-              {saved && (
+              {saved && !refused && (
                 <span className="saved" role="status">
                   Saved
                 </span>
