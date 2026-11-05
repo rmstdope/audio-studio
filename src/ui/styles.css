@@ -4354,6 +4354,7 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--accent);
 }
 .scene-problem {
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

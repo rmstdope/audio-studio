@@ -254,7 +254,7 @@ export async function startMeasure(
     act,
     effects: loaded.summary.scenes!.effects,
     open: open && act.scenes.some((s) => s.id === open.scene) ? open : null,
-    audio: deps.audio ?? ffmpegSceneAudio(),
+    audio: deps.audio ?? ffmpegSceneAudio(dirname(projectFile)),
     files,
     now: () => new Date(),
     keep: (id, measure, draft) => keepMeasure(projectFile, part, id, measure, draft),
