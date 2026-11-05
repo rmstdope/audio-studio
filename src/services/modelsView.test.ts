@@ -109,10 +109,10 @@ describe('modelsView', () => {
         },
       }),
       'tts/act1/music.json': [
-        { id: 'hall', title: 'Hall', brief: 'lute', seconds: 90 },
-        { id: 'cave', title: 'Cave', brief: 'drone', seconds: 20 },
+        { id: 'hall', title: 'Hall', text: 'lute', seconds: 90 },
+        { id: 'cave', title: 'Cave', text: 'drone', seconds: 20 },
       ],
-      'tts/stingers.json': [{ id: 'win', title: 'Win', brief: 'fanfare', seconds: 6 }],
+      'tts/stingers.json': [{ id: 'win', title: 'Win', text: 'fanfare', seconds: 6 }],
       'content-studio/music/edits.json': { cave: { seconds: 25 } },
     })
     const view = await modelsView(join(root, 'content-studio.json'))

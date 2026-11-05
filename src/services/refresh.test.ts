@@ -158,7 +158,7 @@ describe('refreshing the music lists', () => {
   const loop = (id: string, extra = {}) => ({
     id,
     title: id.toUpperCase(),
-    brief: 'b',
+    text: 'b',
     seconds: 80,
     ...extra,
   })
@@ -366,7 +366,7 @@ describe('refreshing the sound effects', () => {
 
 describe('the one shared command', () => {
   it('writes the stingers and the effects alike, and runs once at a time, whichever asked', async () => {
-    const stinger = { id: 'victory', title: 'Victory', brief: 'b', seconds: 5 }
+    const stinger = { id: 'victory', title: 'Victory', text: 'b', seconds: 5 }
     const effect = { id: 'coins', description: 'coins sound', seconds: 2 }
     const command = [
       'echo start >> runs.txt',

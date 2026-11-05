@@ -39,39 +39,50 @@ const list = (id: string, tracks: Track[], over: Partial<MusicListInput> = {}): 
 
 describe('the track schemas', () => {
   it('reads a loop with only what the game must give', () => {
-    const parsed = LoopListSchema.safeParse([{ id: 'a-b', title: 'A', brief: 'x', seconds: 90 }])
+    const parsed = LoopListSchema.safeParse([{ id: 'a-b', title: 'A', text: 'x', seconds: 90 }])
     expect(parsed.success).toBe(true)
+  })
+
+  it('gives the game’s words, its text, to the studio as the track’s brief', () => {
+    const parsed = LoopListSchema.parse([{ id: 'a', title: 'A', text: 'warm lute', seconds: 9 }])
+    expect(parsed[0]).toEqual({ id: 'a', title: 'A', brief: 'warm lute', seconds: 9 })
+  })
+
+  it('refuses a track that gives a brief in place of its text, at its JSON path', () => {
+    const parsed = LoopListSchema.safeParse([{ id: 'a', title: 'A', brief: 'x', seconds: 9 }])
+    if (parsed.success) throw new Error('expected a problem')
+    expect(problemsFrom('f.json', parsed.error).map((p) => p.path)).toEqual(['[0].text'])
   })
 
   it('keeps plays, bpm and key', () => {
     const parsed = LoopListSchema.parse([
-      { id: 'a', title: 'A', brief: 'x', seconds: 90, plays: 'Here', bpm: 84, key: 'D major' },
+      { id: 'a', title: 'A', text: 'x', seconds: 90, plays: 'Here', bpm: 84, key: 'D major' },
     ])
     expect(parsed[0]).toMatchObject({ plays: 'Here', bpm: 84, key: 'D major' })
   })
 
   it('refuses an id that is not a slug, with its JSON path', () => {
     const parsed = LoopListSchema.safeParse([
-      { id: 'ok', title: 'A', brief: 'x', seconds: 9 },
-      { id: 'Not A Slug', title: 'A', brief: 'x', seconds: 9 },
+      { id: 'ok', title: 'A', text: 'x', seconds: 9 },
+      { id: 'Not A Slug', title: 'A', text: 'x', seconds: 9 },
     ])
     if (parsed.success) throw new Error('expected a problem')
     expect(problemsFrom('f.json', parsed.error).map((p) => p.path)).toEqual(['[1].id'])
   })
 
-  it('refuses a list that is not an array, a missing brief and a bad length or tempo', () => {
+  it('refuses a list that is not an array, a missing text and a bad length or tempo', () => {
     expect(LoopListSchema.safeParse({}).success).toBe(false)
     expect(LoopListSchema.safeParse([{ id: 'a', title: 'A', seconds: 9 }]).success).toBe(false)
+    expect(LoopListSchema.safeParse([{ id: 'a', title: 'A', text: 'x', seconds: 0 }]).success).toBe(
+      false,
+    )
     expect(
-      LoopListSchema.safeParse([{ id: 'a', title: 'A', brief: 'x', seconds: 0 }]).success,
-    ).toBe(false)
-    expect(
-      LoopListSchema.safeParse([{ id: 'a', title: 'A', brief: 'x', seconds: 9, bpm: 5 }]).success,
+      LoopListSchema.safeParse([{ id: 'a', title: 'A', text: 'x', seconds: 9, bpm: 5 }]).success,
     ).toBe(false)
   })
 
   it('allows a stinger of at most ten seconds', () => {
-    const stinger = (seconds: number) => [{ id: 'v', title: 'V', brief: 'x', seconds }]
+    const stinger = (seconds: number) => [{ id: 'v', title: 'V', text: 'x', seconds }]
     expect(StingerListSchema.safeParse(stinger(10)).success).toBe(true)
     const long = StingerListSchema.safeParse(stinger(11))
     if (long.success) throw new Error('expected a problem')
@@ -187,7 +198,7 @@ describe('loopsDiff', () => {
 })
 
 describe('a track naming its own game file', () => {
-  const base = { id: 'a', title: 'A', brief: 'x', seconds: 9 }
+  const base = { id: 'a', title: 'A', text: 'x', seconds: 9 }
 
   it('keeps a file inside the project', () => {
     const parsed = LoopListSchema.parse([{ ...base, file: 'web/public/audio/forest-walk.mp3' }])

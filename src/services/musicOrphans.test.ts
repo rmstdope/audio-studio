@@ -25,7 +25,7 @@ const entry = (list: string) => ({
 function repo(over: Record<string, unknown> = {}) {
   const root = tempRepo({
     'content-studio.json': projectJson({ music }),
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
     'content-studio/music/lock.json': { 'castle-gates': entry('act1'), hall: entry('act1') },

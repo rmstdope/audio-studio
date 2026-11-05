@@ -799,7 +799,7 @@ describe('loadProject with a music section', () => {
   const loop = (id: string, extra = {}) => ({
     id,
     title: id,
-    brief: `${id} brief`,
+    text: `${id} brief`,
     seconds: 80,
     ...extra,
   })
@@ -846,7 +846,7 @@ describe('loadProject with a music section', () => {
   it('reports a broken list with its file and JSON path, and the rest still loads', async () => {
     const root = tempRepo({
       'content-studio.json': projectJson({ music: musicSection }),
-      'tts/act1/music.json': [loop('a'), { id: 'Bad Id', title: 'x', brief: 'x', seconds: 1 }],
+      'tts/act1/music.json': [loop('a'), { id: 'Bad Id', title: 'x', text: 'x', seconds: 1 }],
       'tts/stingers.json': [loop('long', { seconds: 30 })],
       'content-studio/music/edits.json': '{ broken',
     })

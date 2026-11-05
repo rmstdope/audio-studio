@@ -10,10 +10,10 @@ const music = {
   manifest: 'audio/music/manifest.json',
 }
 const loops = [
-  { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 80 },
-  { id: 'lane', title: 'Lane', brief: 'recorder', seconds: 90, bpm: 84, key: 'D major' },
+  { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 80 },
+  { id: 'lane', title: 'Lane', text: 'recorder', seconds: 90, bpm: 84, key: 'D major' },
 ]
-const stingers = [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 }]
+const stingers = [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 }]
 
 function repo(extra: Record<string, unknown> = {}) {
   const root = tempRepo({

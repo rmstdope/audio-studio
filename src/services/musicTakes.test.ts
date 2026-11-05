@@ -73,8 +73,8 @@ function setup(
 ) {
   const root = tempRepo({
     'content-studio.json': projectJson({ music }),
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
-    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 }],
     ...extra,
   })
   const file = join(root, 'content-studio.json')
@@ -111,8 +111,8 @@ function setup(
 describe('makeAll, stopAll and modelState', () => {
   const two = {
     'tts/act1/music.json': [
-      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
-      { id: 'cellar', title: 'Cellar', brief: 'drips', seconds: 20 },
+      { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 },
+      { id: 'cellar', title: 'Cellar', text: 'drips', seconds: 20 },
     ],
   }
 
@@ -149,8 +149,8 @@ describe('makeAll, stopAll and modelState', () => {
     const root = tempRepo({
       'content-studio.json': projectJson({ music: { ...music, model: 'short' } }),
       'tts/act1/music.json': [
-        { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 20 },
-        { id: 'cellar', title: 'Cellar', brief: 'drips', seconds: 120 },
+        { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 20 },
+        { id: 'cellar', title: 'Cellar', text: 'drips', seconds: 120 },
       ],
     })
     const file = join(root, 'content-studio.json')
@@ -222,8 +222,8 @@ describe('makeAll, stopAll and modelState', () => {
 describe('the summary of a press on a list is kept by the studio', () => {
   const two = {
     'tts/act1/music.json': [
-      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
-      { id: 'cellar', title: 'Cellar', brief: 'drips fail', seconds: 20 },
+      { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 },
+      { id: 'cellar', title: 'Cellar', text: 'drips fail', seconds: 20 },
     ],
   }
 
@@ -778,7 +778,7 @@ describe('createMusicTakes', () => {
     function elevenProject(installed: (model: string) => boolean, localReady: MusicReady) {
       const root = tempRepo({
         'content-studio.json': projectJson({ music: { ...music, model: 'eleven' } }),
-        'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+        'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
         'tts/stingers.json': [],
       })
       const generator: MusicGenerator = {
@@ -1235,13 +1235,13 @@ describe('choosing a take', () => {
 describe('moving a take', () => {
   const lists = {
     'tts/act1/music.json': [
-      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
-      { id: 'inn', title: 'Inn', brief: 'jolly', seconds: 40 },
+      { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 },
+      { id: 'inn', title: 'Inn', text: 'jolly', seconds: 40 },
     ],
-    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', brief: 'eerie', seconds: 20 }],
+    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', text: 'eerie', seconds: 20 }],
     'tts/stingers.json': [
-      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
-      { id: 'defeat', title: 'Defeat', brief: 'sad', seconds: 5 },
+      { id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 },
+      { id: 'defeat', title: 'Defeat', text: 'sad', seconds: 5 },
     ],
   }
   async function made(count = 2, extra: Record<string, unknown> = {}) {
@@ -1661,8 +1661,8 @@ describe('fading a stinger take', () => {
   it('keeps the fades through a move and loses them with a drop', async () => {
     const made = await stinger({
       'tts/stingers.json': [
-        { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
-        { id: 'defeat', title: 'Defeat', brief: 'doom', seconds: 6 },
+        { id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 },
+        { id: 'defeat', title: 'Defeat', text: 'doom', seconds: 6 },
       ],
     })
     await made.takes.setFades(made.file, 'victory', made.name, fades)
@@ -1691,10 +1691,10 @@ describe('trimming a stinger take', () => {
     })
   }
   const lists = {
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
     'tts/stingers.json': [
-      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
-      { id: 'defeat', title: 'Defeat', brief: 'sad', seconds: 6 },
+      { id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 },
+      { id: 'defeat', title: 'Defeat', text: 'sad', seconds: 6 },
     ],
   }
   async function made(failEncode = false) {

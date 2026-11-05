@@ -36,14 +36,18 @@ const TrackShape = z.object({
   title: z.string().min(1),
   plays: z.string().min(1).optional(),
   file: GameFile.optional(),
-  brief: z.string().min(1),
+  /** What the track should sound like, in the game's words. */
+  text: z.string().min(1),
   seconds: z.number().int().positive(),
   bpm: z.number().int().min(30).max(300).optional(),
   key: z.string().min(1).optional(),
 })
 
-/** One track of a list the game writes. */
-export const TrackSchema = TrackShape
+/**
+ * One track of a list the game writes. The game's words (`text`) are the track's brief inside the
+ * studio, its pages and its API.
+ */
+export const TrackSchema = TrackShape.transform(({ text, ...track }) => ({ ...track, brief: text }))
 
 /** An act's loops, in the game's order (a list that is there and empty means the game asks for none). */
 export const LoopListSchema = z.array(TrackSchema)

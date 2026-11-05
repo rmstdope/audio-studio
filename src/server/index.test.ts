@@ -3168,7 +3168,7 @@ describe('server, generating per language', () => {
 })
 
 describe('server, the music pages', () => {
-  const list = JSON.stringify([{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }])
+  const list = JSON.stringify([{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 5 }])
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       refresh: { shared: `mkdir -p tts && printf '%s' '${list}' > tts/stingers.json` },
@@ -3288,7 +3288,7 @@ describe('server, what music takes cost', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   const studio = startServer({
     projectFile: join(musicRoot, 'content-studio.json'),
@@ -3349,7 +3349,7 @@ describe('server, a track’s takes', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   let ready: { ok: true } | { ok: false; message: string; fix: string } = { ok: true }
   const made: string[] = []
@@ -3522,7 +3522,7 @@ describe('server, choosing a take', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   const studio = startServer({
     projectFile: join(musicRoot, 'content-studio.json'),
@@ -3658,11 +3658,11 @@ describe('server, playing what a track plays now', () => {
     }),
     'content-studio/narration/cast.json': { speakers: {} },
     'tts/act1/music.json': [
-      { id: 'game', title: 'G', brief: 'x', seconds: 5, file: 'game/walk.mp3' },
-      { id: 'gone', title: 'H', brief: 'x', seconds: 5, file: 'game/nope.mp3' },
-      { id: 'bare', title: 'B', brief: 'x', seconds: 5 },
-      { id: 'taken', title: 'T', brief: 'x', seconds: 5, file: 'game/walk.mp3' },
-      { id: 'folder', title: 'F', brief: 'x', seconds: 5, file: 'game/dir.mp3' },
+      { id: 'game', title: 'G', text: 'x', seconds: 5, file: 'game/walk.mp3' },
+      { id: 'gone', title: 'H', text: 'x', seconds: 5, file: 'game/nope.mp3' },
+      { id: 'bare', title: 'B', text: 'x', seconds: 5 },
+      { id: 'taken', title: 'T', text: 'x', seconds: 5, file: 'game/walk.mp3' },
+      { id: 'folder', title: 'F', text: 'x', seconds: 5, file: 'game/dir.mp3' },
     ],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
@@ -3718,7 +3718,7 @@ describe('server, removing music the game no longer asks for', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
     'content-studio/music/lock.json': {
@@ -3783,7 +3783,7 @@ describe('server, the music model', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({ music: paths }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   const asked: string[] = []
   const studio = startServer({
@@ -3888,8 +3888,8 @@ describe('server, moving a take', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
-    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', brief: 'eerie', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
+    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', text: 'eerie', seconds: 5 }],
   })
   const studio = startServer({
     projectFile: join(musicRoot, 'content-studio.json'),
@@ -5838,8 +5838,8 @@ describe('server, trimming a stinger take', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
-    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 }],
   })
   const studio = startServer({
     projectFile: join(root, 'content-studio.json'),
@@ -5929,8 +5929,8 @@ describe('server, a stinger take’s fades', () => {
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
-    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 4 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 4 }],
   })
   const studio = startServer({
     projectFile: join(root, 'content-studio.json'),
