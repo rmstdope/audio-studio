@@ -16,8 +16,9 @@ import {
   type SceneRow,
 } from '../core/scenes'
 import { ffmpegSceneAudio } from './sceneAudio'
-import { keepMeasure } from './sceneMeasures'
-import { effectClipFile, loadProject, musicCurrentFile } from './workspace'
+import { keepMeasure, LOUDNESS_FILE, measuresBroken } from './sceneMeasures'
+import { dirname } from 'node:path'
+import { effectCurrentFile, loadProject, musicCurrentFile } from './workspace'
 
 /** One clip in the minute that is measured, with the file it is read from. */
 export type RenderPart = MixPart & { file: string }
@@ -213,7 +214,8 @@ export function making(projectFile: string): Record<string, { done: number; tota
 
 /** What starting a measure answered: it is under way (`done` settles when it ends), or why not. */
 export type MeasureStart =
-  { ok: true; done: Promise<void> } | { ok: false; kind: 'unknown' | 'running'; message: string }
+  | { ok: true; done: Promise<void> }
+  | { ok: false; kind: 'unknown' | 'running' | 'unreadable'; message: string }
 
 /**
  * Starts measuring every scene of an act in the background and returns at once. A second start for
@@ -235,10 +237,17 @@ export async function startMeasure(
   if (running.has(key)) {
     return { ok: false, kind: 'running', message: `${part} is being measured already` }
   }
+  if (await measuresBroken(dirname(projectFile))) {
+    return {
+      ok: false,
+      kind: 'unreadable',
+      message: `${LOUDNESS_FILE} cannot be read; fix or delete it, and measure again`,
+    }
+  }
   const progress = { done: 0, total: act.scenes.filter((s) => !s.unreadable).length }
   running.set(key, progress)
   const files: SceneFiles = deps.files ?? {
-    effect: (id) => effectClipFile(projectFile, `${id}.mp3`),
+    effect: (id) => effectCurrentFile(projectFile, id),
     music: (id) => musicCurrentFile(projectFile, id),
   }
   const done = measureScenes({
@@ -255,7 +264,7 @@ export async function startMeasure(
     },
   })
     .then(() => {})
-    .catch(() => {})
+    .catch((error) => console.error('Content Studio: measuring the scenes stopped:', error))
     .finally(() => void running.delete(key))
   return { ok: true, done }
 }

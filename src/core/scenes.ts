@@ -432,7 +432,6 @@ function sceneRow(
     known.tracks,
     known.choices,
   )
-  const loudness = kept
   return {
     ...row,
     music,
@@ -442,7 +441,7 @@ function sceneRow(
     gone,
     silent,
     clips,
-    loudness,
+    loudness: kept,
   }
 }
 

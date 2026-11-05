@@ -30,7 +30,11 @@ function shown(
   dirty: boolean,
 ): { measure: SceneMeasure; unsaved: boolean } | null {
   const draft = scene.loudness.draft
-  if (dirty && draft && sameMix(draft.entry, page)) return { measure: draft, unsaved: true }
+  // The unsaved scene's measure shows while the page is what it was made from, or while the scene
+  // has no other (then it says it changed).
+  if (dirty && draft && (sameMix(draft.entry, page) || !scene.loudness.saved)) {
+    return { measure: draft, unsaved: true }
+  }
   return scene.loudness.saved ? { measure: scene.loudness.saved, unsaved: false } : null
 }
 
@@ -47,6 +51,7 @@ export function LoudnessPanel({
   draft,
   dirty,
   running,
+  refused,
   onMeasure,
 }: {
   scene: SceneRow
@@ -57,6 +62,8 @@ export function LoudnessPanel({
   draft: SceneDraft
   dirty: boolean
   running: Running | null
+  /** Why the last press was refused (the studio's words), if it was. */
+  refused: string | null
   /** Starts the measure; given the open scene as the page has it when that has unsaved changes. */
   onMeasure: (open: { scene: string; entry: SceneMix } | null) => void
 }) {
@@ -161,9 +168,11 @@ export function LoudnessPanel({
       )}
       {measure?.error != null && (
         <div className="panel scene-problem">
-          Couldn’t measure {scene.name}: {measure.error}. The other scenes were measured.
+          Couldn’t measure {scene.name}: {measure.error.replace(/\.+$/, '')}. The other scenes were
+          measured.
         </div>
       )}
+      {refused && <div className="panel scene-problem">{refused}</div>}
       <p className="faint scene-loud-when">{when}</p>
       <span className="sr-only" role="status">
         {said}

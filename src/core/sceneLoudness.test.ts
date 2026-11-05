@@ -142,6 +142,9 @@ describe('measureChanged', () => {
   it('is false when the entry and the clips are the same', () => {
     expect(measureChanged(was, now)).toBe(false)
   })
+  it('says nothing changed for a measure that failed', () => {
+    expect(measureChanged({ ...was, error: 'no', clips: {} }, now)).toBe(false)
+  })
   it('is true when the entry was saved differently or a take changed', () => {
     expect(
       measureChanged(was, { ...now, entry: { effects: [], music: { track: null, level: 1 } } }),

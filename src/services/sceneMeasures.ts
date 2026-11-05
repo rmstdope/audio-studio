@@ -16,11 +16,18 @@ export const LOUDNESS_FILE = '.content-studio/scene-loudness.json'
 
 /**
  * The kept measures, act by act and scene by scene. A file that is not there is an empty one. One
- * that cannot be read is reported and read as empty: it only holds figures that can be measured again.
+ * that cannot be read is reported and read as empty, and never written over (`keepMeasure` refuses).
  */
 export async function readMeasures(root: string, problems: Problem[]): Promise<LoudnessFile> {
   const read = await readResource(root, LOUDNESS_FILE, LoudnessFileSchema, problems)
   return read === 'missing' || read === 'invalid' ? {} : read
+}
+
+/** Whether the kept file is there but cannot be read: it is reported and never written over. */
+export async function measuresBroken(root: string): Promise<boolean> {
+  const problems: Problem[] = []
+  await readResource(root, LOUDNESS_FILE, LoudnessFileSchema, problems)
+  return problems.length > 0
 }
 
 /** One change at a time per project: each reads the file the one before wrote. */
@@ -30,6 +37,9 @@ const writes = createSerial()
 function edit(projectFile: string, change: (file: LoudnessFile) => void): Promise<void> {
   return writes.run(projectFile, async () => {
     const root = dirname(projectFile)
+    if (await measuresBroken(root)) {
+      throw new Error(`${LOUDNESS_FILE} cannot be read; fix or delete it to keep loudness figures`)
+    }
     const file = await readMeasures(root, [])
     change(file)
     await writeAtomic(root, LOUDNESS_FILE, `${JSON.stringify(file, null, 2)}\n`)

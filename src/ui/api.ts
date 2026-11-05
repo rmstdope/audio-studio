@@ -800,7 +800,7 @@ export function useSceneLoudness(partId: string) {
     refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length > 0 ? 1000 : false),
   })
   const start = useMutation({
-    mutationFn: async (open: { scene: string; entry: SceneMix } | null) => {
+    mutationFn: async (open: { scene: string; entry: SceneMix } | null): Promise<string | null> => {
       const response = await fetch(`/api/scene-loudness/${encodeURIComponent(partId)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -809,8 +809,14 @@ export function useSceneLoudness(partId: string) {
       if (!response.ok && response.status !== 409) {
         throw new Error(`measuring the scenes answered ${response.status}`)
       }
+      if (response.ok) return null
+      return ((await response.json()) as { message?: string }).message ?? 'The studio refused.'
     },
-    onSettled: () => client.refetchQueries({ queryKey: ['scene-loudness'] }),
+    // A run can end before the first look at how far it has got: read the figures either way.
+    onSettled: async () => {
+      await client.refetchQueries({ queryKey: ['scene-loudness'] })
+      await client.invalidateQueries({ queryKey: ['project'] })
+    },
   })
   const running = making.data?.[partId] ?? null
   const done = running?.done
@@ -824,7 +830,7 @@ export function useSceneLoudness(partId: string) {
     if (was.current && !running) void client.invalidateQueries({ queryKey: ['project'] })
     was.current = running !== null
   }, [client, running])
-  return { running, start: start.mutate }
+  return { running, start: start.mutate, refused: start.data ?? null }
 }
 
 /** Refreshing the stingers with the project's `music.refreshShared`: see `useRefreshRun`. */

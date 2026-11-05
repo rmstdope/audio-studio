@@ -184,6 +184,8 @@ export function measureChanged(
   measure: SceneMeasure,
   scene: { entry: SceneMix | null; clips: Record<string, string> },
 ): boolean {
+  // A scene that could not be measured has nothing to be out of date.
+  if (measure.error !== null) return false
   if (!sameMix(measure.entry, scene.entry)) return true
   const was = Object.keys(measure.clips)
   const now = Object.keys(scene.clips)

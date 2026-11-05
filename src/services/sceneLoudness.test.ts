@@ -290,6 +290,19 @@ describe('startMeasure', () => {
     if (first.ok) await first.done
   })
 
+  it('ignores an open scene that is not in the act', async () => {
+    const { root, projectFile } = repo()
+    const started = await startMeasure(
+      projectFile,
+      'act1',
+      { scene: 'elsewhere', entry: { effects: [] } },
+      { audio: fakeAudio().audio },
+    )
+    if (started.ok) await started.done
+    expect(kept(root).act1.a.draft).toBeNull()
+    expect(kept(root).act1.a.saved).not.toBeNull()
+  })
+
   it('knows no act that is not in the project', async () => {
     const { projectFile } = repo()
     expect(await startMeasure(projectFile, 'act9', null)).toMatchObject({
@@ -345,12 +358,18 @@ describe('the kept figures', () => {
     expect(existsSync(join(root, LOUDNESS_FILE))).toBe(false)
   })
 
-  it('start afresh from a file that cannot be read', async () => {
+  it('never write over a file that cannot be read, and refuse to start a measure', async () => {
     const { root, projectFile } = repo()
     const { writeFileSync, mkdirSync } = await import('node:fs')
     mkdirSync(join(root, '.content-studio'), { recursive: true })
     writeFileSync(join(root, LOUDNESS_FILE), 'not json')
-    await keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)
-    expect(kept(root).act1.a.saved.states).toHaveLength(1)
+    await expect(keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)).rejects.toThrow(
+      'cannot be read',
+    )
+    expect(readFileSync(join(root, LOUDNESS_FILE), 'utf8')).toBe('not json')
+    expect(await startMeasure(projectFile, 'act1', null)).toMatchObject({
+      ok: false,
+      kind: 'unreadable',
+    })
   })
 })

@@ -32,6 +32,7 @@ const puts: { path: string; body: { scene: SceneMix; was: SceneMix | null } }[] 
 let saveAnswer: { status: number; body: unknown } = { status: 200, body: { ok: true } }
 let saveGate: Promise<void> | null = null
 const gains: number[] = []
+let measureAnswer: { status: number; body: unknown } = { status: 200, body: { ok: true } }
 const measures: { path: string; body: { open?: { scene: string; entry: SceneMix } } }[] = []
 const loops: boolean[] = []
 // A page left mounted would go on guarding its unsaved changes in the next test.
@@ -49,6 +50,7 @@ beforeEach(() => {
   refreshAnswer = { status: 200, body: { ok: true } }
   puts.length = 0
   measures.length = 0
+  measureAnswer = { status: 200, body: { ok: true } }
   saveAnswer = { status: 200, body: { ok: true } }
   saveGate = null
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
@@ -60,7 +62,7 @@ beforeEach(() => {
     }
     if (init?.method === 'POST' && path.startsWith('/api/scene-loudness')) {
       measures.push({ path, body: JSON.parse(init.body as string) })
-      return Response.json({ ok: true })
+      return Response.json(measureAnswer.body, { status: measureAnswer.status })
     }
     if (init?.method === 'POST') {
       return Response.json(refreshAnswer.body, { status: refreshAnswer.status })
@@ -1665,6 +1667,31 @@ describe('the Loudness panel', () => {
     expect(text(panel(page).querySelector('.scene-loud-when'))).toBe(
       'Measured today 14:02 · being measured again',
     )
+  })
+
+  it('says why a measure was refused', async () => {
+    measureAnswer = { status: 409, body: { ok: false, message: 'the kept file cannot be read' } }
+    const page = render(open, summary('ok', true, { target }))
+    await act(async () => button(panel(page), 'Measure loudness').click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
+    expect(text(panel(page).querySelector('.scene-problem'))).toBe('the kept file cannot be read')
+  })
+
+  it('keeps showing a measure made with unsaved changes after one more edit, saying it changed', async () => {
+    const draftMeasure = measureOf({ entry: { effects: [] } })
+    const page = render(
+      open,
+      summary('ok', true, { target, loudness: loudness(null, draftMeasure) }),
+    )
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(slider, '50')
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      slider.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(panel(page).querySelectorAll('tbody tr').length).toBe(2)
+    expect(text(panel(page).querySelector('h2'))).toContain('· changed since measured')
   })
 
   it('does not start a second measure while one runs', async () => {

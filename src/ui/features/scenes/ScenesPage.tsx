@@ -220,6 +220,7 @@ export function ScenesPage({
                 draft={editor.draft}
                 dirty={editor.dirty}
                 running={loudness.running}
+                refused={loudness.refused}
                 onMeasure={loudness.start}
               />
               <SceneDetail
