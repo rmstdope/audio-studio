@@ -35,16 +35,19 @@ export async function readMusic(
   const { music } = project
   if (!music) return null
   const lists: MusicListInput[] = []
-  for (const part of music.from.part ? project.parts : []) {
-    const file = partPathFor(music.from.part!, part.id)
-    lists.push({
-      id: part.id,
-      kind: 'act',
-      title: part.title,
-      file,
-      state: await readList(root, file, LoopListSchema, problems),
-      canRefresh: Boolean(project.refresh?.part),
-    })
+  const loops = music.from.part
+  if (loops) {
+    for (const part of project.parts) {
+      const file = partPathFor(loops, part.id)
+      lists.push({
+        id: part.id,
+        kind: 'act',
+        title: part.title,
+        file,
+        state: await readList(root, file, LoopListSchema, problems),
+        canRefresh: Boolean(project.refresh?.part),
+      })
+    }
   }
   if (music.from.shared) {
     lists.push({

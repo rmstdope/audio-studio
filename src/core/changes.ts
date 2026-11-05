@@ -83,6 +83,15 @@ function normal(path: string): string {
   return posix.normalize(path).replace(/^\.\//, '').replace(/\/+$/, '')
 }
 
+/** Each part's loops list as a music file of the changes; none without `from.part`. */
+function loopFiles(
+  parts: Project['parts'],
+  template: string | undefined,
+): [string, MusicFileRole][] {
+  if (template === undefined) return []
+  return parts.map((part) => [normal(partPathFor(template, part.id)), 'list'])
+}
+
 /** The paths the studio reads and writes for a project: what git is asked about, and grouped by. */
 export function projectPaths(project: Project, projectPath: string): ProjectPaths {
   const { narration, music, images } = project
@@ -101,12 +110,7 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
     music: music
       ? {
           files: Object.fromEntries([
-            ...(music.from.part === undefined
-              ? []
-              : project.parts.map((part): [string, MusicFileRole] => [
-                  normal(partPathFor(music.from.part!, part.id)),
-                  'list',
-                ])),
+            ...loopFiles(project.parts, music.from.part),
             ...(music.from.shared === undefined
               ? []
               : [[normal(music.from.shared), 'list'] as [string, MusicFileRole]]),

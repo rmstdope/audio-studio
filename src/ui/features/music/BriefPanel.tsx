@@ -67,6 +67,7 @@ function GameChanged({ track }: { track: TrackRow }) {
   const save = useSetTrackBrief(track.id)
   const keep = useKeepMyBrief(track.id)
   const busy = save.isPending || keep.isPending
+  const error = save.error ?? keep.error
   const failed = [save.data, keep.data].find((data) => data && !data.ok && 'problems' in data)
   return (
     <section className="notice notice-warn" aria-label="The game's brief changed">
@@ -80,9 +81,7 @@ function GameChanged({ track }: { track: TrackRow }) {
         {failed && 'problems' in failed && (
           <Problems title="The brief could not be changed" problems={failed.problems} />
         )}
-        {(save.error ?? keep.error) && (
-          <span className="adopt-error">{(save.error ?? keep.error)!.message}</span>
-        )}
+        {error && <span className="adopt-error">{error.message}</span>}
         <button
           className="btn"
           type="button"

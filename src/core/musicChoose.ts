@@ -50,18 +50,14 @@ export function formatMusicLock(lock: MusicLock): string {
   const ids = Object.keys(lock).sort()
   if (!ids.length) return '{}\n'
   const lines = ids.map((id) => {
-    const { fp, model, seed, list, take, inputs, at } = lock[id]!
-    const { brief, ...rest } = inputs
-    const entry = {
-      fp,
-      model,
-      seed,
-      list: list === 'stingers' ? SHARED_LIST : list,
-      take,
+    const entry = lock[id]!
+    const { brief, ...rest } = entry.inputs
+    const written = {
+      ...entry,
+      list: entry.list === 'stingers' ? SHARED_LIST : entry.list,
       inputs: { text: brief, ...rest },
-      at,
     }
-    return ` ${JSON.stringify(id)}: ${JSON.stringify(entry)}`
+    return ` ${JSON.stringify(id)}: ${JSON.stringify(written)}`
   })
   return `{\n${lines.join(',\n')}\n}\n`
 }
