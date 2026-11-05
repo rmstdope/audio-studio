@@ -134,9 +134,49 @@ function joined(names: string[]): string {
     : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
+/** A piece of a line; a strong one is shown bold. */
+export interface Segment {
+  text: string
+  strong: boolean
+}
+
+/** The muted line saying why no change can make the scene louder: the sounds at 300%, each named in bold. */
+export function limitLine(suggestion: Extract<Suggestion, { kind: 'limit' }>): Segment[] {
+  const { sounds, every } = suggestion
+  const head = { text: 'No change can make the whole scene louder: ', strong: false }
+  if (every) {
+    const top = Math.max(...sounds.map((s) => s.level))
+    return [
+      {
+        ...head,
+        text: `${head.text}every sound in it is at ${top}%, as loud as it goes. The sounds themselves are too quiet for the target.`,
+      },
+    ]
+  }
+  const one = sounds.length === 1
+  const same = sounds.every((s) => s.level === sounds[0]?.level)
+  const names = sounds.map((s) => (same ? s.name : `${s.name} (${s.level}%)`))
+  const out: Segment[] = [head]
+  names.forEach((name, i) => {
+    if (i > 0) out.push({ text: i === names.length - 1 ? ' and ' : ', ', strong: false })
+    const bare = sounds[i]?.name ?? name
+    out.push({ text: bare, strong: true })
+    if (!same) out.push({ text: name.slice(bare.length), strong: false })
+  })
+  const level = sounds[0]?.level
+  const verb = same
+    ? `${one ? 'is' : 'are'} at ${level}%, as loud as ${one ? 'it goes' : 'they go'}`
+    : 'are as loud as they go'
+  out.push({
+    text: ` ${verb}. Turn ${one ? sounds[0]?.name : 'them'} down or the others up by hand.`,
+    strong: false,
+  })
+  return out
+}
+
 /** The suggestion line: its text around the amount (shown strong), and the button ("Make 4.0 dB louder"), if any. */
 export function suggestionLine(
-  suggestion: Suggestion,
+  suggestion: Exclude<Suggestion, { kind: 'limit' }>,
   tolerance: number,
 ): { before: string; strong: string; after: string; button: string | null } {
   if (suggestion.kind === 'none') {

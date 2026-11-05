@@ -1836,6 +1836,20 @@ describe('the loudness suggestion', () => {
     expect(panel(render(open, noTarget)).querySelector('.scene-suggest')).toBeNull()
   })
 
+  it('says why no louder change exists when a sound is at 300%, with no button', () => {
+    const page = render(open, withMeasure(saved(3), 3))
+    const p = panel(page)
+    expect(line(page)).toContain('No change can make the whole scene louder:')
+    expect(line(page)).toContain('is at 300%, as loud as it goes.')
+    expect(p.querySelector('.scene-suggest-muted')).not.toBeNull()
+    expect(p.querySelector('.scene-suggest strong')).not.toBeNull()
+    expect(p.querySelector('.scene-suggest button')).toBeNull()
+    const order = [...p.children].map((c) => c.className)
+    expect(order.indexOf('scene-suggest scene-suggest-muted')).toBeLessThan(
+      order.indexOf('faint scene-loud-when'),
+    )
+  })
+
   it('moves the music and every effect on the page only, and shows the expected figures', async () => {
     const page = render(open, withMeasure(saved()))
     await press(page, 'Make 4.0 dB louder')

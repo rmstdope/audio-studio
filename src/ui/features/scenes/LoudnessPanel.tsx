@@ -18,7 +18,7 @@ import {
   type SceneRow,
 } from '../../../core/scenes'
 import type { Moved } from '../../sceneDraft'
-import { changeWord, measuredLine, suggestionLine } from '../../scenesText'
+import { changeWord, limitLine, measuredLine, suggestionLine } from '../../scenesText'
 
 /** How far a measure of the act has got. */
 export interface Running {
@@ -123,7 +123,10 @@ export function LoudnessPanel({
     kept &&
     target &&
     (moved !== null || suggestChange(kept, target, now.entry ?? page) !== null)
-  const line = suggestion ? suggestionLine(suggestion, target?.tolerance ?? 0) : null
+  const line =
+    suggestion && suggestion.kind !== 'limit'
+      ? suggestionLine(suggestion, target?.tolerance ?? 0)
+      : null
   const justMade =
     expected && dirty && moved && pressed?.measuredAt === kept?.measuredAt
       ? `Made ${changeWord(moved.db)}. Save to keep it, Discard to undo.`
@@ -247,6 +250,15 @@ export function LoudnessPanel({
               {line.button}
             </button>
           )}
+        </div>
+      )}
+      {suggestion?.kind === 'limit' && (
+        <div className="scene-suggest scene-suggest-muted">
+          <span>
+            {limitLine(suggestion).map((part, i) =>
+              part.strong ? <strong key={i}>{part.text}</strong> : part.text,
+            )}
+          </span>
         </div>
       )}
       {justMade && <p className="faint scene-suggest-note">{justMade}</p>}

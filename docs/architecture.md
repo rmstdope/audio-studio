@@ -2035,6 +2035,12 @@ page is what the measure is compared with, saved press or not. A music with no t
 press leaves it alone and the expected scene does too. The levels a press moved show in amber on the page
 (with "was N%" for a screen reader) until saved or discarded.
 
+**When a louder change has no room** (as-w5p; `docs/ui/as-w5p-loudness-ceiling.html`). A scene that
+needs to be louder while a sound is within 0.1 dB of 300% gets `suggestChange` kind `limit` instead
+of nothing: a muted line, no button, naming every sound at the limit with its real level (the music
+as "the music"), or saying the sounds themselves are too quiet when every playing sound is there
+(`limitLine` in `ui/scenesText.ts`). A too loud scene always gets the ordinary change.
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),

@@ -230,6 +230,32 @@ describe('suggestChange', () => {
       ceiling: { sound: 'cat-purr', still: [2.2, 3.4] },
     })
   })
+  it('says which sounds are at the limit when no louder change has room', () => {
+    expect(change([-48, -43], mixOf({ 'door-creak': 3, rain: 1 }, 0.5))).toEqual({
+      kind: 'limit',
+      sounds: [{ name: 'door-creak', level: 300 }],
+      every: false,
+    })
+    expect(change([-48], mixOf({ 'door-creak': 2.99 }, 0.5))).toMatchObject({
+      sounds: [{ name: 'door-creak', level: 299 }],
+    })
+  })
+  it('names every sound at the limit, the music as "the music"', () => {
+    expect(change([-48], mixOf({ a: 3, b: 2.98, c: 1 }, 3))).toMatchObject({
+      sounds: [
+        { name: 'the music', level: 300 },
+        { name: 'a', level: 300 },
+        { name: 'b', level: 298 },
+      ],
+      every: false,
+    })
+  })
+  it('says every sound is at the limit when none can go up, ignoring sounds at 0%', () => {
+    expect(change([-48], mixOf({ a: 3, off: 0 }, 3))).toMatchObject({ every: true })
+  })
+  it('gives a too loud scene its ordinary change even with a sound at 300%', () => {
+    expect(change([-16.2, -17], mixOf({ a: 3 }))).toMatchObject({ kind: 'change', db: -3.4 })
+  })
   it('is not a ceiling when the capped change still brings every state within the tolerance', () => {
     const out = suggestChange(measure([-22.1, -22.3]), t2, mixOf({ a: 2.85 }))
     expect(out).toMatchObject({ kind: 'change', ceiling: null })

@@ -255,6 +255,11 @@ export function scaleMix(mix: SceneMix, db: number): SceneMix {
   }
 }
 
+/** How many dB (one decimal, rounded down) a level can go up before it passes 300%. */
+function roomDb(level: number): number {
+  return Math.floor(20 * Math.log10(MAX_LEVEL / level) * 10) / 10
+}
+
 /** What the panel offers to bring a scene within the target. */
 export type Suggestion =
   | {
@@ -270,6 +275,14 @@ export type Suggestion =
     }
   /** States on both sides of the target and the best change under 0.5 dB: nothing to press. */
   | { kind: 'none'; loud: string[]; quiet: string[] }
+  /** The scene needs to be louder but a sound is within 0.1 dB of 300%: nothing to press, only a reason. */
+  | {
+      kind: 'limit'
+      /** Every sound at the limit, with its level in whole percent; the music is "the music". */
+      sounds: { name: string; level: number }[]
+      /** Every sound that plays is at the limit, so there is nothing to turn up. */
+      every: boolean
+    }
 
 /**
  * The one change for the whole scene that comes closest to bringing every measured state within the
@@ -306,9 +319,18 @@ export function suggestChange(
   const top = sounds.reduce((a, b) => (b.level > a.level ? b : a), { id: '', level: 0 })
   let ceiling: { sound: string; still: number[] } | null = null
   if (db > 0 && top.level > 0) {
-    const room = Math.floor(20 * Math.log10(MAX_LEVEL / top.level) * 10) / 10
+    const room = roomDb(top.level)
     if (room < db) {
-      if (room < 0.1) return null
+      if (room < 0.1) {
+        const playing = [
+          ...(mix.music?.track ? [{ name: 'the music', level: mix.music.level }] : []),
+          ...mix.effects.map((e) => ({ name: e.id, level: e.level })),
+        ].filter((x) => x.level > 0)
+        const sounds = playing
+          .filter((x) => roomDb(x.level) < 0.1)
+          .map((x) => ({ name: x.name, level: Math.round(x.level * 100) }))
+        return { kind: 'limit', sounds, every: sounds.length === playing.length }
+      }
       db = room
       const still = read
         .filter((s) => s.off + db < -target.tolerance)
