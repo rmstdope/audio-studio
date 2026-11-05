@@ -272,7 +272,7 @@ export const LockEntrySchema = z.looseObject({
   fp: z.string(),
   voice: z.string(),
   model: z.string(),
-  parts: z.object({ cue: z.string(), text: z.string(), said: z.string(), settings: z.string() }),
+  hashes: z.object({ cue: z.string(), text: z.string(), said: z.string(), settings: z.string() }),
   /** Share of the words Whisper heard in the kept take; absent for adopted clips. */
   heard: z.number().min(0).max(1).optional(),
   takes: z.number().int().min(1).optional(),
@@ -283,7 +283,7 @@ export const LockEntrySchema = z.looseObject({
   at: z.string(),
 })
 
-/** A part's lock (`narration.lock.json`): line key → what its clip was made from. */
+/** A part's narration lock (`content-studio/narration/<part>[.<lang>].lock.json`): line key → what its clip was made from. */
 export const LockSchema = z.record(z.string(), LockEntrySchema)
 
 /** A voiced line of dialog. */

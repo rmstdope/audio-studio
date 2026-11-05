@@ -8,7 +8,7 @@ const entry = (model: string) => ({
   fp: 'x',
   voice: 'v1',
   model,
-  parts: { cue: 'a', text: 'b', said: 'c', settings: 'd' },
+  hashes: { cue: 'a', text: 'b', said: 'c', settings: 'd' },
   at: 'then',
 })
 

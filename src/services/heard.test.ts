@@ -15,7 +15,7 @@ const files = {
       fp: 'f',
       voice: 'v-m',
       model: 'm',
-      parts: { cue: 'c', text: 't', said: 's', settings: 'x' },
+      hashes: { cue: 'c', text: 't', said: 's', settings: 'x' },
       heard: 0.5,
       at,
     },

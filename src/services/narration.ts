@@ -552,7 +552,7 @@ export async function commitClip({
   }
 
   const duration = pyRound(clip.seconds)
-  const { fp, parts } = fingerprint(inputs)
+  const { fp, hashes } = fingerprint(inputs)
   try {
     const problems = await inPartTurn(
       projectFile,
@@ -576,7 +576,7 @@ export async function commitClip({
           fp,
           voice: inputs.voice,
           model: inputs.model,
-          parts,
+          hashes,
           takes,
           ...(take.heard === null ? {} : { heard: take.heard }),
           at,

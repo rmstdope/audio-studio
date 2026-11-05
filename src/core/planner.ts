@@ -402,8 +402,15 @@ export function adoptUntracked(input: PlanInput, now: string): { lock: Lock; ado
     if (!untracked.has(line.key)) continue
     // An untracked line has a voice, so it has inputs.
     const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)!
-    const { fp, parts } = fingerprint(inputs)
-    lock[line.key] = { fp, voice: inputs.voice, model: inputs.model, parts, adopted: true, at: now }
+    const { fp, hashes } = fingerprint(inputs)
+    lock[line.key] = {
+      fp,
+      voice: inputs.voice,
+      model: inputs.model,
+      hashes,
+      adopted: true,
+      at: now,
+    }
   }
   return { lock, adopted: untracked.size }
 }

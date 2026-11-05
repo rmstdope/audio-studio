@@ -298,7 +298,7 @@ describe('removeOrphans', () => {
         fp: 'x',
         voice: 'v',
         model: 'm',
-        parts: { cue: '', text: '', said: '', settings: '' },
+        hashes: { cue: '', text: '', said: '', settings: '' },
         at: 't',
       },
     },

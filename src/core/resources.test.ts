@@ -3,6 +3,7 @@ import { problemsFrom } from './project'
 import {
   CastSchema,
   DialogSchema,
+  LockSchema,
   NarrationEditsSchema,
   cuesOfEdits,
   formatEdits,
@@ -205,5 +206,26 @@ describe('the narration edits', () => {
         '  "scenes": {\n    "Cave": "[dark]"\n  }\n}\n',
     )
     expect(formatEdits([])).toBe('{\n  "cues": {},\n  "scenes": {}\n}\n')
+  })
+})
+
+describe('the narration lock', () => {
+  const entry = {
+    fp: '8c67d33efba8d9af',
+    voice: 'v1',
+    model: 's2.1-pro-free',
+    hashes: { cue: 'a', text: 'b', said: 'c', settings: 'd' },
+    heard: 1,
+    takes: 1,
+    at: '2026-11-04T09:56:41.790Z',
+  }
+
+  it('keeps each line’s short hashes under hashes', () => {
+    expect(LockSchema.parse({ a1: entry }).a1!.hashes).toEqual(entry.hashes)
+  })
+
+  it('refuses an entry without them', () => {
+    const { hashes, ...old } = entry
+    expect(LockSchema.safeParse({ a1: { ...old, parts: hashes } }).success).toBe(false)
   })
 })

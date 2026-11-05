@@ -472,7 +472,7 @@ describe('review fixes', () => {
           fp: 'x',
           voice: 'v1',
           model: 's2.1-pro-free',
-          parts: { cue: '', text: '', said: '', settings: '' },
+          hashes: { cue: '', text: '', said: '', settings: '' },
           at: 'then',
           future: 42,
         },
@@ -703,8 +703,8 @@ describe('a part in several languages', () => {
       {},
       narration,
     )!
-    const { fp, parts } = fingerprint(inputs)
-    const made = { a: { fp, voice: 'v1-sv', model: inputs.model, parts, at: 'then' } }
+    const { fp, hashes } = fingerprint(inputs)
+    const made = { a: { fp, voice: 'v1-sv', model: inputs.model, hashes, at: 'then' } }
     const { part } = await open('sv', 'act1', {
       'content-studio/narration/cast.json': {
         speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } } },

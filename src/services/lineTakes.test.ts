@@ -267,14 +267,14 @@ describe('useLineTake', () => {
       parsed.narration,
       's1',
     )!
-    const { fp, parts } = fingerprint(finalInputs)
+    const { fp, hashes } = fingerprint(finalInputs)
     const root = tempRepo({
       ...files,
       'content-studio.json': project,
       'audio/act1/manifest.json': { k1: { file: 'k1.mp3', speaker: 'narrator', duration: 1 } },
       'audio/act1/k1.mp3': 'paid',
       'content-studio/narration/act1.lock.json': {
-        k1: { fp, voice: 'v-n', model: 's1', parts, at: 'then' },
+        k1: { fp, voice: 'v-n', model: 's1', hashes, at: 'then' },
       },
     })
     const { fish } = fakeFish()

@@ -52,8 +52,8 @@ function entryFor(
     theCast.pronounce,
     narration,
   )!
-  const { fp, parts } = fingerprint(inputs)
-  return { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then', ...extra }
+  const { fp, hashes } = fingerprint(inputs)
+  return { fp, voice: inputs.voice, model: inputs.model, hashes, at: 'then', ...extra }
 }
 
 const trackedLock = { n1: entryFor(lines[0]!), m1: entryFor(lines[1]!) }
@@ -277,8 +277,8 @@ describe('planPart, clips made with the final model', () => {
       withFinal,
       model,
     )!
-    const { fp, parts } = fingerprint(inputs)
-    return { fp, voice: inputs.voice, model, parts, at: 'then' }
+    const { fp, hashes } = fingerprint(inputs)
+    return { fp, voice: inputs.voice, model, hashes, at: 'then' }
   }
 
   it('counts a final clip as up to date, and says it is final', () => {
@@ -315,8 +315,10 @@ describe('planPart, a weak final clip', () => {
       withFinal,
       's2-pro',
     )!
-    const { fp, parts } = fingerprint(inputs)
-    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', parts, at: 'then', heard: 0.5 } }
+    const { fp, hashes } = fingerprint(inputs)
+    const lock = {
+      n1: { fp, voice: inputs.voice, model: 's2-pro', hashes, at: 'then', heard: 0.5 },
+    }
     expect(planPart(input({ lock, narration: withFinal })).lines[0]).toMatchObject({
       status: 'weak',
       final: true,
@@ -398,8 +400,8 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
   }
   function madeOnS1(line: Line): LockEntry {
     const inputs = clipInputs(line, cast.speakers[line.speaker], {}, cast.pronounce, onS1)!
-    const { fp, parts } = fingerprint(inputs)
-    return { fp, voice: inputs.voice, model: 's1', parts, at: 'then' }
+    const { fp, hashes } = fingerprint(inputs)
+    return { fp, voice: inputs.voice, model: 's1', hashes, at: 'then' }
   }
 
   it('keeps them up to date: Fish records s1 with s2.1-pro at the same price', () => {
@@ -423,8 +425,8 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
       },
     }
     const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, other)!
-    const { fp, parts } = fingerprint(inputs)
-    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', parts, at: 'then' } }
+    const { fp, hashes } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', hashes, at: 'then' } }
     const state = planPart(input({ lock, narration: onS21 }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['model'] })
   })
@@ -445,8 +447,8 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
       },
     }
     const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, wasS1, 's1')!
-    const { fp, parts } = fingerprint(inputs)
-    const lock = { n1: { fp, voice: inputs.voice, model: 's1', parts, at: 'then' } }
+    const { fp, hashes } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's1', hashes, at: 'then' } }
     const state = planPart(input({ lock, narration: split, cues: { n1: '[sad]' } }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['cue'] })
   })
@@ -629,8 +631,8 @@ describe('planPart, cues inside a line', () => {
   it('is stale again when the cue inside changes, and ok when a clip was made with it', () => {
     const entry = (cue: string) => {
       const inputs = clipInputs(lines[0]!, cast.speakers.narrator, { n1: cue }, {}, narration)!
-      const { fp, parts } = fingerprint(inputs)
-      return { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then' }
+      const { fp, hashes } = fingerprint(inputs)
+      return { fp, voice: inputs.voice, model: inputs.model, hashes, at: 'then' }
     }
     const lock = { ...trackedLock, n1: entry(inside) }
     expect(planPart(input({ lock, cues: { n1: inside } })).lines[0]!.status).toBe('ok')
@@ -884,7 +886,7 @@ describe('a Fish voice’s fingerprint', () => {
     )!
     expect(fingerprint(inputs)).toEqual({
       fp: '94f2174f922de996',
-      parts: { cue: '1e136cf1', text: '8cb63797', said: '8cb63797', settings: 'ab047dd6' },
+      hashes: { cue: '1e136cf1', text: '8cb63797', said: '8cb63797', settings: 'ab047dd6' },
     })
   })
 })
