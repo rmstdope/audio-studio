@@ -57,7 +57,7 @@ import { readMusic } from './musicLists'
 import { isRefreshing, isRefreshingShared } from './refresh'
 import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
-import { CACHE_DIR } from '../core/project'
+import { CACHE_DIR, MUSIC_LOCK_FILE } from '../core/project'
 
 /** The queue's key for takes made in the cloud: one at a time, beside the GPU's. */
 const CLOUD = 'music-cloud'
@@ -812,7 +812,7 @@ export function createMusicTakes({
           const chosenTracks = await readChosen(found.root, found.music, problems)
           // Which take the game plays is not known: nothing is dropped.
           if (!chosenTracks || problems.length)
-            return { ok: false, file: found.music.paths.lock, problems }
+            return { ok: false, file: MUSIC_LOCK_FILE, problems }
           const chosen = chosenTracks[id]?.lock
           const take = board.takes.find((t) => fileOf(t) === name)
           if (!take) return { ok: false, message: 'That take is not on the board.' }
@@ -844,7 +844,7 @@ export function createMusicTakes({
           const chosenTracks = await readChosen(found.root, found.music, problems)
           // Which take the game plays is not known: nothing is changed.
           if (!chosenTracks || problems.length)
-            return { ok: false, file: found.music.paths.lock, problems }
+            return { ok: false, file: MUSIC_LOCK_FILE, problems }
           if (found.inputs.kind !== 'stinger')
             return { ok: false, message: 'Only a stinger can fade.' }
           const take = board.takes.find((t) => fileOf(t) === name)
@@ -867,7 +867,7 @@ export function createMusicTakes({
             } catch {
               return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
             }
-            const game = join(found.music.paths.clips, `${id}.mp3`)
+            const game = join(found.music.clips, `${id}.mp3`)
             const was = await Bun.file(resolveInRoot(found.root, game))
               .bytes()
               .catch(() => null)
@@ -1035,7 +1035,7 @@ export function createMusicTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       return boards.run(`${projectFile}\0${id}`, () =>
-        acceptChange({ root: found.root, projectFile, music: found.music, id, now: found.inputs }),
+        acceptChange({ root: found.root, projectFile, id, now: found.inputs }),
       )
     },
 

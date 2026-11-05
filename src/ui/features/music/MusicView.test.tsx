@@ -42,6 +42,8 @@ const track = (id: string, title: string, status: TrackStatus): TrackRow => ({
   bpm: null,
   key: null,
   game: { brief: 'A brief', seconds: 30, bpm: null, key: null },
+  gameChanged: false,
+  gameWas: null,
   status,
   changed: status === 'changed' ? ['brief'] : [],
   chosenAt: status === 'not-chosen' ? null : '2026-10-01T10:00:00.000Z',
@@ -78,10 +80,13 @@ function render(
   show?: 'attention',
   orphans: OrphanRow[] = [],
   making: Record<string, unknown> = {},
+  roof: Partial<TrackRow> = {},
 ) {
   const id = kind === 'act' ? 'act1' : 'stingers'
+  const shown = list(id, kind)
+  const tracks = shown.tracks.map((t) => (t.id === 'roof' ? { ...t, ...roof } : t))
   const summary = {
-    music: { lists: [{ ...list(id, kind), orphans }] },
+    music: { lists: [{ ...shown, tracks, orphans }] },
   } as unknown as ProjectSummary
   const route = (
     kind === 'act'
@@ -242,6 +247,18 @@ describe('a track’s status while takes are made', () => {
         .querySelector('td:last-child')!.textContent
     expect(status('Roof')).toBe('making 2 takes · about 2 min')
     expect(status('Cellar')).toBe('changed since chosen')
+  })
+})
+
+describe('a track whose brief the game changed', () => {
+  it('says so beside its brief, and nothing beside the others', () => {
+    const { container } = render('act', undefined, [], {}, { gameChanged: true, gameWas: 'old' })
+    const cells = [...container.querySelectorAll('td.music-brief-cell')]
+    const marked = cells.filter((cell) => cell.querySelector('.chip'))
+    expect(marked.map((cell) => cell.querySelector('.chip')!.textContent)).toEqual([
+      "game's changed",
+    ])
+    expect(marked[0]!.closest('tr')!.textContent).toContain('Roof')
   })
 })
 

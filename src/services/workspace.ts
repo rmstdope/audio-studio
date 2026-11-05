@@ -436,7 +436,7 @@ export async function musicClipFile(projectFile: string, file: string): Promise<
   const opened = await openProject(projectFile)
   if (!opened.ok || !opened.project.music) return null
   if (file.startsWith('.') || !file.endsWith('.mp3')) return null
-  const folder = resolveInRoot(dirname(projectFile), opened.project.music.paths.clips)
+  const folder = resolveInRoot(dirname(projectFile), opened.project.music.clips)
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
 

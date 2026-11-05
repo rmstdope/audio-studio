@@ -36,14 +36,18 @@ const TrackShape = z.object({
   title: z.string().min(1),
   plays: z.string().min(1).optional(),
   file: GameFile.optional(),
-  brief: z.string().min(1),
+  /** What the track should sound like, in the game's words. */
+  text: z.string().min(1),
   seconds: z.number().int().positive(),
   bpm: z.number().int().min(30).max(300).optional(),
   key: z.string().min(1).optional(),
 })
 
-/** One track of a list the game writes. */
-export const TrackSchema = TrackShape
+/**
+ * One track of a list the game writes. The game's words (`text`) are the track's brief inside the
+ * studio, its pages and its API.
+ */
+export const TrackSchema = TrackShape.transform(({ text, ...track }) => ({ ...track, brief: text }))
 
 /** An act's loops, in the game's order (a list that is there and empty means the game asks for none). */
 export const LoopListSchema = z.array(TrackSchema)
@@ -56,22 +60,70 @@ export const StingerListSchema = z.array(
   }),
 )
 
-/** What the studio changed of one track's game-given values; null for bpm or key means none. */
-const BriefChange = z.object({
-  brief: z.string().min(1).optional(),
-  seconds: z.number().int().positive().optional(),
-  bpm: z.number().int().min(30).max(300).nullable().optional(),
-  key: z.string().min(1).nullable().optional(),
-})
+/**
+ * What the studio changed of one track's game-given values, as the edits file holds it: its own
+ * words (`text`) with the game's words they were written over (`gameWas`), and its length, tempo
+ * and key; null for bpm or key means none. Read with the words as the track's brief.
+ */
+const BriefChange = z
+  .object({
+    text: z.string().min(1).optional(),
+    gameWas: z.string().optional(),
+    seconds: z.number().int().positive().optional(),
+    bpm: z.number().int().min(30).max(300).nullable().optional(),
+    key: z.string().min(1).nullable().optional(),
+  })
+  .superRefine((change, context) => {
+    if (change.text !== undefined && change.gameWas === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['gameWas'],
+        message: 'give the game’s words the text was written over',
+      })
+    }
+    if (change.gameWas !== undefined && change.text === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['text'],
+        message: 'the game’s words are kept only with a text written over them',
+      })
+    }
+  })
+  .transform(({ text, ...rest }): BriefEdit => {
+    // `brief` first, so an entry read and written again keeps its order.
+    return text === undefined ? rest : { brief: text, ...rest }
+  })
 
-/** `briefs.json`: the studio's changes to the game's briefs, by track id. */
+/** One track's changes inside the studio: the edits file's text is its brief. */
+export interface BriefEdit {
+  brief?: string
+  /** The game's brief when `brief` was written or last kept; with `brief` only. */
+  gameWas?: string
+  seconds?: number
+  bpm?: number | null
+  key?: string | null
+}
+
+/** `content-studio/music/edits.json`: the studio's changes to the game's tracks, by track id. */
 export const BriefsSchema = z.record(z.string(), BriefChange)
+
+/** The edits file's text: one track per line in id order, its brief written as `text`. */
+export function formatBriefs(briefs: Briefs): string {
+  const ids = Object.keys(briefs).sort()
+  if (!ids.length) return '{}\n'
+  const lines = ids.map((id) => {
+    const { brief, ...rest } = briefs[id]!
+    const entry = brief === undefined ? rest : { text: brief, ...rest }
+    return ` ${JSON.stringify(id)}: ${JSON.stringify(entry)}`
+  })
+  return `{\n${lines.join(',\n')}\n}\n`
+}
 
 /** A track of a game-written list. */
 export type Track = z.infer<typeof TrackSchema>
 
 /** The studio's changes to the briefs, by track id. */
-export type Briefs = z.infer<typeof BriefsSchema>
+export type Briefs = Record<string, BriefEdit>
 
 /** What reading one list gave: its tracks, no file yet, or a file that failed validation. */
 export type MusicListState =
@@ -119,6 +171,10 @@ export interface TrackRow {
   key: string | null
   /** What the game's list says, for "from the game" and "use the game's". */
   game: GameBrief
+  /** The game reworded the track since the studio's brief was written or last kept. */
+  gameChanged: boolean
+  /** The game's brief the studio's was written over; null when the brief is the game's. */
+  gameWas: string | null
   /** Chosen, not chosen, changed since chosen, or its music file missing. */
   status: TrackStatus
   /** What changed since the take was chosen; empty unless the status is `changed`. */
@@ -307,6 +363,8 @@ function rowOf(
       bpm: track.bpm ?? null,
       key: track.key ?? null,
     },
+    gameChanged: change?.brief !== undefined && change.gameWas !== track.brief,
+    gameWas: change?.brief !== undefined ? (change.gameWas ?? null) : null,
   }
   const current = {
     brief: row.brief,
@@ -369,7 +427,8 @@ export function fieldSource(row: TrackRow, field: BriefField): 'game' | 'changed
   return 'changed'
 }
 
-const FIELD_ORDER: BriefField[] = ['brief', 'seconds', 'bpm', 'key']
+/** The fields of an entry in the order they are written. */
+const FIELD_ORDER: (keyof BriefEdit)[] = ['brief', 'gameWas', 'seconds', 'bpm', 'key']
 
 /**
  * The briefs with one field of a track set to `value`. A value the game already has removes the
@@ -387,6 +446,11 @@ export function applyBriefChange(
   const changed: Record<string, BriefValue | undefined> = { ...before }
   if (value === game[field]) delete changed[field]
   else changed[field] = value
+  // A rewording keeps the game's words it is written over, as the game says them now.
+  if (field === 'brief') {
+    if ('brief' in changed) changed.gameWas = game.brief
+    else delete changed.gameWas
+  }
   // Always in the same order, so setting fields in another order is no diff.
   const entry = Object.fromEntries(
     FIELD_ORDER.flatMap((f) => (f in changed ? [[f, changed[f]]] : [])),
@@ -394,6 +458,17 @@ export function applyBriefChange(
   const next: Briefs = { ...others }
   if (Object.keys(entry).length) next[id] = entry
   return Object.fromEntries(Object.entries(next).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+}
+
+/**
+ * The briefs after "Keep mine": the studio's brief for the track stays, now written over the game's
+ * brief as it is (`gameBrief`). Unchanged when the track has no brief of the studio's, or its
+ * brief is already over those words.
+ */
+export function keepMineBrief(briefs: Briefs, id: string, gameBrief: string): Briefs {
+  const own = briefs[id]
+  if (own?.brief === undefined || own.gameWas === gameBrief) return briefs
+  return { ...briefs, [id]: { ...own, gameWas: gameBrief } }
 }
 
 /** The list that holds a track and its row, by id. */

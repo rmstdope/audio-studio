@@ -4,6 +4,8 @@ import { narrationInLanguages, projectJson } from '../../test/helpers'
 import {
   CAST_FILE,
   DEFAULT_PHRASE,
+  MUSIC_EDITS_FILE,
+  MUSIC_LOCK_FILE,
   ProjectSchema,
   narrationFile,
   parseProject,
@@ -368,19 +370,13 @@ describe('partPathFor with a language', () => {
 })
 
 describe('the music section', () => {
-  const music = (paths: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
+  const music = (fields: Record<string, unknown> = {}) =>
     projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'web/audio/music',
-          manifest: 'web/audio/music/manifest.json',
-          ...paths,
-        },
-        ...extra,
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'web/audio/music',
+        manifest: 'web/audio/music/manifest.json',
+        ...fields,
       },
     })
 
@@ -388,26 +384,69 @@ describe('the music section', () => {
     expect(parse(projectJson()).data!.music).toBeUndefined()
   })
 
-  it('accepts the paths', () => {
-    const result = parse(music())
+  it('takes the loops and stingers from the game, and where the chosen takes go', () => {
+    const result = parse(music({ model: 'careful' }))
     expect(result.success).toBe(true)
-    expect(result.data!.music!.paths.stingers).toBe('tts/stingers.json')
+    expect(result.data!.music).toEqual({
+      from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+      model: 'careful',
+      clips: 'web/audio/music',
+      manifest: 'web/audio/music/manifest.json',
+    })
+  })
+
+  it('may have loops only, or stingers only', () => {
+    expect(parse(music({ from: { part: 'tts/{part}/music.json' } })).success).toBe(true)
+    expect(parse(music({ from: { shared: 'tts/stingers.json' } })).success).toBe(true)
+  })
+
+  it('needs at least one list', () => {
+    expect(problems(music({ from: {} }))).toEqual([
+      {
+        file: 'content-studio.json',
+        path: 'music.from',
+        message: 'name the loops (part), the stingers (shared) or both',
+      },
+    ])
   })
 
   it('needs {part} in the loops path', () => {
-    expect(problems(music({ loops: 'tts/music.json' }))).toEqual([
+    expect(problems(music({ from: { part: 'tts/music.json' } }))).toEqual([
       {
         file: 'content-studio.json',
-        path: 'music.paths.loops',
+        path: 'music.from.part',
         message: 'must contain {part}, or every part would share one file',
       },
     ])
   })
 
   it('refuses {language} in any music path, music being the same in every language', () => {
-    const found = problems(music({ clips: 'web/{language}/music', lock: '{language}/lock.json' }))
-    expect(found.map((p) => p.path).sort()).toEqual(['music.paths.clips', 'music.paths.lock'])
+    const found = problems(
+      music({ clips: 'web/{language}/music', from: { shared: '{language}/stingers.json' } }),
+    )
+    expect(found.map((p) => p.path).sort()).toEqual(['music.clips', 'music.from.shared'])
     expect(found[0]!.message).toContain('{language}')
+  })
+
+  it('refuses a part called shared or stingers, the names the music lock gives the stingers', () => {
+    const parts = [
+      { id: 'act1', title: 'Act I' },
+      { id: 'shared', title: 'Shared' },
+      { id: 'stingers', title: 'Stingers' },
+    ]
+    expect(problems({ ...music(), parts })).toEqual(
+      [1, 2].map((i) => ({
+        file: 'content-studio.json',
+        path: `parts[${i}].id`,
+        message: `"${parts[i]!.id}" names the stingers in the music lock: give the part another id`,
+      })),
+    )
+    expect(parse(projectJson({ parts })).success).toBe(true)
+  })
+
+  it('keeps the edits and the lock at fixed places in the studio folder', () => {
+    expect(MUSIC_EDITS_FILE).toBe('content-studio/music/edits.json')
+    expect(MUSIC_LOCK_FILE).toBe('content-studio/music/lock.json')
   })
 })
 

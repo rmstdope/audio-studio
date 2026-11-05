@@ -952,6 +952,30 @@ export function useSetTrackBrief(trackId: string) {
 }
 
 /**
+ * Keep mine on a track whose brief the game changed: the studio's brief stays, now over the
+ * game's, then reloads the project. Shares the brief's scope, so it waits for a save in flight.
+ */
+export function useKeepMyBrief(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `brief-${trackId}` },
+    mutationFn: async () => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/keep-mine`, {
+        method: 'POST',
+      })
+      if (response.status === 404) {
+        throw new Error('The game no longer lists this track; the page shows it as it is now.')
+      }
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`keeping the brief answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<BriefChangeResult>
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/**
  * Sends one change to the studio's own image words (`PATCH`/`POST` with a JSON body), then reloads
  * the project, whose Images pages show the result. A 404 means the game no longer lists the image.
  * `afterSaved` runs once the reload is done and only when the request did not fail; it is given

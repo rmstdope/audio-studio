@@ -59,14 +59,9 @@ describe('gitChanges', () => {
       ...files,
       'content-studio.json': projectJson({
         music: {
-          paths: {
-            loops: 'tts/{part}/music.json',
-            stingers: 'tts/stingers.json',
-            briefs: 'music/briefs.json',
-            lock: 'music/music.lock.json',
-            clips: 'web/music',
-            manifest: 'web/music/manifest.json',
-          },
+          from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+          clips: 'web/music',
+          manifest: 'web/music/manifest.json',
         },
       }),
     })

@@ -26,14 +26,9 @@ import type { MusicSpend } from '../core/spending'
 import { createHash } from 'node:crypto'
 
 const music = {
-  paths: {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
-    clips: 'audio/music',
-    manifest: 'audio/music/manifest.json',
-  },
+  from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+  clips: 'audio/music',
+  manifest: 'audio/music/manifest.json',
 }
 
 /**
@@ -78,8 +73,8 @@ function setup(
 ) {
   const root = tempRepo({
     'content-studio.json': projectJson({ music }),
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
-    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 }],
     ...extra,
   })
   const file = join(root, 'content-studio.json')
@@ -116,8 +111,8 @@ function setup(
 describe('makeAll, stopAll and modelState', () => {
   const two = {
     'tts/act1/music.json': [
-      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
-      { id: 'cellar', title: 'Cellar', brief: 'drips', seconds: 20 },
+      { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 },
+      { id: 'cellar', title: 'Cellar', text: 'drips', seconds: 20 },
     ],
   }
 
@@ -154,8 +149,8 @@ describe('makeAll, stopAll and modelState', () => {
     const root = tempRepo({
       'content-studio.json': projectJson({ music: { ...music, model: 'short' } }),
       'tts/act1/music.json': [
-        { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 20 },
-        { id: 'cellar', title: 'Cellar', brief: 'drips', seconds: 120 },
+        { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 20 },
+        { id: 'cellar', title: 'Cellar', text: 'drips', seconds: 120 },
       ],
     })
     const file = join(root, 'content-studio.json')
@@ -227,8 +222,8 @@ describe('makeAll, stopAll and modelState', () => {
 describe('the summary of a press on a list is kept by the studio', () => {
   const two = {
     'tts/act1/music.json': [
-      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
-      { id: 'cellar', title: 'Cellar', brief: 'drips fail', seconds: 20 },
+      { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 },
+      { id: 'cellar', title: 'Cellar', text: 'drips fail', seconds: 20 },
     ],
   }
 
@@ -783,7 +778,7 @@ describe('createMusicTakes', () => {
     function elevenProject(installed: (model: string) => boolean, localReady: MusicReady) {
       const root = tempRepo({
         'content-studio.json': projectJson({ music: { ...music, model: 'eleven' } }),
-        'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+        'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
         'tts/stingers.json': [],
       })
       const generator: MusicGenerator = {
@@ -1071,7 +1066,7 @@ describe('choosing a take', () => {
     return made
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8'))
 
   it('keeps and chooses a take made without a seed, with none recorded', async () => {
     const { root, file, takes, settled } = setup(undefined, {}, [], undefined, [], true)
@@ -1105,8 +1100,8 @@ describe('choosing a take', () => {
     expect(after.takes.map((t) => t.chosen)).toEqual([false, true])
   })
 
-  it('makes the track chosen in the project summary, and a stinger’s list is stingers', async () => {
-    const { file, takes } = setup()
+  it('makes the track chosen in the project summary, a stinger’s list written shared', async () => {
+    const { root, file, takes } = setup()
     await takes.make(file, 'victory', { count: 1 })
     for (let i = 0; i < 100; i++) {
       const v = await takes.view(file, 'victory')
@@ -1120,6 +1115,7 @@ describe('choosing a take', () => {
     if (!loaded.ok) throw new Error('project')
     const stingers = loaded.summary.music!.lists.find((l) => l.kind === 'stingers')!
     expect(stingers.tracks[0]).toMatchObject({ id: 'victory', status: 'chosen' })
+    expect(lockOf(root).victory.list).toBe('shared')
   })
 
   it('chooses another take over the first; the first stays on the board', async () => {
@@ -1190,7 +1186,7 @@ describe('choosing a take', () => {
     if (!loaded.ok) throw new Error('project')
     const row = loaded.summary.music!.lists[0]!.tracks[0]!
     expect(row).toMatchObject({ status: 'changed', changed: ['brief'] })
-    expect(lockOf(root).hall.inputs.brief).toBe('warm lute')
+    expect(lockOf(root).hall.inputs.text).toBe('warm lute')
   })
 
   it('never lets a drop of the take being chosen slip between the choice and the board', async () => {
@@ -1204,7 +1200,9 @@ describe('choosing a take', () => {
     ])
     const after = await takes.view(file, 'hall')
     if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
-    const lock = existsSync(join(root, 'music/music.lock.json')) ? lockOf(root).hall : undefined
+    const lock = existsSync(join(root, 'content-studio/music/lock.json'))
+      ? lockOf(root).hall
+      : undefined
     // Either the take was chosen and stays, or it was dropped and nothing names it.
     if (lock) expect(after.takes.some((t) => t.chosen)).toBe(true)
     else expect(after.takes.some((t) => t.n === 1)).toBe(false)
@@ -1215,15 +1213,15 @@ describe('choosing a take', () => {
   })
 
   it('refuses to drop anything while the lock cannot be read', async () => {
-    const { file, takes, settled } = await twoTakes({ 'music/music.lock.json': '{ nope' })
+    const { file, takes, settled } = await twoTakes({ 'content-studio/music/lock.json': '{ nope' })
     const view = await settled('hall')
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
     const answer = await takes.drop(file, 'hall', view.takes[0]!.file)
-    expect(answer).toMatchObject({ ok: false, file: 'music/music.lock.json' })
+    expect(answer).toMatchObject({ ok: false, file: 'content-studio/music/lock.json' })
   })
 
   it('tells the view the lock cannot be read, and not when it can', async () => {
-    const bad = await twoTakes({ 'music/music.lock.json': '{ nope' })
+    const bad = await twoTakes({ 'content-studio/music/lock.json': '{ nope' })
     const unread = await bad.settled('hall')
     if (!unread || !('ok' in unread) || !unread.ok) throw new Error('expected a view')
     expect(unread.lockUnread).toBe(true)
@@ -1238,13 +1236,13 @@ describe('choosing a take', () => {
 describe('moving a take', () => {
   const lists = {
     'tts/act1/music.json': [
-      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
-      { id: 'inn', title: 'Inn', brief: 'jolly', seconds: 40 },
+      { id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 },
+      { id: 'inn', title: 'Inn', text: 'jolly', seconds: 40 },
     ],
-    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', brief: 'eerie', seconds: 20 }],
+    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', text: 'eerie', seconds: 20 }],
     'tts/stingers.json': [
-      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
-      { id: 'defeat', title: 'Defeat', brief: 'sad', seconds: 5 },
+      { id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 },
+      { id: 'defeat', title: 'Defeat', text: 'sad', seconds: 5 },
     ],
   }
   async function made(count = 2, extra: Record<string, unknown> = {}) {
@@ -1259,7 +1257,7 @@ describe('moving a take', () => {
     return view
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8'))
 
   it('moves a take to a loop in another act as that loop’s next take, sound and all', async () => {
     const m = await made()
@@ -1291,7 +1289,7 @@ describe('moving a take', () => {
     expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({ ok: true, n: 1 })
     const hut = await viewOf(m, 'hut')
     expect(await m.takes.choose(m.file, 'hut', hut.takes[0]!.file)).toEqual({ ok: true })
-    expect(lockOf(m.root).hut.inputs).toMatchObject({ brief: 'eerie', seconds: 20 })
+    expect(lockOf(m.root).hut.inputs).toMatchObject({ text: 'eerie', seconds: 20 })
     const loaded = await loadProject(m.file)
     if (!loaded.ok) throw new Error('project')
     const row = loaded.summary.music!.lists.flatMap((l) => l.tracks).find((t) => t.id === 'hut')!
@@ -1349,7 +1347,7 @@ describe('moving a take', () => {
   })
 
   it('refuses while the music lock cannot be read', async () => {
-    const m = await made(2, { 'music/music.lock.json': '{ nope' })
+    const m = await made(2, { 'content-studio/music/lock.json': '{ nope' })
     const [one] = (await viewOf(m, 'hall')).takes
     expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({
       ok: false,
@@ -1460,7 +1458,7 @@ describe('moving a take', () => {
     const before = readdirSync(m.root).sort()
     await m.takes.move(m.file, 'hall', one!.file, 'hut')
     expect(readdirSync(m.root).sort()).toEqual(before)
-    expect(existsSync(join(m.root, 'music/music.lock.json'))).toBe(false)
+    expect(existsSync(join(m.root, 'content-studio/music/lock.json'))).toBe(false)
   })
 })
 
@@ -1493,19 +1491,19 @@ describe('fading a stinger take', () => {
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
     expect((await takeOf(made)).fades).toEqual(fades)
     expect(made.spy.wavs).toHaveLength(0)
-    expect(existsSync(join(made.root, 'music/music.lock.json'))).toBe(false)
+    expect(existsSync(join(made.root, 'content-studio/music/lock.json'))).toBe(false)
   })
 
   it('writes the faded sound at once when the take is the chosen one, leaving the lock alone', async () => {
     const made = await stinger()
     await made.takes.choose(made.file, 'victory', made.name)
-    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    const lock = readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')
     expect(made.spy.wavs).toHaveLength(1)
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
     expect(made.spy.wavs).toHaveLength(2)
     expect(firstAndLast(made.spy.wavs[1]!)).toEqual([0, 0])
     expect(made.spy.wavs[1]).not.toEqual(made.spy.wavs[0]!)
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     expect(await takeOf(made)).toMatchObject({ chosen: true, fades })
   })
 
@@ -1531,11 +1529,11 @@ describe('fading a stinger take', () => {
     await made.takes.choose(made.file, 'victory', made.name)
     await setTrackBrief(made.file, 'victory', { brief: 'a drum' })
     expect(await made.takes.accept(made.file, 'victory')).toEqual({ ok: true })
-    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    const lock = readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     expect(await made.takes.setFades(made.file, 'victory', made.name, null)).toEqual({ ok: true })
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     const loaded = await loadProject(made.file)
     if (!loaded.ok) throw new Error('project')
     const row = loaded.summary.music!.lists.find((l) => l.kind === 'stingers')!.tracks[0]!
@@ -1575,7 +1573,7 @@ describe('fading a stinger take', () => {
   it('says why when the board cannot be written for the chosen take, the lock untouched', async () => {
     const made = await stinger()
     await made.takes.choose(made.file, 'victory', made.name)
-    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    const lock = readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')
     const folder = join(made.root, 'content-studio/cache/music')
     chmodSync(folder, 0o555)
     const quiet = console.error
@@ -1589,7 +1587,7 @@ describe('fading a stinger take', () => {
       console.error = quiet
       chmodSync(folder, 0o755)
     }
-    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(readFileSync(join(made.root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
     expect((await takeOf(made)).fades).toBeUndefined()
   })
 
@@ -1654,18 +1652,18 @@ describe('fading a stinger take', () => {
   })
 
   it('refuses while the lock cannot be read', async () => {
-    const made = await stinger({ 'music/music.lock.json': '{ nope' })
+    const made = await stinger({ 'content-studio/music/lock.json': '{ nope' })
     expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toMatchObject({
       ok: false,
-      file: 'music/music.lock.json',
+      file: 'content-studio/music/lock.json',
     })
   })
 
   it('keeps the fades through a move and loses them with a drop', async () => {
     const made = await stinger({
       'tts/stingers.json': [
-        { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
-        { id: 'defeat', title: 'Defeat', brief: 'doom', seconds: 6 },
+        { id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 },
+        { id: 'defeat', title: 'Defeat', text: 'doom', seconds: 6 },
       ],
     })
     await made.takes.setFades(made.file, 'victory', made.name, fades)
@@ -1694,10 +1692,10 @@ describe('trimming a stinger take', () => {
     })
   }
   const lists = {
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
     'tts/stingers.json': [
-      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
-      { id: 'defeat', title: 'Defeat', brief: 'sad', seconds: 6 },
+      { id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 },
+      { id: 'defeat', title: 'Defeat', text: 'sad', seconds: 6 },
     ],
   }
   async function made(failEncode = false) {
@@ -1724,7 +1722,7 @@ describe('trimming a stinger take', () => {
     return view
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8'))
   const manifestOf = (root: string) =>
     JSON.parse(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8'))
 
@@ -1886,7 +1884,7 @@ describe('trimming a stinger take', () => {
     await setTrackBrief(m.file, 'victory', { brief: 'a louder fanfare' })
     expect(await m.takes.accept(m.file, 'victory')).toEqual({ ok: true })
     const accepted = lockOf(m.root).victory
-    expect(accepted.inputs.brief).toBe('a louder fanfare')
+    expect(accepted.inputs.text).toBe('a louder fanfare')
     expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
     expect(lockOf(m.root).victory.inputs).toEqual(accepted.inputs)
     expect(lockOf(m.root).victory.at).toBe(before.at)
@@ -1895,8 +1893,8 @@ describe('trimming a stinger take', () => {
   it('refuses while the music lock cannot be read, changing nothing', async () => {
     const m = await made()
     const [one] = (await viewOf(m)).takes
-    mkdirSync(join(m.root, 'music'), { recursive: true })
-    writeFileSync(join(m.root, 'music/music.lock.json'), '{ not json')
+    mkdirSync(join(m.root, 'content-studio/music'), { recursive: true })
+    writeFileSync(join(m.root, 'content-studio/music/lock.json'), '{ not json')
     expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toMatchObject({
       ok: false,
       message: 'The music lock could not be read.',

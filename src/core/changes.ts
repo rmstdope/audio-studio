@@ -1,5 +1,12 @@
 import { posix } from 'node:path'
-import { CAST_FILE, narrationFile, partPathFor, type Project } from './project'
+import {
+  CAST_FILE,
+  MUSIC_EDITS_FILE,
+  MUSIC_LOCK_FILE,
+  narrationFile,
+  partPathFor,
+  type Project,
+} from './project'
 
 /** How git sees a changed file; a conflict is a merge left to resolve before committing. */
 export type ChangeKind = 'new' | 'modified' | 'deleted' | 'renamed' | 'conflict'
@@ -76,6 +83,15 @@ function normal(path: string): string {
   return posix.normalize(path).replace(/^\.\//, '').replace(/\/+$/, '')
 }
 
+/** Each part's loops list as a music file of the changes; none without `from.part`. */
+function loopFiles(
+  parts: Project['parts'],
+  template: string | undefined,
+): [string, MusicFileRole][] {
+  if (template === undefined) return []
+  return parts.map((part) => [normal(partPathFor(template, part.id)), 'list'])
+}
+
 /** The paths the studio reads and writes for a project: what git is asked about, and grouped by. */
 export function projectPaths(project: Project, projectPath: string): ProjectPaths {
   const { narration, music, images } = project
@@ -94,16 +110,15 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
     music: music
       ? {
           files: Object.fromEntries([
-            ...project.parts.map((part): [string, MusicFileRole] => [
-              normal(partPathFor(music.paths.loops, part.id)),
-              'list',
-            ]),
-            [normal(music.paths.stingers), 'list'],
-            [normal(music.paths.briefs), 'briefs'],
-            [normal(music.paths.lock), 'lock'],
-            [normal(music.paths.manifest), 'manifest'],
+            ...loopFiles(project.parts, music.from.part),
+            ...(music.from.shared === undefined
+              ? []
+              : [[normal(music.from.shared), 'list'] as [string, MusicFileRole]]),
+            [MUSIC_EDITS_FILE, 'briefs'],
+            [MUSIC_LOCK_FILE, 'lock'],
+            [normal(music.manifest), 'manifest'],
           ]),
-          clips: `${normal(music.paths.clips)}/`,
+          clips: `${normal(music.clips)}/`,
         }
       : null,
     own: [normal(projectPath), CAST_FILE],

@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { fieldSource, type BriefChange, type BriefField, type TrackRow } from '../../../core/music'
 import type { MusicListSummary } from '../../../core/music'
 import { Problems } from '../../components/Problems'
-import { useSetTrackBrief } from '../../api'
+import { useKeepMyBrief, useSetTrackBrief } from '../../api'
 import { fieldTag, fieldText, parseField } from '../../musicText'
 
 /** The change that puts a field back to the game's value. */
@@ -41,6 +41,7 @@ export function BriefPanel({ track, kind }: { track: TrackRow; kind: MusicListSu
           </span>
         )}
       </div>
+      {track.gameChanged && <GameChanged track={track} />}
       {field('brief', 'What it should sound like', { multiline: true })}
       <div className="music-brief-grid">
         <div className="brief-field">
@@ -52,6 +53,46 @@ export function BriefPanel({ track, kind }: { track: TrackRow; kind: MusicListSu
         {field('seconds', 'Length (m:ss)')}
         {field('bpm', 'Tempo in bpm', { inputMode: 'numeric' })}
         {field('key', 'Key', { placeholder: 'e.g. D minor' })}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The notice on a track whose brief the game changed since the studio's was written: the game's
+ * brief now, with Use the game's (the studio's brief goes) and Keep mine (it stays, over the
+ * game's new brief), as the sound effects and images say it.
+ */
+function GameChanged({ track }: { track: TrackRow }) {
+  const save = useSetTrackBrief(track.id)
+  const keep = useKeepMyBrief(track.id)
+  const busy = save.isPending || keep.isPending
+  const error = save.error ?? keep.error
+  const failed = [save.data, keep.data].find((data) => data && !data.ok && 'problems' in data)
+  return (
+    <section className="notice notice-warn" aria-label="The game's brief changed">
+      <div className="notice-text">
+        <strong>The game&apos;s brief changed since you changed yours.</strong>
+        <span className="muted">
+          Yours is still the one used. The game&apos;s now says: {track.game.brief}
+        </span>
+      </div>
+      <div className="notice-actions">
+        {failed && 'problems' in failed && (
+          <Problems title="The brief could not be changed" problems={failed.problems} />
+        )}
+        {error && <span className="adopt-error">{error.message}</span>}
+        <button
+          className="btn"
+          type="button"
+          disabled={busy}
+          onClick={() => save.mutate({ brief: track.game.brief })}
+        >
+          Use the game&apos;s
+        </button>
+        <button className="btn" type="button" disabled={busy} onClick={() => keep.mutate()}>
+          Keep mine
+        </button>
       </div>
     </section>
   )

@@ -69,7 +69,8 @@ bundle breaks.
 ## Rules for the consumer repository
 
 - Read and write only the files the project file names and the studio's own files in
-  `content-studio/` (narration's cast, edits and locks in `content-studio/narration/`), through
+  `content-studio/` (narration's cast, edits and locks in `content-studio/narration/`, music's
+  edits and lock in `content-studio/music/`), through
   `resolveInRoot` and `writeAtomic`; nothing outside the project root. Clips are the one exception to `writeAtomic`: the encoder
   writes a hidden temporary file in the clips folder (through `resolveInRoot`), renamed into place
   only together with the manifest and lock update.
@@ -102,7 +103,8 @@ bundle breaks.
   `content-studio/cache/effect-boards/` and `content-studio/cache/effect-takes/`, the scenes' kept
   loudness in `content-studio/cache/scene-loudness.json`, and the person's own settings, the Fish
   tier and the take fade, in `content-studio/cache/settings.json`, never in the project file).
-- Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock).
+- Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock,
+  `formatMusicLock` and `formatBriefs` for music's).
 - Never delete clips without the user confirming it in the UI.
 - Only changes from the studio's own page are accepted (the Origin check on POST routes).
 

@@ -211,15 +211,12 @@ describe('setStageModel', () => {
 
 describe('setMusicModel', () => {
   const musicPaths = {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
+    from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
     clips: 'audio/music',
     manifest: 'audio/music/manifest.json',
   }
   const withMusic = (extra: Record<string, unknown> = {}) =>
-    projectJson({ music: { paths: musicPaths, ...extra } })
+    projectJson({ music: { ...musicPaths, ...extra } })
 
   it('writes music.model and nothing else, in the file’s own indentation', async () => {
     const { projectFile, read } = repo(withMusic(), 4)

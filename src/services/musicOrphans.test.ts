@@ -6,16 +6,11 @@ import { MUSIC_MODEL } from '../core/musicTake'
 import { removeOrphan } from './musicOrphans'
 
 const music = {
-  paths: {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
-    clips: 'audio/music',
-    manifest: 'audio/music/manifest.json',
-  },
+  from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+  clips: 'audio/music',
+  manifest: 'audio/music/manifest.json',
 }
-const inputs = { brief: 'x', kind: 'loop', seconds: 30, bpm: null, key: null }
+const inputs = { text: 'x', kind: 'loop', seconds: 30, bpm: null, key: null }
 const entry = (list: string) => ({
   fp: '0123456789abcdef',
   model: MUSIC_MODEL,
@@ -30,17 +25,17 @@ const entry = (list: string) => ({
 function repo(over: Record<string, unknown> = {}) {
   const root = tempRepo({
     'content-studio.json': projectJson({ music }),
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 30 }],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
-    'music/music.lock.json': { 'castle-gates': entry('act1'), hall: entry('act1') },
+    'content-studio/music/lock.json': { 'castle-gates': entry('act1'), hall: entry('act1') },
     'audio/music/manifest.json': {
       'castle-gates': { file: 'castle-gates.mp3', duration: 30 },
       hall: { file: 'hall.mp3', duration: 30 },
     },
     'audio/music/castle-gates.mp3': 'mp3',
     'audio/music/hall.mp3': 'mp3',
-    'music/briefs.json': { 'castle-gates': { bpm: 70 }, hall: { bpm: 80 } },
+    'content-studio/music/edits.json': { 'castle-gates': { bpm: 70 }, hall: { bpm: 80 } },
     'content-studio/cache/music/castle-gates.json': { next: 2, takes: [] },
     'content-studio/cache/music/hall.json': { next: 2, takes: [] },
     'content-studio/cache/music-takes/castle-gates/0123456789abcdef.1.wav': 'wav',
@@ -59,8 +54,8 @@ describe('removeOrphan', () => {
     expect(json(root, 'audio/music/manifest.json')).toEqual({
       hall: { file: 'hall.mp3', duration: 30 },
     })
-    expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
-    expect(json(root, 'music/briefs.json')).toEqual({ hall: { bpm: 80 } })
+    expect(Object.keys(json(root, 'content-studio/music/lock.json'))).toEqual(['hall'])
+    expect(json(root, 'content-studio/music/edits.json')).toEqual({ hall: { bpm: 80 } })
     expect(existsSync(join(root, 'content-studio/cache/music/castle-gates.json'))).toBe(false)
     expect(existsSync(join(root, 'content-studio/cache/music-takes/castle-gates'))).toBe(false)
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
@@ -71,12 +66,12 @@ describe('removeOrphan', () => {
   it('removes an orphan whose music file is already gone, and one with no briefs entry or board', async () => {
     const { root, file } = repo({
       'audio/music/castle-gates.mp3': undefined,
-      'music/briefs.json': undefined,
+      'content-studio/music/edits.json': undefined,
       'content-studio/cache/music/castle-gates.json': undefined,
       'content-studio/cache/music-takes/castle-gates/0123456789abcdef.1.wav': undefined,
     })
     expect(await removeOrphan(file, 'castle-gates')).toEqual({ ok: true })
-    expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
+    expect(Object.keys(json(root, 'content-studio/music/lock.json'))).toEqual(['hall'])
   })
 
   it('is null for a track that is listed, not chosen or unknown, and deletes nothing', async () => {
@@ -98,14 +93,14 @@ describe('removeOrphan', () => {
     const result = await removeOrphan(file, 'castle-gates')
     expect(result).toMatchObject({ ok: false, file: 'audio/music/manifest.json' })
     expect(existsSync(join(root, 'audio/music/castle-gates.mp3'))).toBe(true)
-    expect(Object.keys(json(root, 'music/music.lock.json'))).toContain('castle-gates')
-    expect(json(root, 'music/briefs.json')).toHaveProperty('castle-gates')
+    expect(Object.keys(json(root, 'content-studio/music/lock.json'))).toContain('castle-gates')
+    expect(json(root, 'content-studio/music/edits.json')).toHaveProperty('castle-gates')
   })
 
   it('reports the lock’s problems, and deletes nothing, when the lock cannot be read', async () => {
-    const { root, file } = repo({ 'music/music.lock.json': '[1]' })
+    const { root, file } = repo({ 'content-studio/music/lock.json': '[1]' })
     const result = await removeOrphan(file, 'castle-gates')
-    expect(result).toMatchObject({ ok: false, file: 'music/music.lock.json' })
+    expect(result).toMatchObject({ ok: false, file: 'content-studio/music/lock.json' })
     expect(existsSync(join(root, 'audio/music/castle-gates.mp3'))).toBe(true)
   })
 
@@ -116,31 +111,31 @@ describe('removeOrphan', () => {
     rmSync(board)
     mkdirSync(join(board, 'inner'), { recursive: true })
     expect(await removeOrphan(file, 'castle-gates')).toMatchObject({ ok: false })
-    expect(Object.keys(json(root, 'music/music.lock.json'))).toContain('castle-gates')
+    expect(Object.keys(json(root, 'content-studio/music/lock.json'))).toContain('castle-gates')
     rmSync(board, { recursive: true })
     writeFileSync(board, '{ "next": 2, "takes": [] }')
     expect(await removeOrphan(file, 'castle-gates')).toEqual({ ok: true })
-    expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
+    expect(Object.keys(json(root, 'content-studio/music/lock.json'))).toEqual(['hall'])
   })
 
   it('removes the orphan even when the briefs cannot be read, and says so', async () => {
-    const { root, file } = repo({ 'music/briefs.json': '{ nope' })
+    const { root, file } = repo({ 'content-studio/music/edits.json': '{ nope' })
     expect(await removeOrphan(file, 'castle-gates')).toMatchObject({
       ok: false,
-      file: 'music/briefs.json',
+      file: 'content-studio/music/edits.json',
     })
-    expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
+    expect(Object.keys(json(root, 'content-studio/music/lock.json'))).toEqual(['hall'])
     expect(existsSync(join(root, 'audio/music/castle-gates.mp3'))).toBe(false)
   })
 
   it('removes the orphan of the stingers from their page too', async () => {
     const { root, file } = repo({
-      'music/music.lock.json': { fanfare: entry('stingers') },
+      'content-studio/music/lock.json': { fanfare: entry('shared') },
       'audio/music/manifest.json': { fanfare: { file: 'fanfare.mp3', duration: 5 } },
       'audio/music/fanfare.mp3': 'mp3',
     })
     expect(await removeOrphan(file, 'fanfare')).toEqual({ ok: true })
     expect(existsSync(join(root, 'audio/music/fanfare.mp3'))).toBe(false)
-    expect(json(root, 'music/music.lock.json')).toEqual({})
+    expect(json(root, 'content-studio/music/lock.json')).toEqual({})
   })
 })

@@ -3168,19 +3168,14 @@ describe('server, generating per language', () => {
 })
 
 describe('server, the music pages', () => {
-  const list = JSON.stringify([{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }])
+  const list = JSON.stringify([{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 5 }])
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       refresh: { shared: `mkdir -p tts && printf '%s' '${list}' > tts/stingers.json` },
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
@@ -3260,6 +3255,33 @@ describe('server, the music pages', () => {
       const stingers = body.summary.music.lists.find((l: { id: string }) => l.id === 'stingers')
       expect(stingers.tracks[0]).toMatchObject({ brief: 'ours', game: { brief: 'fanfare' } })
     })
+
+    it('keeps the studio’s brief over the game’s new one, from the studio’s own page only', async () => {
+      const keep = (id: string, origin = studio.url.origin) =>
+        fetch(new URL(`/api/music/tracks/${id}/keep-mine`, studio.url), {
+          method: 'POST',
+          headers: { origin },
+        })
+      const stingers = async () => {
+        const body = await (await fetch(new URL('/api/project', studio.url))).json()
+        return body.summary.music.lists.find((l: { id: string }) => l.id === 'stingers')
+      }
+      writeFileSync(
+        join(musicRoot, 'content-studio/music/edits.json'),
+        JSON.stringify({ victory: { text: 'ours', gameWas: 'older' } }),
+      )
+      expect((await stingers()).tracks[0]).toMatchObject({ gameChanged: true, gameWas: 'older' })
+      expect((await keep('victory', 'https://evil.example')).status).toBe(403)
+      expect((await keep('nobody')).status).toBe(404)
+      const answer = await keep('victory')
+      expect(answer.status).toBe(200)
+      expect(await answer.json()).toEqual({ ok: true })
+      expect((await stingers()).tracks[0]).toMatchObject({
+        brief: 'ours',
+        gameChanged: false,
+        gameWas: 'fanfare',
+      })
+    })
   })
 
   it('refuses with a reason when the project has no shared command', async () => {
@@ -3287,18 +3309,13 @@ describe('server, what music takes cost', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   const studio = startServer({
     projectFile: join(musicRoot, 'content-studio.json'),
@@ -3353,18 +3370,13 @@ describe('server, a track’s takes', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   let ready: { ok: true } | { ok: false; message: string; fix: string } = { ok: true }
   const made: string[] = []
@@ -3531,18 +3543,13 @@ describe('server, choosing a take', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   const studio = startServer({
     projectFile: join(musicRoot, 'content-studio.json'),
@@ -3665,33 +3672,28 @@ describe('server, playing what a track plays now', () => {
     seed: 1,
     list: 'act1',
     take: 3,
-    inputs: { brief: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
+    inputs: { text: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
     at: '2026-11-02T10:00:00.000Z',
   }
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
     'tts/act1/music.json': [
-      { id: 'game', title: 'G', brief: 'x', seconds: 5, file: 'game/walk.mp3' },
-      { id: 'gone', title: 'H', brief: 'x', seconds: 5, file: 'game/nope.mp3' },
-      { id: 'bare', title: 'B', brief: 'x', seconds: 5 },
-      { id: 'taken', title: 'T', brief: 'x', seconds: 5, file: 'game/walk.mp3' },
-      { id: 'folder', title: 'F', brief: 'x', seconds: 5, file: 'game/dir.mp3' },
+      { id: 'game', title: 'G', text: 'x', seconds: 5, file: 'game/walk.mp3' },
+      { id: 'gone', title: 'H', text: 'x', seconds: 5, file: 'game/nope.mp3' },
+      { id: 'bare', title: 'B', text: 'x', seconds: 5 },
+      { id: 'taken', title: 'T', text: 'x', seconds: 5, file: 'game/walk.mp3' },
+      { id: 'folder', title: 'F', text: 'x', seconds: 5, file: 'game/dir.mp3' },
     ],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
-    'music/music.lock.json': { taken: lock },
+    'content-studio/music/lock.json': { taken: lock },
     'audio/music/manifest.json': { taken: { file: 'taken.mp3', duration: 5 } },
     'audio/music/taken.mp3': 'the take',
     'game/walk.mp3': 'the game file',
@@ -3737,28 +3739,23 @@ describe('server, removing music the game no longer asks for', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
     'tts/act2/music.json': [],
     'tts/stingers.json': [],
-    'music/music.lock.json': {
+    'content-studio/music/lock.json': {
       'castle-gates': {
         fp: '0123456789abcdef',
         model: 'm',
         seed: 1,
         list: 'act1',
         take: 1,
-        inputs: { brief: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
+        inputs: { text: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
         at: '2026-11-02T10:00:00.000Z',
       },
     },
@@ -3806,17 +3803,14 @@ describe('server, removing music the game no longer asks for', () => {
 
 describe('server, the music model', () => {
   const paths = {
-    loops: 'tts/{part}/music.json',
-    stingers: 'tts/stingers.json',
-    briefs: 'music/briefs.json',
-    lock: 'music/music.lock.json',
+    from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
     clips: 'audio/music',
     manifest: 'audio/music/manifest.json',
   }
   const root = tempRepo({
-    'content-studio.json': projectJson({ music: { paths } }),
+    'content-studio.json': projectJson({ music: paths }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
   })
   const asked: string[] = []
   const studio = startServer({
@@ -3915,19 +3909,14 @@ describe('server, moving a take', () => {
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
-    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', brief: 'eerie', seconds: 5 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
+    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', text: 'eerie', seconds: 5 }],
   })
   const studio = startServer({
     projectFile: join(musicRoot, 'content-studio.json'),
@@ -5870,19 +5859,14 @@ describe('server, trimming a stinger take', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
-    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 6 }],
   })
   const studio = startServer({
     projectFile: join(root, 'content-studio.json'),
@@ -5966,19 +5950,14 @@ describe('server, a stinger take’s fades', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
-    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 4 }],
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'warm lute', seconds: 5 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 4 }],
   })
   const studio = startServer({
     projectFile: join(root, 'content-studio.json'),

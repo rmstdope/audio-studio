@@ -11,13 +11,14 @@ import {
 import { lstat, realpath } from 'node:fs/promises'
 import { relative, isAbsolute } from 'node:path'
 import { resolveInRoot } from '../core/paths'
-import { partPathFor, type Problem, type Project } from '../core/project'
+import { MUSIC_EDITS_FILE, partPathFor, type Problem, type Project } from '../core/project'
 import { readResource } from './files'
 import { readChosen } from './musicClips'
 
 /** The path of an act's loops list. */
 export function loopsPath(project: Project, partId: string): string | null {
-  return project.music ? partPathFor(project.music.paths.loops, partId) : null
+  const template = project.music?.from.part
+  return template ? partPathFor(template, partId) : null
 }
 
 /**
@@ -34,26 +35,31 @@ export async function readMusic(
   const { music } = project
   if (!music) return null
   const lists: MusicListInput[] = []
-  for (const part of project.parts) {
-    const file = partPathFor(music.paths.loops, part.id)
+  const loops = music.from.part
+  if (loops) {
+    for (const part of project.parts) {
+      const file = partPathFor(loops, part.id)
+      lists.push({
+        id: part.id,
+        kind: 'act',
+        title: part.title,
+        file,
+        state: await readList(root, file, LoopListSchema, problems),
+        canRefresh: Boolean(project.refresh?.part),
+      })
+    }
+  }
+  if (music.from.shared) {
     lists.push({
-      id: part.id,
-      kind: 'act',
-      title: part.title,
-      file,
-      state: await readList(root, file, LoopListSchema, problems),
-      canRefresh: Boolean(project.refresh?.part),
+      id: 'stingers',
+      kind: 'stingers',
+      title: 'Stingers',
+      file: music.from.shared,
+      state: await readList(root, music.from.shared, StingerListSchema, problems),
+      canRefresh: Boolean(project.refresh?.shared),
     })
   }
-  lists.push({
-    id: 'stingers',
-    kind: 'stingers',
-    title: 'Stingers',
-    file: music.paths.stingers,
-    state: await readList(root, music.paths.stingers, StingerListSchema, problems),
-    canRefresh: Boolean(project.refresh?.shared),
-  })
-  const briefs = await readResource(root, music.paths.briefs, BriefsSchema, problems)
+  const briefs = await readResource(root, MUSIC_EDITS_FILE, BriefsSchema, problems)
   const shown: Briefs = briefs === 'missing' || briefs === 'invalid' ? {} : briefs
   const gameFiles = await presentGameFiles(root, lists)
   const summary = summarizeMusic(lists, shown, await readChosen(root, music, problems), gameFiles)

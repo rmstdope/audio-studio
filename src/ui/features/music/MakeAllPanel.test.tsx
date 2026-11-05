@@ -31,6 +31,8 @@ const track = (id: string, title: string, status: TrackStatus, seconds = 30): Tr
   bpm: null,
   key: null,
   game: { brief: 'A brief', seconds, bpm: null, key: null },
+  gameChanged: false,
+  gameWas: null,
   status,
   changed: [],
   chosenAt: null,

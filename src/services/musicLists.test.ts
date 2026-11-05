@@ -2,8 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { mkdirSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { gameFilePath } from './musicLists'
-import { loadProject, musicCurrentFile } from './workspace'
+import type { Problem } from '../core/project'
+import { gameFilePath, readMusic } from './musicLists'
+import { loadProject, musicCurrentFile, openProject } from './workspace'
 
 describe('gameFilePath', () => {
   const outside = tempRepo({ 'secret.mp3': 'secret' })
@@ -35,24 +36,19 @@ describe('a music lock that cannot be read', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({
       music: {
-        paths: {
-          loops: 'tts/{part}/music.json',
-          stingers: 'tts/stingers.json',
-          briefs: 'music/briefs.json',
-          lock: 'music/music.lock.json',
-          clips: 'audio/music',
-          manifest: 'audio/music/manifest.json',
-        },
+        from: { part: 'tts/{part}/music.json', shared: 'tts/stingers.json' },
+        clips: 'audio/music',
+        manifest: 'audio/music/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
     'tts/stingers.json': [
-      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5, file: 'game/win.mp3' },
+      { id: 'victory', title: 'Victory', text: 'fanfare', seconds: 5, file: 'game/win.mp3' },
     ],
     'game/win.mp3': 'x',
     'audio/music/victory.mp3': 'x',
     'audio/music/manifest.json': { victory: { file: 'victory.mp3', duration: 5 } },
-    'music/music.lock.json': '{ broken',
+    'content-studio/music/lock.json': '{ broken',
   })
 
   it('makes what a track plays not known in the summary, not the game’s own file', async () => {
@@ -64,5 +60,41 @@ describe('a music lock that cannot be read', () => {
 
   it('serves no music for the track, not the game’s own file', async () => {
     expect(await musicCurrentFile(join(root, 'content-studio.json'), 'victory')).toBeNull()
+  })
+})
+
+describe('a music section with one list', () => {
+  const read = async (from: Record<string, string>) => {
+    const root = tempRepo({
+      'content-studio.json': projectJson({
+        music: { from, clips: 'audio/music', manifest: 'audio/music/manifest.json' },
+      }),
+      'content-studio/narration/cast.json': { speakers: {} },
+      'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'lute', seconds: 30 }],
+      'tts/stingers.json': [{ id: 'victory', title: 'Victory', text: 'fanfare', seconds: 5 }],
+    })
+    const loaded = await loadProject(join(root, 'content-studio.json'))
+    if (!loaded.ok) throw new Error('project')
+    return loaded.summary.music!.lists.map((list) => list.id)
+  }
+
+  it('has a page per part and no Stingers page without the shared list', async () => {
+    expect(await read({ part: 'tts/{part}/music.json' })).toEqual(['act1', 'act2'])
+  })
+
+  it('has only the Stingers page without the parts’ lists', async () => {
+    expect(await read({ shared: 'tts/stingers.json' })).toEqual(['stingers'])
+  })
+})
+
+describe('the sample project’s music', () => {
+  it('reads every list without a problem', async () => {
+    const root = join(import.meta.dir, '../../test/fixtures/sample')
+    const opened = await openProject(join(root, 'content-studio.json'))
+    if (!opened.ok) throw new Error('the sample did not open')
+    const problems: Problem[] = []
+    const music = await readMusic(root, opened.project, problems)
+    expect(problems).toEqual([])
+    expect(music!.lists.find((list) => list.id === 'stingers')!.tracks.length).toBeGreaterThan(0)
   })
 })

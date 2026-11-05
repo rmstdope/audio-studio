@@ -266,6 +266,9 @@ function ListPage({
                       <div className="music-brief" title={track.brief}>
                         {track.brief}
                       </div>
+                      {track.gameChanged && (
+                        <span className="chip chip-warn">game&apos;s changed</span>
+                      )}
                     </td>
                     <td>{clock(track.seconds)}</td>
                     <PlaysCell text={playsText(track.current, failed[track.id])} />

@@ -353,6 +353,20 @@
     "music": {
       "type": "object",
       "properties": {
+        "from": {
+          "type": "object",
+          "properties": {
+            "part": {
+              "type": "string",
+              "minLength": 1
+            },
+            "shared": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
         "model": {
           "type": "string",
           "enum": [
@@ -365,47 +379,19 @@
             "eleven"
           ]
         },
-        "paths": {
-          "type": "object",
-          "properties": {
-            "loops": {
-              "type": "string",
-              "minLength": 1
-            },
-            "stingers": {
-              "type": "string",
-              "minLength": 1
-            },
-            "briefs": {
-              "type": "string",
-              "minLength": 1
-            },
-            "lock": {
-              "type": "string",
-              "minLength": 1
-            },
-            "clips": {
-              "type": "string",
-              "minLength": 1
-            },
-            "manifest": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "loops",
-            "stingers",
-            "briefs",
-            "lock",
-            "clips",
-            "manifest"
-          ],
-          "additionalProperties": false
+        "clips": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
-        "paths"
+        "from",
+        "clips",
+        "manifest"
       ],
       "additionalProperties": false
     },
