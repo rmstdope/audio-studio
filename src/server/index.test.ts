@@ -3473,7 +3473,14 @@ describe('server, a track’s takes', () => {
     const summary = await (await fetch(making)).json()
     expect(summary.hall.takes).toBeGreaterThan(0)
     expect(summary.hall.left).toBeGreaterThan(0)
+    // Leave nothing making, or the next test's make-all finds the track busy and makes nothing.
+    await stop()
+    for (let i = 0; i < 200 && Object.keys(await (await fetch(making)).json()).length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    expect(await (await fetch(making)).json()).toEqual({})
   })
+
   it('makes and stops takes for a whole list from the studio’s own page only', async () => {
     const post = (path: string, origin = studio.url.origin) =>
       fetch(new URL(path, studio.url), { method: 'POST', headers: { origin } })
