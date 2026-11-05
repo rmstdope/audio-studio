@@ -2,7 +2,14 @@ import { describe, expect, it } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
-import { formatEntriesPerLine, listFiles, readJson, writeAtomic, writeFailure } from './files'
+import {
+  formatEntriesPerLine,
+  isWriteFailure,
+  listFiles,
+  readJson,
+  writeAtomic,
+  writeFailure,
+} from './files'
 
 describe('formatEntriesPerLine', () => {
   it('writes one sorted entry per line, as valid JSON', () => {
@@ -79,5 +86,19 @@ describe('writeFailure', () => {
   it('gives an unknown error’s own message', () => {
     expect(writeFailure(failed('EIO'))).toBe("EIO: open 'x.tmp'")
     expect(writeFailure(failed('toString'))).toBe("toString: open 'x.tmp'")
+  })
+})
+
+describe('isWriteFailure', () => {
+  const failed = (code: string) => Object.assign(new Error(`${code}: open 'x.tmp'`), { code })
+
+  it('knows the refusals writeFailure names, and nothing else', () => {
+    for (const code of ['EACCES', 'EPERM', 'EROFS', 'ENOSPC', 'EDQUOT']) {
+      expect(isWriteFailure(failed(code))).toBe(true)
+    }
+    expect(isWriteFailure(failed('EIO'))).toBe(false)
+    expect(isWriteFailure(failed('toString'))).toBe(false)
+    expect(isWriteFailure(new Error('no code'))).toBe(false)
+    expect(isWriteFailure(null)).toBe(false)
   })
 })

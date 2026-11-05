@@ -81,6 +81,12 @@ export function writeFailure(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** Whether a write was refused for a reason `writeFailure` names (no permission, a full disk, …). */
+export function isWriteFailure(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code
+  return Boolean(code && Object.hasOwn(WRITE_FAILURES, code))
+}
+
 /**
  * Writes `text` (or bytes) to `path` (relative to `root`) through a temporary file and a rename, so a crash
  * never leaves a half-written file. Each write has its own temporary file, so two writes at once

@@ -17,7 +17,7 @@ import { resolveInRoot } from '../core/paths'
 import type { MusicConfig, Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import { FileNotWritten, type Encoder } from './audio'
-import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
+import { formatEntriesPerLine, isWriteFailure, listFiles, readResource, writeAtomic } from './files'
 import { createSerial, type Serial } from './serial'
 import type { ProjectFailure } from './workspace'
 
@@ -193,15 +193,10 @@ export async function uncommitChoice({
       return { ok: true }
     })
   } catch (error) {
-    if (notWritable(error)) return { ok: false, message: 'The game’s file could not be written.' }
+    if (isWriteFailure(error))
+      return { ok: false, message: 'The game’s file could not be written.' }
     return { ok: false, message: error instanceof Error ? error.message : String(error) }
   }
-}
-
-/** Whether a failed write was refused by the file system (no permission, a read-only disk). */
-function notWritable(error: unknown): boolean {
-  const code = error instanceof Error && 'code' in error ? error.code : undefined
-  return code === 'EACCES' || code === 'EPERM' || code === 'EROFS'
 }
 
 /**
