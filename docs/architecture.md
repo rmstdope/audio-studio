@@ -51,11 +51,9 @@ retroquest/                      ← user runs `content-studio` here
 ├── .env                         ← FISH_AUDIO_API_KEY (gitignored, already exists)
 ├── content-studio/              ← the studio folder: its .gitignore (written at start if missing) keeps cache/ out
 │   └── cache/                   ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard, settings
-├── tts/cast.json                ← character resource, shared by all parts (read + written)
+│   └── narration/               ← cast.json (the cast), act1.edits.json (an act's cues), act1.lock.json (what its clips were made from)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
-│   ├── cues.json                ← per-line delivery cues (read + written)
-│   ├── narration.lock.json      ← per-clip fingerprints (written, committed)
 │   └── music.json               ← the act's loops, from the game (read; built, §8.5)
 ├── tts/stingers.json            ← the game's stingers (read; built)
 ├── music/
@@ -91,8 +89,9 @@ retroquest/                      ← user runs `content-studio` here
    studio's page; what a command writes is the game's business, and the studio does not check it
    beyond reading the dialog, the loops or the stingers again.
    Besides those paths, the studio writes the project file itself in a few places only: the project's
-   own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3),
-   the models (`narration.models`, `narration.elevenlabs.models`, `music.model` and `images.model`) from Setup's
+   own words that sound the same (`narration.generate.soundAlike`), from the characters page (§8.3),
+   the models (`narration.models.fish`, `narration.models.elevenlabs`, ElevenLabs' voice settings
+   `narration.generate.elevenlabs`, `music.model`, `images.model` and `effects.model`) from Setup's
    Models panel, and the retirement
    switch of `s1`. The Fish tier and the take fade are the person's own, not the project's: they are
    kept in the cache (`content-studio/cache/settings.json`), never in the project file.
@@ -166,7 +165,7 @@ audio-studio/
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
 │   │   ├── spending.ts          the record of paid recordings (content-studio/cache/spending.json) and the running ones
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
-│   │   ├── models.ts            s1 → s2.1-pro, and a stage's model, in the project file's `narration.models`
+│   │   ├── models.ts            s1 → s2.1-pro, and a stage's model, in the project file's `narration.models.fish`
 │   │   ├── modelsView.ts        the whole dialog's size and what recorded clips were made with, for the Models panel
 │   │   ├── projectFile.ts       reading the project file for a change, and writing it back as it was laid out
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
@@ -207,12 +206,16 @@ audio, network or disk.
 ## 5. The project file
 
 The format the studio is moving to, version 2, is described for the people who write the files in
-[docs/project-files.md](project-files.md) (epic as-6u9, §12 step 18). This section and §6 describe
-the files as the studio reads them today; each step of the move takes its part out of them.
+[docs/project-files.md](project-files.md) (epic as-6u9, §12 step 18), which is where the format of
+the project file's top level and of narration's files (the `narration` section, the dialog, the
+cast, the cues and the lock) is described. This section and §6 say how the studio uses them, and
+describe the files of the sections that have not moved yet; each step of the move takes its part
+out of them.
 
 `content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
-an id and a title. Its top level, the studio folder and the cache are version 2 already (as-6u9.2);
-the sections keep their shape until their own step moves them.
+an id and a title. Its top level, the studio folder and the cache (as-6u9.2) and the `narration`
+section (as-6u9.3) are version 2; the other sections keep their shape until their own step moves
+them.
 
 ```json
 {
@@ -232,31 +235,9 @@ the sections keep their shape until their own step moves them.
     "shared": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-shared.ts"
   },
   "narration": {
-    "characters": "tts/cast.json",
-    "paths": {
-      "dialog": "tts/{part}/script.json",
-      "cues": "tts/{part}/cues.json",
-      "lock": "tts/{part}/narration.lock.json",
-      "clips": "web/public/audio/narration/{part}",
-      "manifest": "web/public/audio/narration/{part}/manifest.json"
-    },
-    "models": { "audition": "s2.1-pro-free", "draft": "s2.1-pro-free", "final": "s2.1-pro-free" },
-    "tts": { "temperature": 0.7, "topP": 0.7, "speed": 1.0 },
-    "output": { "codec": "mp3", "bitrate": "64k", "channels": 1, "lufs": -16 },
-    "quality": {
-      "minHeard": 0.9,
-      "takes": 3,
-      "chunkLimit": 400,
-      "parallel": 4,
-      "transcriber": "mlx-whisper",
-      "whisperModel": "mlx-community/whisper-large-v3-turbo",
-      "soundAlike": [["Lyria", "Liria"]]
-    },
-    "audition": {
-      "phrase": "Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.",
-      "candidatesPerRound": 5,
-      "language": "en"
-    }
+    "from": { "part": "tts/{part}/script.json" },
+    "clips": "web/public/audio/narration/{part}",
+    "manifest": "web/public/audio/narration/{part}/manifest.json"
   }
 }
 ```
@@ -271,12 +252,13 @@ the sections keep their shape until their own step moves them.
 - `partLabel` (default `Part`) and `parts` (required) are at the top level.
 - `languages` (top level) lists the languages the game is narrated in, by code (`["en", "sv"]`; default
   `["en"]`). The first is the source language: its dialog is the line shown beneath a translation.
-  Path templates may contain `{language}`; with more than one language every path (`dialog`,
-  `cues`, `lock`, `clips`, `manifest`) must, or languages would share a file. Each language is
+  Path templates may contain `{language}`; with more than one language every narration path
+  (`from.part`, `clips`, `manifest`) must, or languages would share a file. The studio's own files
+  of a language besides the source carry its code (`act1.sv.edits.json`, `narrationFile`). Each language is
   named in itself in the UI (`core/languages.ts`: `sv` is Svenska).
-- `audition.phrases` (optional, language code → phrase) is the standard audition phrase of each
-  language but the first, whose own is `audition.phrase`; each must fit one take. A language
-  without one borrows her longest line (§6).
+- `audition.phrase` (language code → phrase) is each language's standard audition phrase; each
+  must fit one take. The source language without one has the built-in phrase (`standardPhrase`);
+  another language without one borrows her longest line (§6).
 - `refresh` is optional, and so is each of its two commands. `refresh.part` (it must contain
   `{part}`, replaced by the part's id) writes one part's lists of every kind: the UI offers
   **Refresh dialog**, and Refresh from the game on an act's Music, Images and Scenes pages, which
@@ -291,16 +273,17 @@ the sections keep their shape until their own step moves them.
   forgets, so editing the file takes effect without a restart. To see which values Bun loaded, the
   studio reads the start folder's `.env` files once, at start, and only when one of them is the
   project's env file.
-- `characters` is one file for the whole project, not a per-part path (see §6).
-- `models` names the Fish model for each stage (see §8.4). Each stage, `audition` too, may name
+- The cast and each part's cues and lock are not named in the project file: they are at fixed
+  places in `content-studio/narration/` (`CAST_FILE`, `narrationFile`; see §6).
+- `models.fish` names the Fish model for each stage (see §8.4), `models.elevenlabs` ElevenLabs'. Each stage, `audition` too, may name
   any model whose price the studio knows (a paid audition model is paid from a budget per sitting,
   §8.1). Anything else is rejected with a clear message.
-- `quality.soundAlike` lists the game's own words that sound the same (words or phrases, a letter or
+- `generate.soundAlike` lists, by language, the game's own words that sound the same (words or phrases, a letter or
   digit in each word: "all right" and "alright"), a group each, added to the studio's built-in
   English ones (`core/soundAlike.ts`: "in" and "inn", "weekly" and "weakly", "there", "their" and
   "they're", …); see §8.2. Optional, empty by default; edited on the characters page (§8.3).
-  The same for a language besides the source in `quality.soundAlikeByLanguage` (`{ "sv": [[…]] }`,
-  declared languages only); the built-in groups are English words and apply to `en` only. Words
+  Declared languages only (`{ "en": [[…]], "sv": [[…]] }`); the built-in groups are English words
+  and apply to `en` only. Words
   are compared in any alphabet (letters and their marks kept: "får" is not "för"), and the numbers
   0 to 99 of `en`, `sv`, `de`, `el` and `ru` are built-in groups of their language with the digits
   Whisper writes ("tjugo" and "20", "twenty one" and "21"; `core/numbers.ts`).
@@ -325,12 +308,16 @@ the sections keep their shape until their own step moves them.
 The formats are the ones RetroQuest uses today, so existing files work unchanged. The studio only
 **adds** fields; the game ignores what it doesn't know.
 
-**Dialog** (`script.json`, read only; one per part and language): `[{ key, speaker, text }]`. `key` is the game's stable id for
-the line (RetroQuest: a hash of speaker and words, so new wording gets a new key). Between
+The formats of narration's files are in [docs/project-files.md](project-files.md); this section
+says how the studio uses them.
+
+**Dialog** (`narration.from.part`, read only; one per part and language): `[{ id, speaker, text, scene? }]`. `id` is the game's stable id for
+the line (RetroQuest: a hash of speaker and words, so new wording gets a new id). Inside the studio
+it is the line's `key` (`LineSchema` reads `id` into it). Between
 languages lines are matched by key: a source line missing from a language's dialog (or blank
 there) is _Not translated_, and a line only the language has is shown with "No English line".
 
-**Characters** (`tts/cast.json`, read and written): one file for the whole project. A character is
+**Characters** (`content-studio/narration/cast.json`, read and written): one file for the whole project. A character is
 keyed by its name; every part whose dialog has a speaker of that name uses that entry, so its voice,
 style and audition keywords are the same in every part. To give a character a different voice in
 another part, the game names the speaker differently (`narrator-act2`), and it becomes a character
@@ -338,24 +325,9 @@ of its own. The pronunciation table is project-wide too. Per-part differences in
 part's cues. Two characters may be cast with one voice (a narrator and a character in a prologue,
 say); the studio points it out on their pages and cards, as a note, not a problem.
 
-```json
-{
-  "speakers": {
-    "grandmother": {
-      "voice": "e48a228e21a443d6a4302dc6238c8128",
-      "voiceName": "Gentle Granny",
-      "style": "[warm, gentle, a little worried]",
-      "speed": 0.9,
-      "audition": { "keywords": ["elderly female", "warm", "storyteller"], "phrase": null }
-    }
-  },
-  "pronounce": { "Act I:": "Act One:" }
-}
-```
-
 **Per language** (as-170.2): the fields above are the source language's (the first declared). Her
 casting in any other language is `languages: { "sv": { voice, voiceName, speed, phrase } }` on the
-same entry, so a single-language cast, and RetroQuest's file, are unchanged. Keywords and style
+same entry, so a single-language cast never names a language for its speakers. Keywords and style
 are one set for every language. `core/resources.ts` reads it through `voiceOf` and `projectCast`,
 which gives the planner and the takes the cast as one language sees it. The audition phrase of a
 language is her own in it, else the project's standard one in it, else her longest line in it, else
@@ -366,17 +338,17 @@ On a language with no voice, the page's explanation names each distinct Fish voi
 by its name on Fish with the languages it is cast in; until Fish has named it, by those languages
 ("Its English voice").
 
-**Pronunciations per language** (as-170.3): the source language's table is `pronounce`; another
-language's is `languages: { "sv": { "pronounce": {…} } }` at the top of the cast. `projectCast`
-puts the language's own table in `pronounce`, so what is said, priced and fingerprinted is that
+**Pronunciations per language** (as-170.3): `pronounce` holds a table per language, the source
+language's included (`{ "en": {…}, "sv": {…} }`). `projectCast` gives the cast as one language
+speaks it (`SpokenCast`), with that language's own table in `pronounce`, so what is said, priced and fingerprinted is that
 language's alone; a language without one has none (English respellings are never sent to another
 voice).
 
 New fields: `voiceName` (shown in the UI; the id alone is unreadable), `audition` (the keywords,
 plus an optional phrase that replaces the project's standard one) and `speed` (the character's own
-speaking speed, half to double as Fish allows, in place of the project's `tts.speed`; its lines,
+speaking speed, half to double as Fish allows, in place of the project's `generate.fish.speed`; its lines,
 audition takes and tries are all spoken at it). A speaker in the script with no
-entry in `cast.json` shows as **Uncast**. The UI shows, for each character, which parts it appears
+entry in the cast shows as **Uncast**. The UI shows, for each character, which parts it appears
 in and how many lines it has in each, because recasting it makes its lines stale in all of them.
 
 Pronunciations apply in the order the file lists them, with one limit: JavaScript puts integer-like
@@ -384,10 +356,10 @@ keys (`"10"`) first when it reads the file, so the studio applies those first, w
 Python tooling keeps file order. The studio refuses to rewrite a cast where this would change the
 order (an integer-like key among others); a longer key such as `"Act 10"` keeps its place.
 
-RetroQuest today has `tts/act1/cast.json`; switching over moves it to `tts/cast.json` once (only Act I
-is cast so far, so there is nothing to merge).
-
-**Cues** (`cues.json`, read and written): `{ key: cue }`, replacing a character's style for one line.
+**Cues** (`content-studio/narration/<part>[.<lang>].edits.json`, read and written): `cues` holds
+`{ id: cue }`, replacing a character's style for one line, and `scenes` a cue per scene. The studio
+reads both into one cue table, a scene's cue under the key `scene:<name>` (a line key never holds a
+colon), and writes them back split (`EditsCuesSchema`, `formatEdits`).
 Cues are per language (as-170.3): a line in a language besides the source follows the source
 language's cue for the line until the language's own file gives it one, then the character's style.
 The planner is given the merged cues (`readPart` builds them), so a changed source cue makes the
@@ -395,10 +367,9 @@ language's clips stale for the cue, and `LineState.cueFrom` (`own`, `source`, `s
 `sourceCue` tell the page where a cue comes from. Editing a cue in a language writes that
 language's file only.
 
-**Scene cues** (as-2qh): a dialog line may name its `scene`, and the cues file holds a cue per scene
-under the key `scene:<name>` (a line key never holds a colon, so it cannot collide with one, and the
-game, which looks up its own keys, ignores it). A line is cued by its own cue, else its scene's, else
-its character's style; only the speakers in `narration.sceneCueSpeakers` (cast ids, default
+**Scene cues** (as-2qh): a dialog line may name its `scene`, and the edits hold a cue per scene
+under `scenes`, by the scene's name. A line is cued by its own cue, else its scene's, else
+its character's style; only the speakers in `narration.generate.sceneCueSpeakers` (cast ids, default
 `["narrator"]`, edited by hand in the project file) follow scene cues. The cue that results feeds the
 fingerprint, so changing a scene's cue makes the lines that follow it stale for "The cue changed"
 and putting it back makes them up to date again. In a language besides the source the scene is the
@@ -426,27 +397,13 @@ words, which never include cues.
 **Manifest** (`manifest.json`, written): unchanged, `{ key: { file, speaker, duration, words[] } }`.
 This is what the game reads.
 
-**Lock** (`narration.lock.json`, written, committed): one entry per clip, recording what it was
-made from. Written one entry per line, keys sorted, so a re-recorded clip is a one-line diff.
-
-```json
-{
-  "0022d0ca3a78d2": {
-    "fp": "720367754eff3c80",
-    "voice": "7d80…",
-    "model": "s2.1-pro-free",
-    "parts": { "cue": "30e4588b", "text": "a05bdb9c", "said": "a05bdb9c", "settings": "4666d299" },
-    "heard": 0.96,
-    "takes": 1,
-    "at": "2026-10-23T10:14:00Z"
-  }
-}
-```
-
-`parts` are short hashes of the inputs that are not kept in the clear, so the planner can say which
-one changed. `heard` and `takes` are absent, and `adopted` is true, for clips made before the studio.
-`accepted` is true when the user accepted a weak clip as it is (Accept on the lines page); recording
-the line again writes a new entry without it.
+**Lock** (`content-studio/narration/<part>[.<lang>].lock.json`, written, committed): one entry per
+clip, recording what it was made from. Written one entry per line, keys sorted, so a re-recorded
+clip is a one-line diff. `hashes` are short hashes of the inputs that are not kept in the clear
+(`cue`, `text`, `said`, `settings`), so the planner can say which one changed. `heard` and `takes`
+are absent, and `adopted` is true, for clips made before the studio. `accepted` is true when the
+user accepted a weak clip as it is (Accept on the lines page); recording the line again writes a
+new entry without it.
 
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
@@ -696,7 +653,7 @@ An audition is for a character, not for a part: the result applies to every part
       American spellings are one word (-our and -or, -re and -er after a consonant, a doubled l
       before -er, -ed, -ing and -ous, -ise and -ize: "traveller" heard as "traveler", "colours" as
       "colors"), and words that sound the same are one word (the built-in groups and the project's
-      `quality.soundAlike`: "inn" heard as "in", "weekly" as "weakly"), wherever words are matched
+      `generate.soundAlike`: "inn" heard as "in", "weekly" as "weakly"), wherever words are matched
       exactly or run together (a phrase of a group heard as one word, or as another phrase of it,
       "all right" as "alright", "Leer ia" as "Lee ria"; a word or spelling run apart, "week ly" as
       "weakly"), not where a name is guessed; words matched whole come first, so a phrase sharing a
@@ -756,7 +713,7 @@ An audition is for a character, not for a part: the result applies to every part
   different.
 - Edit the project's own words that sound the same (built: the Words that sound the same panel on
   the characters page, under Pronunciations): one group a row, words separated by commas, saved
-  as a whole in the project file's `narration.quality.soundAlike`, refused if the file's groups
+  as a whole in the project file's `narration.generate.soundAlike`, refused if the file's groups
   changed since editing began. The project file is otherwise only read; the save keeps the rest of
   it, in its own indentation (a hand-compacted object is written out). Takes already recorded keep
   their heard share; the groups count from the next take on.
@@ -772,7 +729,7 @@ An audition is for a character, not for a part: the result applies to every part
   audition, draft and final models with Fish's rate and what recording the whole dialog once
   would cost (`GET /api/models`: the models, the dialog's lines and bytes over every part and
   language, the clips by the model they were made with, and what is recording or auditioning).
-  A menu change is saved in `narration.models.<stage>` (`PUT /api/models/:stage`, `{ model, was }`:
+  A menu change is saved in `narration.models.fish.<stage>` (`PUT /api/models/:stage`, `{ model, was }`:
   the fourth kind of change the studio makes to the project file, the same careful way, refused
   when the file's value differs from `was`, for a model with no price or for `s1`, and while
   anything is recording or auditioning). The audition model, and a draft or final change that
@@ -804,7 +761,7 @@ An audition is for a character, not for a part: the result applies to every part
   (§8.4), so Use is refused for it, and a final clip landing meanwhile is kept as a recording
   keeps it. A broken file of the part is reported with its path, as a recording reports it. With a paid
   draft model Another take first asks what it can cost (the same `admit` as Record, priced for one
-  take, not the `quality.takes` a recording is held to): **Pay up to $X** and **Cancel** replace the
+  take, not the `generate.takes` a recording is held to): **Pay up to $X** and **Cancel** replace the
   button, every take asks again, and nothing of the ask is kept; the take is charged to the budget
   confirmed, so no more than that reaches Fish. Whisper's best is not always the best read; this
   lets the ear decide.
@@ -1214,7 +1171,7 @@ the studio's `Voice`), `sharedVoices`, `addSharedVoice`, `deleteVoice`, `designV
 and `music`. It retries a 429 as Fish's client does. Its work runs in
 its own limiter (`elevenWork`), so neither provider waits for the other, at most two requests at
 once (the Free plan's limit, which every plan allows; higher plans allow more, which the studio does
-not use until it is measured) and never more than `quality.parallel` (`requestsAtOnce`). Speech is asked
+not use until it is measured) and never more than `generate.parallel` (`requestsAtOnce`). Speech is asked
 for as `wav_24000` (every plan may ask for it; 44.1 kHz needs Pro), so lines join, are checked and
 encoded as Fish's are. Music is asked for as `mp3_44100_128` (every plan; the default 192 kbps needs
 Creator) and decoded with ffmpeg to 16-bit WAV before it is shaped; it is encoded at 160 kbps when
@@ -1223,8 +1180,8 @@ chosen, as every take is.
 **Models, per provider.** Each provider's prices are a table of their own, in their own unit: Fish's
 stay `core/prices.ts` (dollars per million bytes), ElevenLabs' speech models get a table beside it
 (credits per character, `core/elevenSpeech.ts`, built in 14.7a), and Eleven Music's price per minute is on its music model
-(14.5). A stage accepts only its own provider's models: `narration.models` (Fish's, as
-today) and `narration.elevenlabs.models` (`audition`, `draft`, `final`; default `eleven_v3`) are
+(14.5). A stage accepts only its own provider's models: `narration.models.fish` (Fish's, as
+today) and `narration.models.elevenlabs` (`audition`, `draft`, `final`; default `eleven_v3`) are
 validated and listed each against its own provider's list, so Fish is never sent an ElevenLabs
 model.
 
@@ -1238,7 +1195,7 @@ with that provider's model for the stage. Recasting a character from a Fish voic
 one makes its lines stale for the voice, as any recast does; since a model is valid for one provider
 only, the fingerprint needs no provider of its own.
 
-- **Settings** (saved from Setup since 14.9.2). ElevenLabs' voice settings, `narration.elevenlabs.tts`
+- **Settings** (saved from Setup since 14.9.2). ElevenLabs' voice settings, `narration.generate.elevenlabs`
   (`stability`, `similarityBoost`, `style`; defaults 0.5, 0.75, 0, ElevenLabs' own), are one set for
   every ElevenLabs voice at every stage, and stand in for temperature and top-p in an ElevenLabs
   line's fingerprint and take key, so changing them puts every line recorded with them out of date
@@ -1249,7 +1206,7 @@ only, the fingerprint needs no provider of its own.
   auditions), at once, or after a question naming each change, the lines recorded on an
   ElevenLabs model in use that go out of date and the credits to record them again on that model
   (`elevenSettingsChangeOf`). The speed in use (the character's, else the project's
-  `narration.tts.speed`) is sent as `speed`; ElevenLabs takes 0.7–1.2, so a character with an
+  `narration.generate.fish.speed`) is sent as `speed`; ElevenLabs takes 0.7–1.2, so a character with an
   ElevenLabs voice whose speed in use lies outside it has each of its lines refused when recorded,
   with the reason, and its page says why under its speed. Nothing is clamped.
 - **Cues** (built in 14.8). Eleven v3 reads `[bracket]` tags as directions, as Fish does, so cues
@@ -1258,7 +1215,7 @@ only, the fingerprint needs no provider of its own.
   `inside` empty), so editing a cue never re-records audio that would not change, and out of what a
   plan counts (`sentPieces`). The page still shows a line's cues (`cueInputs`), and from 14.9, when
   such a model can be chosen, the cue editor says they are not spoken. The text is chunked at
-  `quality.chunkLimit` as for Fish.
+  `generate.chunkLimit` as for Fish.
 - **Languages.** Each language's voice may be either provider's; `language_code` is sent with models
   that take it.
 - **Credits, confirmed** (built in 14.7c). A part's plan prices each line by its voice's provider
@@ -1280,7 +1237,7 @@ only, the fingerprint needs no provider of its own.
 - **Page takes and tries** (built in 14.10a, `docs/ui/elevenlabs-takes.html`). Fish's are made
   with its free model. ElevenLabs has none, so the cast voice's take on its character's page and
   a cue try (Hear it, in the cue, scene cue and cue-inside editors) with an ElevenLabs voice use
-  `narration.elevenlabs.models.audition` (chosen on Setup's ElevenLabs audition row, saved at
+  `narration.models.elevenlabs.audition` (chosen on Setup's ElevenLabs audition row, saved at
   once, since 14.10b-1) with the project's voice settings at the character's
   speed (refused, with the reason, outside 0.7–1.2), in ElevenLabs' requests at once. They are not
   confirmed (a try is a line's worth of characters). On a model that would speak cues the text is
@@ -2224,10 +2181,10 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 - An invalid project file or resource opens the UI on an error page that names the file, the path
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
-  ffmpeg, uv for Whisper (off when `quality.transcriber` is `none`; a problem off Apple silicon),
+  ffmpeg, uv for Whisper (off when `generate.transcriber` is `none`; a problem off Apple silicon),
   the Fish key in the environment or the env file (read on every check, as `env` above says), whether
   Fish answers (the server's credit
-  lookup, only with a key), Requests at once (`quality.parallel` against the Fish account's limit
+  lookup, only with a key), Requests at once (`generate.parallel` against the Fish account's limit
   from the setting `fishTier` (§5): ready up to 5 with no tier, a problem above it until the tier is
   chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
   which asks Fish once more), the optional `refresh.part` and, with a `music` section, the music
@@ -2260,8 +2217,8 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   job carries on. Too many requests at once (429: Fish allows 5 at a time until $100 has been
   paid in, 15 until $1,000, then 50, as its pricing page said on 2026-10-25; it sends no
   `Retry-After`) is not an error: the client asks again after 1 s, then 2, 4, 8, 16 and 32 s, and
-  only then gives up, saying to lower `quality.parallel` or wait for other work on the key. The
-  studio itself never has more than `quality.parallel` TTS requests in flight (one limiter for
+  only then gives up, saying to lower `generate.parallel` or wait for other work on the key. The
+  studio itself never has more than `generate.parallel` TTS requests in flight (one limiter for
   lines and audition takes alike), so a 429 means `parallel` is set above the tier, or something
   else uses the same key.
 - The studio never runs `git add`, `commit` or `push`.
@@ -2640,7 +2597,12 @@ Small, independently useful increments:
        command for the stingers and the effects), the studio folder `content-studio/` with its
        `.gitignore` and its cache (what `.content-studio/` held), and the personal settings
        (`fishTier`, `takeFade`) moved into `content-studio/cache/settings.json`.
-    3. **Narration** (as-6u9.3): the dialog, the cast, the cues as edits and the lock.
+    3. **Narration** (as-6u9.3, built): the `narration` section (`from.part`, `models.fish` and
+       `models.elevenlabs`, `generate` with the checks and `soundAlike` by language, `audition`
+       with `phrase` by language and `searchLanguage`, `clips`, `manifest`), dialog lines by `id`,
+       and the cast, the cues (`{ cues, scenes }`) and the lock (`hashes`) at fixed places in
+       `content-studio/narration/`. The fingerprint is unchanged, so a converted game's clips stay
+       as they stood.
     4. **Music and stingers** (as-6u9.4): the lists, the edits in place of the briefs, the lock.
     5. **Images** (as-6u9.5): the lists, the style and rewordings as edits, the lock.
     6. **Sound effects** (as-6u9.6): the list, the rewordings committed as edits, the lock.

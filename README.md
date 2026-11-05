@@ -29,7 +29,7 @@ Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmp
 `"output": { "lufs": -16 }` each clip is also levelled to that loudness, as RetroQuest's `level.py`
 does), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads
-the model). Without them, set `"quality": { "transcriber": "none" }` in the project file.
+the model). Without them, set `"generate": { "transcriber": "none" }` in the project file's `narration` section.
 
 The studio keeps its own files in `content-studio/` beside the project file. Its working state on
 your machine (audition takes and sessions, your Fish tier and take fade) is in
