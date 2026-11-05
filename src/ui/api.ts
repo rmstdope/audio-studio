@@ -762,13 +762,18 @@ export function useSaveScene(partId: string) {
   const client = useQueryClient()
   return useMutation({
     scope: { id: `scene-${partId}` },
-    mutationFn: async (change: { sceneId: string; scene: SceneMix; was: SceneMix | null }) => {
+    mutationFn: async (change: {
+      sceneId: string
+      scene: SceneMix
+      was: SceneMix | null
+      moved?: { db: number; measuredAt: string }
+    }) => {
       const response = await fetch(
         `/api/scenes/${encodeURIComponent(partId)}/${encodeURIComponent(change.sceneId)}`,
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ scene: change.scene, was: change.was }),
+          body: JSON.stringify({ scene: change.scene, was: change.was, moved: change.moved }),
         },
       )
       if (!response.ok && response.status !== 409) {

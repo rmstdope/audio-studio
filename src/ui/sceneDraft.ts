@@ -23,7 +23,11 @@ export interface SceneEditor {
   /** How many effect rows have a red box. */
   reds: number
   status: SceneStatus
+  /** The "Make … louder / quieter" the page pressed on a measure, until saved or discarded. */
+  moved: Moved | null
   change: (next: SceneDraft) => void
+  /** Puts in the draft the levels moved by a press of the loudness suggestion. */
+  apply: (next: SceneDraft, moved: Moved) => void
   discard: () => void
   /** Saves the draft; true when it was written. */
   save: () => Promise<boolean>
@@ -33,6 +37,12 @@ export interface SceneEditor {
   loadSaved: () => Promise<void>
 }
 
+/** A press of "Make … louder / quieter": how many dB, on the measure made at `measuredAt`. */
+export interface Moved {
+  db: number
+  measuredAt: string
+}
+
 /** What the editor holds for one scene: the unsaved draft, if any, and where saving stands. */
 interface Held {
   sceneId: string
@@ -40,6 +50,7 @@ interface Held {
   /** The entry the draft began from: what Save compares with the file, however the project is read again. */
   was: SceneMix | null
   status: SceneStatus
+  moved: Moved | null
 }
 
 /**
@@ -54,25 +65,37 @@ export function useSceneEditor(partId: string, scene: SceneRow | undefined): Sce
   const mine: Held =
     held?.sceneId === sceneId
       ? held
-      : { sceneId, draft: null, was: scene?.entry ?? null, status: { kind: 'idle' } }
+      : { sceneId, draft: null, was: scene?.entry ?? null, status: { kind: 'idle' }, moved: null }
   const base = scene ? draftOf(scene) : { music: { track: null, level: 1 }, effects: [] }
   const draft = mine.draft ?? base
   const dirty = !sameDraft(draft, base)
   const reds = redRows(draft)
   // The latest, for the saves that finish later.
-  const latest = useRef({ draft, dirty, reds, sceneId, was: mine.was })
-  latest.current = { draft, dirty, reds, sceneId, was: mine.was }
+  const latest = useRef({ draft, dirty, reds, sceneId, was: mine.was, moved: mine.moved })
+  latest.current = { draft, dirty, reds, sceneId, was: mine.was, moved: mine.moved }
   // A scene saved earlier does not say Saved when it is opened again.
   useEffect(() => setHeld((h) => (h && h.sceneId !== sceneId && !h.draft ? null : h)), [sceneId])
 
   const send = useCallback(
     async (was: SceneMix | null): Promise<boolean> => {
       const { draft, sceneId } = latest.current
+      const { moved } = latest.current
       const set = (status: SceneStatus, kept: SceneDraft | null = draft) =>
-        setHeld({ sceneId, draft: kept, was: latest.current.was, status })
+        setHeld({
+          sceneId,
+          draft: kept,
+          was: latest.current.was,
+          status,
+          moved: kept ? moved : null,
+        })
       set({ kind: 'saving' })
       try {
-        const answer = await saving.mutateAsync({ sceneId, scene: toMix(draft), was })
+        const answer = await saving.mutateAsync({
+          sceneId,
+          scene: toMix(draft),
+          was,
+          ...(moved ? { moved } : {}),
+        })
         if (answer.ok) {
           set({ kind: 'saved' }, null)
           return true
@@ -92,9 +115,19 @@ export function useSceneEditor(partId: string, scene: SceneRow | undefined): Sce
     dirty,
     reds,
     status: mine.status,
-    change: (next) => setHeld({ sceneId, draft: next, was: mine.was, status: { kind: 'idle' } }),
+    moved: dirty ? mine.moved : null,
+    change: (next) =>
+      setHeld({ sceneId, draft: next, was: mine.was, status: { kind: 'idle' }, moved: mine.moved }),
+    apply: (next, moved) =>
+      setHeld({ sceneId, draft: next, was: mine.was, status: { kind: 'idle' }, moved }),
     discard: () =>
-      setHeld({ sceneId, draft: null, was: scene?.entry ?? null, status: { kind: 'idle' } }),
+      setHeld({
+        sceneId,
+        draft: null,
+        was: scene?.entry ?? null,
+        status: { kind: 'idle' },
+        moved: null,
+      }),
     save: async () => {
       const { dirty, reds, was } = latest.current
       if (!dirty || reds > 0 || mine.status.kind === 'saving') return false
@@ -103,7 +136,7 @@ export function useSceneEditor(partId: string, scene: SceneRow | undefined): Sce
     keepMine: async () => (mine.status.kind === 'conflict' ? send(mine.status.current) : false),
     loadSaved: async () => {
       await client.invalidateQueries({ queryKey: ['project'] })
-      setHeld({ sceneId, draft: null, was: null, status: { kind: 'idle' } })
+      setHeld({ sceneId, draft: null, was: null, status: { kind: 'idle' }, moved: null })
     },
   }
 }

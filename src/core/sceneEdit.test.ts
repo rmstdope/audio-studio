@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  scaleDraft,
   addEffect,
   draftOf,
   fixHeading,
@@ -10,6 +11,7 @@ import {
   switchMode,
   toMix,
   type EffectDraft,
+  type SceneDraft,
 } from './sceneEdit'
 import type { SceneEffectChoice, SceneMix, SceneRow } from './scenes'
 
@@ -168,5 +170,39 @@ describe('sameMix and sameDraft', () => {
     const edited = draftOf(row(full))
     edited.effects[2]!.level = 0.5
     expect(sameDraft(saved, edited)).toBe(false)
+  })
+})
+
+describe('scaleDraft', () => {
+  it('moves the music and every effect by the same dB and leaves the rest', () => {
+    const draft: SceneDraft = {
+      music: { track: 'theme', level: 1 },
+      effects: [
+        {
+          id: 'a',
+          mode: 'loop',
+          every: ['10', '20'],
+          after: '0',
+          trigger: null,
+          state: 'x',
+          level: 0.6,
+        },
+        {
+          id: 'b',
+          mode: 'loop',
+          every: ['10', '20'],
+          after: '0',
+          trigger: null,
+          state: null,
+          level: 0,
+        },
+      ],
+    }
+    const out = scaleDraft(draft, 4)
+    expect(out.music).toEqual({ track: 'theme', level: 1.58 })
+    expect(out.effects.map((e) => e.level)).toEqual([0.95, 0])
+    expect(out.effects[0]?.state).toBe('x')
+    // A scene with no music keeps its level.
+    expect(scaleDraft({ ...draft, music: { track: null, level: 1 } }, 4).music.level).toBe(1)
   })
 })

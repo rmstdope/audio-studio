@@ -308,7 +308,13 @@ function imageAnswer(result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAn
 }
 
 /** A scene as the page saves it, and the entry it was read as (null: the mix had none). */
-const SceneBody = z.object({ scene: SceneMixSchema, was: SceneMixSchema.nullable() }).strict()
+const SceneBody = z
+  .object({
+    scene: SceneMixSchema,
+    was: SceneMixSchema.nullable(),
+    moved: z.object({ db: z.number(), measuredAt: z.string() }).strict().optional(),
+  })
+  .strict()
 
 /** Measuring an act's scenes, with the open scene as the page has it (unsaved changes included). */
 const MeasureBody = z
@@ -1835,6 +1841,7 @@ export function startServer({
             request.params.id,
             body.data.scene,
             body.data.was,
+            body.data.moved,
           )
           if (!result.ok && result.kind === 'unknown') return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })

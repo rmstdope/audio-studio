@@ -2016,6 +2016,19 @@ measured from exactly the saved entry the saved figures, and drops any other dra
 one that cannot be read is reported and read as empty. The figures reach the page with
 `ProjectSummary.scenes` (`SceneRow.loudness`, `ScenesSummary.loudnessTarget`).
 
+**Bringing a scene back to the target** (as-gdf.2; `docs/ui/as-gdf.2-loudness-suggestion.html`). When
+a measure puts a scene off the target, one line under the Loudness table offers a single change for
+the whole scene (`suggestChange` in `core/sceneLoudness.ts`): the even dB that puts the middle of the
+measured states on the target, one decimal; the closest one when no change fits every state; only as
+much as keeps every level within 300%; nothing when the states disagree and the best change is under
+0.5 dB. The press (`scaleDraft`) multiplies the music and every effect by the same factor, to a whole
+percent, **on the page only**: Save keeps it, Discard undoes it. The table then shows the expected
+figures (measured + dB). The page sends the move with Save (`moved: { db, measuredAt }`); if the
+measure made at `measuredAt`, moved by `db`, is exactly the scene saved, `sceneSaved` keeps that
+measure as the saved one with `moved: { db }`, and the figures stay the expected ones while the saved
+scene is still that (`expectedFigures`) until the act is measured again. A scene changed by hand
+after the press, or saved differently since the measure, gets no suggestion.
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
@@ -2553,7 +2566,7 @@ Small, independently useful increments:
        triggers declared shows none.
     7. **Loudness of the scenes** (as-gdf.1, done: §8.11): a kept loudness per scene and state against
        the target in the project file, warnings in the Loudness panel and the scene list. Suggesting
-       and applying a change is as-gdf.2.
+       and applying a change (as-gdf.2, done) is in the same section.
 
 ---
 
