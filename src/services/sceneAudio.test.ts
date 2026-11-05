@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
@@ -38,6 +38,8 @@ const part = (file: string, over: Partial<RenderPart> = {}): RenderPart => ({
 })
 
 describe.skipIf(!hasFfmpeg)('ffmpegSceneAudio', () => {
+  // Each test runs ffmpeg up to three times; a slow runner needs more than bun's five seconds.
+  setDefaultTimeout(30_000)
   const root = tempRepo({})
   const audio = ffmpegSceneAudio(root)
 
