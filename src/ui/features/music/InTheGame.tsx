@@ -223,6 +223,8 @@ export function InTheGame({
         : 'track-in-game'
   const label = <span className="track-in-game-label">In the game</span>
   const hint = <span className="faint small">{state.hint}</span>
+  // The chosen take's fade editor is open: it stands in for the buttons and the line naming them.
+  const editing = take !== undefined && fading === take.n
 
   if (state.kind === 'nothing')
     return (
@@ -284,14 +286,14 @@ export function InTheGame({
         ) : (
           <span className="chip chip-ok">chosen</span>
         )}
-        {take && fading === take.n && <span className="chip chip-fade">fading</span>}
+        {editing && <span className="chip chip-fade">fading</span>}
         {take && <span className="faint small">{take.model}</span>}
       </div>
       {take?.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
       {take?.fades && fading !== take.n && (
         <span className="faint small">{fadesLine(take.fades)}</span>
       )}
-      {take && fading === take.n ? (
+      {take && editing ? (
         <FadesEditor
           trackId={track.id}
           take={take}
@@ -310,7 +312,7 @@ export function InTheGame({
           />
         )
       )}
-      {!(take && fading === take.n) && (
+      {!editing && (
         <div className="track-in-game-actions">
           {trimControl.button}
           {take && view.kind === 'stinger' && (
@@ -359,7 +361,7 @@ export function InTheGame({
           )}
         </div>
       )}
-      {!(take && fading === take.n) && hint}
+      {!editing && hint}
       {trimControl.failure}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
       {choose.data && !choose.data.ok && (
