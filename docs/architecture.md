@@ -2614,9 +2614,10 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
        and the lock (`inputs.text`) at fixed places in `content-studio/effects/`. The take hashes,
        the boards and the takes in the cache are unchanged, so a converted game's effects stay as
        they stood.
-    7. **Scenes** (as-6u9.7, built): the `scenes` section (`from.part`, `output: { lufs,
-tolerance }`, `mix`), scenes' names as `title`, and the kept loudness moved from the
-       gitignored cache into each part's committed scenes lock, `content-studio/scenes/<part>.lock.json`.
+    7. **Scenes** (as-6u9.7, built): the `scenes` section (`from.part`,
+       `output: { lufs, tolerance }`, `mix`), scenes' names as `title`, and the kept loudness moved
+       from the gitignored cache into each part's committed scenes lock,
+       `content-studio/scenes/<part>.lock.json`.
        The mix's format and the measures' fields are unchanged, so a converted game's figures stay
        as they stood.
     8. **RetroQuest end to end** (as-6u9.8): the game and the studio shown working on the new files.

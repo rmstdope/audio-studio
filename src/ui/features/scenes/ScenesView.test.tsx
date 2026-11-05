@@ -1716,11 +1716,20 @@ describe('the Loudness panel', () => {
   })
 
   it('says why a measure was refused', async () => {
-    measureAnswer = { status: 409, body: { ok: false, message: 'the kept file cannot be read' } }
+    measureAnswer = {
+      status: 409,
+      body: {
+        ok: false,
+        message:
+          'content-studio/scenes/act1.lock.json cannot be read; fix or delete it, and measure again',
+      },
+    }
     const page = render(open, summary('ok', true, { target }))
     await act(async () => button(panel(page), 'Measure loudness').click())
     await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
-    expect(text(panel(page).querySelector('.scene-problem'))).toBe('the kept file cannot be read')
+    expect(text(panel(page).querySelector('.scene-problem'))).toBe(
+      'content-studio/scenes/act1.lock.json cannot be read; fix or delete it, and measure again',
+    )
   })
 
   it('keeps showing a measure made with unsaved changes after one more edit, saying it changed', async () => {

@@ -105,9 +105,9 @@ bundle breaks.
   rest (the sound effects' takes in `content-studio/cache/effect-boards/` and
   `content-studio/cache/effect-takes/`, and the person's own settings, the Fish
   tier and the take fade, in `content-studio/cache/settings.json`, never in the project file).
-- Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock,
-  `formatMusicLock` and `formatBriefs` for music's, `formatImageLock` and `formatImageEdits` for
-  images', `formatEffectLock` for effects', `formatEntriesPerLine` for the scenes' locks).
+- Write JSON with stable key order and small diffs (`formatEntriesPerLine` for narration's and the
+  scenes' locks, `formatMusicLock` and `formatBriefs` for music's, `formatImageLock` and
+  `formatImageEdits` for images', `formatEffectLock` for effects').
 - Never delete clips without the user confirming it in the UI.
 - Only changes from the studio's own page are accepted (the Origin check on POST routes).
 
