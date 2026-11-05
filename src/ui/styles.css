@@ -4142,6 +4142,59 @@ button.cue-chip[aria-expanded='true'] {
 .scene-count-red {
   color: var(--danger-ink);
 }
+.scene-count-warn {
+  color: var(--warn);
+}
+.scene-loud-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 10px;
+}
+.scene-loud-head h2 {
+  margin: 0;
+}
+.scene-loud-target {
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 6px;
+}
+.scene-loud-warn {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--warn);
+}
+.scene-loud-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+}
+.scene-loud-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--faint);
+  padding: 4px 8px 4px 0;
+}
+.scene-loud-table td {
+  padding: 6px 8px 6px 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.scene-loud-figure {
+  font-variant-numeric: tabular-nums;
+}
+.scene-loud-bad {
+  color: var(--danger-ink);
+}
+.scene-loud-when {
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.scene-loud-table + .scene-problem {
+  margin-top: 10px;
+}
 .scene-menu {
   display: none;
 }

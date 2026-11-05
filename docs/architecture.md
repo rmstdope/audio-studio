@@ -1986,6 +1986,36 @@ carries a `problem` derived on every read from what the Music page knows (`take`
 "file not there"; neither chosen nor in the game: an amber "no take chosen"; none when the lock cannot be
 read), and the chip links to the track's page and follows the track chosen in the menu before saving.
 
+**Loudness** (as-gdf.1; the screens are `docs/ui/as-gdf.1-scene-loudness.html`). The project file may
+say what the game's scenes should sound like: `scenes.loudness` is `{ "target": -20, "tolerance": 2 }`
+(integrated LUFS and dB), edited by hand and only read; without it nothing is flagged. The open
+scene's **Loudness** panel and the scene list's count column show the last measure of the act.
+**Measure loudness** (`POST /api/scene-loudness/:part`, with `open: { scene, entry }` when the open
+scene has unsaved changes) measures every readable scene of the act in the background, one after
+another, and returns at once; `GET /api/scene-loudness` says how far each running act has got
+(`{ act: { done, total } }`, in memory: a quit forgets it), and the page asks once a second while any
+runs. A scene is measured in each of its states (`core/sceneLoudness.ts`, `planStateMix`): one
+steady-state minute of the mix the play bar would play, with no chance in it so a figure is the
+same every time. The music loops at its level; a loop effect fills the minute; a random effect
+starts in the middle of its range and again after each clip and wait; a once effect sounds at its
+delay if that falls inside the minute; a trigger effect is not counted (the player fires it). An
+effect plays in a state if it has none or that one. Sounds with no take chosen, or no file, are left
+out and named. The minute is mixed by ffmpeg (`services/sceneAudio.ts`: `amix` with each level as a
+`volume`, then loudnorm's first pass, as `levelClip` measures) and the figure is the integrated
+loudness (BS.1770), so silence between sparse effects is gated out as in any LUFS reading; a state
+with nothing playing has no figure ("nothing plays") and is never flagged. A figure is judged
+against the target in `core/sceneLoudness.ts`: within the tolerance is "on target", else "N dB too
+quiet / too loud" by how far from the target; a scene whose states disagree is "off target" in the
+list. The figures are **kept** in `.content-studio/scene-loudness.json` (act, then scene: `saved`,
+the measure of the saved scene, and `draft`, the open scene's measure with its unsaved changes,
+kept beside it so Discard puts the saved figures back). Each measure remembers the scene's entry
+and the clip each sound played (its take or the game's file); the page says "changed since
+measured" when the saved entry or one of those clips is no longer the same. A Save makes a draft
+measured from exactly the saved entry the saved figures, and drops any other draft
+(`services/sceneMeasures.ts`). The kept file only holds figures that can be measured again, so
+one that cannot be read is reported and read as empty. The figures reach the page with
+`ProjectSummary.scenes` (`SceneRow.loudness`, `ScenesSummary.loudnessTarget`).
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
@@ -2015,6 +2045,8 @@ groups. The rest is the plan:
 
 ```
 GET    /api/project                              project, parts
+POST   /api/scene-loudness/:part                 measure every scene of an act in the background ({ open?: { scene, entry } }; 409 if it is being measured)
+GET    /api/scene-loudness                       the acts being measured, scenes done out of all
 GET    /api/credit                               the Fish account's API credit (dollars)
 GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish, ACE-Step)
 GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
@@ -2519,6 +2551,9 @@ Small, independently useful increments:
     6. **Triggers in the game** (RetroQuest rq-xfkn): the game fires the declared triggers and plays the
        effects the mix binds to them. The studio's play bar fires them from as-p86.4 on; a scene with no
        triggers declared shows none.
+    7. **Loudness of the scenes** (as-gdf.1, done: §8.11): a kept loudness per scene and state against
+       the target in the project file, warnings in the Loudness panel and the scene list. Suggesting
+       and applying a change is as-gdf.2.
 
 ---
 

@@ -1,3 +1,4 @@
+import type { LoudnessTarget } from '../../../core/sceneLoudness'
 import type { SceneAct, SceneRow } from '../../../core/scenes'
 import { routeHref } from '../../route'
 import { listCount } from '../../scenesText'
@@ -15,11 +16,14 @@ export function SceneList({
   act,
   open,
   unsaved,
+  target,
 }: {
   act: SceneAct
   open: SceneRow
   /** The id of the scene with unsaved changes. */
   unsaved: string | null
+  /** The loudness the project asks of the scenes; null: none is flagged. */
+  target: LoudnessTarget | null
 }) {
   const move = (event: React.KeyboardEvent<HTMLUListElement>) => {
     const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
@@ -38,7 +42,7 @@ export function SceneList({
         </span>
         <ul onKeyDown={move}>
           {act.scenes.map((scene) => {
-            const count = listCount(scene)
+            const count = listCount(scene, target)
             const current = scene.id === open.id
             return (
               <li key={scene.id}>
@@ -56,7 +60,15 @@ export function SceneList({
                       </span>
                     )}
                   </span>
-                  <span className={count.red ? 'scene-count scene-count-red' : 'scene-count'}>
+                  <span
+                    className={
+                      count.red
+                        ? 'scene-count scene-count-red'
+                        : count.warn
+                          ? 'scene-count scene-count-warn'
+                          : 'scene-count'
+                    }
+                  >
                     {count.text}
                   </span>
                 </a>

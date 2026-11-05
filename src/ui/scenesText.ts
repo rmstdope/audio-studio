@@ -1,3 +1,4 @@
+import { sceneVerdict, type LoudnessTarget } from '../core/sceneLoudness'
 import type { Play, SceneAct, SceneRow, ScenesSummary, TrackProblem } from '../core/scenes'
 import { fileName } from './musicPlays'
 import type { ScenesRoute } from './route'
@@ -23,12 +24,19 @@ export function levelText(level: number): string {
 
 /**
  * What a scene's row in the list says at the right: what the game no longer has, else the effects
- * with no take chosen, each counted in red; else how many effects it has.
+ * with no take chosen, each counted in red; else, when the last measure put it off the target,
+ * which way (amber); else how many effects it has.
  */
-export function listCount(scene: SceneRow): { text: string; red: boolean } {
+export function listCount(
+  scene: SceneRow,
+  target: LoudnessTarget | null = null,
+): { text: string; red: boolean; warn?: true } {
   if (scene.unreadable) return { text: 'unreadable', red: true }
   if (scene.gone > 0) return { text: `${scene.gone} gone`, red: true }
   if (scene.silent > 0) return { text: `${scene.silent} silent`, red: true }
+  // Off the target, from the last measure of the saved scene (else of the unsaved one), stays until measured again.
+  const verdict = target && sceneVerdict(scene.loudness.saved ?? scene.loudness.draft, target)
+  if (verdict) return { text: verdict, red: false, warn: true }
   const n = scene.effects.length
   return { text: n === 0 ? 'none' : n === 1 ? '1 effect' : `${n} effects`, red: false }
 }
@@ -72,4 +80,23 @@ export function trackProblemChip(
     case 'nothing':
       return { text: 'no take chosen', title: undefined, tone: 'warn' }
   }
+}
+
+/** The two-digit clock time of a date, as "14:02". */
+function clock(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/** The month names the line under the Loudness table uses for an older day. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** When a scene was measured: "Measured today 14:02", "Measured yesterday 16:40", else "Measured 3 Nov 16:40". */
+export function measuredLine(measuredAt: string, now: Date): string {
+  const at = new Date(measuredAt)
+  const ago = Math.round(
+    (new Date(now).setHours(0, 0, 0, 0) - new Date(at).setHours(0, 0, 0, 0)) / 86_400_000,
+  )
+  if (ago === 0) return `Measured today ${clock(at)}`
+  if (ago === 1) return `Measured yesterday ${clock(at)}`
+  return `Measured ${at.getDate()} ${MONTHS[at.getMonth()]} ${clock(at)}`
 }

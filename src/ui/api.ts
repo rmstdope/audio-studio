@@ -782,6 +782,51 @@ export function useSaveScene(partId: string) {
   })
 }
 
+/** How far the measure of each act's scenes has got: scenes done out of all, by act. */
+export type SceneLoudnessMaking = Record<string, { done: number; total: number }>
+
+/**
+ * Measuring the loudness of an act's scenes (§8.11). `running` is how far the act's measure has
+ * got (null: none is running), kept up by asking the studio once a second while any is, so it is
+ * still there coming back to the page. The project is read again as each scene finishes, so its
+ * figures appear as they are made. `start` presses Measure loudness, with the open scene as the
+ * page has it when that has unsaved changes.
+ */
+export function useSceneLoudness(partId: string) {
+  const client = useQueryClient()
+  const making = useQuery({
+    queryKey: ['scene-loudness'],
+    queryFn: () => getJson<SceneLoudnessMaking>('/api/scene-loudness'),
+    refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length > 0 ? 1000 : false),
+  })
+  const start = useMutation({
+    mutationFn: async (open: { scene: string; entry: SceneMix } | null) => {
+      const response = await fetch(`/api/scene-loudness/${encodeURIComponent(partId)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(open ? { open } : {}),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`measuring the scenes answered ${response.status}`)
+      }
+    },
+    onSettled: () => client.refetchQueries({ queryKey: ['scene-loudness'] }),
+  })
+  const running = making.data?.[partId] ?? null
+  const done = running?.done
+  // Each scene that finishes brings its figures.
+  useEffect(() => {
+    if (done !== undefined) void client.invalidateQueries({ queryKey: ['project'] })
+  }, [client, done])
+  // The last one too: the run is gone from the studio's list once it has ended.
+  const was = useRef(false)
+  useEffect(() => {
+    if (was.current && !running) void client.invalidateQueries({ queryKey: ['project'] })
+    was.current = running !== null
+  }, [client, running])
+  return { running, start: start.mutate }
+}
+
 /** Refreshing the stingers with the project's `music.refreshShared`: see `useRefreshRun`. */
 export function useRefreshShared() {
   return useRefreshRun<RefreshSharedResult>(
