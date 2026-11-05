@@ -1,6 +1,8 @@
 import {
   planStateMix,
   sceneStateNames,
+  statesPlaying,
+  withoutName,
   WINDOW_SECONDS,
   type MixPart,
   type PlanEffect,
@@ -84,6 +86,7 @@ async function measureScene(
   }
   const chosen = entry?.music ?? (scene.music.track ? { track: scene.music.track, level: 1 } : null)
   const paths = new Map<string, string>()
+  const stateNames = sceneStateNames(scene)
 
   let music: PlanMusic | null = null
   const track = act.tracks.find((t) => t.id === chosen?.track)
@@ -104,7 +107,11 @@ async function measureScene(
       ? await once(found.effect, row.id, () => files.effect(row.id))
       : null
     if (!file) {
-      left(row.id, choice.silent ? NO_TAKE : NO_FILE)
+      // Named only if the measured minute would have played it, and in which states.
+      const playing = statesPlaying({ play: row.play, state: row.state ?? null }, stateNames)
+      if (playing.length > 0) {
+        left(withoutName(row.id, playing, stateNames), choice.silent ? NO_TAKE : NO_FILE)
+      }
     } else {
       paths.set(`effect:${row.id}`, file)
     }
@@ -118,7 +125,7 @@ async function measureScene(
   }
 
   const states: StateLoudness[] = []
-  for (const state of sceneStateNames(scene)) {
+  for (const state of stateNames) {
     const parts = planStateMix({ music, effects, state }).map((part): RenderPart => ({
       ...part,
       file: paths.get(`${part.source.kind}:${part.source.id}`)!,

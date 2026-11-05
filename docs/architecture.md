@@ -2000,7 +2000,8 @@ same every time. The music loops at its level; a loop effect fills the minute; a
 starts in the middle of its range and again after each clip and wait; a once effect sounds at its
 delay if that falls inside the minute; a trigger effect is not counted (the player fires it). An
 effect plays in a state if it has none or that one. Sounds with no take chosen, or no file, are left
-out and named. The minute is mixed by ffmpeg (`services/sceneAudio.ts`: `amix` with each level as a
+out and named, but an effect only when the minute would have played it (`statesPlaying`), with the
+states when that is only some of them ("rain in rainy and storm"). The minute is mixed by ffmpeg (`services/sceneAudio.ts`: `amix` with each level as a
 `volume`, then loudnorm's first pass, as `levelClip` measures) and the figure is the integrated
 loudness (BS.1770), so silence between sparse effects is gated out as in any LUFS reading; a state
 with nothing playing has no figure ("nothing plays") and is never flagged. A figure is judged

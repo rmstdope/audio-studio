@@ -207,6 +207,33 @@ describe('measureScenes', () => {
     expect(asked[0]!.map((p) => p.file)).toEqual(['/music/theme.mp3', '/clips/hum.mp3'])
   })
 
+  it('names only effects the measured minute would have played, and in which states', async () => {
+    const built = actOf(
+      [declared('a', ['calm', 'rainy', 'storm'])],
+      {
+        a: {
+          music: { track: 'theme', level: 1 },
+          effects: [
+            { id: 'creak', play: { mode: 'trigger', trigger: 'open' }, level: 1 },
+            { id: 'coins', play: { mode: 'loop' }, state: 'flooded', level: 1 },
+            { id: 'late', play: { mode: 'once', afterSeconds: 90 }, level: 1 },
+            { id: 'rain', play: { mode: 'loop' }, state: 'rainy', level: 1 },
+            { id: 'fire', play: { mode: 'loop' }, level: 1 },
+          ],
+        },
+      },
+      ['creak', 'coins', 'late', 'rain', 'fire'].map((id) =>
+        choice(id, { silent: true, playable: false, clip: null }),
+      ),
+    )
+    const kept: [string, SceneMeasure, boolean][] = []
+    await run(built, { kept })
+    expect(kept[0]![1].without).toEqual([
+      'rain in rainy, which has no take chosen',
+      'fire, which has no take chosen',
+    ])
+  })
+
   it('records why a scene could not be measured and goes on with the others', async () => {
     const built = actOf([declared('a', ['x', 'y']), declared('b')], {
       a: { music: { track: 'theme', level: 1 }, effects: [] },
