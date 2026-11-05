@@ -2285,7 +2285,8 @@ Small, independently useful increments:
       among others. The table is shown in the order the studio applies it.
       Under it, **Words that sound the same** (built): the project's own sound-alike groups,
       one a row, words separated by commas, saved as a whole in the project file's
-      `narration.quality.soundAlike`, refused if the file's groups changed since editing began.
+      `narration.quality.soundAlike` (`narration.generate.soundAlike` since as-6u9.3), refused if
+      the file's groups changed since editing began.
    3. **Changes panel** (built): `git status` for the project's own files only (the project file,
       the cast, each part's dialog, cues, lock, manifest and clips), grouped by part with clips
       counted, merge conflicts marked; read again every few seconds, and counted in the sidebar.
@@ -2314,7 +2315,8 @@ Small, independently useful increments:
    2. **Loudness** (built): `output.lufs` levels each new clip as `level.py` does, command for
       command (`pyFixed` formats numbers as Python does); clips come out byte-identical. Not in
       the fingerprint: changing the target does not make clips stale.
-   3. **The switch** (built, RetroQuest #508): in RetroQuest, one shared `tts/cast.json` from the four act casts (the
+   3. **The switch** (built, RetroQuest #508): in RetroQuest, one shared `tts/cast.json`
+      (`content-studio/narration/cast.json` since as-6u9.3) from the four act casts (the
       grandmother's recast everywhere; the mother's Act III style as cues on her Act III lines),
       `content-studio.json` for all four acts with the new extractor, every act's clips adopted,
       `.content-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
@@ -2388,7 +2390,8 @@ Small, independently useful increments:
     2. **Track lists** (built): the project file's `music` section, the game's loop and stinger lists and
        the studio's briefs (schemas, problems with file and path), and the Music pages, a page per
        act and one for the stingers, listing the tracks, read only; Refresh from the game on an
-       act's page, and on the Stingers page running `refreshShared` (CLAUDE.md's consumer rules
+       act's page, and on the Stingers page running `refreshShared` (`refresh.shared` since
+       as-6u9.2; CLAUDE.md's consumer rules
        updated in that step to name both buttons and the new command); the sample project in
        `test/fixtures/sample` gains loop and stinger lists.
     3. **Briefs** (built): a track's page (a track opens from its row), its brief, length, tempo
@@ -2620,7 +2623,12 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
        `content-studio/scenes/<part>.lock.json`.
        The mix's format and the measures' fields are unchanged, so a converted game's figures stay
        as they stood.
-    8. **RetroQuest end to end** (as-6u9.8): the game and the studio shown working on the new files.
+    8. **RetroQuest end to end** (as-6u9.8, built): the studio run on RetroQuest through every
+       section's pages, with no problems listed and a narration clip, a track, a stinger, an effect
+       and a scene mix played, and the game playing its narration, music, stingers, images, effects
+       and scene mixes in Act I from the converted files. No file of the old format is left in
+       either repository; a few delivery-plan steps above name the old places they were built with,
+       with the new name beside them.
 
 ---
 
