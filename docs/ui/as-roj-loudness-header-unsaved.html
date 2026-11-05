@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Loudness header with unsaved edits — agreed (as-roj)</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --ls: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --warn: #ffc24b;
+        --warnbg: #2d2412;
+        --ok: #3ddc97;
+        --okbg: #10291f;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 900px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro b {
+        color: var(--text);
+      }
+      .cards {
+        max-width: 900px;
+        margin: 0 auto;
+        display: grid;
+        gap: 22px;
+      }
+      .card h3 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+      .card .note {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 8px;
+      }
+      .scene {
+        border: 1px solid var(--ls);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 14px;
+      }
+      .sname {
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      .dot {
+        color: var(--accent);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--ls);
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .head h2 {
+        font-size: 15px;
+        margin: 0;
+      }
+      .faint {
+        color: var(--faint);
+        font-weight: 400;
+      }
+      .warn {
+        color: var(--warn);
+        font-weight: 400;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--ls);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 5px 11px;
+        font: inherit;
+      }
+      .btn.pri {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #111;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 6px;
+      }
+      th {
+        text-align: left;
+        font-size: 12px;
+        color: var(--faint);
+        font-weight: 500;
+        padding: 3px 0;
+      }
+      td {
+        padding: 4px 0;
+        border-top: 1px solid var(--ls);
+      }
+      .chip {
+        font-size: 12px;
+        border-radius: 99px;
+        padding: 1px 8px;
+      }
+      .chip.ok {
+        background: var(--okbg);
+        color: var(--ok);
+      }
+      .chip.w {
+        background: var(--warnbg);
+        color: var(--warn);
+      }
+      .sug {
+        background: var(--warnbg);
+        border-radius: 8px;
+        padding: 8px 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin: 6px 0;
+      }
+      .mutedline {
+        color: var(--faint);
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .when {
+        color: var(--faint);
+        font-size: 12px;
+        margin: 4px 0 0;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        border-top: 1px solid var(--ls);
+      }
+      .row:first-of-type {
+        border-top: 0;
+      }
+      .chg {
+        color: var(--accent);
+      }
+      .bar {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .hl {
+        outline: 2px dashed var(--accent);
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
+      .narrow {
+        max-width: 360px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Option A — the same header, saved or not</h1>
+      <p>
+        As soon as a level on the page differs from what was measured, the header says
+        <b>· changed since measured</b>, whether or not it has been saved. Save changes nothing in
+        the panel; Discard puts it back as measured. The dashed outline marks what is new.
+      </p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h3>1. Measured, nothing changed</h3>
+        <p class="note">As today: the suggestion is offered.</p>
+        <div class="scene">
+          <div class="sname">General store</div>
+          <div class="panel">
+            <div class="head">
+              <h2>Loudness <span class="faint">target −20 LUFS ± 2 dB</span></h2>
+              <button class="btn">Measure loudness</button>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td>−24.0 LUFS</td>
+                <td><span class="chip w">4.0 dB too quiet</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td>−23.6 LUFS</td>
+                <td><span class="chip w">3.6 dB too quiet</span></td>
+              </tr>
+            </table>
+            <div class="sug">
+              <span
+                >Make the whole scene <b>3.8 dB louder</b> to bring both states within ± 2 dB.</span
+              ><button class="btn pri">Make 3.8 dB louder</button>
+            </div>
+            <p class="when">Measured today 14:02</p>
+          </div>
+          <div class="panel">
+            <div class="head"><h2>Effects</h2></div>
+            <div class="row"><span>door-creak</span><span>120%</span></div>
+            <div class="row"><span>rain</span><span>80%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>2. A level changed by hand, not saved (off target)</h3>
+        <p class="note">
+          door-creak 120% → 150%. The suggestion gives way to the out-of-date line, and the header
+          now says so too.
+        </p>
+        <div class="scene">
+          <div class="sname">General store <span class="dot">●</span></div>
+          <div class="panel">
+            <div class="head">
+              <h2>
+                Loudness <span class="faint">target −20 LUFS ± 2 dB</span
+                ><span class="hl"> <span class="warn">· changed since measured</span></span>
+              </h2>
+              <button class="btn">Measure loudness</button>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td>−24.0 LUFS</td>
+                <td><span class="chip w">4.0 dB too quiet</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td>−23.6 LUFS</td>
+                <td><span class="chip w">3.6 dB too quiet</span></td>
+              </tr>
+            </table>
+            <p class="mutedline">
+              The scene changed since it was measured. Measure loudness again for a suggestion.
+            </p>
+            <p class="when">Measured today 14:02</p>
+          </div>
+          <div class="panel">
+            <div class="head"><h2>Effects</h2></div>
+            <div class="row"><span>door-creak</span><span class="chg">150%</span></div>
+            <div class="row"><span>rain</span><span>80%</span></div>
+          </div>
+          <div class="bar">
+            <button class="btn pri">Save</button><button class="btn">Discard</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>3. A level changed by hand, not saved (on target)</h3>
+        <p class="note">
+          No suggestion was offered, so no out-of-date line; the header still says the figures no
+          longer match the page.
+        </p>
+        <div class="scene">
+          <div class="sname">General store <span class="dot">●</span></div>
+          <div class="panel">
+            <div class="head">
+              <h2>
+                Loudness <span class="faint">target −20 LUFS ± 2 dB</span
+                ><span class="hl"> <span class="warn">· changed since measured</span></span>
+              </h2>
+              <button class="btn">Measure loudness</button>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td>−19.6 LUFS</td>
+                <td><span class="chip ok">on target</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td>−20.3 LUFS</td>
+                <td><span class="chip ok">on target</span></td>
+              </tr>
+            </table>
+            <p class="when">Measured today 14:02</p>
+          </div>
+          <div class="panel">
+            <div class="head"><h2>Effects</h2></div>
+            <div class="row"><span>door-creak</span><span class="chg">150%</span></div>
+            <div class="row"><span>rain</span><span>80%</span></div>
+          </div>
+          <div class="bar">
+            <button class="btn pri">Save</button><button class="btn">Discard</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>4. After Save</h3>
+        <p class="note"></p>
+        <div class="scene">
+          <div class="sname">General store</div>
+          <div class="panel">
+            <div class="head">
+              <h2>
+                Loudness <span class="faint">target −20 LUFS ± 2 dB</span
+                ><span class=""> <span class="warn">· changed since measured</span></span>
+              </h2>
+              <button class="btn">Measure loudness</button>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td>−24.0 LUFS</td>
+                <td><span class="chip w">4.0 dB too quiet</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td>−23.6 LUFS</td>
+                <td><span class="chip w">3.6 dB too quiet</span></td>
+              </tr>
+            </table>
+            <p class="mutedline">
+              The scene changed since it was measured. Measure loudness again for a suggestion.
+            </p>
+            <p class="when">Measured today 14:02</p>
+          </div>
+          <div class="panel">
+            <div class="head"><h2>Effects</h2></div>
+            <div class="row"><span>door-creak</span><span>150%</span></div>
+            <div class="row"><span>rain</span><span>80%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>5. After Discard, or the level set back to 120% by hand</h3>
+        <p class="note">The page matches what was measured again: header plain, suggestion back.</p>
+        <div class="scene">
+          <div class="sname">General store</div>
+          <div class="panel">
+            <div class="head">
+              <h2>Loudness <span class="faint">target −20 LUFS ± 2 dB</span></h2>
+              <button class="btn">Measure loudness</button>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td>−24.0 LUFS</td>
+                <td><span class="chip w">4.0 dB too quiet</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td>−23.6 LUFS</td>
+                <td><span class="chip w">3.6 dB too quiet</span></td>
+              </tr>
+            </table>
+            <div class="sug">
+              <span
+                >Make the whole scene <b>3.8 dB louder</b> to bring both states within ± 2 dB.</span
+              ><button class="btn pri">Make 3.8 dB louder</button>
+            </div>
+            <p class="when">Measured today 14:02</p>
+          </div>
+          <div class="panel">
+            <div class="head"><h2>Effects</h2></div>
+            <div class="row"><span>door-creak</span><span>120%</span></div>
+            <div class="row"><span>rain</span><span>80%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>6. Narrow window</h3>
+        <p class="note">The header addition wraps with the target line; the button goes below.</p>
+        <div class="scene narrow">
+          <div class="sname">General store <span class="dot">●</span></div>
+          <div class="panel">
+            <div class="head">
+              <h2>
+                Loudness <span class="faint">target −20 LUFS ± 2 dB</span
+                ><span class="hl"> <span class="warn">· changed since measured</span></span>
+              </h2>
+              <button class="btn">Measure loudness</button>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td>−24.0 LUFS</td>
+                <td><span class="chip w">4.0 dB too quiet</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td>−23.6 LUFS</td>
+                <td><span class="chip w">3.6 dB too quiet</span></td>
+              </tr>
+            </table>
+            <p class="mutedline">
+              The scene changed since it was measured. Measure loudness again for a suggestion.
+            </p>
+            <p class="when">Measured today 14:02</p>
+          </div>
+          <div class="bar">
+            <button class="btn pri">Save</button><button class="btn">Discard</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
