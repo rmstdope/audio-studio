@@ -210,14 +210,46 @@ describe('the loudness suggestion line', () => {
             db: 1.2,
             states: 2,
             closest: null,
-            ceiling: { sound: 'cat-purr', still: [2.2, 3.4] },
+            ceiling: {
+              sound: 'cat-purr',
+              still: [
+                { name: 'plain', db: 2.2 },
+                { name: 'cat-home', db: 3.4 },
+              ],
+            },
           },
           2,
         ),
       ),
     ).toBe(
-      'Make the whole scene 1.2 dB louder — as far as it goes before cat-purr passes 300%. The states would still be 2.2 and 3.4 dB too quiet; turn cat-purr down or the others up by hand to go further.',
+      'Make the whole scene 1.2 dB louder — as far as it goes before cat-purr passes 300%. plain would still be 2.2 dB and cat-home 3.4 dB too quiet; turn cat-purr down or the others up by hand to go further.',
     )
+    const words = (still: { name: string; db: number }[]) =>
+      full(
+        suggestionLine(
+          {
+            kind: 'change',
+            db: 1.2,
+            states: still.length,
+            closest: null,
+            ceiling: { sound: 'cat-purr', still },
+          },
+          2,
+        ),
+      )
+    expect(words([{ name: 'The scene', db: 13.6 }])).toContain(
+      'cat-purr passes 300%. The scene would still be 13.6 dB too quiet; turn',
+    )
+    expect(words([{ name: 'cat-home', db: 2.2 }])).toContain(
+      '300%. cat-home would still be 2.2 dB too quiet; turn',
+    )
+    expect(
+      words([
+        { name: 'plain', db: 1 },
+        { name: 'rain', db: 2.2 },
+        { name: 'night', db: 3.4 },
+      ]),
+    ).toContain('300%. plain would still be 1.0 dB, rain 2.2 dB and night 3.4 dB too quiet; turn')
     const none = suggestionLine({ kind: 'none', loud: ['plain'], quiet: ['cat-home'] }, 2)
     expect(none.before).toBe(
       'No single change helps: plain is too loud and cat-home too quiet. Bring them closer in the scene’s levels.',
