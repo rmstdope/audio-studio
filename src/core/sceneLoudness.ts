@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { sameMix } from './sceneEdit'
+import { sameMix, scaleLevel } from './sceneEdit'
 import { SceneMixSchema, type Play, type SceneMix } from './scenes'
 
 /** How much of a scene's sound is measured: a steady-state minute in each state. */
@@ -102,6 +102,8 @@ export const SceneMeasureSchema = z.object({
   entry: SceneMixSchema.nullable(),
   /** The clip each sound came from (a take number or the game's file), to tell when one changed. */
   clips: z.record(z.string(), z.string()),
+  /** Set once a scene was saved after "Make … louder / quieter": the figures are then expected ones (measured + db). */
+  moved: z.object({ db: z.number() }).nullable().optional(),
   states: z.array(z.object({ state: z.string().nullable(), lufs: z.number().nullable() })),
   /** What was left out, worded "glass-clink, which has no take chosen". */
   without: z.array(z.string()),
@@ -190,4 +192,119 @@ export function measureChanged(
   const was = Object.keys(measure.clips)
   const now = Object.keys(scene.clips)
   return was.length !== now.length || was.some((key) => measure.clips[key] !== scene.clips[key])
+}
+
+/** The highest level the mix takes. */
+const MAX_LEVEL = 3
+
+/** A number of dB to one decimal, without a negative zero. */
+function oneDecimal(n: number): number {
+  return Math.round(n * 10) / 10 || 0
+}
+
+/**
+ * The mix with the music and every effect moved by the same `db`: each level times the factor,
+ * to a whole percent, 0% staying 0% and none above 300%.
+ */
+export function scaleMix(mix: SceneMix, db: number): SceneMix {
+  const scale = (level: number) => scaleLevel(level, db)
+  return {
+    ...mix,
+    ...(mix.music ? { music: { ...mix.music, level: scale(mix.music.level) } } : {}),
+    effects: mix.effects.map((e) => ({ ...e, level: scale(e.level) })),
+  }
+}
+
+/** What the panel offers to bring a scene within the target. */
+export type Suggestion =
+  | {
+      kind: 'change'
+      /** dB, one decimal; positive is louder. */
+      db: number
+      /** How many states were measured (the wording says "both", "every" or "it"). */
+      states: number
+      /** No single change fits every state: how far apart they are, and how far the best one leaves each outside the tolerance. */
+      closest: { apart: number; leaving: number } | null
+      /** A level would pass 300%: which sound, and how far from the target (dB) each state still is. */
+      ceiling: { sound: string; still: number[] } | null
+    }
+  /** States on both sides of the target and the best change under 0.5 dB: nothing to press. */
+  | { kind: 'none'; loud: string[]; quiet: string[] }
+
+/**
+ * The one change for the whole scene that comes closest to bringing every measured state within the
+ * target, aimed at putting the states' middle on the target (§8.11). Null when there is nothing to
+ * say: no target, nothing off, nothing measured, or the scene could not be measured.
+ */
+export function suggestChange(
+  measure: SceneMeasure,
+  target: LoudnessTarget | null,
+  mix: SceneMix,
+): Suggestion | null {
+  if (!target || measure.error !== null) return null
+  const read = measure.states.flatMap((s) =>
+    s.lufs === null ? [] : [{ name: s.state ?? 'The scene', off: s.lufs - target.target }],
+  )
+  if (read.length === 0 || read.every((s) => Math.abs(s.off) <= target.tolerance)) return null
+  const low = Math.min(...read.map((s) => s.off))
+  const high = Math.max(...read.map((s) => s.off))
+  let db = oneDecimal(-(low + high) / 2)
+  const loud = read.filter((s) => s.off > target.tolerance).map((s) => s.name)
+  const quiet = read.filter((s) => s.off < -target.tolerance).map((s) => s.name)
+  if (Math.abs(db) < 0.5 && loud.length > 0 && quiet.length > 0)
+    return { kind: 'none', loud, quiet }
+  if (db === 0) return null
+  const apart = high - low
+  const closest =
+    apart > 2 * target.tolerance
+      ? { apart: oneDecimal(apart), leaving: oneDecimal(apart / 2 - target.tolerance) }
+      : null
+  const sounds = [
+    ...(mix.music?.track ? [{ id: mix.music.track, level: mix.music.level }] : []),
+    ...mix.effects.map((e) => ({ id: e.id, level: e.level })),
+  ]
+  const top = sounds.reduce((a, b) => (b.level > a.level ? b : a), { id: '', level: 0 })
+  let ceiling: { sound: string; still: number[] } | null = null
+  if (db > 0 && top.level > 0) {
+    const room = Math.floor(20 * Math.log10(MAX_LEVEL / top.level) * 10) / 10
+    if (room < db) {
+      if (room < 0.1) return null
+      db = room
+      ceiling = {
+        sound: top.id,
+        still: read
+          .filter((s) => s.off + db < -target.tolerance)
+          .map((s) => oneDecimal(-(s.off + db))),
+      }
+    }
+  }
+  return { kind: 'change', db, states: read.length, closest, ceiling }
+}
+
+/** The measure with every figure moved by `db`; a state that reads nothing stays so. */
+export function shiftStates(measure: SceneMeasure, db: number): SceneMeasure {
+  return {
+    ...measure,
+    states: measure.states.map((s) => ({ ...s, lufs: s.lufs === null ? null : s.lufs + db })),
+  }
+}
+
+/**
+ * Which figures to show for a measure: the `measured` ones, the `expected` ones (the scene is
+ * exactly the measured one moved by `moved.db`), or none that can be trusted (`changed`).
+ */
+export function expectedFigures(
+  measure: SceneMeasure,
+  moved: { db: number } | null | undefined,
+  now: { entry: SceneMix | null; clips: Record<string, string> },
+): 'measured' | 'expected' | 'changed' {
+  if (!measureChanged(measure, now)) return 'measured'
+  if (
+    moved &&
+    measure.entry &&
+    measureChanged({ ...measure, entry: scaleMix(measure.entry, moved.db) }, now) === false
+  ) {
+    return 'expected'
+  }
+  return 'changed'
 }

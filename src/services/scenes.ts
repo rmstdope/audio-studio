@@ -146,7 +146,7 @@ const mixWrites = createSerial()
  * Saves one scene of an act into the act's mix file (§8.11), and nothing else: the other entries,
  * those the game no longer declares and those that cannot be read stay as they are. `was` is the
  * entry the page read (null: none); if the file's differs, someone saved meanwhile and nothing is
- * written. A mix that cannot be read is never written over. The file is written whole, scenes in
+ * written. `moved` is the move of the figures the page made (see `sceneSaved`). A mix that cannot be read is never written over. The file is written whole, scenes in
  * the declarations' order and then the rest in their old order, two-space indented.
  */
 export function saveScene(
@@ -155,6 +155,7 @@ export function saveScene(
   sceneId: string,
   scene: SceneMix,
   was: SceneMix | null,
+  moved?: { db: number; measuredAt: string },
 ): Promise<SceneSave> {
   const refuse = (kind: 'unknown' | 'invalid' | 'unreadable', message: string): SceneSave => ({
     ok: false,
@@ -209,7 +210,7 @@ export function saveScene(
       return { ok: false, kind: 'failed', message: writeFailure(error) }
     }
     // The figures kept for the scene follow the Save; failing to keep them is not failing to save.
-    await sceneSaved(projectFile, part, sceneId, checked.data).catch(() => {})
+    await sceneSaved(projectFile, part, sceneId, checked.data, moved).catch(() => {})
     return { ok: true }
   })
 }

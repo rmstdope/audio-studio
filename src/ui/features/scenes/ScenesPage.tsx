@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { fixHeading } from '../../../core/sceneEdit'
+import { fixHeading, toMix } from '../../../core/sceneEdit'
+import { expectedFigures, shiftStates, type SceneMeasure } from '../../../core/sceneLoudness'
 import type { SceneAct, ScenesSummary } from '../../../core/scenes'
 import { useRefreshDialog, useSceneLoudness } from '../../api'
 import { Problems } from '../../components/Problems'
@@ -127,6 +128,18 @@ export function ScenesPage({
     )
   }
   const { status } = editor
+  // An unsaved press moves the figures the list judges the open scene by.
+  const pressedOn = [scene.loudness.draft, scene.loudness.saved].find(
+    (m) => m && editor.moved && m.measuredAt === editor.moved.measuredAt,
+  )
+  const expected: SceneMeasure | null =
+    pressedOn &&
+    editor.moved &&
+    editor.reds === 0 &&
+    expectedFigures(pressedOn, editor.moved, { entry: toMix(editor.draft), clips: scene.clips }) ===
+      'expected'
+      ? shiftStates(pressedOn, editor.moved.db)
+      : null
   const red = editor.reds > 0
   const word = red
     ? { text: fixHeading(editor.reds), className: 'scene-status scene-status-red' }
@@ -201,6 +214,7 @@ export function ScenesPage({
           open={scene}
           unsaved={editor.dirty ? scene.id : null}
           target={summary.loudnessTarget}
+          expected={expected}
         />
         <div className="scene-open">
           {scene.unreadable ? (
@@ -219,9 +233,14 @@ export function ScenesPage({
                 target={summary.loudnessTarget}
                 draft={editor.draft}
                 dirty={editor.dirty}
+                pressed={editor.moved}
                 running={loudness.running}
                 refused={loudness.refused}
                 onMeasure={loudness.start}
+                onApply={(next, moved) => {
+                  editor.apply(next, moved)
+                  saveButton.current?.focus()
+                }}
               />
               <SceneDetail
                 key={scene.id}

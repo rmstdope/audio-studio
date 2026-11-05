@@ -168,3 +168,16 @@ export function sameMix(a: SceneMix | null, b: SceneMix | null): boolean {
 export function sameDraft(a: SceneDraft, b: SceneDraft): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
+
+/** A level moved by `db`: times the factor, to a whole percent, 0% staying 0% and none above 300%. */
+export function scaleLevel(level: number, db: number): number {
+  return Math.min(3, Math.round(level * 10 ** (db / 20) * 100) / 100)
+}
+
+/** The draft with the music and every effect moved by the same `db`; nothing else changes. */
+export function scaleDraft(draft: SceneDraft, db: number): SceneDraft {
+  return {
+    music: { ...draft.music, level: scaleLevel(draft.music.level, db) },
+    effects: draft.effects.map((e) => ({ ...e, level: scaleLevel(e.level, db) })),
+  }
+}

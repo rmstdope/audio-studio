@@ -18,6 +18,7 @@ import {
   type RenderPart,
   type SceneAudio,
 } from './sceneLoudness'
+import { scaleMix } from '../core/sceneLoudness'
 import { saveScene } from './scenes'
 
 const choice = (id: string, over: Partial<SceneEffectChoice> = {}): SceneEffectChoice => ({
@@ -350,6 +351,31 @@ describe('the kept figures', () => {
     expect((await saveScene(projectFile, 'act1', 'a', other, entry)).ok).toBe(true)
     expect(kept(root).act1.a.draft).toBeNull()
     expect(kept(root).act1.a.saved.entry).toEqual(entry)
+  })
+
+  it('keep the expected figures when a scene is saved as the measured one moved', async () => {
+    const { root, projectFile } = repo()
+    const entry: SceneMix = { music: { track: null, level: 1 }, effects: [] }
+    const moved = scaleMix(entry, 4)
+    await keepMeasure(projectFile, 'act1', 'a', measureOf(entry), false)
+    const answer = await saveScene(projectFile, 'act1', 'a', moved, null, {
+      db: 4,
+      measuredAt: '2026-11-05T14:02:00.000Z',
+    })
+    expect(answer.ok).toBe(true)
+    expect(kept(root).act1.a.saved.moved).toEqual({ db: 4 })
+    expect(kept(root).act1.a.saved.entry).toEqual(entry)
+  })
+
+  it('ignore a move that is not what was saved', async () => {
+    const { root, projectFile } = repo()
+    const entry: SceneMix = { music: { track: null, level: 1 }, effects: [] }
+    await keepMeasure(projectFile, 'act1', 'a', measureOf(entry), true)
+    await saveScene(projectFile, 'act1', 'a', scaleMix(entry, 2), null, {
+      db: 4,
+      measuredAt: '2026-11-05T14:02:00.000Z',
+    })
+    expect(kept(root).act1.a.saved ?? null).toBeNull()
   })
 
   it('write nothing when a scene is saved that has no kept figures', async () => {

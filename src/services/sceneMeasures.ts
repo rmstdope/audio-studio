@@ -6,6 +6,7 @@ import {
   type SceneMeasure,
 } from '../core/sceneLoudness'
 import { sameMix } from '../core/sceneEdit'
+import { scaleMix } from '../core/sceneLoudness'
 import type { Problem } from '../core/project'
 import type { SceneMix } from '../core/scenes'
 import { readResource, writeAtomic } from './files'
@@ -68,19 +69,36 @@ export function keepMeasure(
 /**
  * A scene was saved as `entry`: a draft measured from exactly that becomes the saved figures,
  * any other draft is dropped (it was measured from something that is no longer on the page).
- * Writes nothing when the scene has no draft.
+ * `moved` says the page had pressed "Make … louder / quieter" on the measure made at `measuredAt`:
+ * if that measure moved by `db` is exactly `entry`, it is kept as the saved figures with the move,
+ * so they stay the expected ones until the act is measured again.
+ * Writes nothing when the scene has no draft and no move.
  */
 export async function sceneSaved(
   projectFile: string,
   part: string,
   sceneId: string,
   entry: SceneMix,
+  moved?: { db: number; measuredAt: string },
 ): Promise<void> {
   const has = await readMeasures(dirname(projectFile), [])
-  if (!has[part]?.[sceneId]?.draft) return
+  if (!has[part]?.[sceneId]?.draft && !moved) return
   await edit(projectFile, (file) => {
     const kept = file[part]?.[sceneId]
-    if (!kept?.draft) return
+    if (!kept) return
+    const base = moved
+      ? [kept.draft, kept.saved].find(
+          (m) =>
+            m?.measuredAt === moved.measuredAt &&
+            m.entry !== null &&
+            sameMix(scaleMix(m.entry, moved.db), entry),
+        )
+      : undefined
+    if (base) {
+      file[part]![sceneId] = { saved: { ...base, moved: { db: moved!.db } }, draft: null }
+      return
+    }
+    if (!kept.draft) return
     file[part]![sceneId] = {
       saved: sameMix(kept.draft.entry, entry) ? kept.draft : kept.saved,
       draft: null,

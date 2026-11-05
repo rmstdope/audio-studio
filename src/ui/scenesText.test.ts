@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import type { SceneRow } from '../core/scenes'
 import {
+  changeWord,
+  suggestionLine,
   howItPlays,
   levelText,
   listCount,
@@ -165,5 +167,61 @@ describe('when a scene was measured', () => {
     expect(measuredLine(new Date(2026, 10, 3, 9, 5).toISOString(), now)).toBe(
       'Measured 3 Nov 09:05',
     )
+  })
+})
+
+describe('the loudness suggestion line', () => {
+  const full = (l: ReturnType<typeof suggestionLine>) => l.before + l.strong + l.after
+  it('words a change, with one decimal', () => {
+    expect(changeWord(4)).toBe('4.0 dB louder')
+    expect(changeWord(-3.4)).toBe('3.4 dB quieter')
+  })
+  it('words the plain change for both states, one state and more', () => {
+    const base = { kind: 'change', db: 4, closest: null, ceiling: null } as const
+    expect(full(suggestionLine({ ...base, states: 2 }, 2))).toBe(
+      'Make the whole scene 4.0 dB louder — music and every effect by the same amount — to bring both states within the target.',
+    )
+    expect(suggestionLine({ ...base, states: 1 }, 2).after).toContain('to bring it within')
+    expect(suggestionLine({ ...base, states: 3 }, 2).after).toContain('to bring every state within')
+    expect(suggestionLine({ ...base, states: 2 }, 2).button).toBe('Make 4.0 dB louder')
+  })
+  it('words the closest change, the ceiling and the change that helps nothing', () => {
+    expect(
+      full(
+        suggestionLine(
+          {
+            kind: 'change',
+            db: 1.6,
+            states: 2,
+            closest: { apart: 4.4, leaving: 0.2 },
+            ceiling: null,
+          },
+          2,
+        ),
+      ),
+    ).toBe(
+      'No single change brings both states within ± 2 dB: they are 4.4 dB apart. 1.6 dB louder comes closest, leaving each 0.2 dB off.',
+    )
+    expect(
+      full(
+        suggestionLine(
+          {
+            kind: 'change',
+            db: 1.2,
+            states: 2,
+            closest: null,
+            ceiling: { sound: 'cat-purr', still: [2.2, 3.4] },
+          },
+          2,
+        ),
+      ),
+    ).toBe(
+      'Make the whole scene 1.2 dB louder — as far as it goes before cat-purr passes 300%. The states would still be 2.2 and 3.4 dB too quiet; turn cat-purr down or the others up by hand to go further.',
+    )
+    const none = suggestionLine({ kind: 'none', loud: ['plain'], quiet: ['cat-home'] }, 2)
+    expect(none.before).toBe(
+      'No single change helps: plain is too loud and cat-home is too quiet. Bring them closer in the scene’s levels.',
+    )
+    expect(none.button).toBeNull()
   })
 })

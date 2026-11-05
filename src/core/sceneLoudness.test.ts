@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import {
   chipFor,
+  expectedFigures,
+  scaleMix,
+  shiftStates,
+  suggestChange,
   formatLufs,
   measureChanged,
   planStateMix,
@@ -11,6 +15,7 @@ import {
   type PlanEffect,
   type SceneMeasure,
 } from './sceneLoudness'
+import type { SceneMix } from './scenes'
 
 const effect = (over: Partial<PlanEffect>): PlanEffect => ({
   id: 'bell',
@@ -151,5 +156,89 @@ describe('measureChanged', () => {
     ).toBe(true)
     expect(measureChanged(was, { ...now, clips: { 'effect:a': 'take 2' } })).toBe(true)
     expect(measureChanged(was, { ...now, clips: {} })).toBe(true)
+  })
+})
+
+const t2 = { target: -20, tolerance: 2 }
+const mixOf = (levels: Record<string, number>, music = 1): SceneMix => ({
+  music: { track: 'theme', level: music },
+  effects: Object.entries(levels).map(([id, level]) => ({
+    id,
+    play: { mode: 'loop' as const },
+    level,
+  })),
+})
+
+describe('scaleMix', () => {
+  it('multiplies every level by the same factor, to a whole percent', () => {
+    const out = scaleMix(mixOf({ a: 0.6, b: 0.5 }), 4)
+    expect(out.music?.level).toBe(1.58)
+    expect(out.effects.map((e) => e.level)).toEqual([0.95, 0.79])
+  })
+  it('leaves 0% at 0% and stops at 300%', () => {
+    const out = scaleMix(mixOf({ a: 0, b: 2.6 }), 4)
+    expect(out.effects.map((e) => e.level)).toEqual([0, 3])
+  })
+  it('keeps a scene with no music as it is', () => {
+    expect(scaleMix({ music: undefined, effects: [] }, 3).music).toBeUndefined()
+  })
+})
+
+describe('suggestChange', () => {
+  const mix = mixOf({ a: 1 })
+  const change = (lufs: number[], m = mix) => suggestChange(measure(lufs), t2, m)
+  it('offers the even change that puts the middle of the states on the target', () => {
+    expect(change([-23.4, -24.6])).toMatchObject({ kind: 'change', db: 4, closest: null })
+    expect(change([-16.2, -17])).toMatchObject({ kind: 'change', db: -3.4 })
+  })
+  it('works for a scene with one state', () => {
+    expect(change([-24.1])).toMatchObject({ kind: 'change', db: 4.1, states: 1 })
+  })
+  it('leaves out states that read nothing', () => {
+    expect(change([null as never, -24.1])).toMatchObject({ db: 4.1, states: 1 })
+  })
+  it('offers the closest change when no single one fits', () => {
+    expect(change([-19.4, -23.8])).toMatchObject({
+      kind: 'change',
+      db: 1.6,
+      closest: { apart: 4.4, leaving: 0.2 },
+    })
+  })
+  it('limits a louder change to what keeps every level within 300%', () => {
+    const out = change([-23.4, -24.6], mixOf({ 'cat-purr': 2.6 }, 1))
+    expect(out).toMatchObject({
+      db: 1.2,
+      ceiling: { sound: 'cat-purr', still: [2.2, 3.4] },
+    })
+  })
+  it('offers nothing when states disagree and the closest change is under 0.5 dB', () => {
+    expect(change([-16.9, -22.8])).toEqual({ kind: 'none', loud: ['s0'], quiet: ['s1'] })
+  })
+  it('is null when on target, nothing plays, it could not be measured, or no states read', () => {
+    expect(change([-19.4, -20.6])).toBeNull()
+    expect(change([null as never])).toBeNull()
+    expect(suggestChange(measure([-24], { error: 'x' }), t2, mix)).toBeNull()
+  })
+})
+
+describe('expectedFigures', () => {
+  const entry = mixOf({ a: 0.6 })
+  const base = measure([-23.4], { entry, clips: { a: '1' } })
+  it('is expected while the scene is the measured one moved by the change', () => {
+    const now = { entry: scaleMix(entry, 4), clips: { a: '1' } }
+    expect(expectedFigures(base, { db: 4 }, now)).toBe('expected')
+  })
+  it('is measured while the scene is as measured, and changed otherwise', () => {
+    expect(expectedFigures(base, { db: 4 }, { entry, clips: { a: '1' } })).toBe('measured')
+    expect(expectedFigures(base, null, { entry: scaleMix(entry, 4), clips: { a: '1' } })).toBe(
+      'changed',
+    )
+    expect(expectedFigures(base, { db: 4 }, { entry: mixOf({ a: 0.7 }), clips: { a: '1' } })).toBe(
+      'changed',
+    )
+  })
+  it('shifts every figure and keeps what reads nothing', () => {
+    const shifted = shiftStates(measure([-23.4, null as never]), 4)
+    expect(shifted.states.map((s) => s.lufs)).toEqual([-19.4, null])
   })
 })
