@@ -13,9 +13,10 @@ import {
 } from '../core/spending'
 import { readResource, writeAtomic } from './files'
 import { createSerial } from './serial'
+import { CACHE_DIR } from '../core/project'
 
 /** Where paid recordings are remembered, in the project's tool state. */
-export const SPENDING_FILE = '.content-studio/spending.json'
+export const SPENDING_FILE = `${CACHE_DIR}/spending.json`
 
 /** What the record holds (a version 1 record has no music takes), or what is wrong with the file. */
 export type SpendingRead = ({ ok: true } & Saved) | { ok: false; problems: Problem[] }

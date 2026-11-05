@@ -76,7 +76,7 @@ describe('modelsView', () => {
   it('counts every language’s lines once each', async () => {
     const json = project(models)
     const narration = json.narration as Record<string, unknown>
-    narration.languages = ['en', 'sv']
+    json.languages = ['en', 'sv']
     narration.paths = {
       dialog: 'tts/{part}/{language}/script.json',
       cues: 'tts/{part}/{language}/cues.json',

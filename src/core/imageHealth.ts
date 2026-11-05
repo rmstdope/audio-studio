@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { IMAGE_MODEL_IDS } from './imageModels'
+import { CACHE_DIR } from './project'
 
 /** Where the studio remembers which image models failed their last take, relative to the project root. */
-export const IMAGE_HEALTH_FILE = '.content-studio/image-model-health.json'
+export const IMAGE_HEALTH_FILE = `${CACHE_DIR}/image-model-health.json`
 
 /** The last take of a model that failed: where, and what the image tool said. */
 export const ImageFailureSchema = z.object({

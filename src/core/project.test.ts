@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
 import { projectJson } from '../../test/helpers'
-import { ProjectSchema, partPathFor, problemsFrom } from './project'
+import { ProjectSchema, parseProject, partPathFor, problemsFrom } from './project'
 
 function parse(value: unknown) {
   return ProjectSchema.safeParse(value)
@@ -12,6 +12,39 @@ function problems(value: unknown) {
   if (result.success) throw new Error('expected the project to be invalid')
   return problemsFrom('content-studio.json', result.error)
 }
+
+describe('the format version', () => {
+  const refusal = {
+    file: 'content-studio.json',
+    path: 'version',
+    message:
+      'This project file is in the format before version 2. Add "version": 2 and move its fields as docs/project-files.md describes.',
+  }
+
+  it('reads a project file of version 2', () => {
+    const read = parseProject('content-studio.json', projectJson())
+    expect(read.ok && read.project.version).toBe(2)
+  })
+
+  it('refuses an unversioned file with one problem, whatever else is wrong in it', () => {
+    const { version: _version, ...old } = projectJson()
+    expect(parseProject('content-studio.json', { ...old, narration: 'x' })).toEqual({
+      ok: false,
+      problems: [refusal],
+    })
+  })
+
+  it('refuses another version, or a file that is not an object', () => {
+    for (const raw of [projectJson({ version: 1 }), projectJson({ version: '2' }), [], null]) {
+      expect(parseProject('content-studio.json', raw)).toEqual({ ok: false, problems: [refusal] })
+    }
+  })
+
+  it('says what else is wrong in a file of version 2', () => {
+    const read = parseProject('content-studio.json', projectJson({ name: '' }))
+    expect(!read.ok && read.problems.map((p) => p.path)).toEqual(['name'])
+  })
+})
 
 describe('ProjectSchema', () => {
   it('fills in defaults for everything optional', () => {
@@ -78,9 +111,9 @@ describe('ProjectSchema', () => {
     const narration = base.narration as Record<string, unknown>
     const withPhrases = (phrases: Record<string, string>) => ({
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...narration,
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -140,19 +173,17 @@ describe('ProjectSchema', () => {
   it('takes the words that sound the same of the languages besides the source, and no others', () => {
     const base = projectJson()
     const narration = base.narration as Record<string, unknown>
-    const languages = {
-      languages: ['en', 'sv'],
-      paths: {
-        dialog: 'tts/{part}/{language}/script.json',
-        cues: 'tts/{part}/{language}/cues.json',
-        lock: 'tts/{part}/{language}/lock.json',
-        clips: 'audio/{part}/{language}',
-        manifest: 'audio/{part}/{language}/manifest.json',
-      },
+    const paths = {
+      dialog: 'tts/{part}/{language}/script.json',
+      cues: 'tts/{part}/{language}/cues.json',
+      lock: 'tts/{part}/{language}/lock.json',
+      clips: 'audio/{part}/{language}',
+      manifest: 'audio/{part}/{language}/manifest.json',
     }
     const by = (soundAlikeByLanguage: unknown) => ({
       ...base,
-      narration: { ...narration, ...languages, quality: { soundAlikeByLanguage } },
+      languages: ['en', 'sv'],
+      narration: { ...narration, paths, quality: { soundAlikeByLanguage } },
     })
     expect(parse(by({ sv: [['Lyria', 'Liria']] })).success).toBe(true)
     expect(problems(by({ sv: [['alone']] })).map((p) => p.path)).toEqual([
@@ -167,27 +198,9 @@ describe('ProjectSchema', () => {
     ])
   })
 
-  it('takes the Fish tier the user chose, or none', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const tier = (fishTier: unknown) => ({
-      ...base,
-      narration: { ...narration, quality: { fishTier } },
-    })
-    expect(parse(base).data!.narration.quality.fishTier).toBeUndefined()
-    for (const t of ['under-100', '100', '1000'] as const) {
-      expect(parse(tier(t)).data!.narration.quality.fishTier).toBe(t)
-    }
-    expect(problems(tier('50')).map((p) => p.path)).toEqual(['narration.quality.fishTier'])
-  })
-
-  it('takes the length of a take fade in seconds, or none', () => {
-    const base = projectJson()
-    expect(parse(base).data!.takeFade).toBeUndefined()
-    expect(parse({ ...base, takeFade: 0 }).data!.takeFade).toBe(0)
-    expect(parse({ ...base, takeFade: 0.3 }).data!.takeFade).toBe(0.3)
-    expect(problems({ ...base, takeFade: -1 }).map((p) => p.path)).toEqual(['takeFade'])
-    expect(problems({ ...base, takeFade: 'long' }).map((p) => p.path)).toEqual(['takeFade'])
+  it('holds no setting of the person’s own: those are in the cache', () => {
+    const project = parse({ ...projectJson(), takeFade: 1 }).data!
+    expect('takeFade' in project).toBe(false)
   })
 
   it('requires {part} in part paths', () => {
@@ -200,25 +213,58 @@ describe('ProjectSchema', () => {
     expect(found.map((p) => p.path)).toEqual(['narration.paths.clips'])
   })
 
+  it('takes the parts and what the game calls them at the top level', () => {
+    const project = parse(projectJson({ partLabel: 'Chapter' })).data!
+    expect(project.parts.map((part) => part.id)).toEqual(['act1', 'act2'])
+    expect(project.partLabel).toBe('Chapter')
+    const { partLabel: _label, ...unlabelled } = projectJson()
+    expect(parse(unlabelled).data!.partLabel).toBe('Part')
+  })
+
+  it('needs the parts', () => {
+    const { parts: _parts, ...rest } = projectJson()
+    expect(problems(rest).map((p) => p.path)).toEqual(['parts'])
+  })
+
   it('rejects duplicate part ids', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
     const parts = [
       { id: 'act1', title: 'A' },
       { id: 'act1', title: 'B' },
     ]
-    expect(problems({ ...base, narration: { ...narration, parts } })[0]!.message).toBe(
-      'part ids must be unique',
-    )
+    expect(problems(projectJson({ parts }))[0]!.message).toBe('part ids must be unique')
   })
 
   it('writes array indexes in problem paths', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
     const parts = [{ id: 'act 1', title: 'A' }]
-    expect(problems({ ...base, narration: { ...narration, parts } })[0]!.path).toBe(
-      'narration.parts[0].id',
-    )
+    expect(problems(projectJson({ parts }))[0]!.path).toBe('parts[0].id')
+  })
+})
+
+describe('refresh', () => {
+  it('is optional, and so is each of its commands', () => {
+    expect(parse(projectJson()).data!.refresh).toBeUndefined()
+    expect(parse(projectJson({ refresh: {} })).data!.refresh).toEqual({})
+  })
+
+  it('names the command for a part and the one for every shared list', () => {
+    const refresh = { part: 'sh tools/refresh.sh {part}', shared: 'sh tools/refresh-shared.sh' }
+    expect(parse(projectJson({ refresh })).data!.refresh).toEqual(refresh)
+  })
+
+  it('needs {part} in the part command, which is run for one part', () => {
+    expect(problems(projectJson({ refresh: { part: 'sh tools/refresh.sh' } }))).toEqual([
+      {
+        file: 'content-studio.json',
+        path: 'refresh.part',
+        message: 'must contain {part}: the command is run for one part, given its id',
+      },
+    ])
+  })
+
+  it('refuses an empty command', () => {
+    expect(problems(projectJson({ refresh: { shared: '' } })).map((p) => p.path)).toEqual([
+      'refresh.shared',
+    ])
   })
 })
 
@@ -259,13 +305,14 @@ describe('ProjectSchema, paid models', () => {
   })
 })
 
-describe('narration.languages', () => {
+describe('languages', () => {
   function withLanguages(languages: unknown, paths: Record<string, string> = {}) {
     const base = projectJson()
     const narration = base.narration as { paths: Record<string, string> }
     return {
       ...base,
-      narration: { ...narration, languages, paths: { ...narration.paths, ...paths } },
+      languages,
+      narration: { ...narration, paths: { ...narration.paths, ...paths } },
     }
   }
   const everyPath = {
@@ -277,12 +324,12 @@ describe('narration.languages', () => {
   }
 
   it('is English alone by default', () => {
-    expect(parse(projectJson()).data!.narration.languages).toEqual(['en'])
+    expect(parse(projectJson()).data!.languages).toEqual(['en'])
   })
 
   it('takes several languages when every path has {language}', () => {
     const result = parse(withLanguages(['en', 'sv', 'de'], everyPath))
-    expect(result.data!.narration.languages).toEqual(['en', 'sv', 'de'])
+    expect(result.data!.languages).toEqual(['en', 'sv', 'de'])
   })
 
   it('accepts {language} with one language', () => {
@@ -303,9 +350,7 @@ describe('narration.languages', () => {
   it('rejects an empty list, repeats and unknown codes', () => {
     expect(problems(withLanguages([])).length).toBeGreaterThan(0)
     expect(problems(withLanguages(['en', 'en'], everyPath))[0]!.message).toContain('unique')
-    expect(problems(withLanguages(['en', 'Swedish'], everyPath))[0]!.path).toBe(
-      'narration.languages[1]',
-    )
+    expect(problems(withLanguages(['en', 'Swedish'], everyPath))[0]!.path).toBe('languages[1]')
   })
 })
 
@@ -340,10 +385,10 @@ describe('the music section', () => {
     expect(parse(projectJson()).data!.music).toBeUndefined()
   })
 
-  it('accepts the paths and the shared refresh command', () => {
-    const result = parse(music({}, { refreshShared: 'node extract-shared.js' }))
+  it('accepts the paths', () => {
+    const result = parse(music())
     expect(result.success).toBe(true)
-    expect(result.data!.music!.refreshShared).toBe('node extract-shared.js')
+    expect(result.data!.music!.paths.stingers).toBe('tts/stingers.json')
   })
 
   it('needs {part} in the loops path', () => {
@@ -437,13 +482,21 @@ describe('problemsFrom wording', () => {
   const base = projectJson()
   const messages = (value: unknown) => problems(value).map((p) => p.message)
 
+  const narration = base.narration as Record<string, unknown>
+  const quality = (value: Record<string, unknown>) => ({
+    ...base,
+    narration: { ...narration, quality: value },
+  })
+
   it('says a number that is too small in plain words', () => {
-    expect(messages({ ...base, takeFade: -1 })).toEqual(['takeFade must be 0 or more'])
+    expect(messages(quality({ parallel: 0 }))).toEqual([
+      'narration.quality.parallel must be 1 or more',
+    ])
   })
 
   it('says a wrong type in plain words', () => {
-    expect(messages({ ...base, takeFade: 'long' })).toEqual([
-      'takeFade must be a number (it is text)',
+    expect(messages(quality({ minHeard: 'long' }))).toEqual([
+      'narration.quality.minHeard must be a number (it is text)',
     ])
   })
 
@@ -453,9 +506,8 @@ describe('problemsFrom wording', () => {
   })
 
   it('says a text or list that is too short in plain words', () => {
-    const narration = base.narration as Record<string, unknown>
-    const all = messages({ ...base, narration: { ...narration, languages: [] } })
-    expect(all).toEqual(['narration.languages must be 1 or more items'])
+    const all = messages({ ...base, languages: [] })
+    expect(all).toEqual(['languages must be 1 or more items'])
   })
 
   it('says too big, exclusive bounds, whole numbers and choices in plain words', () => {
@@ -502,13 +554,10 @@ describe('the effects section', () => {
     expect(parse(projectJson()).data!.effects).toBeUndefined()
   })
 
-  it('accepts the list, lock, clips and manifest paths and the refresh command', () => {
-    const result = parse(effects({}, { refresh: 'node tts/extract-effects.js' }))
+  it('accepts the list, lock, clips and manifest paths', () => {
+    const result = parse(effects())
     expect(result.success).toBe(true)
-    expect(result.data!.effects).toEqual({
-      refresh: 'node tts/extract-effects.js',
-      paths: effectPaths,
-    })
+    expect(result.data!.effects).toEqual({ paths: effectPaths })
   })
 
   it('needs the lock, clips and manifest paths the game reads', () => {

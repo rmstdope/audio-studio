@@ -1606,7 +1606,7 @@ describe('the Loudness panel', () => {
   it('sets each clip path in the red box in the code font, the words unchanged', () => {
     const failed = measureOf({
       error:
-        'ffmpeg could not read audio/a.mp3, .content-studio/effect-takes/x/3.mp3: Invalid data.',
+        'ffmpeg could not read audio/a.mp3, content-studio/cache/effect-takes/x/3.mp3: Invalid data.',
       states: [{ state: 'plain', lufs: null }],
     })
     const page = render(open, summary('ok', true, { target, loudness: loudness(failed) }))
@@ -1616,10 +1616,10 @@ describe('the Loudness panel', () => {
     expect(box!.children[0]!.querySelectorAll('code.scene-clip-path').length).toBe(2)
     expect([...box!.querySelectorAll('code.scene-clip-path')].map((c) => text(c))).toEqual([
       'audio/a.mp3',
-      '.content-studio/effect-takes/x/3.mp3',
+      'content-studio/cache/effect-takes/x/3.mp3',
     ])
     expect(text(box)).toBe(
-      'Couldn’t measure General store: ffmpeg could not read audio/a.mp3, .content-studio/effect-takes/x/3.mp3: Invalid data. The other scenes were measured.',
+      'Couldn’t measure General store: ffmpeg could not read audio/a.mp3, content-studio/cache/effect-takes/x/3.mp3: Invalid data. The other scenes were measured.',
     )
   })
 

@@ -47,7 +47,7 @@ export type EffectLock = z.infer<typeof EffectLockSchema>
 /** The effects manifest. */
 export type EffectManifest = z.infer<typeof EffectManifestSchema>
 
-/** A take on an effect's board, saved in `.content-studio/effect-boards/<effect>.json`. */
+/** A take on an effect's board, saved in `content-studio/cache/effect-boards/<effect>.json`. */
 export const EffectBoardTakeSchema = z.object({
   n: z.number().int().positive(),
   /** The hash of its inputs, which with `n` names its WAV. */

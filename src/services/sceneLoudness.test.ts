@@ -473,7 +473,7 @@ describe('the kept figures', () => {
   it('never write over a file that cannot be read, and refuse to start a measure', async () => {
     const { root, projectFile } = repo()
     const { writeFileSync, mkdirSync } = await import('node:fs')
-    mkdirSync(join(root, '.content-studio'), { recursive: true })
+    mkdirSync(join(root, 'content-studio/cache'), { recursive: true })
     writeFileSync(join(root, LOUDNESS_FILE), 'not json')
     await expect(keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)).rejects.toThrow(
       'cannot be read',

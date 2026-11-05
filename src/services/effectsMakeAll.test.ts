@@ -249,8 +249,8 @@ describe('a press that is stopped, or cannot start one effect', () => {
 
   it('goes on past an effect whose board cannot be read', async () => {
     const { root, file, takes, idle } = setup()
-    mkdirSync(join(root, '.content-studio/effect-boards'), { recursive: true })
-    writeFileSync(join(root, '.content-studio/effect-boards/door-creak.json'), '{ nope')
+    mkdirSync(join(root, 'content-studio/cache/effect-boards'), { recursive: true })
+    writeFileSync(join(root, 'content-studio/cache/effect-boards/door-creak.json'), '{ nope')
     const result = await takes.makeAll(file, ['door-creak', 'coins'])
     expect(result).toEqual({ ok: true, started: [{ id: 'coins', takes: 4 }] })
     await idle()

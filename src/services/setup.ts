@@ -23,6 +23,7 @@ import { aceStepCheckpoints, aceStepReady } from './music'
 import { accountOf, createElevenLabsClient } from './elevenlabs'
 import type { CreditResult } from './fish'
 import { openProject, type ProjectFailure } from './workspace'
+import { readSettings } from './settings'
 
 /** The setup as checked, or why the project file could not be read. */
 export type SetupResult = { ok: true; checks: SetupCheck[] } | ProjectFailure
@@ -95,9 +96,9 @@ export async function checkSetup(
     envPath: project.env,
     key,
     fish: fishAnswer,
-    refreshDialog: Boolean(narration.refreshDialog),
+    refreshPart: Boolean(project.refresh?.part),
     parallel: narration.quality.parallel,
-    fishTier: narration.quality.fishTier ?? null,
+    fishTier: (await readSettings(root, [])).fishTier ?? null,
     music: project.music
       ? {
           ready: aceStepReady(machine, checkpoints, project.music.model),

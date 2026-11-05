@@ -181,8 +181,8 @@ function describeFailure(error: unknown): string {
 
 /**
  * The takes of the game's images: made by `generator` on the GPU `queue` (shared with music and
- * Whisper), and kept on a board per image in `.content-studio/images/<id>.json`, the pictures in
- * `.content-studio/image-takes/<id>/<n>.png`. Takes waiting, being made and failed are kept in memory
+ * Whisper), and kept on a board per image in `content-studio/cache/images/<id>.json`, the pictures in
+ * `content-studio/cache/image-takes/<id>/<n>.png`. Takes waiting, being made and failed are kept in memory
  * per image, for the page to poll; a take made is a file and a board entry. Choosing writes the
  * game's picture, manifest entry and lock entry.
  */

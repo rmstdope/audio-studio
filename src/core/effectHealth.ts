@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { EFFECT_MODEL_IDS } from './effectModels'
+import { CACHE_DIR } from './project'
 
 /** Where the studio remembers which effect models failed their last effect, relative to the project root. */
-export const EFFECT_HEALTH_FILE = '.content-studio/effect-model-health.json'
+export const EFFECT_HEALTH_FILE = `${CACHE_DIR}/effect-model-health.json`
 
 /** The last effect of a model that failed: what the tool said, and when. */
 export const EffectFailureSchema = z.object({

@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { SETTINGS_FILE } from '../../../core/settings'
 import { fadeEntries, fadeSaveFailure } from '../../../core/takeFade'
 import { useProject, useSetTakeFade } from '../../api'
 
 /**
  * The Playing takes panel on Setup: how long music takes fade in and out when played in the
- * studio, a menu saved in the project file as soon as a length is picked. The menu shows the new
+ * studio, a menu saved in the person's own settings as soon as a length is picked. The menu shows the new
  * length while it saves and goes back to the saved one if the save fails, with a line saying so;
  * it is never disabled, so focus stays on it. Shows nothing until the project file reads.
  */
@@ -14,7 +15,7 @@ export function PlayingPanel() {
   // The last failure stays until a save succeeds, not just until the next one starts.
   const [failure, setFailure] = useState<string | null>(null)
   if (!project.data?.ok) return null
-  const { takeFade, projectFile } = project.data.summary
+  const { takeFade } = project.data.summary
   const shown = save.isPending ? save.variables : takeFade
   return (
     <section className="panel models" aria-labelledby="playing-heading">
@@ -22,8 +23,8 @@ export function PlayingPanel() {
         Playing takes
       </h2>
       <span className="muted">
-        How music takes sound when you play them in the studio. Saved in{' '}
-        <span className="mono">{projectFile}</span> for everyone on the project.
+        How music takes sound when you play them in the studio. Saved for you alone, in{' '}
+        <span className="mono">{SETTINGS_FILE}</span>.
       </span>
       <div className="mrow">
         <div className="mname">Fade in and out</div>

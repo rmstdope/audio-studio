@@ -12,19 +12,19 @@ import {
   type ChosenEntry,
   type Prompts,
 } from '../core/images'
-import { partPathFor, type Problem, type Project } from '../core/project'
+import { CACHE_DIR, partPathFor, type Problem, type Project } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { readJson, readResource, writeAtomic } from './files'
 import { gameFilePath } from './musicLists'
 
 /** Where the game's style as the user last saw it is kept, in the studio's own folder. */
-export const STYLE_SEEN_FILE = '.content-studio/images-style-seen.json'
+export const STYLE_SEEN_FILE = `${CACHE_DIR}/images-style-seen.json`
 
 /** Where an image's takes are cached, one folder per image, `<n>.png` the model's picture and `<n>.game.png` the game's version. */
-export const IMAGE_TAKES_DIR = '.content-studio/image-takes'
+export const IMAGE_TAKES_DIR = `${CACHE_DIR}/image-takes`
 
 /** Where an image's board is saved: one file per image (an id is a slug, so a safe file name). */
-export const IMAGE_BOARD_DIR = '.content-studio/images'
+export const IMAGE_BOARD_DIR = `${CACHE_DIR}/images`
 
 /** The look the game's style file asks for; none when it cannot be used, with the sentence saying why. */
 export async function readStyleLook(
@@ -96,10 +96,10 @@ export async function readImages(
   project: Project,
   problems: Problem[],
 ): Promise<ImagesSummary | null> {
-  const { images, narration } = project
+  const { images } = project
   if (!images) return null
   const lists = []
-  for (const part of narration.parts) {
+  for (const part of project.parts) {
     const file = partPathFor(images.paths.list, part.id)
     const read = await readResource(root, file, ImageListSchema, problems)
     const state: ImageListState =
@@ -109,7 +109,7 @@ export async function readImages(
       title: part.title,
       file,
       state,
-      canRefresh: Boolean(narration.refreshDialog),
+      canRefresh: Boolean(project.refresh?.part),
     })
   }
   const styleRead = await readResource(root, images.paths.style, StyleSchema, problems)
@@ -144,7 +144,7 @@ export async function readImages(
     lookError: styleLook.error,
     takeLooks: await readTakeLooks(root, ids),
     styleInvalid: styleRead === 'invalid',
-    parts: narration.parts,
+    parts: project.parts,
     lists,
     styleFile: images.paths.style,
     style,

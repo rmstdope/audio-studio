@@ -31,7 +31,7 @@ describe('the effect models health', () => {
     const file = join(root, 'content-studio.json')
     await createEffectHealth().record(file, 'small-sfx', failure)
     expect((await createEffectHealth().read(file))['small-sfx']?.error).toBe(failure.error)
-    expect(existsSync(join(root, '.content-studio/effect-model-health.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/cache/effect-model-health.json'))).toBe(true)
   })
 
   it('writes nothing when there is nothing to clear, and reads a broken file as no failures', async () => {
@@ -39,9 +39,9 @@ describe('the effect models health', () => {
     const file = join(root, 'content-studio.json')
     const health = createEffectHealth()
     await health.clear(file, 'small-sfx')
-    expect(existsSync(join(root, '.content-studio/effect-model-health.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/effect-model-health.json'))).toBe(false)
     await health.record(file, 'small-sfx', failure)
-    writeFileSync(join(root, '.content-studio/effect-model-health.json'), '{nope')
+    writeFileSync(join(root, 'content-studio/cache/effect-model-health.json'), '{nope')
     expect(await health.read(file)).toEqual({})
   })
 })

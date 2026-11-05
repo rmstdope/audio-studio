@@ -82,7 +82,7 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
   return {
     images: images
       ? Object.fromEntries([
-          ...narration.parts.map((part): [string, ImagesFileRole] => [
+          ...project.parts.map((part): [string, ImagesFileRole] => [
             normal(partPathFor(images.paths.list, part.id)),
             'images',
           ]),
@@ -94,7 +94,7 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
     music: music
       ? {
           files: Object.fromEntries([
-            ...narration.parts.map((part): [string, MusicFileRole] => [
+            ...project.parts.map((part): [string, MusicFileRole] => [
               normal(partPathFor(music.paths.loops, part.id)),
               'list',
             ]),
@@ -107,21 +107,21 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
         }
       : null,
     own: [normal(projectPath), normal(narration.characters)],
-    parts: narration.parts.map((part) => {
+    parts: project.parts.map((part) => {
       const at = (template: string, language: string) =>
         normal(partPathFor(template, part.id, language))
       return {
         id: part.id,
         title: part.title,
         files: Object.fromEntries(
-          narration.languages.flatMap((language) => [
+          project.languages.flatMap((language) => [
             [at(narration.paths.dialog, language), 'dialog'],
             [at(narration.paths.cues, language), 'cues'],
             [at(narration.paths.lock, language), 'lock'],
             [at(narration.paths.manifest, language), 'manifest'],
           ]),
         ),
-        clips: narration.languages.map((language) => `${at(narration.paths.clips, language)}/`),
+        clips: project.languages.map((language) => `${at(narration.paths.clips, language)}/`),
       }
     }),
   }

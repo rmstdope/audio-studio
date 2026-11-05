@@ -236,7 +236,7 @@ export async function designElevenVoices(
     (designs) => ({ ...designs, description: text }),
     asked,
   )
-  const language = declaredLanguage(loaded.project.narration, asked)
+  const language = declaredLanguage(loaded.project, asked)
   const stamp = at.toISOString()
   try {
     const designed = await client.designVoices({ description: text, text: preview })

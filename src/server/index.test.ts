@@ -696,9 +696,9 @@ describe('server, a character per language', () => {
   const languageRoot = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -1039,9 +1039,9 @@ describe('server, paid auditions in two languages', () => {
   const root = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         models: { audition: 's2.1-pro' },
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
@@ -1364,8 +1364,7 @@ describe('server, generating a part', () => {
 })
 
 describe('server, refreshing and generating', () => {
-  const json = projectJson()
-  ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 0.5'
+  const json = projectJson({ refresh: { part: 'sleep 0.5 # {part}' } })
   const busyRoot = tempRepo({
     'content-studio.json': json,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
@@ -2035,8 +2034,8 @@ describe('server, paid recording and what changes meanwhile', () => {
 describe('server, a paid job refused for a refresh', () => {
   const json = projectJson({
     narration: { ...(projectJson().narration as object), models: { draft: 's2-pro' } },
+    refresh: { part: 'sleep 1 # {part}' },
   })
-  ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
   const root = tempRepo({
     'content-studio.json': json,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
@@ -2500,9 +2499,9 @@ describe('server, a part in another language', () => {
   const many = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -2735,7 +2734,7 @@ describe('server, the spending record', () => {
     expect(now.rows[0].cost).toBeLessThan(line * 1.01)
     expect(now.acts[0]).toMatchObject({ part: 'act1', title: 'Act I' })
     expect(now.total).toBeCloseTo(now.rows[0].cost, 12)
-    expect(existsSync(join(repo, '.content-studio/spending.json'))).toBe(true)
+    expect(existsSync(join(repo, 'content-studio/cache/spending.json'))).toBe(true)
   })
 
   it('logs a whole-part job, and shows it live while it runs', async () => {
@@ -2779,12 +2778,12 @@ describe('server, the spending record', () => {
   })
 
   it('says so when the record is damaged', async () => {
-    const path = join(repo, '.content-studio/spending.json')
+    const path = join(repo, 'content-studio/cache/spending.json')
     const good = readFileSync(path, 'utf8')
     writeFileSync(path, '{ nope')
     const body = await spending()
     expect(body).toMatchObject({ ok: false })
-    expect(body.problems[0].file).toBe('.content-studio/spending.json')
+    expect(body.problems[0].file).toBe('content-studio/cache/spending.json')
     writeFileSync(path, good)
   })
 
@@ -2813,7 +2812,7 @@ describe('server, the spending record', () => {
         ok: true,
         count: 0,
       })
-      expect(existsSync(join(freeRepo, '.content-studio/spending.json'))).toBe(false)
+      expect(existsSync(join(freeRepo, 'content-studio/cache/spending.json'))).toBe(false)
     } finally {
       free.stop(true)
     }
@@ -2986,9 +2985,9 @@ describe('server, generating per language', () => {
   const languageRoot = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         quality: { transcriber: 'none' },
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
@@ -3152,8 +3151,8 @@ describe('server, the music pages', () => {
   const list = JSON.stringify([{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }])
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
+      refresh: { shared: `printf '%s' '${list}' > tts/stingers.json` },
       music: {
-        refreshShared: `printf '%s' '${list}' > tts/stingers.json`,
         paths: {
           loops: 'tts/{part}/music.json',
           stingers: 'tts/stingers.json',
@@ -3474,7 +3473,14 @@ describe('server, a track’s takes', () => {
     const summary = await (await fetch(making)).json()
     expect(summary.hall.takes).toBeGreaterThan(0)
     expect(summary.hall.left).toBeGreaterThan(0)
+    // Leave nothing making, or the next test's make-all finds the track busy and makes nothing.
+    await stop()
+    for (let i = 0; i < 200 && Object.keys(await (await fetch(making)).json()).length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    expect(await (await fetch(making)).json()).toEqual({})
   })
+
   it('makes and stops takes for a whole list from the studio’s own page only', async () => {
     const post = (path: string, origin = studio.url.origin) =>
       fetch(new URL(path, studio.url), { method: 'POST', headers: { origin } })
@@ -4874,7 +4880,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     const board = await (await fetch(new URL('/api/auditions/gran', server.url))).json()
     expect(board.session.voices['eleven:l1'].library).toEqual({ owner: 'o1', added: true })
     expect(
-      JSON.parse(readFileSync(join(root, '.content-studio/eleven-voices.json'), 'utf8')),
+      JSON.parse(readFileSync(join(root, 'content-studio/cache/eleven-voices.json'), 'utf8')),
     ).toMatchObject({
       added: [{ library: 'eleven:l1', voice: 'eleven:own-l1', character: 'gran' }],
     })
@@ -4929,7 +4935,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     expect((await slots()).used).not.toBe(3)
     // ...but a free changes the slots, so it is.
     writeFileSync(
-      join(root, '.content-studio/eleven-voices.json'),
+      join(root, 'content-studio/cache/eleven-voices.json'),
       JSON.stringify({
         version: 1,
         added: [{ library: 'eleven:z', voice: 'eleven:z2', name: 'Z', character: 'gran', at: '' }],
@@ -4961,7 +4967,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
 
   it('offers and frees nothing while the cast cannot be read', async () => {
     writeFileSync(
-      join(root, '.content-studio/eleven-voices.json'),
+      join(root, 'content-studio/cache/eleven-voices.json'),
       JSON.stringify({
         version: 1,
         added: [{ library: 'eleven:y', voice: 'eleven:y2', name: 'Y', character: 'gran', at: '' }],
@@ -4974,13 +4980,16 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     const refusal = await offered.json()
     expect([offered.status, refusal.reason]).toEqual([409, 'unknown-use'])
     expect(refusal.message).toStartWith(
-      'tts/cast.json or a saved audition in .content-studio/auditions',
+      'tts/cast.json or a saved audition in content-studio/cache/auditions',
     )
     const freed = await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:y2'] })
     expect([freed.status, (await freed.json()).reason]).toEqual([409, 'unknown-use'])
     expect(deleted).toEqual([])
     // With nothing the studio added there is nothing to offer, and nothing to say.
-    writeFileSync(join(root, '.content-studio/eleven-voices.json'), '{"version": 1, "added": []}')
+    writeFileSync(
+      join(root, 'content-studio/cache/eleven-voices.json'),
+      '{"version": 1, "added": []}',
+    )
     const none = await fetch(new URL('/api/elevenlabs/voices/freeable', server.url))
     expect([none.status, await none.json()]).toEqual([200, { ok: true, voices: [] }])
   })
@@ -5437,8 +5446,8 @@ describe('server, the sound effects', () => {
   const list = JSON.stringify([{ id: 'coins', description: 'Coins spill', seconds: 0.5 }])
   const effectsRoot = tempRepo({
     'content-studio.json': projectJson({
+      refresh: { shared: `printf '%s' '${list}' > tts/effects.json` },
       effects: {
-        refresh: `printf '%s' '${list}' > tts/effects.json`,
         paths: {
           list: 'tts/effects.json',
           lock: 'audio/effects.lock.json',
@@ -5794,7 +5803,7 @@ describe('server, measuring the loudness of scenes', () => {
 
   it('starts from the studio’s own page only', async () => {
     expect((await post('/api/scene-loudness/act1', {}, 'https://evil.example')).status).toBe(403)
-    expect(existsSync(join(root, '.content-studio/scene-loudness.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/scene-loudness.json'))).toBe(false)
   })
 
   it('answers 404 for an act it does not know and 400 for a body that is not an open scene', async () => {
@@ -5807,7 +5816,7 @@ describe('server, measuring the loudness of scenes', () => {
       open: { scene: 'store', entry: { effects: [] } },
     })
     expect([started.status, await started.json()]).toEqual([200, { ok: true }])
-    const file = join(root, '.content-studio/scene-loudness.json')
+    const file = join(root, 'content-studio/cache/scene-loudness.json')
     for (let i = 0; i < 100 && !existsSync(file); i++) await Bun.sleep(20)
     const kept = JSON.parse(readFileSync(file, 'utf8'))
     expect(kept.act1.store.draft.states).toEqual([{ state: null, lufs: null }])

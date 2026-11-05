@@ -8,13 +8,14 @@ import type { ElevenLabsClient, SpeechRequest } from '../src/services/elevenlabs
 /** A minimal valid project file; override any top-level key. */
 export function projectJson(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
+    version: 2,
     name: 'Test Game',
+    partLabel: 'Act',
+    parts: [
+      { id: 'act1', title: 'Act I' },
+      { id: 'act2', title: 'Act II' },
+    ],
     narration: {
-      partLabel: 'Act',
-      parts: [
-        { id: 'act1', title: 'Act I' },
-        { id: 'act2', title: 'Act II' },
-      ],
       characters: 'tts/cast.json',
       paths: {
         dialog: 'tts/{part}/script.json',

@@ -65,11 +65,11 @@ export interface SetupFacts {
   key: boolean
   /** What asking Fish for the account's credit gave (not asked without a key). */
   fish: FishAnswer
-  /** The project file names a `refreshDialog` command. */
-  refreshDialog: boolean
+  /** The project file names a `refresh.part` command. */
+  refreshPart: boolean
   /** The project's `quality.parallel`: requests recording sends to Fish at a time. */
   parallel: number
-  /** The tier the user told the studio (`quality.fishTier`), or none. */
+  /** The tier the user told the studio (the setting `fishTier`), or none. */
   fishTier: FishTier | null
   /** The music generator, or null when the project has no `music` section. */
   music: {
@@ -327,19 +327,19 @@ function requests(facts: SetupFacts): SetupCheck {
 }
 
 function refresh(facts: SetupFacts): SetupCheck {
-  return facts.refreshDialog
+  return facts.refreshPart
     ? {
         id: 'refresh',
         title: 'Refresh dialog',
         state: 'ok',
-        detail: 'The project names a refreshDialog command: the dialog can be extracted from here.',
+        detail: 'The project names a refresh.part command: the dialog can be extracted from here.',
       }
     : {
         id: 'refresh',
         title: 'Refresh dialog',
         state: 'off',
         detail:
-          'No refreshDialog command in the project file (optional): extract the dialog outside the studio.',
+          'No refresh.part command in the project file (optional): extract the dialog outside the studio.',
       }
 }
 

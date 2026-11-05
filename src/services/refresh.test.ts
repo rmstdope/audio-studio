@@ -14,9 +14,13 @@ const after = JSON.stringify([
   { key: 'c', speaker: 'mira', text: 'Farewell.' },
 ])
 
-function project(refreshDialog?: string) {
-  const json = projectJson()
-  ;(json.narration as Record<string, unknown>).refreshDialog = refreshDialog
+/** `command` as a part's refresh command, which names `{part}` (here in a comment if it has no use for it). */
+function forPart(command: string): string {
+  return command.includes('{part}') ? command : `${command} # {part}`
+}
+
+function project(part?: string) {
+  const json = projectJson(part === undefined ? {} : { refresh: { part: forPart(part) } })
   return {
     'content-studio.json': json,
     'tts/cast.json': { speakers: {}, pronounce: {} },
@@ -158,8 +162,7 @@ describe('refreshing the music lists', () => {
     seconds: 80,
     ...extra,
   })
-  const music = (refreshShared?: string) => ({
-    refreshShared,
+  const music = () => ({
     paths: {
       loops: 'tts/{part}/music.json',
       stingers: 'tts/stingers.json',
@@ -170,8 +173,7 @@ describe('refreshing the music lists', () => {
     },
   })
   const withMusic = (command: string, shared?: string, files: Record<string, unknown> = {}) => {
-    const json = projectJson({ music: music(shared) })
-    ;(json.narration as Record<string, unknown>).refreshDialog = command
+    const json = projectJson({ music: music(), refresh: { part: forPart(command), shared } })
     return {
       'content-studio.json': json,
       'tts/cast.json': { speakers: {}, pronounce: {} },
@@ -223,7 +225,7 @@ describe('refreshing the music lists', () => {
     })
   })
 
-  it('runs refreshShared in the project root and names the stingers added and removed', async () => {
+  it('runs refresh.shared in the project root and names the stingers added and removed', async () => {
     const list = JSON.stringify([loop('victory', { seconds: 5 })])
     const root = tempRepo(
       withMusic('true', `printf '%s' '${list}' > tts/stingers.json && echo listed`, {
@@ -272,11 +274,11 @@ describe('refreshing the music lists', () => {
 
 describe('refreshing the sound effects', () => {
   const effect = (id: string) => ({ id, description: `${id} sound`, seconds: 2 })
-  const withEffects = (refresh?: string, files: Record<string, unknown> = {}) =>
+  const withEffects = (shared?: string, files: Record<string, unknown> = {}) =>
     tempRepo({
       'content-studio.json': projectJson({
+        refresh: { shared },
         effects: {
-          refresh,
           paths: {
             list: 'tts/effects.json',
             lock: 'audio/effects.lock.json',
@@ -347,5 +349,51 @@ describe('refreshing the sound effects', () => {
       ok: true,
       effects: 1,
     })
+  })
+})
+
+describe('the one shared command', () => {
+  it('writes the stingers and the effects alike, and runs once at a time, whichever asked', async () => {
+    const stinger = { id: 'victory', title: 'Victory', brief: 'b', seconds: 5 }
+    const effect = { id: 'coins', description: 'coins sound', seconds: 2 }
+    const command = [
+      'echo start >> runs.txt',
+      `printf '%s' '${JSON.stringify([stinger])}' > tts/stingers.json`,
+      `printf '%s' '${JSON.stringify([effect])}' > tts/effects.json`,
+      'sleep 0.2',
+      'echo end >> runs.txt',
+    ].join('; ')
+    const root = tempRepo({
+      'content-studio.json': projectJson({
+        refresh: { shared: command },
+        music: {
+          paths: {
+            loops: 'tts/{part}/music.json',
+            stingers: 'tts/stingers.json',
+            briefs: 'music/briefs.json',
+            lock: 'music/music.lock.json',
+            clips: 'audio/music',
+            manifest: 'audio/music/manifest.json',
+          },
+        },
+        effects: {
+          paths: {
+            list: 'tts/effects.json',
+            lock: 'audio/effects.lock.json',
+            clips: 'audio/effects',
+            manifest: 'audio/effects/manifest.json',
+          },
+        },
+      }),
+      'tts/.keep': '',
+    })
+    const projectFile = join(root, 'content-studio.json')
+    const [stingers, effects] = await Promise.all([
+      refreshShared(projectFile),
+      refreshEffects(projectFile),
+    ])
+    expect(stingers).toMatchObject({ ok: true, stingers: 1 })
+    expect(effects).toMatchObject({ ok: true, effects: 1 })
+    expect(readFileSync(join(root, 'runs.txt'), 'utf8')).toBe('start\nend\nstart\nend\n')
   })
 })

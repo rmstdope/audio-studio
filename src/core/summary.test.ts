@@ -30,10 +30,10 @@ describe('summarize', () => {
     })
   })
 
-  it('carries the take fade, 0.2 s until one is saved', () => {
+  it('carries the take fade from the person’s settings, 0.2 s until one is saved', () => {
     expect(summarize(input()).takeFade).toBe(0.2)
-    expect(summarize(input({ project: { ...project, takeFade: 0 } })).takeFade).toBe(0)
-    expect(summarize(input({ project: { ...project, takeFade: 1 } })).takeFade).toBe(1)
+    expect(summarize(input({ settings: { takeFade: 0 } })).takeFade).toBe(0)
+    expect(summarize(input({ settings: { takeFade: 1 } })).takeFade).toBe(1)
   })
 
   it('reports a part whose dialog is gone with what was recorded for it', () => {
@@ -149,9 +149,7 @@ describe('summarize, words that sound the same', () => {
 describe('summarize, refreshing', () => {
   it('says whether the project can refresh its dialog', () => {
     expect(summarize(input()).canRefresh).toBe(false)
-    const withCommand = ProjectSchema.parse(
-      projectJson({ narration: { ...(projectJson().narration as object), refreshDialog: 'make' } }),
-    )
+    const withCommand = ProjectSchema.parse(projectJson({ refresh: { part: 'make {part}' } }))
     expect(summarize(input({ project: withCommand })).canRefresh).toBe(true)
   })
 })
@@ -188,9 +186,9 @@ describe('a character per language', () => {
   const languages = ['en', 'sv']
   const several: typeof project = {
     ...project,
+    languages,
     narration: {
       ...project.narration,
-      languages,
       paths: {
         dialog: 'tts/{part}/{language}/script.json',
         cues: 'c/{language}/{part}',

@@ -10,8 +10,8 @@ export interface FoundNames {
 
 const LEAD = 'This game is set up for Audio Studio, which is now Content Studio.'
 const RENAME_FILE = '  git mv audio-studio.json content-studio.json'
-const RENAME_FOLDER = '  mv .audio-studio .content-studio'
-const RENAME_GITIGNORE = '  in .gitignore, change .audio-studio/ to .content-studio/'
+const RENAME_FOLDER = '  mkdir -p content-studio && mv .audio-studio content-studio/cache'
+const RENAME_GITIGNORE = '  in .gitignore, remove .audio-studio/'
 
 /**
  * What the terminal says when a game still has the studio's old names: exactly the renames left to
@@ -32,6 +32,24 @@ export function renameNotice({ oldFile, newFile, oldFolder }: FoundNames): strin
   if (steps.length === 0) return null
   const ask = oldFile && !oldFolder ? 'Rename this' : 'Rename these'
   return [LEAD, `${ask}, then run content-studio again:`, ...steps].join('\n')
+}
+
+/**
+ * What the terminal says when a game's studio cache is still in `.content-studio/`, where it was
+ * before format version 2: the move to `content-studio/cache/`, or, when that is there too, to
+ * merge or remove one by hand. The studio never reads the old folder.
+ */
+export function oldCacheNotice(cacheThere: boolean): string {
+  return cacheThere
+    ? [
+        'This game has both .content-studio/ and content-studio/cache/.',
+        'Merge them by hand, or remove one, then run content-studio again.',
+      ].join('\n')
+    : [
+        'This game’s studio cache is still in .content-studio/, where it was before version 2.',
+        'Move it, then run content-studio again:',
+        '  mkdir -p content-studio && mv .content-studio content-studio/cache',
+      ].join('\n')
 }
 
 /** What the terminal says when no project file is found from `cwd` upwards. */

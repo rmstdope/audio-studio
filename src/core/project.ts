@@ -10,7 +10,7 @@ import { SOUND_ALIKE_WORD } from './soundAlikeEdit'
 /** Fish Audio's free model: the only one for auditions, for now. */
 export const FREE_MODELS = ['s2.1-pro-free'] as const
 
-/** What the user has paid Fish in total, as the project file names it (sets its limit at once). */
+/** What the user has paid Fish in total, as the settings name it (sets its limit at once). */
 export const FishTierSchema = z.enum(['under-100', '100', '1000'])
 
 /** The smallest `quality.chunkLimit` allowed. */
@@ -29,6 +29,15 @@ export function phraseProblem(phrase: string, chunkLimit: number): string | null
 
 /** The file name the CLI looks for, walking up from the current directory. */
 export const PROJECT_FILE = 'content-studio.json'
+
+/** The studio's own folder, beside the project file: its edits and locks, and the cache. */
+export const STUDIO_DIR = 'content-studio'
+
+/** What the studio keeps for itself on this machine, never committed: takes, notes, settings. */
+export const CACHE_DIR = `${STUDIO_DIR}/cache`
+
+/** Where the cache was before format version 2; never read, only reported. */
+export const OLD_CACHE_DIR = '.content-studio'
 
 /** The project file's name before the rename to Content Studio; never read, only reported. */
 export const OLD_PROJECT_FILE = 'audio-studio.json'
@@ -86,28 +95,6 @@ const PartSchema = z.object({
 
 const NarrationSchema = z
   .object({
-    partLabel: z.string().min(1).default('Part'),
-    parts: z
-      .array(PartSchema)
-      .min(1)
-      .refine((parts) => new Set(parts.map((part) => part.id)).size === parts.length, {
-        error: 'part ids must be unique',
-      }),
-    /**
-     * The languages the game is narrated in, by code. The first is the source language: the one a
-     * translation is shown beside.
-     */
-    languages: z
-      .array(
-        z.string().refine(knownLanguage, {
-          error: (issue) => `"${String(issue.input)}" is not a language code (such as en or sv)`,
-        }),
-      )
-      .min(1)
-      .refine((languages) => new Set(languages).size === languages.length, {
-        error: 'languages must be unique',
-      })
-      .default(['en']),
     characters: z.string().min(1),
     paths: z.object({
       dialog: partPath,
@@ -116,7 +103,6 @@ const NarrationSchema = z
       clips: partPath,
       manifest: partPath,
     }),
-    refreshDialog: z.string().optional(),
     /**
      * The speakers (cast ids) whose lines follow their scene's cue unless they have a cue of
      * their own; the others keep their own cue or their style. Edited by hand in this file.
@@ -170,11 +156,6 @@ const NarrationSchema = z
         chunkLimit: z.number().int().min(MIN_CHUNK).default(400),
         parallel: z.number().int().min(1).default(4),
         /**
-         * What the user has paid Fish in total, which sets how many requests it takes at once
-         * (Setup compares it with `parallel`). Absent: not told.
-         */
-        fishTier: FishTierSchema.optional(),
-        /**
          * How takes are checked: mlx-whisper (Apple silicon, through uv), or none (one take each,
          * word timings spread evenly).
          */
@@ -211,36 +192,6 @@ const NarrationSchema = z
       .prefault({}),
   })
   .superRefine((narration, context) => {
-    if (narration.languages.length > 1) {
-      for (const [name, template] of Object.entries(narration.paths)) {
-        if (template.includes('{language}')) continue
-        context.addIssue({
-          code: 'custom',
-          path: ['paths', name],
-          message:
-            'must contain {language} when the project has several languages, or they would share one file',
-        })
-      }
-    }
-    for (const language of Object.keys(narration.quality.soundAlikeByLanguage ?? {})) {
-      if (narration.languages.slice(1).includes(language)) continue
-      context.addIssue({
-        code: 'custom',
-        path: ['quality', 'soundAlikeByLanguage', language],
-        message:
-          narration.languages[0] === language
-            ? `the groups of the source language “${language}” are quality.soundAlike`
-            : `"${language}" is not one of the project’s languages`,
-      })
-    }
-    for (const language of Object.keys(narration.audition.phrases ?? {})) {
-      if (narration.languages.includes(language)) continue
-      context.addIssue({
-        code: 'custom',
-        path: ['audition', 'phrases', language],
-        message: `"${language}" is not one of the project’s languages`,
-      })
-    }
     const limit = narration.quality.chunkLimit
     // A wrong limit is reported on its own; measuring against it would only add noise.
     if (!Number.isInteger(limit) || limit < MIN_CHUNK) return
@@ -269,8 +220,6 @@ const musicPath = z
 
 /** The optional `music` section: where the game lists its tracks and where their files go. */
 const MusicSchema = z.object({
-  /** The game's command for what belongs to no act (the stingers); run in the project root. */
-  refreshShared: z.string().min(1).optional(),
   /** The music model new takes are made with unless a track asks for another; absent is Balanced. */
   model: z.enum(MUSIC_MODEL_IDS).optional(),
   paths: z.object({
@@ -322,8 +271,6 @@ const ImagesSchema = z.object({
 const EffectsSchema = z.object({
   /** The effects model new takes are made with unless an effect asks for the other; absent is Small SFX. */
   model: z.enum(EFFECT_MODEL_IDS).optional(),
-  /** The game's command that writes the effects list; run in the project root, only from Refresh from the game. */
-  refresh: z.string().min(1).optional(),
   paths: z.object({
     /** The game's one list of sound effects, written by the game and read only. */
     list: z
@@ -369,23 +316,100 @@ const ScenesSchema = z.object({
     .optional(),
 })
 
+/** The project file format the studio reads; any other, or none, is refused. */
+export const PROJECT_VERSION = 2
+
+/** What the studio says of a project file without `"version": 2`. */
+const OLD_FORMAT =
+  'This project file is in the format before version 2. Add "version": 2 and move its fields as docs/project-files.md describes.'
+
 /** The project file, `content-studio.json`, in the consumer repository's root. */
-export const ProjectSchema = z.object({
-  $schema: z.string().optional(),
-  name: z.string().min(1),
-  description: z.string().default(''),
-  env: z.string().default('.env'),
-  narration: NarrationSchema,
-  music: MusicSchema.optional(),
-  images: ImagesSchema.optional(),
-  effects: EffectsSchema.optional(),
-  scenes: ScenesSchema.optional(),
-  /**
-   * How long a take fades in and out when played in the studio, in seconds (0: no fade); absent is
-   * 0.2. Saved from Setup's Playing takes panel; the game's own file never fades.
-   */
-  takeFade: z.number().min(0).optional(),
-})
+export const ProjectSchema = z
+  .object({
+    $schema: z.string().optional(),
+    /** The format's version: the studio reads version 2 only. */
+    version: z.literal(PROJECT_VERSION, { error: OLD_FORMAT }),
+    name: z.string().min(1),
+    description: z.string().default(''),
+    env: z.string().default('.env'),
+    /** What the game calls a part, in the studio's words ("Act", "Chapter"). */
+    partLabel: z.string().min(1).default('Part'),
+    /** The parts in play order. */
+    parts: z
+      .array(PartSchema)
+      .min(1)
+      .refine((parts) => new Set(parts.map((part) => part.id)).size === parts.length, {
+        error: 'part ids must be unique',
+      }),
+    /**
+     * The languages the game is narrated in, by code. The first is the source language: the one a
+     * translation is shown beside.
+     */
+    languages: z
+      .array(
+        z.string().refine(knownLanguage, {
+          error: (issue) => `"${String(issue.input)}" is not a language code (such as en or sv)`,
+        }),
+      )
+      .min(1)
+      .refine((languages) => new Set(languages).size === languages.length, {
+        error: 'languages must be unique',
+      })
+      .default(['en']),
+    /**
+     * The game's commands that write its lists, run in the project root only when the user presses
+     * Refresh: `part` writes one part's lists of every kind, `shared` every list of no part.
+     */
+    refresh: z
+      .object({
+        part: z
+          .string()
+          .min(1)
+          .refine((command) => command.includes('{part}'), {
+            error: 'must contain {part}: the command is run for one part, given its id',
+          })
+          .optional(),
+        shared: z.string().min(1).optional(),
+      })
+      .optional(),
+    narration: NarrationSchema,
+    music: MusicSchema.optional(),
+    images: ImagesSchema.optional(),
+    effects: EffectsSchema.optional(),
+    scenes: ScenesSchema.optional(),
+  })
+  .superRefine(({ languages, narration }, context) => {
+    if (languages.length > 1) {
+      for (const [name, template] of Object.entries(narration.paths)) {
+        if (template.includes('{language}')) continue
+        context.addIssue({
+          code: 'custom',
+          path: ['narration', 'paths', name],
+          message:
+            'must contain {language} when the project has several languages, or they would share one file',
+        })
+      }
+    }
+    for (const language of Object.keys(narration.quality.soundAlikeByLanguage ?? {})) {
+      if (languages.slice(1).includes(language)) continue
+      context.addIssue({
+        code: 'custom',
+        path: ['narration', 'quality', 'soundAlikeByLanguage', language],
+        message:
+          languages[0] === language
+            ? `the groups of the source language “${language}” are quality.soundAlike`
+            : `"${language}" is not one of the project’s languages`,
+      })
+    }
+    for (const language of Object.keys(narration.audition.phrases ?? {})) {
+      if (languages.includes(language)) continue
+      context.addIssue({
+        code: 'custom',
+        path: ['narration', 'audition', 'phrases', language],
+        message: `"${language}" is not one of the project’s languages`,
+      })
+    }
+  })
 
 /** A validated project file, with defaults filled in. */
 export type Project = z.infer<typeof ProjectSchema>
@@ -419,12 +443,10 @@ export function partPathFor(template: string, partId: string, language?: string)
 
 /** The language a request means: the one asked for if the project declares it, else the source language. */
 export function declaredLanguage(
-  narration: Pick<Project['narration'], 'languages'>,
+  project: Pick<Project, 'languages'>,
   asked: string | undefined,
 ): string {
-  return asked !== undefined && narration.languages.includes(asked)
-    ? asked
-    : narration.languages[0]!
+  return asked !== undefined && project.languages.includes(asked) ? asked : project.languages[0]!
 }
 
 /**
@@ -433,22 +455,23 @@ export function declaredLanguage(
  * language.
  */
 export function partCacheName(
-  narration: Pick<Project['narration'], 'languages'>,
+  project: Pick<Project, 'languages'>,
   partId: string,
   asked: string | undefined,
 ): string {
-  const language = declaredLanguage(narration, asked)
-  return language === narration.languages[0] ? partId : `${partId}\0${language}`
+  const language = declaredLanguage(project, asked)
+  return language === project.languages[0] ? partId : `${partId}\0${language}`
 }
 
 /** The groups of words that sound the same the project gives `language`: the source's are `soundAlike`. */
 export function soundAlikeOf(
-  narration: Pick<Project['narration'], 'languages' | 'quality'>,
+  project: Pick<Project, 'languages' | 'narration'>,
   language: string,
 ): string[][] {
-  return language === narration.languages[0]
-    ? narration.quality.soundAlike
-    : (narration.quality.soundAlikeByLanguage?.[language] ?? [])
+  const { quality } = project.narration
+  return language === project.languages[0]
+    ? quality.soundAlike
+    : (quality.soundAlikeByLanguage?.[language] ?? [])
 }
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
@@ -458,7 +481,29 @@ export interface Problem {
   message: string
 }
 
-/** Zod's issues as problems in `file`, each with its JSON path written out (`narration.parts[0].id`). */
+/**
+ * The project file `file` read as JSON (`raw`), validated: the project, or what is wrong with it. A
+ * file of another version, or none, is one problem at `version`, since the rest of it is in another
+ * format and every other complaint would only be noise.
+ */
+export function parseProject(
+  file: string,
+  raw: unknown,
+): { ok: true; project: Project } | { ok: false; problems: Problem[] } {
+  const version =
+    typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>).version
+      : undefined
+  if (version !== PROJECT_VERSION) {
+    return { ok: false, problems: [{ file, path: 'version', message: OLD_FORMAT }] }
+  }
+  const parsed = ProjectSchema.safeParse(raw)
+  return parsed.success
+    ? { ok: true, project: parsed.data }
+    : { ok: false, problems: problemsFrom(file, parsed.error) }
+}
+
+/** Zod's issues as problems in `file`, each with its JSON path written out (`parts[0].id`). */
 export function problemsFrom(file: string, error: z.ZodError): Problem[] {
   return error.issues.map((issue) => ({
     file,

@@ -22,7 +22,7 @@ unchecked) can be measured with Whisper without new audio. A character's style i
 audition page, a line's own cue by clicking it in the lines table, and the pronunciation table on
 All characters (steps 6.1 and 6.2). **Changes** lists what git sees of the studio's files, so
 you know what to commit (step 6.3); the studio itself never commits. **Refresh dialog** runs the
-project's `refreshDialog` command for a part and shows what changed; cues left without a line are
+project's `refresh.part` command for a part and shows what changed; cues left without a line are
 listed on the part's overview, to give to the reworded line or remove (step 6.4).
 
 Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`; with
@@ -31,8 +31,11 @@ does), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads
 the model). Without them, set `"quality": { "transcriber": "none" }` in the project file.
 
-Audition takes and sessions are kept in `.content-studio/` in the game repository; add it to that
-repository's `.gitignore`.
+The studio keeps its own files in `content-studio/` beside the project file. Its working state on
+your machine (audition takes and sessions, your Fish tier and take fade) is in
+`content-studio/cache/`, which the studio keeps out of git with `content-studio/.gitignore`, written
+when it starts. The project file's format, version 2, is described in
+[docs/project-files.md](docs/project-files.md).
 
 ## Install
 
@@ -61,8 +64,8 @@ lists when it finds the old names and then stops (it never reads or renames them
 
 ```sh
 git mv audio-studio.json content-studio.json
-mv .audio-studio .content-studio
-# and in .gitignore, change .audio-studio/ to .content-studio/
+mkdir -p content-studio && mv .audio-studio content-studio/cache
+# and in .gitignore, remove .audio-studio/
 ```
 
 If you linked the old command, remove it: `rm ~/.bun/bin/audio-studio`.

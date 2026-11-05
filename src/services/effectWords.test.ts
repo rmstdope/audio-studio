@@ -6,7 +6,6 @@ import { forgetEffect, keepMineEffect, setEffectDescription } from './effectWord
 import { loadWorkspace } from './workspace'
 
 const effects = {
-  refresh: 'true',
   paths: {
     list: 'tts/effects.json',
     lock: 'audio/effects.lock.json',
@@ -21,7 +20,7 @@ const list = [
 
 function repo(files: Record<string, unknown> = {}) {
   const root = tempRepo({
-    'content-studio.json': projectJson({ effects }),
+    'content-studio.json': projectJson({ effects, refresh: { shared: 'true' } }),
     'tts/effects.json': list,
     ...files,
   })
@@ -72,22 +71,23 @@ describe('reading the effects into the summary', () => {
   })
 
   it('reports a broken overrides file and shows the game’s words', async () => {
-    const { file } = repo({ '.content-studio/effects.json': '[1]' })
+    const { file } = repo({ 'content-studio/cache/effects.json': '[1]' })
     const s = await summary(file)
     expect(s.rows[0]!.changedHere).toBe(false)
     const opened = await loadWorkspace(file)
     expect(
-      opened.ok && opened.summary.problems.some((p) => p.file === '.content-studio/effects.json'),
+      opened.ok &&
+        opened.summary.problems.some((p) => p.file === 'content-studio/cache/effects.json'),
     ).toBe(true)
   })
 })
 
 describe('setEffectDescription', () => {
-  it('keeps the studio’s words in .content-studio/effects.json and never writes the game’s list', async () => {
+  it('keeps the studio’s words in content-studio/cache/effects.json and never writes the game’s list', async () => {
     const { file, read } = repo()
     const before = read('tts/effects.json')
     expect(await setEffectDescription(file, 'coins', '  Coins on glass ')).toEqual({ ok: true })
-    expect(read('.content-studio/effects.json')).toBe(
+    expect(read('content-studio/cache/effects.json')).toBe(
       '{\n "coins": {"words":"Coins on glass","gameWas":"Coins spill on stone"}\n}\n',
     )
     expect(read('tts/effects.json')).toBe(before)
@@ -102,7 +102,7 @@ describe('setEffectDescription', () => {
     for (const back of ['', 'Coins spill on stone', null]) {
       await setEffectDescription(file, 'coins', 'Mine')
       await setEffectDescription(file, 'coins', back)
-      expect(read('.content-studio/effects.json')).toBe('{}\n')
+      expect(read('content-studio/cache/effects.json')).toBe('{}\n')
     }
   })
 
@@ -112,10 +112,10 @@ describe('setEffectDescription', () => {
   })
 
   it('refuses to write over an overrides file it cannot read', async () => {
-    const { file, read } = repo({ '.content-studio/effects.json': '[1]' })
+    const { file, read } = repo({ 'content-studio/cache/effects.json': '[1]' })
     const result = await setEffectDescription(file, 'coins', 'Mine')
     expect(result).toMatchObject({ ok: false })
-    expect(read('.content-studio/effects.json')).toBe('[1]')
+    expect(read('content-studio/cache/effects.json')).toBe('[1]')
   })
 })
 
@@ -126,7 +126,7 @@ describe('the game rewording an effect you changed', () => {
   it('flags it, across reads, until Keep mine', async () => {
     const { file } = repo({
       'tts/effects.json': game('A heavy door groans'),
-      '.content-studio/effects.json': mine,
+      'content-studio/cache/effects.json': mine,
     })
     expect((await summary(file)).rows[0]!.gameChanged).toBe(true)
     expect((await summary(file)).rows[0]!.gameChanged).toBe(true)
@@ -137,7 +137,7 @@ describe('the game rewording an effect you changed', () => {
   it('is cleared by changing your own words', async () => {
     const { file } = repo({
       'tts/effects.json': game('A heavy door groans'),
-      '.content-studio/effects.json': mine,
+      'content-studio/cache/effects.json': mine,
     })
     await setEffectDescription(file, 'door-creak', 'Mine again')
     expect((await summary(file)).rows[0]).toMatchObject({
@@ -152,7 +152,10 @@ describe('the game rewording an effect you changed', () => {
   })
 
   it('Use the game’s is setEffectDescription with null', async () => {
-    const { file } = repo({ 'tts/effects.json': game('New'), '.content-studio/effects.json': mine })
+    const { file } = repo({
+      'tts/effects.json': game('New'),
+      'content-studio/cache/effects.json': mine,
+    })
     await setEffectDescription(file, 'door-creak', null)
     expect((await summary(file)).rows[0]).toMatchObject({ changedHere: false, description: 'New' })
   })
@@ -161,7 +164,9 @@ describe('the game rewording an effect you changed', () => {
 describe('an effect the game drops', () => {
   const files = {
     'tts/effects.json': [list[0]],
-    '.content-studio/effects.json': { coins: { words: 'Mine', gameWas: 'Coins spill on stone' } },
+    'content-studio/cache/effects.json': {
+      coins: { words: 'Mine', gameWas: 'Coins spill on stone' },
+    },
   }
 
   it('keeps your words in a dropped list, and brings them back when the game lists it again', async () => {
@@ -177,7 +182,7 @@ describe('an effect the game drops', () => {
     const { file, read } = repo(files)
     expect(await forgetEffect(file, 'door-creak')).toBeNull()
     expect(await forgetEffect(file, 'coins')).toEqual({ ok: true })
-    expect(read('.content-studio/effects.json')).toBe('{}\n')
+    expect(read('content-studio/cache/effects.json')).toBe('{}\n')
     expect((await summary(file)).dropped).toEqual([])
   })
 })

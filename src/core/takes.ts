@@ -29,15 +29,14 @@ export interface AuditionText {
 export function auditionText(
   character: Pick<Character, 'style' | 'audition'>,
   pronounce: Record<string, string>,
-  narration: Project['narration'],
-  language: string = narration.languages[0]!,
+  project: Pick<Project, 'languages' | 'narration'>,
+  language: string = project.languages[0]!,
   longest: string | null = null,
 ): AuditionText {
   const own = character.audition?.phrase?.trim()
+  const { audition } = project.narration
   const standard =
-    language === narration.languages[0]
-      ? narration.audition.phrase
-      : narration.audition.phrases?.[language]
+    language === project.languages[0] ? audition.phrase : audition.phrases?.[language]
   const [phrase, from]: [string | null, PhraseSource] = own
     ? [own, 'own']
     : standard

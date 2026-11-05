@@ -35,7 +35,10 @@ describe('locateProject', () => {
   })
 
   it('opens when everything is renamed', () => {
-    const root = tempRepo({ 'content-studio.json': projectJson(), '.content-studio/x.json': {} })
+    const root = tempRepo({
+      'content-studio.json': projectJson(),
+      'content-studio/cache/x.json': {},
+    })
     expect(locateProject(root)).toEqual({ ok: true, file: join(root, 'content-studio.json') })
   })
 
@@ -62,6 +65,34 @@ describe('locateProject', () => {
     expect(locateProject(root)).toEqual({
       ok: false,
       message: renameNotice({ oldFile: false, newFile: true, oldFolder: true })!,
+    })
+  })
+
+  it('stops while the cache is still in .content-studio, saying how to move it', () => {
+    const root = tempRepo({ 'content-studio.json': projectJson(), '.content-studio/x.json': {} })
+    expect(locateProject(root)).toEqual({
+      ok: false,
+      message: [
+        'This game’s studio cache is still in .content-studio/, where it was before version 2.',
+        'Move it, then run content-studio again:',
+        '  mkdir -p content-studio && mv .content-studio content-studio/cache',
+      ].join('\n'),
+    })
+    expect(locateProject(root, join(root, 'content-studio.json')).ok).toBe(false)
+  })
+
+  it('stops when both caches are there, asking to merge or remove one by hand', () => {
+    const root = tempRepo({
+      'content-studio.json': projectJson(),
+      '.content-studio/x.json': {},
+      'content-studio/cache/y.json': {},
+    })
+    expect(locateProject(root)).toEqual({
+      ok: false,
+      message: [
+        'This game has both .content-studio/ and content-studio/cache/.',
+        'Merge them by hand, or remove one, then run content-studio again.',
+      ].join('\n'),
     })
   })
 
@@ -139,11 +170,26 @@ describe('loadProject', () => {
   })
 
   it('fails on an invalid project file, naming what is wrong', async () => {
-    const root = tempRepo({ 'content-studio.json': { name: '' } })
+    const root = tempRepo({ 'content-studio.json': { version: 2, name: '' } })
     const result = await loadProject(join(root, 'content-studio.json'))
     if (result.ok) throw new Error('expected the project file to be rejected')
     expect(result.file).toBe('content-studio.json')
-    expect(result.problems.map((p) => p.path)).toEqual(['name', 'narration'])
+    expect(result.problems.map((p) => p.path)).toEqual(['name', 'parts', 'narration'])
+  })
+
+  it('refuses a project file in the format before version 2, saying what to do', async () => {
+    const { version: _version, ...old } = projectJson()
+    const root = tempRepo({ 'content-studio.json': old })
+    const result = await loadProject(join(root, 'content-studio.json'))
+    if (result.ok) throw new Error('expected the project file to be rejected')
+    expect(result.problems).toEqual([
+      {
+        file: 'content-studio.json',
+        path: 'version',
+        message:
+          'This project file is in the format before version 2. Add "version": 2 and move its fields as docs/project-files.md describes.',
+      },
+    ])
   })
 
   it('fails when the project file is not JSON', async () => {
@@ -304,9 +350,9 @@ describe('loadPart, a dialog that is gone', () => {
   it('carries a gone language into the progress and the project summary', async () => {
     const project = {
       ...projectJson(),
+      languages: ['en', 'sv'],
       narration: {
         ...(projectJson().narration as object),
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -525,7 +571,7 @@ describe('a part in several languages', () => {
   }
   function project(languages: string[]) {
     const base = projectJson()
-    return { ...base, narration: { ...(base.narration as object), languages, paths } }
+    return { ...base, languages, narration: { ...(base.narration as object), paths } }
   }
   const files = {
     'content-studio.json': project(['en', 'sv', 'de']),
@@ -731,7 +777,6 @@ describe('a part in several languages', () => {
 
 describe('loadProject with a music section', () => {
   const musicSection = {
-    refreshShared: 'true',
     paths: {
       loops: 'tts/{part}/music.json',
       stingers: 'tts/stingers.json',
@@ -758,7 +803,7 @@ describe('loadProject with a music section', () => {
 
   it('lists each act’s loops and the stingers, and tells a missing list from an empty one', async () => {
     const root = tempRepo({
-      'content-studio.json': projectJson({ music: musicSection }),
+      'content-studio.json': projectJson({ music: musicSection, refresh: { shared: 'true' } }),
       'tts/act1/music.json': [loop('a'), loop('b')],
       'tts/act2/music.json': [],
       'tts/stingers.json': [loop('victory', { seconds: 5 })],

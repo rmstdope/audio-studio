@@ -41,10 +41,10 @@ function repo(over: Record<string, unknown> = {}) {
     'audio/music/castle-gates.mp3': 'mp3',
     'audio/music/hall.mp3': 'mp3',
     'music/briefs.json': { 'castle-gates': { bpm: 70 }, hall: { bpm: 80 } },
-    '.content-studio/music/castle-gates.json': { next: 2, takes: [] },
-    '.content-studio/music/hall.json': { next: 2, takes: [] },
-    '.content-studio/music-takes/castle-gates/0123456789abcdef.1.wav': 'wav',
-    '.content-studio/music-takes/hall/0123456789abcdef.1.wav': 'wav',
+    'content-studio/cache/music/castle-gates.json': { next: 2, takes: [] },
+    'content-studio/cache/music/hall.json': { next: 2, takes: [] },
+    'content-studio/cache/music-takes/castle-gates/0123456789abcdef.1.wav': 'wav',
+    'content-studio/cache/music-takes/hall/0123456789abcdef.1.wav': 'wav',
     ...over,
   })
   return { root, file: join(root, 'content-studio.json') }
@@ -61,19 +61,19 @@ describe('removeOrphan', () => {
     })
     expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
     expect(json(root, 'music/briefs.json')).toEqual({ hall: { bpm: 80 } })
-    expect(existsSync(join(root, '.content-studio/music/castle-gates.json'))).toBe(false)
-    expect(existsSync(join(root, '.content-studio/music-takes/castle-gates'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/music/castle-gates.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/music-takes/castle-gates'))).toBe(false)
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
-    expect(existsSync(join(root, '.content-studio/music/hall.json'))).toBe(true)
-    expect(existsSync(join(root, '.content-studio/music-takes/hall'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/cache/music/hall.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/cache/music-takes/hall'))).toBe(true)
   })
 
   it('removes an orphan whose music file is already gone, and one with no briefs entry or board', async () => {
     const { root, file } = repo({
       'audio/music/castle-gates.mp3': undefined,
       'music/briefs.json': undefined,
-      '.content-studio/music/castle-gates.json': undefined,
-      '.content-studio/music-takes/castle-gates/0123456789abcdef.1.wav': undefined,
+      'content-studio/cache/music/castle-gates.json': undefined,
+      'content-studio/cache/music-takes/castle-gates/0123456789abcdef.1.wav': undefined,
     })
     expect(await removeOrphan(file, 'castle-gates')).toEqual({ ok: true })
     expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
@@ -112,7 +112,7 @@ describe('removeOrphan', () => {
   it('keeps the lock entry when a step fails, so the removal can be done again', async () => {
     const { root, file } = repo()
     // The board is a folder with something in it, which cannot be deleted as a file.
-    const board = join(root, '.content-studio/music/castle-gates.json')
+    const board = join(root, 'content-studio/cache/music/castle-gates.json')
     rmSync(board)
     mkdirSync(join(board, 'inner'), { recursive: true })
     expect(await removeOrphan(file, 'castle-gates')).toMatchObject({ ok: false })

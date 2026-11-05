@@ -13,9 +13,10 @@ import {
 import { characterFile, readJson, writeAtomic } from './files'
 import { createSerial } from './serial'
 import { cacheNameFor, knownCharacter, type ProjectFailure } from './workspace'
+import { CACHE_DIR } from '../core/project'
 
 /** Where the voices ruled out per character are kept, in the project's tool cache. */
-export const RULED_OUT_DIR = '.content-studio/ruled-out'
+export const RULED_OUT_DIR = `${CACHE_DIR}/ruled-out`
 
 /** A character's ruled-out voices, the latest first; null for an unknown character. */
 export type RuledOutResult = { ok: true; voices: RuledOutVoice[] } | ProjectFailure | null

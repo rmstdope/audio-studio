@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import {
+  CACHE_DIR,
   declaredLanguage,
   FREE_MODELS,
   phraseProblem,
@@ -37,7 +38,7 @@ import { randomUUID } from 'node:crypto'
 import { NO_KEY } from './fish'
 
 /** Where audition takes are kept, in the project's tool cache (gitignored by the consumer). */
-export const TAKES_DIR = '.content-studio/takes'
+export const TAKES_DIR = `${CACHE_DIR}/takes`
 
 /** A recorded take (its key, and the text it is of), or why there is none. Null for an unknown character. */
 export type TakeResult =
@@ -145,7 +146,7 @@ export async function recordTake(
   // A phrase edited into the cast by hand is checked too: never pay for a take that is too long.
   const tooLong = phraseProblem(text.phrase, project.narration.quality.chunkLimit)
   if (tooLong) {
-    const source = language === project.narration.languages[0]
+    const source = language === project.languages[0]
     const where =
       text.from === 'own'
         ? phrasePath(characterId, source ? undefined : language)
@@ -576,8 +577,8 @@ export function auditionIn(
   characterId: string,
   asked?: string,
 ): { language: string; cast: Cast; audition: AuditionText } {
-  const { languages } = project.narration
-  const language = declaredLanguage(project.narration, asked)
+  const { languages } = project
+  const language = declaredLanguage(project, asked)
   const seen = projectCast(cast, language, languages[0]!)
   const longest = summary.characters.find((c) => c.id === characterId)?.languages[language]?.longest
   return {
@@ -586,7 +587,7 @@ export function auditionIn(
     audition: auditionText(
       seen.speakers[characterId] ?? {},
       cast.pronounce,
-      project.narration,
+      project,
       language,
       longest ?? null,
     ),
@@ -606,7 +607,7 @@ export function recordedTakes(
   text: AuditionText,
   voiceIds: string[],
   model: string = project.narration.models.audition,
-  language: string = project.narration.languages[0]!,
+  language: string = project.languages[0]!,
 ): Record<string, string> {
   const takes: Record<string, string> = {}
   for (const voice of voiceIds) {

@@ -154,8 +154,8 @@ describe('startAudition', () => {
 
   it('takes an audition saved in rounds, before the shortlist, for none', async () => {
     const { root, projectFile } = await started()
-    const [file] = readdirSync(join(root, '.content-studio/auditions'))
-    const path = join(root, '.content-studio/auditions', file!)
+    const [file] = readdirSync(join(root, 'content-studio/cache/auditions'))
+    const path = join(root, 'content-studio/cache/auditions', file!)
     writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), version: 1 }))
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
   })
@@ -342,7 +342,7 @@ describe('moreVoices from ElevenLabs’ library', () => {
   it('leaves out a library voice the studio added that is cast or on the board as its own id', async () => {
     const { root, projectFile } = await started()
     writeFileSync(
-      join(root, '.content-studio/eleven-voices.json'),
+      join(root, 'content-studio/cache/eleven-voices.json'),
       JSON.stringify({
         version: 1,
         added: [
@@ -664,7 +664,7 @@ describe('discardSession', () => {
     await moveVoice(projectFile, 'mira', 'a', 'drop')
     await discardSession(projectFile, 'mira')
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
-    expect(readdirSync(join(root, '.content-studio/auditions'))).toEqual([])
+    expect(readdirSync(join(root, 'content-studio/cache/auditions'))).toEqual([])
     expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
     expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
   })
@@ -694,7 +694,7 @@ describe('ruled-out voices in an audition', () => {
 
   it('changes nothing when the ruled-out voices cannot be saved', async () => {
     const { root, projectFile } = await started()
-    writeFileSync(join(root, '.content-studio/ruled-out'), 'in the way')
+    writeFileSync(join(root, 'content-studio/cache/ruled-out'), 'in the way')
     await expect(moveVoice(projectFile, 'mira', 'a', 'drop')).rejects.toThrow()
     const saved = await sessionFor(projectFile, 'mira')
     expect(saved?.ok && saved.session?.toHear).toEqual(['a', 'b', 'c'])
@@ -894,9 +894,9 @@ describe('an audition per language', () => {
     ...files,
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         audition: { candidatesPerRound: 3 },
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
@@ -1055,11 +1055,11 @@ describe('voicesInUse', () => {
 
   it('knows nothing in use when the cast or a session cannot be read, so nothing is freed', async () => {
     const { root, projectFile } = await started()
-    const [file] = readdirSync(join(root, '.content-studio/auditions'))
-    writeFileSync(join(root, '.content-studio/auditions', file!), '{"version": 2}')
+    const [file] = readdirSync(join(root, 'content-studio/cache/auditions'))
+    writeFileSync(join(root, 'content-studio/cache/auditions', file!), '{"version": 2}')
     expect(await voicesInUse(projectFile)).toBeNull()
     // One of an earlier version is no audition in progress.
-    writeFileSync(join(root, '.content-studio/auditions', file!), '{"version": 1}')
+    writeFileSync(join(root, 'content-studio/cache/auditions', file!), '{"version": 1}')
     expect([...(await voicesInUse(projectFile))!].sort()).toEqual(['cur', 't1'])
     const broken = tempRepo({ ...files, 'tts/cast.json': '{ not json' })
     expect(await voicesInUse(join(broken, 'content-studio.json'))).toBeNull()

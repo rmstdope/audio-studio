@@ -11,9 +11,10 @@ import type { Problem } from '../core/project'
 import type { SceneMix } from '../core/scenes'
 import { readResource, writeAtomic } from './files'
 import { createSerial } from './serial'
+import { CACHE_DIR } from '../core/project'
 
 /** Where the measures of the scenes are kept, in the studio's own folder of the consumer. */
-export const LOUDNESS_FILE = '.content-studio/scene-loudness.json'
+export const LOUDNESS_FILE = `${CACHE_DIR}/scene-loudness.json`
 
 /**
  * The kept measures, act by act and scene by scene. A file that is not there is an empty one. One

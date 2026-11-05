@@ -74,7 +74,7 @@ export function PartOverview({
                 className="btn"
                 type="button"
                 disabled={refresh.pending}
-                title="Runs the project’s refreshDialog command to extract this dialog from the game"
+                title="Runs the project’s refresh.part command to extract this dialog from the game"
                 onClick={refresh.start}
               >
                 {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}

@@ -95,7 +95,7 @@ describe('readImages', () => {
   it('remembers the style it first saw in the studio’s own folder', async () => {
     const { summary, read } = repo()
     await summary()
-    expect(JSON.parse(read('.content-studio/images-style-seen.json'))).toEqual(style)
+    expect(JSON.parse(read('content-studio/cache/images-style-seen.json'))).toEqual(style)
   })
 
   it('moves the remembered style along when a change leaves nothing out of date', async () => {
@@ -103,7 +103,7 @@ describe('readImages', () => {
     await summary()
     writeFileSync(join(root, 'images/style.json'), JSON.stringify({ ...style, look: 'oil' }))
     await summary()
-    expect(JSON.parse(read('.content-studio/images-style-seen.json')).look).toBe('oil')
+    expect(JSON.parse(read('content-studio/cache/images-style-seen.json')).look).toBe('oil')
   })
 
   it('tells a style the game could not be read from one it has not written yet', async () => {

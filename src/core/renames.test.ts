@@ -10,8 +10,8 @@ describe('renameNotice', () => {
         LEAD,
         'Rename these, then run content-studio again:',
         '  git mv audio-studio.json content-studio.json',
-        '  mv .audio-studio .content-studio',
-        '  in .gitignore, change .audio-studio/ to .content-studio/',
+        '  mkdir -p content-studio && mv .audio-studio content-studio/cache',
+        '  in .gitignore, remove .audio-studio/',
       ].join('\n'),
     )
   })
@@ -31,8 +31,8 @@ describe('renameNotice', () => {
       [
         LEAD,
         'Rename these, then run content-studio again:',
-        '  mv .audio-studio .content-studio',
-        '  in .gitignore, change .audio-studio/ to .content-studio/',
+        '  mkdir -p content-studio && mv .audio-studio content-studio/cache',
+        '  in .gitignore, remove .audio-studio/',
       ].join('\n'),
     )
   })

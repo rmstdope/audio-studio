@@ -1,22 +1,33 @@
 {
+  "$schema": "https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json",
+  "version": 2,
   "name": "Sample Quest",
   "description": "A tiny project for working on the studio.",
+  "partLabel": "Act",
+  "parts": [
+    {
+      "id": "act1",
+      "title": "Act I: The Lantern"
+    },
+    {
+      "id": "act2",
+      "title": "Act II: The Road"
+    },
+    {
+      "id": "act3",
+      "title": "Act III: The Crown"
+    }
+  ],
+  "languages": [
+    "en",
+    "sv",
+    "de"
+  ],
+  "refresh": {
+    "part": "sh tools/refresh.sh {part}",
+    "shared": "sh tools/refresh-shared.sh"
+  },
   "narration": {
-    "partLabel": "Act",
-    "parts": [
-      {
-        "id": "act1",
-        "title": "Act I: The Lantern"
-      },
-      {
-        "id": "act2",
-        "title": "Act II: The Road"
-      },
-      {
-        "id": "act3",
-        "title": "Act III: The Crown"
-      }
-    ],
     "characters": "tts/cast.json",
     "paths": {
       "dialog": "tts/{part}/{language}/script.json",
@@ -24,16 +35,9 @@
       "lock": "tts/{part}/{language}/narration.lock.json",
       "clips": "audio/narration/{part}/{language}",
       "manifest": "audio/narration/{part}/{language}/manifest.json"
-    },
-    "languages": [
-      "en",
-      "sv",
-      "de"
-    ],
-    "refreshDialog": "sh tools/refresh.sh {part}"
+    }
   },
   "music": {
-    "refreshShared": "sh tools/refresh-stingers.sh",
     "paths": {
       "loops": "tts/{part}/music.json",
       "stingers": "tts/stingers.json",
@@ -66,6 +70,9 @@
       "declarations": "tts/{part}/scenes.json",
       "mix": "web/scenes/{part}.mix.json"
     },
-    "loudness": { "target": -20, "tolerance": 2 }
+    "loudness": {
+      "target": -20,
+      "tolerance": 2
+    }
   }
 }

@@ -6,7 +6,7 @@ import { basename, dirname, join } from 'node:path'
 import { soundAlikes, type SoundAlike } from '../core/align'
 import { capitalisesNouns, languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
-import { noProjectMessage, renameNotice, type FoundNames } from '../core/renames'
+import { noProjectMessage, oldCacheNotice, renameNotice, type FoundNames } from '../core/renames'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import {
   adoptUntracked,
@@ -16,14 +16,15 @@ import {
   type PlanInput,
 } from '../core/planner'
 import {
+  CACHE_DIR,
+  OLD_CACHE_DIR,
   OLD_PROJECT_FILE,
   OLD_STATE_DIR,
   PROJECT_FILE,
-  ProjectSchema,
+  parseProject,
   declaredLanguage,
   partCacheName,
   partPathFor,
-  problemsFrom,
   soundAlikeOf,
   type Part,
   type Problem,
@@ -59,6 +60,7 @@ import { readScenes } from './scenes'
 import { readEffects } from './effectsLists'
 import { gameFilePath, readMusic } from './musicLists'
 import { inPartTurn } from './partFiles'
+import { readSettings } from './settings'
 
 /** Where the project file is, or the message to print instead of starting the studio. */
 export type Located = { ok: true; file: string } | { ok: false; message: string }
@@ -81,10 +83,17 @@ export function locateProject(start: string, explicit?: string): Located {
   }
 }
 
-/** `file` to open, unless the old names found in `dir` (a leftover old folder too) say to stop. */
+/**
+ * `file` to open, unless the old names found in `dir` (a leftover old folder too) or a cache still
+ * in `.content-studio/` say to stop.
+ */
 function opening(dir: string, file: string, found: Omit<FoundNames, 'oldFolder'>): Located {
   const oldFolder = isDirectory(join(dir, OLD_STATE_DIR))
-  const message = renameNotice({ ...found, oldFolder })
+  const message =
+    renameNotice({ ...found, oldFolder }) ??
+    (isDirectory(join(dir, OLD_CACHE_DIR))
+      ? oldCacheNotice(isDirectory(join(dir, CACHE_DIR)))
+      : null)
   return message ? { ok: false, message } : { ok: true, file }
 }
 
@@ -141,10 +150,8 @@ export async function cacheNameFor(
   if (language === undefined) return characterId
   const opened = await openProject(projectFile)
   if (!opened.ok) return characterId
-  const resolved = declaredLanguage(opened.project.narration, language)
-  return resolved === opened.project.narration.languages[0]
-    ? characterId
-    : `${characterId}\0${resolved}`
+  const resolved = declaredLanguage(opened.project, language)
+  return resolved === opened.project.languages[0] ? characterId : `${characterId}\0${resolved}`
 }
 
 /** How far an act's narration is in one language: its lines that are ok, out of all of them. */
@@ -164,7 +171,7 @@ export async function narrationProgress(
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
   const parts: Record<string, PartProgress> = {}
-  for (const part of opened.project.narration.parts) {
+  for (const part of opened.project.parts) {
     const read = await readPart(projectFile, part.id, language)
     if (!read?.ok || read.dialog.status !== 'ok') continue
     const state = planPart(read.input)
@@ -192,14 +199,14 @@ export async function loadWorkspace(projectFile: string): Promise<
 
   const cast = await readCast(root, project, problems)
   const dialogs: Record<string, DialogState> = {}
-  for (const part of project.narration.parts) {
+  for (const part of project.parts) {
     dialogs[part.id] = await readDialog(root, project, part, problems)
   }
   // The other languages' dialogs say where a character speaks in each; a missing one is no problem.
   const languageDialogs: Record<string, Record<string, DialogState>> = {}
-  for (const language of project.narration.languages.slice(1)) {
+  for (const language of project.languages.slice(1)) {
     languageDialogs[language] = {}
-    for (const part of project.narration.parts) {
+    for (const part of project.parts) {
       languageDialogs[language][part.id] = await readDialog(root, project, part, problems, language)
     }
   }
@@ -222,13 +229,14 @@ export async function loadWorkspace(projectFile: string): Promise<
       images,
       effects,
       scenes,
+      settings: await readSettings(root, problems),
       problems,
     }),
   }
 }
 
 /** Where the user's notes on each part's lines are kept, in the project's tool cache. */
-export const NOTES_DIR = '.content-studio/notes'
+export const NOTES_DIR = `${CACHE_DIR}/notes`
 
 /**
  * The notes on a part's lines: none if there is no file. A file that cannot be read or does not
@@ -317,7 +325,7 @@ export async function loadPart(
   const { project, part, input, dialog, problems } = read
   const plan = planPart(input)
   const languages: LanguageProgress[] = []
-  for (const id of project.narration.languages) {
+  for (const id of project.languages) {
     const other = id === read.language ? read : await readPart(projectFile, partId, id)
     if (!other?.ok) continue
     const state = id === read.language ? plan : planPart(other.input)
@@ -407,11 +415,12 @@ export async function clipFile(
 ): Promise<string | null> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return null
-  const { narration } = opened.project
-  if (!narration.parts.some((p) => p.id === partId) || file.startsWith('.')) return null
+  const { project } = opened
+  const { narration } = project
+  if (!project.parts.some((p) => p.id === partId) || file.startsWith('.')) return null
   const folder = resolveInRoot(
     dirname(projectFile),
-    partPathFor(narration.paths.clips, partId, declaredLanguage(narration, language)),
+    partPathFor(narration.paths.clips, partId, declaredLanguage(project, language)),
   )
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
@@ -492,17 +501,17 @@ export async function readPart(
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
   const { project } = opened
-  const part = project.narration.parts.find((p) => p.id === partId)
+  const part = project.parts.find((p) => p.id === partId)
   if (!part) return null
 
   const problems: Problem[] = []
   const templates = project.narration.paths
-  const language = declaredLanguage(project.narration, asked)
+  const language = declaredLanguage(project, asked)
   const at = (template: string) => partPathFor(template, part.id, language)
 
   const dialog = await readDialog(root, project, part, problems, language)
   // Another language is shown beside the source language's lines, so those are read too.
-  const sourceLanguage = project.narration.languages[0]!
+  const sourceLanguage = project.languages[0]!
   const source =
     language !== sourceLanguage && dialog.status === 'ok'
       ? await readDialog(root, project, part, problems, sourceLanguage)
@@ -544,13 +553,13 @@ export async function readPart(
   return {
     ok: true,
     language,
-    cacheName: partCacheName(project.narration, part.id, language),
+    cacheName: partCacheName(project, part.id, language),
     sourceCues,
     ears: {
       // Told the language only in a project with several, so a single-language project is as it was.
-      language: project.narration.languages.length > 1 ? language : undefined,
+      language: project.languages.length > 1 ? language : undefined,
       // Its numbers as words; the built-in groups are English words and apply to English only.
-      alike: soundAlikes(soundAlikeOf(project.narration, language), language),
+      alike: soundAlikes(soundAlikeOf(project, language), language),
       capitalNouns: capitalisesNouns(language),
     },
     project,
@@ -562,11 +571,7 @@ export async function readPart(
         source?.status === 'ok' ? source.lines : undefined,
       ),
       ...(source?.status === 'ok' ? { source: source.lines } : {}),
-      cast: projectCast(
-        cast ?? { speakers: {}, pronounce: {} },
-        language,
-        project.narration.languages[0]!,
-      ),
+      cast: projectCast(cast ?? { speakers: {}, pronounce: {} }, language, project.languages[0]!),
       cues,
       ownCues,
       sourceCues,
@@ -605,7 +610,7 @@ async function readDialog(
   project: Project,
   part: Part,
   problems: Problem[],
-  language: string = project.narration.languages[0]!,
+  language: string = project.languages[0]!,
 ): Promise<DialogState> {
   const path = partPathFor(project.narration.paths.dialog, part.id, language)
   const read = await readResource(root, path, DialogSchema, problems)
@@ -634,10 +639,10 @@ export async function openProject(
   if (json.status === 'invalid') {
     return { ok: false, file, problems: [{ file, path: '', message: json.message }] }
   }
-  const parsed = ProjectSchema.safeParse(json.value)
-  if (!parsed.success) return { ok: false, file, problems: problemsFrom(file, parsed.error) }
+  const parsed = parseProject(file, json.value)
+  if (!parsed.ok) return { ok: false, file, problems: parsed.problems }
 
-  const outside = projectPaths(parsed.data).flatMap(([path, value]) => {
+  const outside = projectPaths(parsed.project).flatMap(([path, value]) => {
     try {
       resolveInRoot(root, value)
       return []
@@ -646,7 +651,7 @@ export async function openProject(
     }
   })
   if (outside.length) return { ok: false, file, problems: outside }
-  return { ok: true, project: parsed.data }
+  return { ok: true, project: parsed.project }
 }
 
 /** Every path the project file names, with its JSON path, for the outside-the-root check. */
@@ -657,8 +662,8 @@ function projectPaths(project: Project): [string, string][] {
     ['narration.characters', narration.characters],
   ]
   for (const [name, template] of Object.entries(narration.paths)) {
-    for (const part of narration.parts) {
-      for (const language of narration.languages) {
+    for (const part of project.parts) {
+      for (const language of project.languages) {
         paths.push([`narration.paths.${name}`, partPathFor(template, part.id, language)])
       }
     }

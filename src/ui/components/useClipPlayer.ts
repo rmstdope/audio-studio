@@ -10,7 +10,7 @@ import { createPlayer, playedShare, type AudioLike, type Clip, type PlayerState 
  * (any toggle stops that). `onFailed` hears the id of a clip that failed. `playing` is the id of
  * the clip playing, or null; `inTurn` says whether a list is being played. `toggle(id, url, { fade: true })`
  * plays a take: it fades in and out, and a stop is a short fade, never a cut. The length is the
- * project's `takeFade` (Setup's Playing takes), asked as each clip begins. With `loop: true` it
+ * person's own `takeFade` setting (Setup's Playing takes), asked as each clip begins. With `loop: true` it
  * comes round until stopped, without a gap (`createClipAudio`). `position()` is how far into the clip playing it is, 0 to 1, or null
  * while that is not known.
  */

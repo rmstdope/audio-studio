@@ -132,7 +132,7 @@ describe('createEffectTakes', () => {
 
   it('makes takes from the studio’s own words when they are in use', async () => {
     const { file, takes, requests, settled } = setup(undefined, undefined, {
-      '.content-studio/effects.json': {
+      'content-studio/cache/effects.json': {
         coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' },
       },
     })
@@ -295,7 +295,7 @@ describe('createEffectTakes', () => {
     })
     expect(await takes.drop(file, 'coins', view.takes[1]!.file)).toEqual({ ok: true })
     expect((await settled('coins')).takes.map((t) => t.n)).toEqual([1])
-    expect(readdirSync(join(root, '.content-studio/effect-takes/coins'))).toHaveLength(1)
+    expect(readdirSync(join(root, 'content-studio/cache/effect-takes/coins'))).toHaveLength(1)
     expect(await takes.drop(file, 'coins', view.takes[1]!.file)).toEqual({
       ok: false,
       message: 'That take is not on the board.',
@@ -335,7 +335,7 @@ describe('createEffectTakes', () => {
     const view = await settled('coins')
     await takes.choose(file, 'coins', view.takes[0]!.file)
     writeFileSync(
-      join(root, '.content-studio/effects.json'),
+      join(root, 'content-studio/cache/effects.json'),
       JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     expect(await takes.accept(file, 'coins')).toEqual({ ok: true })
@@ -368,7 +368,7 @@ describe('createEffectTakes', () => {
     await takes.make(file, 'coins', { count: 1 })
     await settled('coins')
     writeFileSync(
-      join(root, '.content-studio/effects.json'),
+      join(root, 'content-studio/cache/effects.json'),
       JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     await takes.make(file, 'coins', { count: 1 })
@@ -548,12 +548,12 @@ describe('takes of an effect that loops', () => {
     const view = await settled('rain')
     expect(view.takes[0]).toMatchObject({ seconds: 10, loops: true, quietAt: 6.2 })
     const board = JSON.parse(
-      readFileSync(join(root, '.content-studio/effect-boards/rain.json'), 'utf8'),
+      readFileSync(join(root, 'content-studio/cache/effect-boards/rain.json'), 'utf8'),
     )
     expect(board.takes[0]).toMatchObject({ quietAt: 6.2, inputs: { loops: true, seconds: 10 } })
     const wav = readWav(
       new Uint8Array(
-        readFileSync(join(root, '.content-studio/effect-takes/rain', view.takes[0]!.file)),
+        readFileSync(join(root, 'content-studio/cache/effect-takes/rain', view.takes[0]!.file)),
       ),
     )
     expect(wavSeconds(wav)).toBe(10)

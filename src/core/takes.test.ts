@@ -4,18 +4,19 @@ import { ProjectSchema } from './project'
 import { auditionText, takeKey } from './takes'
 import { ttsFor } from './resources'
 
-const narration = ProjectSchema.parse(projectJson()).narration
+const project = ProjectSchema.parse(projectJson())
+const { narration } = project
 
 describe('auditionText', () => {
   it('uses the project’s phrase, in the character’s style, said as the cast asks', () => {
-    const text = auditionText({ style: '[warm]' }, { Elior: 'El-ee-or' }, narration)
+    const text = auditionText({ style: '[warm]' }, { Elior: 'El-ee-or' }, project)
     expect(text.phrase).toBe(narration.audition.phrase)
     expect(text.from).toBe('standard')
     expect(text.spoken).toBe(`[warm] ${narration.audition.phrase}`)
     const named = auditionText(
       { style: '', audition: { phrase: 'Elior, come here.' } },
       { Elior: 'El-ee-or' },
-      narration,
+      project,
     )
     expect(named).toEqual({
       phrase: 'Elior, come here.',
@@ -27,11 +28,15 @@ describe('auditionText', () => {
 })
 
 describe('auditionText in another language', () => {
-  const several: typeof narration = {
-    ...narration,
+  const several: typeof project = {
+    ...project,
     languages: ['en', 'sv'],
-    audition: { ...narration.audition, phrases: { sv: 'Kom in, barn.' } },
+    narration: {
+      ...narration,
+      audition: { ...narration.audition, phrases: { sv: 'Kom in, barn.' } },
+    },
   }
+  const unphrased = { ...several, narration }
   const sv = (character: Parameters<typeof auditionText>[0], longest: string | null, n = several) =>
     auditionText(character, {}, n, 'sv', longest)
 
@@ -51,14 +56,14 @@ describe('auditionText in another language', () => {
   })
 
   it('then her longest line in that language', () => {
-    expect(sv({}, 'Längsta raden.', { ...several, audition: narration.audition })).toMatchObject({
+    expect(sv({}, 'Längsta raden.', unphrased)).toMatchObject({
       phrase: 'Längsta raden.',
       from: 'line',
     })
   })
 
   it('has none when the project has no phrase for it and she has no lines', () => {
-    expect(sv({}, null, { ...several, audition: narration.audition })).toEqual({
+    expect(sv({}, null, unphrased)).toEqual({
       phrase: null,
       from: 'none',
       standard: false,

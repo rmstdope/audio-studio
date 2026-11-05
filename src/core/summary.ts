@@ -5,6 +5,7 @@ import type { EffectsSummary } from './effects'
 import type { MusicSummary } from './music'
 import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
+import type { Settings } from './settings'
 import { DEFAULT_TAKE_FADE } from './takeFade'
 import { pronounceOf, voiceOf, type Cast, type Line } from './resources'
 
@@ -111,7 +112,7 @@ export interface ProjectSummary {
   charactersPath: string
   parts: PartSummary[]
   characters: CharacterSummary[]
-  /** Whether the project file names a `refreshDialog` command. */
+  /** Whether the project file names a `refresh.part` command. */
   canRefresh: boolean
   /** The pronunciation table in file order; null when the cast cannot be read. */
   pronounce: Pronunciation[] | null
@@ -126,7 +127,7 @@ export interface ProjectSummary {
   models: { draft: string; final: string }
   /** The project's speaking speed (`tts.speed`), which a character may have its own in place of. */
   speed: number
-  /** How long a take fades when played in the studio, in seconds (`takeFade`, 0.2 if unset). */
+  /** How long a take fades when played in the studio, in seconds (the setting `takeFade`, 0.2 if unset). */
   takeFade: number
   /** The project file's name, where `soundAlike` is saved. */
   projectFile: string
@@ -159,6 +160,8 @@ export interface SummaryInput {
   effects?: EffectsSummary | null
   /** The Scenes pages, from `summarizeScenes`; absent or null without a `scenes` section. */
   scenes?: ScenesSummary | null
+  /** The person's own settings, from the cache; absent is none chosen. */
+  settings?: Settings
   problems: Problem[]
 }
 
@@ -182,12 +185,13 @@ export function summarize({
   images = null,
   effects = null,
   scenes = null,
+  settings = {},
   problems,
 }: SummaryInput): ProjectSummary {
   const { narration } = project
   const appearances = new Map<string, Appearance[]>()
 
-  const parts = narration.parts.map((part): PartSummary => {
+  const parts = project.parts.map((part): PartSummary => {
     const dialog = dialogs[part.id] ?? { status: 'missing' }
     const lines = dialog.status === 'ok' ? dialog.lines : []
     const counts = countBySpeaker(lines)
@@ -199,7 +203,7 @@ export function summarize({
     return {
       id: part.id,
       title: part.title,
-      dialogPath: partPathFor(narration.paths.dialog, part.id, narration.languages[0]),
+      dialogPath: partPathFor(narration.paths.dialog, part.id, project.languages[0]),
       dialog: dialog.status,
       recorded: recordedOf(dialog),
       lineCount: lines.length,
@@ -207,16 +211,16 @@ export function summarize({
     }
   })
 
-  const source = narration.languages[0]!
+  const source = project.languages[0]!
   // Where each character speaks in each language, and its longest line there.
   const spoken = new Map<
     string,
     Map<string, { appearances: Appearance[]; longest: string | null }>
   >()
-  for (const language of narration.languages) {
+  for (const language of project.languages) {
     const byPart = language === source ? dialogs : (languageDialogs[language] ?? {})
     const found = new Map<string, { appearances: Appearance[]; longest: string | null }>()
-    for (const part of narration.parts) {
+    for (const part of project.parts) {
       const dialog = byPart[part.id]
       if (dialog?.status !== 'ok') continue
       for (const [id, count] of countBySpeaker(dialog.lines)) {
@@ -245,7 +249,7 @@ export function summarize({
     const entry = speakers[id]
     const seen = appearances.get(id) ?? []
     const languages = Object.fromEntries(
-      narration.languages.map((language): [string, CharacterLanguage] => {
+      project.languages.map((language): [string, CharacterLanguage] => {
         const where = spoken.get(language)?.get(id)
         const lines = where?.appearances ?? []
         return [
@@ -277,26 +281,26 @@ export function summarize({
     name: project.name,
     description: project.description,
     root,
-    partLabel: narration.partLabel,
-    languages: narration.languages.map((id) => ({ id, name: languageName(id) })),
+    partLabel: project.partLabel,
+    languages: project.languages.map((id) => ({ id, name: languageName(id) })),
     charactersPath: narration.characters,
     parts,
     characters: characters.sort((a, b) => b.totalLines - a.totalLines || a.id.localeCompare(b.id)),
-    canRefresh: Boolean(narration.refreshDialog),
+    canRefresh: Boolean(project.refresh?.part),
     pronounce: cast ? Object.entries(cast.pronounce) : null,
     soundAlike: narration.quality.soundAlike,
     perLanguage: Object.fromEntries(
-      narration.languages.map((language) => [
+      project.languages.map((language) => [
         language,
         {
           pronounce: cast ? Object.entries(pronounceOf(cast, language, source)) : null,
-          soundAlike: soundAlikeOf(narration, language),
+          soundAlike: soundAlikeOf(project, language),
         },
       ]),
     ),
     models: { draft: narration.models.draft, final: narration.models.final },
     speed: narration.tts.speed,
-    takeFade: project.takeFade ?? DEFAULT_TAKE_FADE,
+    takeFade: settings.takeFade ?? DEFAULT_TAKE_FADE,
     projectFile,
     music,
     images,

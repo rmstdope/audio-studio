@@ -529,7 +529,7 @@ describe("an effect's page", () => {
 
   it('keeps what was typed and says why when saving fails', async () => {
     const problems = [
-      { file: '.content-studio/effects.json', path: '', message: 'permission denied' },
+      { file: 'content-studio/cache/effects.json', path: '', message: 'permission denied' },
     ]
     const { container, text, settle } = render(page('door-creak'), effects(), () =>
       Response.json({ ok: false, problems }, { status: 409 }),
@@ -572,7 +572,9 @@ describe("an effect's page", () => {
 
   it('says why Keep mine did not work', async () => {
     const rows = [row('door-creak', { changedHere: true, gameChanged: true })]
-    const problems = [{ file: '.content-studio/effects.json', path: '', message: 'disk is full' }]
+    const problems = [
+      { file: 'content-studio/cache/effects.json', path: '', message: 'disk is full' },
+    ]
     const { text, button, settle } = render(page('door-creak'), effects({ rows }), () =>
       Response.json({ ok: false, problems }, { status: 409 }),
     )

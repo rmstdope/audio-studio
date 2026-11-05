@@ -31,7 +31,7 @@ describe('the image models health', () => {
     const file = join(root, 'content-studio.json')
     await createImageHealth().record(file, 'klein', failure)
     expect((await createImageHealth().read(file)).klein?.error).toBe(failure.error)
-    expect(existsSync(join(root, '.content-studio/image-model-health.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/cache/image-model-health.json'))).toBe(true)
   })
 
   it('writes nothing when there is nothing to clear, and reads a broken file as no failures', async () => {
@@ -39,15 +39,15 @@ describe('the image models health', () => {
     const file = join(root, 'content-studio.json')
     const health = createImageHealth()
     await health.clear(file, 'klein')
-    expect(existsSync(join(root, '.content-studio/image-model-health.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/cache/image-model-health.json'))).toBe(false)
     await health.record(file, 'klein', failure)
-    writeFileSync(join(root, '.content-studio/image-model-health.json'), '{nope')
+    writeFileSync(join(root, 'content-studio/cache/image-model-health.json'), '{nope')
     expect(await health.read(file)).toEqual({})
     // A broken file is replaced by the next record, not kept.
     await health.record(file, 'klein', failure)
     expect(
-      JSON.parse(readFileSync(join(root, '.content-studio/image-model-health.json'), 'utf8')).models
-        .klein.take,
+      JSON.parse(readFileSync(join(root, 'content-studio/cache/image-model-health.json'), 'utf8'))
+        .models.klein.take,
     ).toBe(3)
   })
 })

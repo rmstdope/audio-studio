@@ -638,7 +638,7 @@ export function startServer({
    */
   async function languageFor(request: Request): Promise<string | undefined> {
     const opened = await openProject(projectFile)
-    return opened.ok ? declaredLanguage(opened.project.narration, languageOf(request)) : undefined
+    return opened.ok ? declaredLanguage(opened.project, languageOf(request)) : undefined
   }
 
   /** Fish TTS requests (audition takes and lines alike): `quality.parallel` at a time, each once. */
@@ -668,7 +668,7 @@ export function startServer({
   async function busyNow(): Promise<Busy | null> {
     const opened = await openProject(projectFile)
     if (!opened.ok) return null
-    const { parts } = opened.project.narration
+    const { parts } = opened.project
     const titleOf = (id: string) => parts.find((p) => p.id === id)?.title ?? id
     const underway = (kind: 'part' | 'character') =>
       [...going.keys()].find((key) => key.startsWith(`${kind}:`))?.slice(kind.length + 1)
@@ -1119,7 +1119,8 @@ export function startServer({
     if (!read) return null
     if (!read.ok) return read
     if (read.problems.length) return { ok: false as const, problems: read.problems }
-    const { narration } = read.project
+    const { project } = read
+    const { narration } = project
     // Without a final step for its voices (one model for both, on each one's provider), the final
     // plan is the draft one.
     const stage: 'draft' | 'final' =
@@ -1173,7 +1174,7 @@ export function startServer({
       parallel: narration.quality.parallel,
       stage,
       // Recording is in the source language.
-      language: narration.languages[0] ?? 'en',
+      language: project.languages[0] ?? 'en',
     }
   }
 
