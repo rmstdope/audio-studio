@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { rm } from 'node:fs/promises'
+import { rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
   MUSIC_MODEL,
@@ -32,7 +32,15 @@ import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { movedBoardTake } from '../core/musicMove'
 import { TAKES_EACH, planMakeAll } from '../core/musicMakeAll'
-import { readWav } from '../core/wav'
+import {
+  NOTHING_LINE,
+  SILENT_LINE,
+  findTrim,
+  trimWav,
+  trimmedSeconds,
+  type Trim,
+} from '../core/musicTrim'
+import { readWav, writeWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
 import { gpuQueue, holdGpu, GPU } from './gpu'
@@ -97,6 +105,9 @@ export type StopAllResult =
 
 /** What choosing a take answered; null for a track the project does not list. */
 export type ChooseResult = CommitResult | null
+
+/** What trimming or untrimming a take answered; null for a track the project does not list. */
+export type TrimResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
 
 /** A track's takes as the page shows them, a project failure, or null for an unknown track. */
 export type TakesResult = MusicTakesView | ProjectFailure | null
@@ -213,6 +224,14 @@ export interface MusicTakes {
    * list is being refreshed from the game.
    */
   move(projectFile: string, id: string, name: string, toId: string): Promise<MoveResult>
+  /**
+   * Cuts the near-silent start and end of a stinger take (or, with `undo`, gives it back as
+   * generated). The WAV stays as generated; the cut is kept on the board. A take that is the one in
+   * the game has the game's file rewritten first, and nothing changes if that fails.
+   */
+  trim(projectFile: string, id: string, name: string, undo: boolean): Promise<TrimResult>
+  /** A trimmed take's sound between its cuts as a WAV; null for a take that is not trimmed. */
+  trimmedSound(projectFile: string, id: string, name: string): Promise<Uint8Array | null>
   /** What is being made in the project, by track, for the lists' status. */
   making(projectFile: string): Promise<Record<string, MusicMakingSummary>>
   /** The path of a take's WAV, or null for a track not listed or a name that is not a take's. */
@@ -239,6 +258,18 @@ interface StoredBatch extends Omit<MusicBatch, 'running'> {
 
 /** A take's file name on the board. */
 const fileOf = (take: Pick<BoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.wav`
+
+/**
+ * What the game plays of a take: its WAV between the cuts if it was trimmed, and the take as the
+ * board should hand it to the encoder, with the length that is left.
+ */
+function playedOf(take: BoardTake, bytes: Uint8Array): { take: BoardTake; wav: Uint8Array } {
+  if (!take.trim) return { take, wav: bytes }
+  return {
+    take: { ...take, seconds: trimmedSeconds(take.seconds, take.trim) },
+    wav: writeWav(trimWav(readWav(bytes), take.trim)),
+  }
+}
 
 /**
  * The takes of the game's music: made by `generator` on the GPU `queue` (shared with Whisper),
@@ -280,6 +311,26 @@ export function createMusicTakes({
   let pressing: StoredBatch | null = null
   // Changes to one track's board, one after another: a take finishing and a drop lose neither.
   const boards = boardQueue()
+  // What a stinger take has to cut, by its file's path, size and time, so a poll reads no WAV again.
+  const scans = new Map<string, NonNullable<TakeView['trimmable']>>()
+
+  /** What the WAV at `path` has to cut. */
+  async function scan(path: string): Promise<NonNullable<TakeView['trimmable']> | null> {
+    const file = Bun.file(path)
+    // The time to the nanosecond, so a sound written again at once is not taken for the one before.
+    const { size, mtimeMs, ctimeMs } = await stat(path)
+    const key = `${path}\0${size}\0${mtimeMs}\0${ctimeMs}`
+    const known = scans.get(key)
+    if (known) return known
+    try {
+      const found = findTrim(readWav(new Uint8Array(await file.arrayBuffer())))
+      const answer = found.kind === 'cut' ? 'cut' : found.kind
+      scans.set(key, answer)
+      return answer
+    } catch {
+      return null
+    }
+  }
 
   async function resolve(projectFile: string, id: string) {
     if (!SAFE_ID.test(id)) return null
@@ -448,7 +499,9 @@ export function createMusicTakes({
       const chosen = chosenTracks?.[id]?.lock
       const takes: TakeView[] = []
       for (const take of board.takes) {
-        if (!(await Bun.file(join(root, folder, fileOf(take))).exists())) continue
+        const path = join(root, folder, fileOf(take))
+        if (!(await Bun.file(path).exists())) continue
+        const trimmable = inputs.kind === 'stinger' && !take.trim ? await scan(path) : null
         takes.push({
           n: take.n,
           file: fileOf(take),
@@ -459,6 +512,10 @@ export function createMusicTakes({
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
           model: modelLine(take.model),
           ...(take.movedFrom && { movedFrom: take.movedFrom }),
+          ...(take.trim && {
+            trim: { ...take.trim, seconds: trimmedSeconds(take.seconds, take.trim) },
+          }),
+          ...(trimmable && { trimmable }),
         })
       }
       const making: MakingView[] = entries
@@ -749,17 +806,84 @@ export function createMusicTakes({
         } catch {
           return { ok: false, message: 'That take’s sound is gone, so it cannot be chosen.' }
         }
+        const played = playedOf(take, wav)
         return commitChoice({
           root: found.root,
           projectFile,
           music: found.music,
           id,
           listId: found.listId,
-          take,
-          wav,
+          take: played.take,
+          wav: played.wav,
           encode,
         })
       })
+    },
+
+    async trim(projectFile, id, name, undo) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      if (found.inputs.kind !== 'stinger') {
+        return { ok: false, message: 'Only a stinger’s take can be trimmed.' }
+      }
+      return changeBoard(projectFile, found, async (board): Promise<TrimResult> => {
+        const take = board.takes.find((t) => fileOf(t) === name)
+        if (!take) return { ok: false, message: 'That take is not on the board.' }
+        let bytes: Uint8Array
+        try {
+          bytes = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
+        } catch {
+          return { ok: false, message: 'The take’s sound file could not be read.' }
+        }
+        let trim: Trim | undefined
+        if (undo) {
+          if (!take.trim) return { ok: false, message: 'That take is not trimmed.' }
+        } else {
+          const finding = findTrim(readWav(bytes))
+          if (finding.kind === 'nothing') return { ok: false, message: NOTHING_LINE }
+          if (finding.kind === 'silent') return { ok: false, message: SILENT_LINE }
+          trim = { start: finding.start, end: finding.end }
+        }
+        const { trim: _was, ...rest } = take
+        const next: BoardTake = trim ? { ...rest, trim } : rest
+        const problems: Problem[] = []
+        const chosenTracks = await readChosen(found.root, found.music, problems)
+        if (!chosenTracks || problems.length) {
+          return { ok: false, message: 'The music lock could not be read.' }
+        }
+        const chosen = chosenTracks[id]?.lock
+        if (chosen?.take === take.n && chosen.fp === take.hash) {
+          const played = playedOf(next, bytes)
+          const committed = await commitChoice({
+            root: found.root,
+            projectFile,
+            music: found.music,
+            id,
+            listId: found.listId,
+            take: played.take,
+            wav: played.wav,
+            encode,
+          })
+          if (!committed.ok) {
+            return 'message' in committed
+              ? { ok: false, message: committed.message }
+              : { ok: false, message: `${committed.file} could not be read` }
+          }
+        }
+        board.takes = board.takes.map((t) => (t === take ? next : t))
+        return { ok: true }
+      })
+    },
+
+    async trimmedSound(projectFile, id, name) {
+      const path = await api.takeFile(projectFile, id, name)
+      const found = await resolve(projectFile, id)
+      if (!path || !found || !('inputs' in found)) return null
+      const board = await readBoard(found.root, found.board)
+      if ('ok' in board) return null
+      const take = board.takes.find((t) => fileOf(t) === name)
+      if (!take?.trim) return null
+      return playedOf(take, new Uint8Array(await Bun.file(path).arrayBuffer())).wav
     },
 
     async unchoose(projectFile, id) {

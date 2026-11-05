@@ -21,7 +21,12 @@ import type { BriefChange } from '../core/music'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
 import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
-import type { MakeAllResult, ModelStateResult, MusicBatch } from '../services/musicTakes'
+import type {
+  MakeAllResult,
+  ModelStateResult,
+  MusicBatch,
+  TrimResult,
+} from '../services/musicTakes'
 import type {
   ChooseResult,
   DropResult,
@@ -1181,6 +1186,31 @@ export function useChooseTake(trackId: string) {
         throw new Error(`choosing the take answered ${response.status}`)
       }
       return (await response.json()) as NonNullable<ChooseResult>
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['project'] })
+      return client.invalidateQueries({ queryKey: ['music-takes', trackId] })
+    },
+  })
+}
+
+/**
+ * Trims a stinger take's near-silence (or, with `undo`, gives the take back as generated), then
+ * reloads the track's takes and the project, since the take in the game may have been rewritten.
+ */
+export function useTrimTake(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: { file: string; undo: boolean }) => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/trim`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`trimming the take answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<TrimResult>
     },
     onSettled: () => {
       void client.invalidateQueries({ queryKey: ['project'] })

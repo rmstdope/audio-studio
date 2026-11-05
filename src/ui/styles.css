@@ -3439,6 +3439,28 @@ button.cue-chip[aria-expanded='true'] {
   border-left: 1px dashed var(--warn);
   pointer-events: none;
 }
+.wave i.cut {
+  opacity: 0.35;
+}
+.wave .cutzone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, var(--line-strong) 0 2px, transparent 2px 6px);
+  border-left: 1px dashed var(--line-strong);
+  border-right: 1px dashed var(--line-strong);
+  pointer-events: none;
+}
+.take-tag {
+  font-size: 11px;
+  color: var(--accent-soft-ink);
+  background: var(--accent-soft-bg);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.take-actions {
+  flex-wrap: wrap;
+}
 .wave .playhead {
   position: absolute;
   top: -4px;

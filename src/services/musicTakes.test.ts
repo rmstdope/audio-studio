@@ -73,6 +73,7 @@ function setup(
   gate?: Promise<void>,
   missing: string[] = [],
   seedless = false,
+  encoder?: Encoder,
 ) {
   const root = tempRepo({
     'content-studio.json': projectJson({ music }),
@@ -89,7 +90,7 @@ function setup(
   }
   const takes = createMusicTakes({
     generator,
-    encode,
+    encode: encoder ?? encode,
     queue: createSerial(),
     now: () => 0,
     newSeed: () => seed++,
@@ -1451,5 +1452,152 @@ describe('moving a take', () => {
     await m.takes.move(m.file, 'hall', one!.file, 'hut')
     expect(readdirSync(m.root).sort()).toEqual(before)
     expect(existsSync(join(m.root, 'music/music.lock.json'))).toBe(false)
+  })
+})
+
+describe('trimming a stinger take', () => {
+  /** A mono 1000 Hz WAV of a second of near-silence, four of sound and a second of near-silence. */
+  const padded = () => {
+    const samples = new Int16Array(6000)
+    samples.forEach((_, i) => {
+      samples[i] = i < 1000 ? (i % 2 ? 50 : -50) : i < 5000 ? (i % 2 ? 8000 : -8000) : 100
+    })
+    return writeWav({
+      format: { channels: 1, sampleRate: 1000, bitsPerSample: 16 },
+      data: new Uint8Array(samples.buffer),
+    })
+  }
+  const lists = {
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+    'tts/stingers.json': [
+      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
+      { id: 'defeat', title: 'Defeat', brief: 'sad', seconds: 6 },
+    ],
+  }
+  async function made(failEncode = false) {
+    const encoded: Uint8Array[] = []
+    let failing = failEncode
+    const encoder: Encoder = async (wav, out) => {
+      if (failing) throw new Error('the encoder broke')
+      encoded.push(wav)
+      mkdirSync(dirname(out), { recursive: true })
+      writeFileSync(out, `mp3 ${encoded.length}`)
+    }
+    const m = setup(undefined, lists, [], undefined, [], false, encoder)
+    await m.takes.make(m.file, 'victory', { count: 2 })
+    await m.settled('victory')
+    const folder = join(m.root, '.content-studio/music-takes/victory')
+    for (const name of readdirSync(folder)) writeFileSync(join(folder, name), padded())
+    return { ...m, encoded, folder, fail: (on: boolean) => (failing = on) }
+  }
+  type Made = Awaited<ReturnType<typeof made>>
+  const viewOf = async (m: Made, id = 'victory') => {
+    const view = await m.takes.view(m.file, id)
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    return view
+  }
+  const lockOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+  const manifestOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8'))
+
+  it('says what a stinger take has to cut, and a loop never does', async () => {
+    const m = await made()
+    expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
+    expect((await viewOf(m)).takes[0]).not.toHaveProperty('trim')
+    await m.takes.make(m.file, 'hall', { count: 1 })
+    await m.settled('hall')
+    const loop = (await viewOf(m, 'hall')).takes[0]!
+    expect(loop).not.toHaveProperty('trimmable')
+  })
+
+  it('says nothing to cut, and silent, from the take’s own sound', async () => {
+    const m = await made()
+    const [one, two] = (await viewOf(m)).takes
+    const flat = (level: number) =>
+      writeWav({
+        format: readWav(padded()).format,
+        data: new Uint8Array(new Int16Array(6000).fill(level).buffer),
+      })
+    writeFileSync(join(m.folder, one!.file), flat(8000))
+    writeFileSync(join(m.folder, two!.file), flat(40))
+    const view = await viewOf(m)
+    expect(view.takes.map((t) => t.trimmable)).toEqual(['nothing', 'silent'])
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toMatchObject({ ok: false })
+    expect(await m.takes.trim(m.file, 'victory', two!.file, false)).toMatchObject({ ok: false })
+  })
+
+  it('keeps the cut with the take, leaves its sound as generated, and undoes it', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    const before = readFileSync(join(m.folder, one!.file))
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    const trimmed = (await viewOf(m)).takes[0]!
+    expect(trimmed.seconds).toBe(6)
+    expect(trimmed.trim!.start).toBeCloseTo(0.95, 3)
+    expect(trimmed.trim!.end).toBeCloseTo(0.95, 3)
+    expect(trimmed.trim!.seconds).toBeCloseTo(4.1, 3)
+    expect(trimmed).not.toHaveProperty('trimmable')
+    expect(readFileSync(join(m.folder, one!.file)).equals(before)).toBe(true)
+    const sound = await m.takes.trimmedSound(m.file, 'victory', one!.file)
+    expect(wavSeconds(readWav(sound!))).toBeCloseTo(4.1, 3)
+    expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual({ ok: true })
+    expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
+  })
+
+  it('refuses a loop, and a take that is not there', async () => {
+    const m = await made()
+    await m.takes.make(m.file, 'hall', { count: 1 })
+    await m.settled('hall')
+    const loop = (await viewOf(m, 'hall')).takes[0]!
+    expect(await m.takes.trim(m.file, 'hall', loop.file, false)).toMatchObject({ ok: false })
+    expect(await m.takes.trim(m.file, 'victory', 'nope.wav', false)).toMatchObject({ ok: false })
+  })
+
+  it('writes the trimmed sound and length into the game when a trimmed take is chosen', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.trim(m.file, 'victory', one!.file, false)
+    expect(await m.takes.choose(m.file, 'victory', one!.file)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(m.encoded[0]!))).toBeCloseTo(4.1, 3)
+    expect(manifestOf(m.root).victory.duration).toBeCloseTo(4.1, 1)
+  })
+
+  it('rewrites the game’s file at once when the take in the game is trimmed and untrimmed', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    expect(wavSeconds(readWav(m.encoded[0]!))).toBeCloseTo(6, 3)
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(m.encoded[1]!))).toBeCloseTo(4.1, 3)
+    expect(manifestOf(m.root).victory.duration).toBeCloseTo(4.1, 1)
+    expect((await viewOf(m)).takes[0]).toMatchObject({ chosen: true })
+    expect(lockOf(m.root).victory).toMatchObject({ take: 1 })
+    expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(m.encoded[2]!))).toBeCloseTo(6, 3)
+    expect(manifestOf(m.root).victory.duration).toBe(6)
+    expect((await viewOf(m)).takes[0]).toMatchObject({ chosen: true, trimmable: 'cut' })
+  })
+
+  it('changes neither the take nor the game’s file when the game’s file cannot be written', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    m.fail(true)
+    const answer = await m.takes.trim(m.file, 'victory', one!.file, false)
+    expect(answer).toMatchObject({ ok: false, message: 'the encoder broke' })
+    expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
+    expect(readFileSync(join(m.root, 'audio/music/victory.mp3'), 'utf8')).toBe('mp3 1')
+    expect(manifestOf(m.root).victory.duration).toBe(6)
+  })
+
+  it('keeps the trim on a take moved to another stinger', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.trim(m.file, 'victory', one!.file, false)
+    expect(await m.takes.move(m.file, 'victory', one!.file, 'defeat')).toMatchObject({ ok: true })
+    const moved = (await viewOf(m, 'defeat')).takes[0]!
+    expect(moved.trim!.seconds).toBeCloseTo(4.1, 3)
+    expect(await m.takes.trim(m.file, 'defeat', moved.file, true)).toEqual({ ok: true })
   })
 })

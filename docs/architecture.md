@@ -979,10 +979,24 @@ the page can be left meanwhile; **Drop** removes one (not the chosen one); **Cho
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
 `.content-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed?,
-seconds, peaks, inputs, model }] }` (`model` is the recipe of the music model that made the take, which Choose records in the lock; a board without it is read as Balanced, the only model there was), the take's WAV beside the others in `music-takes/<track>/`. Take
+seconds, peaks, inputs, model, movedFrom?, trim? }] }` (`model` is the recipe of the music model that made the take, which Choose records in the lock; a board without it is read as Balanced, the only model there was), the take's WAV beside the others in `music-takes/<track>/`. Take
 numbers are per track and never reused (`next` is reserved when takes are asked for), and a take
 is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
 seeds don't come back, so nothing is ruled out.
+
+**Trim silence** (built, as-k7i.1; stingers only, not loops): every stinger take card, and the take in the In
+the game block, has **Trim silence** at the left of its bottom row. One press cuts the near-silent start and
+end of the take (`core/musicTrim.ts`: samples at or under 300 of 32768, the level a stinger's last sound is
+found by, count as near-silence; 0.05 s of lead-in is kept at each cut, and a side with under 0.05 s to cut
+is left alone; "nothing to cut" and "near-silent throughout" grey the button with the reason). The take's WAV
+stays as generated; the cut is kept on its board entry as `trim: { start, end }` (seconds cut from each end),
+so it survives a reload and travels with Move…, and **Undo trim** removes it. The view carries `trim` (with the
+length left) or `trimmable` (`cut`, `nothing`, `silent`, scanned once per file and cached in memory); the card
+shows the waveform at its full width with the cut ends hatched, the new length (m:ss.s), a "trimmed" tag and a
+line saying what went from each end. Play uses `GET …/takes/:file?trimmed=1`, the part between the cuts.
+**Choose** cuts the WAV before encoding, so the game's file holds the trimmed sound and the manifest the
+trimmed duration; Trim silence and Undo trim on the take already in the game re-commit it (the same
+`commitChoice`) first and write the board only if that worked, so a failure leaves both as they were.
 
 **Move a take** (built, as-824): a take that is made, not chosen and not dropped can be moved to another track of
 the same kind (loop to loop in any act, stinger to stinger) from the **Move…** button on its card, which opens a
@@ -2081,6 +2095,7 @@ POST   /api/music/tracks/:id/choose              { file } make a take the track'
 POST   /api/music/tracks/:id/remove              remove an orphan's music: clip, manifest, lock, board, takes, brief changes (404 if it is not one)
 GET    /api/music/clips/:file                    a music clip (a plain .mp3 in the music clips folder)
 POST   /api/music/tracks/:id/stop                stop the takes: the one being made ends and is discarded, the waiting ones are cancelled
+POST   /api/music/tracks/:id/trim                { file, undo? } cut the near-silence of a stinger take, or give it back as generated; rewrites the game's file when it is the one in the game (409 and why if it cannot)
 POST   /api/music/tracks/:id/move                { file, to } move a take to the track `to` of the same kind: `{ ok, n }` its new number (409 and why if it cannot)
 DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
 GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
@@ -2422,6 +2437,8 @@ Small, independently useful increments:
         that can be un-chosen (§8.5).
     13. **Move a take** (built, as-824): Move… on a take card moves it to another loop in any act, or
         another stinger, counted as made for the track it joins (§8.5).
+        13a. **Trim silence on a stinger take** (built, as-k7i.1): one press cuts the near-silent start and end,
+        kept with the take and written into the game's file when the take is chosen (§8.5).
     14. **Make takes for every track with no chosen take** (built, as-23x.1): one press on an act's or the
         Stingers page makes four takes for every track with no chosen take, on the project's model (§8.5).
     15. **The same press on the Stingers page** (built, as-23x.2): the page says "stinger", and Refresh from
