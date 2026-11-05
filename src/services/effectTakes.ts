@@ -583,7 +583,6 @@ export function createEffectTakes({
         acceptEffect({
           root: found.root,
           projectFile,
-          effects: found.effects,
           id,
           now: found.inputs,
         }),

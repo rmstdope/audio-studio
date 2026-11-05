@@ -5461,21 +5461,18 @@ describe('the image model routes', () => {
 })
 
 describe('server, the sound effects', () => {
-  const list = JSON.stringify([{ id: 'coins', description: 'Coins spill', seconds: 0.5 }])
+  const list = JSON.stringify([{ id: 'coins', text: 'Coins spill', seconds: 0.5 }])
   const effectsRoot = tempRepo({
     'content-studio.json': projectJson({
       refresh: { shared: `printf '%s' '${list}' > tts/effects.json` },
       effects: {
-        paths: {
-          list: 'tts/effects.json',
-          lock: 'audio/effects.lock.json',
-          clips: 'audio/effects',
-          manifest: 'audio/effects/manifest.json',
-        },
+        from: { shared: 'tts/effects.json' },
+        clips: 'audio/effects',
+        manifest: 'audio/effects/manifest.json',
       },
     }),
     'content-studio/narration/cast.json': { speakers: {} },
-    'tts/effects.json': [{ id: 'coins', description: 'Coins spill', seconds: 0.5 }],
+    'tts/effects.json': [{ id: 'coins', text: 'Coins spill', seconds: 0.5 }],
   })
   const studio = startServer({
     projectFile: join(effectsRoot, 'content-studio.json'),
@@ -5549,18 +5546,17 @@ describe('server, the sound effects', () => {
 
 describe('server, sound effect takes', () => {
   const effectsPaths = {
-    list: 'tts/effects.json',
-    lock: 'audio/effects.lock.json',
+    from: { shared: 'tts/effects.json' },
     clips: 'audio/effects',
     manifest: 'audio/effects/manifest.json',
   }
   const effectsRoot = tempRepo({
-    'content-studio.json': projectJson({ effects: { paths: effectsPaths } }),
+    'content-studio.json': projectJson({ effects: effectsPaths }),
     'content-studio/narration/cast.json': { speakers: {} },
     'tts/effects.json': [
-      { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
-      { id: 'door-creak', description: 'A door creaks', seconds: 3 },
-      { id: 'wind', description: 'Wind howls', seconds: 6, loops: true },
+      { id: 'coins', text: 'Coins spill on stone', seconds: 0.5 },
+      { id: 'door-creak', text: 'A door creaks', seconds: 3 },
+      { id: 'wind', text: 'Wind howls', seconds: 6, loops: true },
     ],
   })
   const studio = startServer({

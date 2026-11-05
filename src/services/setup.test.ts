@@ -404,16 +404,13 @@ describe('checkSetup: the sound-effect models', () => {
   const effectsProject = (extra: Record<string, unknown> = {}) =>
     projectJson({
       effects: {
-        paths: {
-          list: 'tts/effects.json',
-          lock: 'audio/effects.lock.json',
-          clips: 'audio/effects',
-          manifest: 'audio/effects/manifest.json',
-        },
+        from: { shared: 'tts/effects.json' },
+        clips: 'audio/effects',
+        manifest: 'audio/effects/manifest.json',
         ...extra,
       },
     })
-  const listed = [{ id: 'chest-open', description: 'A chest opens', seconds: 2 }]
+  const listed = [{ id: 'chest-open', text: 'A chest opens', seconds: 2 }]
   const row = async (
     machine: Machine,
     downloads: Partial<Record<EffectModelId, ImageDownload>>,

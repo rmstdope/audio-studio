@@ -267,16 +267,16 @@ async function refreshEffectsList(
     }
   }
   const root = dirname(projectFile)
-  const before = await readEffectsList(root, effects.paths.list)
+  const before = await readEffectsList(root, effects.from.shared)
   const run = await shell(command, root, timeoutMs)
   if (!run.ok) return { ok: false, reason: 'failed', message: run.message, output: run.output }
 
-  const after = await readEffectsList(root, effects.paths.list)
+  const after = await readEffectsList(root, effects.from.shared)
   if (after.status !== 'ok') {
     const problems =
       after.status === 'invalid'
         ? after.problems
-        : [{ file: effects.paths.list, path: '', message: 'the command wrote no effects file' }]
+        : [{ file: effects.from.shared, path: '', message: 'the command wrote no effects file' }]
     return { ok: false, problems, output: run.output }
   }
   const was: EffectEntry[] | null =

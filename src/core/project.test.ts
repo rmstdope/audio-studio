@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
 import { narrationInLanguages, projectJson } from '../../test/helpers'
 import {
+  EFFECTS_EDITS_FILE,
+  EFFECTS_LOCK_FILE,
   IMAGES_EDITS_FILE,
   IMAGES_LOCK_FILE,
   CAST_FILE,
@@ -590,47 +592,68 @@ describe('problemsFrom wording', () => {
 })
 
 describe('the effects section', () => {
-  const effectPaths = {
-    list: 'tts/effects.json',
-    lock: 'audio/effects.lock.json',
+  const section = (extra: Record<string, unknown> = {}) => ({
+    from: { shared: 'tts/effects.json' },
     clips: 'audio/effects',
     manifest: 'audio/effects/manifest.json',
-  }
-  const effects = (paths: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
-    projectJson({ effects: { paths: { ...effectPaths, ...paths }, ...extra } })
+    ...extra,
+  })
+  const effects = (extra: Record<string, unknown> = {}) => projectJson({ effects: section(extra) })
 
   it('names the main effects model, Small SFX when absent', () => {
     expect(parse(effects()).data!.effects!.model).toBeUndefined()
-    expect(parse(effects({}, { model: 'open-1' })).data!.effects!.model).toBe('open-1')
-    expect(parse(effects({}, { model: 'other' })).success).toBe(false)
+    expect(parse(effects({ model: 'open-1' })).data!.effects!.model).toBe('open-1')
+    expect(problems(effects({ model: 'other' })).map((p) => p.path)).toEqual(['effects.model'])
   })
 
   it('is optional', () => {
     expect(parse(projectJson()).data!.effects).toBeUndefined()
   })
 
-  it('accepts the list, lock, clips and manifest paths', () => {
+  it("names the game's one list, the clips folder and the manifest", () => {
     const result = parse(effects())
     expect(result.success).toBe(true)
-    expect(result.data!.effects).toEqual({ paths: effectPaths })
+    expect(result.data!.effects).toEqual(section())
   })
 
-  it('needs the lock, clips and manifest paths the game reads', () => {
-    const bare = projectJson({ effects: { paths: { list: 'tts/effects.json' } } })
-    expect(problems(bare).map((p) => p.path)).toEqual([
-      'effects.paths.lock',
-      'effects.paths.clips',
-      'effects.paths.manifest',
-    ])
+  it('needs the shared list, the clips folder and the manifest', () => {
+    expect(problems(effects({ from: {} })).map((p) => p.path)).toEqual(['effects.from.shared'])
+    const { clips: _clips, manifest: _manifest, ...rest } = section()
+    const found = problems(projectJson({ effects: rest }))
+    expect(found.map((p) => p.path).sort()).toEqual(['effects.clips', 'effects.manifest'])
   })
 
-  it('refuses {language} and {part} in the list path: the list is for the whole game', () => {
-    expect(problems(effects({ list: 'tts/{part}/effects.json' }))[0]!.path).toBe(
-      'effects.paths.list',
-    )
-    expect(problems(effects({ list: '{language}/effects.json' }))[0]!.path).toBe(
-      'effects.paths.list',
-    )
+  it('takes no list per part: sound effects are for the whole game', () => {
+    const found = problems(effects({ from: { part: 'tts/{part}/effects.json' } }))
+    expect(found.map((p) => p.path)).toEqual(['effects.from.shared'])
+  })
+
+  it('refuses {language} and {part} in any effects path', () => {
+    for (const [field, value] of [
+      ['from', { shared: 'tts/{part}/effects.json' }],
+      ['from', { shared: '{language}/effects.json' }],
+      ['clips', 'audio/{part}'],
+      ['manifest', 'audio/{language}/manifest.json'],
+    ] as const) {
+      const found = problems(effects({ [field]: value }))
+      expect(found.map((p) => p.path)).toEqual([
+        field === 'from' ? 'effects.from.shared' : `effects.${field}`,
+      ])
+    }
+  })
+
+  it('refuses the paths of the format before version 2', () => {
+    const old = projectJson({
+      effects: {
+        paths: { list: 'tts/effects.json', lock: 'a.json', clips: 'a', manifest: 'a/m.json' },
+      },
+    })
+    expect(problems(old).map((p) => p.path)).toContain('effects.from')
+  })
+
+  it('keeps the edits and the lock at fixed places in the studio folder', () => {
+    expect(EFFECTS_EDITS_FILE).toBe('content-studio/effects/edits.json')
+    expect(EFFECTS_LOCK_FILE).toBe('content-studio/effects/lock.json')
   })
 })
 

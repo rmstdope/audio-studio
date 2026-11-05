@@ -437,6 +437,19 @@
     "effects": {
       "type": "object",
       "properties": {
+        "from": {
+          "type": "object",
+          "properties": {
+            "shared": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "shared"
+          ],
+          "additionalProperties": false
+        },
         "model": {
           "type": "string",
           "enum": [
@@ -444,37 +457,19 @@
             "open-1"
           ]
         },
-        "paths": {
-          "type": "object",
-          "properties": {
-            "list": {
-              "type": "string",
-              "minLength": 1
-            },
-            "lock": {
-              "type": "string",
-              "minLength": 1
-            },
-            "clips": {
-              "type": "string",
-              "minLength": 1
-            },
-            "manifest": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "list",
-            "lock",
-            "clips",
-            "manifest"
-          ],
-          "additionalProperties": false
+        "clips": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
-        "paths"
+        "from",
+        "clips",
+        "manifest"
       ],
       "additionalProperties": false
     },

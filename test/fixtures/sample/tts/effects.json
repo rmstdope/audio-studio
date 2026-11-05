@@ -1,22 +1,23 @@
 [
   {
     "id": "door-creak",
-    "description": "A slow wooden door creaks open",
+    "text": "A slow wooden door creaks open",
     "seconds": 3
   },
   {
     "id": "coins",
-    "description": "A handful of coins spills on stone",
+    "text": "A handful of coins spills on stone",
     "seconds": 0.5
   },
   {
     "id": "wind-howl",
-    "description": "Wind howls through a stone gap",
+    "text": "Wind howls through a stone gap",
     "seconds": 10
   },
   {
     "id": "rain",
-    "description": "Steady rain on a tin roof",
+    "title": "Rain",
+    "text": "Steady rain on a tin roof",
     "seconds": 8,
     "loops": true
   }

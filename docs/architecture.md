@@ -54,6 +54,7 @@ retroquest/                      ← user runs `content-studio` here
 │   └── narration/               ← cast.json (the cast), act1.edits.json (an act's cues), act1.lock.json (what its clips were made from)
 │   └── music/                   ← edits.json (the studio's changes to the tracks), lock.json (the chosen take of each track)
 │   └── images/                  ← edits.json (the style and the studio's changes to the images), lock.json (the chosen take of each image)
+│   └── effects/                 ← edits.json (the studio's rewordings of the sound effects), lock.json (the chosen take of each effect)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
 │   └── music.json               ← the act's loops, from the game (read; built, §8.5)
@@ -206,14 +207,14 @@ audio, network or disk.
 
 The format the studio is moving to, version 2, is described for the people who write the files in
 [docs/project-files.md](project-files.md) (epic as-6u9, §12 step 18), which is where the format of
-the project file's top level and of narration's, music's and images' files is described. This section and §6 say how the studio uses them, and
+the project file's top level and of narration's, music's, images' and sound effects' files is described. This section and §6 say how the studio uses them, and
 describe the files of the sections that have not moved yet; each step of the move takes its part
 out of them.
 
 `content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
 an id and a title. Its top level, the studio folder and the cache (as-6u9.2), the `narration`
-section (as-6u9.3), the `music` section (as-6u9.4) and the `images` section (as-6u9.5) are version 2; the other sections keep their shape until their own step moves
-them.
+section (as-6u9.3), the `music` section (as-6u9.4), the `images` section (as-6u9.5) and the `effects` section (as-6u9.6) are version 2; the `scenes` section keeps its shape until its own step moves
+it.
 
 ```json
 {
@@ -1660,15 +1661,15 @@ choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
 
 ```json
 "effects": {
+  "from": { "shared": "tts/effects.json" },
   "model": "small-sfx",
-  "paths": {
-    "list": "tts/effects.json",
-    "lock": "audio/effects.lock.json",
-    "clips": "audio/effects",
-    "manifest": "audio/effects/manifest.json"
-  }
+  "clips": "audio/effects",
+  "manifest": "audio/effects/manifest.json"
 }
 ```
+
+The format of the section, the list, the edits and the lock is in
+[docs/project-files.md](project-files.md) (as-6u9.6); this section says how the studio uses them.
 
 The `effects` section is optional; without it the page says how to add one. `model` is optional
 (`small-sfx`, the default, or `open-1`): the sound-effects model an effect's new takes start on,
@@ -1676,29 +1677,34 @@ saved from the Sound effects row of Setup's Models panel (`PUT /api/effect-model
 as `images.model` is), at once and with nothing asked, over a stale `was` refused (§8.8). The
 top-level `refresh.shared` (§5) is the game's command that writes the list, with the stingers, run
 in the project root only when the user clicks Refresh from the game (the consumer rules in
-CLAUDE.md name it). `paths.list` may contain neither
-`{part}` nor `{language}`. `lock`, `clips` and `manifest` (as-5wc.4) are required: where the studio
-writes what the game plays (§8.10); a section without them is a problem naming the path.
+CLAUDE.md name it). `from.shared` (the list), `clips` and `manifest` are required, and none of them
+may contain `{part}` or `{language}`; `clips` and `manifest` are where the studio writes what the
+game plays (§8.10). A section without one is a problem naming the path. The edits and the lock are
+not named: they are at fixed places, `content-studio/effects/edits.json` (`EFFECTS_EDITS_FILE`)
+and `content-studio/effects/lock.json` (`EFFECTS_LOCK_FILE`), both committed with the game.
 
-**The list** is `[{ "id", "description", "seconds", "loops"? }]` in the game's order, read only. `loops` is an optional
+**The list** is `[{ "id", "title"?, "text", "seconds", "loops"? }]` in the game's order, read only;
+the studio reads `text` as the effect's description (`EffectEntrySchema`) and calls it that in its
+pages and API. `loops` is an optional
 boolean (as-5wc.6): `true` marks an effect the game plays round and round (ambience); absent or `false`, it plays once. An id is a
 slug; `seconds` is positive and may be fractional. The list is read entry by entry
 (`readEffectEntries`): an entry with a problem, or an id used twice (both entries), is left out and
 reported with its file and place (`tts/effects.json at [2].seconds`), and the rest still show. A
-file that is not a list is unreadable as a whole. The name shown is made from the id ("door-creak"
-is "Door creak"); the game's list has none.
+file that is not a list is unreadable as a whole. The name shown is the `title` when the game gives
+one, else made from the id ("door-creak" is "Door creak").
 
-**The studio's descriptions** are kept in `content-studio/cache/effects.json` (the studio's own state,
-never the game's files), one line per effect: `{ "<id>": { "words", "gameWas" } }`. `gameWas` is the
-game's description the words were written over. From it the page derives, with nothing else stored,
+**The studio's descriptions** are the effects edits, `content-studio/effects/edits.json` (the
+studio's own file, committed with the game, never the game's list), one line per effect:
+`{ "<id>": { "text", "gameWas" } }`, every kind's rewording. `gameWas` is the game's description
+the text was written over. From it the page derives, with nothing else stored,
 that the game reworded an effect you changed (`gameWas` differs from the game's words now): the
 list shows a second tag and the effect's page a notice. **Keep mine** and changing your own words
 set `gameWas` to the game's present words, **Use the game's** drops the entry, so the flag goes only
 when decided and survives reloads. Saving an empty text, the game's own words or null drops the
 entry. The words of an effect the game dropped stay in the file, shown under the table with
 **Forget** (which asks first), and come back if the game lists the id again; an id whose entry is
-merely unreadable is not taken for dropped. A descriptions file that cannot be read is reported and
-never written over.
+merely unreadable is not taken for dropped. An edits file that cannot be read (an entry still
+written as `words`, say) is reported at its path and never written over.
 
 **Status** is §8.10's: the ring and the sidebar count the effects up to date, over the readable ones only.
 
@@ -1730,7 +1736,9 @@ one being made and the ones waiting.
 short and the game sets their volume) in the clips folder, written like a music clip: a hidden
 temporary file renamed in, then the manifest `{ effect: { file, duration } }` (the game's format, as
 music's), the lock last, in the project's one choice turn (`services/effectClips.ts`). The lock
-(`{ fp, model, seed, take, inputs: { description, seconds }, at }` per effect, one per line) records the
+(`content-studio/effects/lock.json`, `{ fp, model, seed, take, inputs: { text, seconds, loops? }, at }`
+per effect, one per line in id order through `formatEffectLock`, `text` read back as the
+description so the fingerprint and the comparison are as before) records the
 take's own inputs. **Un-choose** asks first, then deletes the manifest entry, the clip and the lock
 entry last; the take stays on the board. **Drop** removes a take that is not chosen, at once; a
 chosen take is refused (409).
@@ -2597,7 +2605,12 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
        and `partStyle`) and the lock (flat by id, `inputs` in the clear) at fixed places in
        `content-studio/images/`. The staleness keys and the cache are unchanged, so a converted
        game's images stay as they stood.
-    6. **Sound effects** (as-6u9.6): the list, the rewordings committed as edits, the lock.
+    6. **Sound effects** (as-6u9.6, built): the `effects` section (`from.shared`, `model`, `clips`,
+       `manifest`), effects' words as `text` with an optional `title` (the name shown), the
+       rewordings (`{ text, gameWas }`) moved from the gitignored cache into the committed edits,
+       and the lock (`inputs.text`) at fixed places in `content-studio/effects/`. The take hashes,
+       the boards and the takes in the cache are unchanged, so a converted game's effects stay as
+       they stood.
     7. **Scenes** (as-6u9.7): the declarations, the mix and the kept loudness as the scenes lock.
     8. **RetroQuest end to end** (as-6u9.8): the game and the studio shown working on the new files.
 

@@ -1,8 +1,8 @@
 import { dirname } from 'node:path'
 import { applyDescription, keepMine, type EffectOverrides } from '../core/effects'
-import type { Problem } from '../core/project'
+import { EFFECTS_EDITS_FILE, type Problem } from '../core/project'
 import { formatEntriesPerLine, writeAtomic, writeFailure } from './files'
-import { EFFECTS_OVERRIDES_FILE, readEffectOverrides, readEffects } from './effectsLists'
+import { readEffectOverrides, readEffects } from './effectsLists'
 import { createSerial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
@@ -37,13 +37,13 @@ function edit(
     try {
       await writeAtomic(
         root,
-        EFFECTS_OVERRIDES_FILE,
+        EFFECTS_EDITS_FILE,
         formatEntriesPerLine(change(overrides, gameWords)),
       )
     } catch (error) {
       return {
         ok: false,
-        problems: [{ file: EFFECTS_OVERRIDES_FILE, path: '', message: writeFailure(error) }],
+        problems: [{ file: EFFECTS_EDITS_FILE, path: '', message: writeFailure(error) }],
       }
     }
     return { ok: true }

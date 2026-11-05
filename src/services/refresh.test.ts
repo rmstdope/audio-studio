@@ -285,18 +285,15 @@ describe('refreshing the music lists', () => {
 })
 
 describe('refreshing the sound effects', () => {
-  const effect = (id: string) => ({ id, description: `${id} sound`, seconds: 2 })
+  const effect = (id: string) => ({ id, text: `${id} sound`, seconds: 2 })
   const withEffects = (shared?: string, files: Record<string, unknown> = {}) =>
     tempRepo({
       'content-studio.json': projectJson({
         refresh: { shared },
         effects: {
-          paths: {
-            list: 'tts/effects.json',
-            lock: 'audio/effects.lock.json',
-            clips: 'audio/effects',
-            manifest: 'audio/effects/manifest.json',
-          },
+          from: { shared: 'tts/effects.json' },
+          clips: 'audio/effects',
+          manifest: 'audio/effects/manifest.json',
         },
       }),
       'tts/.keep': '',
@@ -367,7 +364,7 @@ describe('refreshing the sound effects', () => {
 describe('the one shared command', () => {
   it('writes the stingers and the effects alike, and runs once at a time, whichever asked', async () => {
     const stinger = { id: 'victory', title: 'Victory', text: 'b', seconds: 5 }
-    const effect = { id: 'coins', description: 'coins sound', seconds: 2 }
+    const effect = { id: 'coins', text: 'coins sound', seconds: 2 }
     const command = [
       'echo start >> runs.txt',
       `printf '%s' '${JSON.stringify([stinger])}' > tts/stingers.json`,
@@ -384,12 +381,9 @@ describe('the one shared command', () => {
           manifest: 'audio/music/manifest.json',
         },
         effects: {
-          paths: {
-            list: 'tts/effects.json',
-            lock: 'audio/effects.lock.json',
-            clips: 'audio/effects',
-            manifest: 'audio/effects/manifest.json',
-          },
+          from: { shared: 'tts/effects.json' },
+          clips: 'audio/effects',
+          manifest: 'audio/effects/manifest.json',
         },
       }),
       'tts/.keep': '',

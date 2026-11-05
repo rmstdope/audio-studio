@@ -6,16 +6,13 @@ import { forgetEffect, keepMineEffect, setEffectDescription } from './effectWord
 import { loadWorkspace } from './workspace'
 
 const effects = {
-  paths: {
-    list: 'tts/effects.json',
-    lock: 'audio/effects.lock.json',
-    clips: 'audio/effects',
-    manifest: 'audio/effects/manifest.json',
-  },
+  from: { shared: 'tts/effects.json' },
+  clips: 'audio/effects',
+  manifest: 'audio/effects/manifest.json',
 }
 const list = [
-  { id: 'door-creak', description: 'A slow wooden door creaks', seconds: 3 },
-  { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
+  { id: 'door-creak', text: 'A slow wooden door creaks', seconds: 3 },
+  { id: 'coins', text: 'Coins spill on stone', seconds: 0.5 },
 ]
 
 function repo(files: Record<string, unknown> = {}) {
@@ -55,7 +52,7 @@ describe('reading the effects into the summary', () => {
 
   it('shows the readable effects and reports the others', async () => {
     const { file } = repo({
-      'tts/effects.json': [...list, { id: 'Bad', description: 'x', seconds: 1 }],
+      'tts/effects.json': [...list, { id: 'Bad', text: 'x', seconds: 1 }],
     })
     const s = await summary(file)
     expect(s.rows.map((r) => r.id)).toEqual(['door-creak', 'coins'])
@@ -70,25 +67,40 @@ describe('reading the effects into the summary', () => {
     expect((await summary(file)).problems).toHaveLength(3)
   })
 
-  it('reports a broken overrides file and shows the game’s words', async () => {
-    const { file } = repo({ 'content-studio/cache/effects.json': '[1]' })
+  it('reports a broken edits file and shows the game’s words', async () => {
+    const { file } = repo({ 'content-studio/effects/edits.json': '[1]' })
     const s = await summary(file)
     expect(s.rows[0]!.changedHere).toBe(false)
     const opened = await loadWorkspace(file)
     expect(
       opened.ok &&
-        opened.summary.problems.some((p) => p.file === 'content-studio/cache/effects.json'),
+        opened.summary.problems.some((p) => p.file === 'content-studio/effects/edits.json'),
     ).toBe(true)
+  })
+
+  it('reads a rewording as text with gameWas, and reports one written as words', async () => {
+    const mine = { 'door-creak': { text: 'Mine', gameWas: 'A slow wooden door creaks' } }
+    const { file } = repo({ 'content-studio/effects/edits.json': mine })
+    expect((await summary(file)).rows[0]).toMatchObject({ description: 'Mine', changedHere: true })
+    const old = { 'door-creak': { words: 'Mine', gameWas: 'A slow wooden door creaks' } }
+    const before = repo({ 'content-studio/effects/edits.json': old })
+    const opened = await loadWorkspace(before.file)
+    expect(opened.ok && opened.summary.problems).toContainEqual(
+      expect.objectContaining({
+        file: 'content-studio/effects/edits.json',
+        path: 'door-creak.text',
+      }),
+    )
   })
 })
 
 describe('setEffectDescription', () => {
-  it('keeps the studio’s words in content-studio/cache/effects.json and never writes the game’s list', async () => {
+  it('keeps the studio’s words in content-studio/effects/edits.json and never writes the game’s list', async () => {
     const { file, read } = repo()
     const before = read('tts/effects.json')
     expect(await setEffectDescription(file, 'coins', '  Coins on glass ')).toEqual({ ok: true })
-    expect(read('content-studio/cache/effects.json')).toBe(
-      '{\n "coins": {"words":"Coins on glass","gameWas":"Coins spill on stone"}\n}\n',
+    expect(read('content-studio/effects/edits.json')).toBe(
+      '{\n "coins": {"text":"Coins on glass","gameWas":"Coins spill on stone"}\n}\n',
     )
     expect(read('tts/effects.json')).toBe(before)
     expect((await summary(file)).rows[1]).toMatchObject({
@@ -102,7 +114,7 @@ describe('setEffectDescription', () => {
     for (const back of ['', 'Coins spill on stone', null]) {
       await setEffectDescription(file, 'coins', 'Mine')
       await setEffectDescription(file, 'coins', back)
-      expect(read('content-studio/cache/effects.json')).toBe('{}\n')
+      expect(read('content-studio/effects/edits.json')).toBe('{}\n')
     }
   })
 
@@ -111,22 +123,22 @@ describe('setEffectDescription', () => {
     expect(await setEffectDescription(file, 'nope', 'x')).toBeNull()
   })
 
-  it('refuses to write over an overrides file it cannot read', async () => {
-    const { file, read } = repo({ 'content-studio/cache/effects.json': '[1]' })
+  it('refuses to write over an edits file it cannot read', async () => {
+    const { file, read } = repo({ 'content-studio/effects/edits.json': '[1]' })
     const result = await setEffectDescription(file, 'coins', 'Mine')
     expect(result).toMatchObject({ ok: false })
-    expect(read('content-studio/cache/effects.json')).toBe('[1]')
+    expect(read('content-studio/effects/edits.json')).toBe('[1]')
   })
 })
 
 describe('the game rewording an effect you changed', () => {
-  const game = (description: string) => [{ ...list[0]!, description }, list[1]]
-  const mine = { 'door-creak': { words: 'Mine', gameWas: 'A slow wooden door creaks' } }
+  const game = (text: string) => [{ ...list[0]!, text }, list[1]]
+  const mine = { 'door-creak': { text: 'Mine', gameWas: 'A slow wooden door creaks' } }
 
   it('flags it, across reads, until Keep mine', async () => {
     const { file } = repo({
       'tts/effects.json': game('A heavy door groans'),
-      'content-studio/cache/effects.json': mine,
+      'content-studio/effects/edits.json': mine,
     })
     expect((await summary(file)).rows[0]!.gameChanged).toBe(true)
     expect((await summary(file)).rows[0]!.gameChanged).toBe(true)
@@ -137,7 +149,7 @@ describe('the game rewording an effect you changed', () => {
   it('is cleared by changing your own words', async () => {
     const { file } = repo({
       'tts/effects.json': game('A heavy door groans'),
-      'content-studio/cache/effects.json': mine,
+      'content-studio/effects/edits.json': mine,
     })
     await setEffectDescription(file, 'door-creak', 'Mine again')
     expect((await summary(file)).rows[0]).toMatchObject({
@@ -154,7 +166,7 @@ describe('the game rewording an effect you changed', () => {
   it('Use the game’s is setEffectDescription with null', async () => {
     const { file } = repo({
       'tts/effects.json': game('New'),
-      'content-studio/cache/effects.json': mine,
+      'content-studio/effects/edits.json': mine,
     })
     await setEffectDescription(file, 'door-creak', null)
     expect((await summary(file)).rows[0]).toMatchObject({ changedHere: false, description: 'New' })
@@ -164,8 +176,8 @@ describe('the game rewording an effect you changed', () => {
 describe('an effect the game drops', () => {
   const files = {
     'tts/effects.json': [list[0]],
-    'content-studio/cache/effects.json': {
-      coins: { words: 'Mine', gameWas: 'Coins spill on stone' },
+    'content-studio/effects/edits.json': {
+      coins: { text: 'Mine', gameWas: 'Coins spill on stone' },
     },
   }
 
@@ -182,7 +194,19 @@ describe('an effect the game drops', () => {
     const { file, read } = repo(files)
     expect(await forgetEffect(file, 'door-creak')).toBeNull()
     expect(await forgetEffect(file, 'coins')).toEqual({ ok: true })
-    expect(read('content-studio/cache/effects.json')).toBe('{}\n')
+    expect(read('content-studio/effects/edits.json')).toBe('{}\n')
     expect((await summary(file)).dropped).toEqual([])
+  })
+})
+
+describe('the sample project’s sound effects', () => {
+  it('reads the list without a problem', async () => {
+    const root = join(import.meta.dir, '../../test/fixtures/sample')
+    const opened = await loadWorkspace(join(root, 'content-studio.json'))
+    if (!opened.ok) throw new Error('the sample did not open')
+    const effects = opened.summary.effects!
+    expect(effects.status).toBe('ok')
+    expect(effects.problems).toEqual([])
+    expect(effects.rows.length).toBeGreaterThan(0)
   })
 })

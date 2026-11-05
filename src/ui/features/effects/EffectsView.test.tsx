@@ -5,6 +5,8 @@ import type { ProjectSummary } from '../../../core/summary'
 import type { EffectsRoute } from '../../route'
 import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
 import { readFileSync } from 'node:fs'
+import { ProjectSchema } from '../../../core/project'
+import { projectJson } from '../../../../test/helpers'
 import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
@@ -334,6 +336,14 @@ describe('the Sound effects list', () => {
     act(() => button('How to set it up').click())
     expect(container.querySelector('pre')!.textContent).toContain('"effects"')
   })
+
+  it('shows an effects section the studio accepts', () => {
+    const { button, container } = render(list, null)
+    act(() => button('How to set it up').click())
+    const example = JSON.parse(`{${container.querySelector('pre')!.textContent}}`)
+    const parsed = ProjectSchema.safeParse({ ...projectJson(), ...example })
+    expect(parsed.error?.issues ?? []).toEqual([])
+  })
 })
 
 describe('Refresh from the game', () => {
@@ -529,7 +539,7 @@ describe("an effect's page", () => {
 
   it('keeps what was typed and says why when saving fails', async () => {
     const problems = [
-      { file: 'content-studio/cache/effects.json', path: '', message: 'permission denied' },
+      { file: 'content-studio/effects/edits.json', path: '', message: 'permission denied' },
     ]
     const { container, text, settle } = render(page('door-creak'), effects(), () =>
       Response.json({ ok: false, problems }, { status: 409 }),
@@ -573,7 +583,7 @@ describe("an effect's page", () => {
   it('says why Keep mine did not work', async () => {
     const rows = [row('door-creak', { changedHere: true, gameChanged: true })]
     const problems = [
-      { file: 'content-studio/cache/effects.json', path: '', message: 'disk is full' },
+      { file: 'content-studio/effects/edits.json', path: '', message: 'disk is full' },
     ]
     const { text, button, settle } = render(page('door-creak'), effects({ rows }), () =>
       Response.json({ ok: false, problems }, { status: 409 }),

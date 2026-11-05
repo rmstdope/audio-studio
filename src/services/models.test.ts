@@ -293,13 +293,12 @@ describe('setImageModel', () => {
 
 describe('setEffectModel', () => {
   const effectPaths = {
-    list: 'tts/effects.json',
-    lock: 'audio/effects.lock.json',
+    from: { shared: 'tts/effects.json' },
     clips: 'audio/effects',
     manifest: 'audio/effects/manifest.json',
   }
   const withEffects = (extra: Record<string, unknown> = {}) =>
-    projectJson({ effects: { paths: effectPaths, ...extra } })
+    projectJson({ effects: { ...effectPaths, ...extra } })
 
   it('writes effects.model and nothing else, in the file’s own indentation', async () => {
     const { projectFile, read } = repo(withEffects(), 4)

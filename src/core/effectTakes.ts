@@ -13,6 +13,19 @@ export const EffectInputsSchema = z.object({
 /** What a sound-effect take is made from. */
 export type EffectInputs = z.infer<typeof EffectInputsSchema>
 
+/**
+ * What a chosen take was made from, as the lock file holds it: the description as `text`. Read as
+ * the take's `EffectInputs`.
+ */
+const LockInputsSchema = z
+  .object({
+    text: z.string(),
+    seconds: z.number(),
+    /** The effect loops (the take was made seamless); absent for a take made to play once. */
+    loops: z.boolean().optional(),
+  })
+  .transform(({ text, ...rest }): EffectInputs => ({ description: text, ...rest }))
+
 /** One effect in the effects lock: the take the game plays, and what it was made from. */
 export const EffectLockEntrySchema = z.object({
   /** A hash of what went into the take (description, length). */
@@ -26,12 +39,12 @@ export const EffectLockEntrySchema = z.object({
    * What the chosen take counts as made from, which the effect's inputs are compared with: its
    * own inputs, with a description accepted since (Accept) in place of what it was made from.
    */
-  inputs: EffectInputsSchema,
+  inputs: LockInputsSchema,
   /** When it was chosen (ISO time). */
   at: z.string(),
 })
 
-/** The effects lock: the chosen take of each effect, by effect id. */
+/** `content-studio/effects/lock.json`: the chosen take of each effect, by effect id. */
 export const EffectLockSchema = z.record(z.string(), EffectLockEntrySchema)
 
 /** The manifest in the effects clips folder, which the game reads: `{ effect: { file, duration } }`. */

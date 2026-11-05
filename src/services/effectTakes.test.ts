@@ -14,12 +14,9 @@ import type { EffectHealthStore } from './effectHealth'
 import { createSerial, type Serial } from './serial'
 
 const effects = {
-  paths: {
-    list: 'tts/effects.json',
-    lock: 'audio/effects.lock.json',
-    clips: 'audio/effects',
-    manifest: 'audio/effects/manifest.json',
-  },
+  from: { shared: 'tts/effects.json' },
+  clips: 'audio/effects',
+  manifest: 'audio/effects/manifest.json',
 }
 
 /** A generator that makes a tone `length` seconds long (shorter than asked, as the model does), and fails for a description saying "fail". */
@@ -68,8 +65,8 @@ function fakeHealth(failed: EffectModelId[] = []) {
 function setup(
   ready?: EffectReady,
   list: unknown = [
-    { id: 'door-creak', description: 'A slow wooden door creaks open', seconds: 3 },
-    { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
+    { id: 'door-creak', text: 'A slow wooden door creaks open', seconds: 3 },
+    { id: 'coins', text: 'Coins spill on stone', seconds: 0.5 },
   ],
   extra: Record<string, unknown> = {},
   length = 1.4,
@@ -137,8 +134,8 @@ describe('createEffectTakes', () => {
 
   it('makes takes from the studio’s own words when they are in use', async () => {
     const { file, takes, requests, settled } = setup(undefined, undefined, {
-      'content-studio/cache/effects.json': {
-        coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' },
+      'content-studio/effects/edits.json': {
+        coins: { text: 'Coins on glass', gameWas: 'Coins spill on stone' },
       },
     })
     await takes.make(file, 'coins', { count: 1 })
@@ -159,7 +156,7 @@ describe('createEffectTakes', () => {
     }
     const root = tempRepo({
       'content-studio.json': projectJson({ effects }),
-      'tts/effects.json': [{ id: 'coins', description: 'Coins', seconds: 0.5 }],
+      'tts/effects.json': [{ id: 'coins', text: 'Coins', seconds: 0.5 }],
     })
     const file = join(root, 'content-studio.json')
     const takes = createEffectTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
@@ -184,7 +181,7 @@ describe('createEffectTakes', () => {
 
   it('keeps a failed take with its reason, remakes it on Try again, and keeps the others', async () => {
     const { file, takes, calls, settled } = setup(undefined, [
-      { id: 'coins', description: 'fail once', seconds: 0.5 },
+      { id: 'coins', text: 'fail once', seconds: 0.5 },
     ])
     await takes.make(file, 'coins', { count: 1 })
     const failed = await settled('coins')
@@ -235,7 +232,7 @@ describe('createEffectTakes', () => {
     }
     const root = tempRepo({
       'content-studio.json': projectJson({ effects }),
-      'tts/effects.json': [{ id: 'coins', description: 'Coins', seconds: 0.5 }],
+      'tts/effects.json': [{ id: 'coins', text: 'Coins', seconds: 0.5 }],
     })
     const file = join(root, 'content-studio.json')
     const { health, calls } = fakeHealth()
@@ -273,7 +270,7 @@ describe('createEffectTakes', () => {
     }
     const root = tempRepo({
       'content-studio.json': projectJson({ effects }),
-      'tts/effects.json': [{ id: 'coins', description: 'Coins', seconds: 0.5 }],
+      'tts/effects.json': [{ id: 'coins', text: 'Coins', seconds: 0.5 }],
     })
     const file = join(root, 'content-studio.json')
     const { health, calls } = fakeHealth()
@@ -330,7 +327,7 @@ describe('createEffectTakes', () => {
     const view = await settled('door-creak')
     expect(await takes.choose(file, 'door-creak', view.takes[1]!.file)).toEqual({ ok: true })
     expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'), 'utf8')).toBe('mp3')
-    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
     expect(lock['door-creak']).toMatchObject({ take: 2, model: 'small-sfx', seed: 101 })
     expect(JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))).toEqual({
       'door-creak': { file: 'door-creak.mp3', duration: 1.4 },
@@ -377,7 +374,7 @@ describe('createEffectTakes', () => {
 
   it('refuses to drop while the lock cannot be read, and shows the lock as unread', async () => {
     const { file, takes, settled } = setup(undefined, undefined, {
-      'audio/effects.lock.json': '{ nope',
+      'content-studio/effects/lock.json': '{ nope',
     })
     await takes.make(file, 'coins', { count: 1 })
     const view = await settled('coins')
@@ -407,20 +404,22 @@ describe('createEffectTakes', () => {
     await takes.make(file, 'coins', { count: 1 })
     const view = await settled('coins')
     await takes.choose(file, 'coins', view.takes[0]!.file)
+    const edits = join(root, 'content-studio/effects/edits.json')
+    mkdirSync(dirname(edits), { recursive: true })
     writeFileSync(
-      join(root, 'content-studio/cache/effects.json'),
-      JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
+      edits,
+      JSON.stringify({ coins: { text: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     expect(await takes.accept(file, 'coins')).toEqual({ ok: true })
     expect(
-      JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8')).coins.inputs,
+      JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8')).coins.inputs,
     ).toEqual({
-      description: 'Coins on glass',
+      text: 'Coins on glass',
       seconds: 0.5,
     })
     writeFileSync(
       join(root, 'tts/effects.json'),
-      JSON.stringify([{ id: 'coins', description: 'Coins spill on stone', seconds: 2 }]),
+      JSON.stringify([{ id: 'coins', text: 'Coins spill on stone', seconds: 2 }]),
     )
     expect(await takes.accept(file, 'coins')).toMatchObject({ ok: false })
   })
@@ -440,9 +439,11 @@ describe('createEffectTakes', () => {
     const { root, file, takes, settled } = setup()
     await takes.make(file, 'coins', { count: 1 })
     await settled('coins')
+    const edits = join(root, 'content-studio/effects/edits.json')
+    mkdirSync(dirname(edits), { recursive: true })
     writeFileSync(
-      join(root, 'content-studio/cache/effects.json'),
-      JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
+      edits,
+      JSON.stringify({ coins: { text: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     await takes.make(file, 'coins', { count: 1 })
     expect((await settled('coins')).takes.map((t) => t.n)).toEqual([1, 2])
@@ -461,7 +462,7 @@ describe('createEffectTakes', () => {
     }
     const root = tempRepo({
       'content-studio.json': projectJson({ effects }),
-      'tts/effects.json': [{ id: 'coins', description: 'Coins', seconds: 0.5 }],
+      'tts/effects.json': [{ id: 'coins', text: 'Coins', seconds: 0.5 }],
     })
     const file = join(root, 'content-studio.json')
     const before = createEffectTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
@@ -541,7 +542,7 @@ describe('two models', () => {
 
   it('remakes a failed take with the model it was asked with, and records the failure per model', async () => {
     const { file, takes, requests, calls, settled } = setup(undefined, [
-      { id: 'coins', description: 'fail once', seconds: 0.5 },
+      { id: 'coins', text: 'fail once', seconds: 0.5 },
     ])
     await takes.make(file, 'coins', { count: 1, model: 'open-1' })
     await settled('coins')
@@ -604,7 +605,7 @@ describe('readEffects with a lock', () => {
 })
 
 describe('takes of an effect that loops', () => {
-  const rain = { id: 'rain', description: 'Steady rain on a tin roof', seconds: 10, loops: true }
+  const rain = { id: 'rain', text: 'Steady rain on a tin roof', seconds: 10, loops: true }
   const rainy = (length: number) => setup(undefined, [rain], {}, length)
 
   it('asks for the length, the seam and a spare second, and keeps a take exactly the length asked', async () => {
@@ -654,7 +655,7 @@ describe('takes of an effect that loops', () => {
     // The game makes the effect play once: the loop take can no longer be chosen again.
     writeFileSync(
       join(root, 'tts/effects.json'),
-      JSON.stringify([{ id: 'rain', description: rain.description, seconds: 10 }]),
+      JSON.stringify([{ id: 'rain', text: rain.text, seconds: 10 }]),
     )
     const refused = await takes.choose(file, 'rain', first.file)
     expect(refused).toEqual({
@@ -668,7 +669,7 @@ describe('takes of an effect that loops', () => {
       [2, false],
     ])
     expect(await takes.choose(file, 'rain', view.takes[1]!.file)).toEqual({ ok: true })
-    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
     expect(lock.rain.inputs.loops).toBeUndefined()
     expect(lock.rain.take).toBe(2)
   })
@@ -678,8 +679,8 @@ describe('takes of an effect that loops', () => {
     await takes.make(file, 'rain', { count: 1 })
     const first = (await settled('rain')).takes[0]!
     await takes.choose(file, 'rain', first.file)
-    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
-    expect(lock.rain.inputs).toEqual({ description: rain.description, seconds: 10, loops: true })
+    const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
+    expect(lock.rain.inputs).toEqual({ text: rain.text, seconds: 10, loops: true })
     const manifest = JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))
     expect(manifest.rain.duration).toBe(10)
   })
@@ -690,7 +691,7 @@ describe('takes of an effect that loops', () => {
     await takes.choose(file, 'rain', (await settled('rain')).takes[0]!.file)
     writeFileSync(
       join(root, 'tts/effects.json'),
-      JSON.stringify([{ id: 'rain', description: rain.description, seconds: 10 }]),
+      JSON.stringify([{ id: 'rain', text: rain.text, seconds: 10 }]),
     )
     const accepted = await takes.accept(file, 'rain')
     expect(accepted).toEqual({

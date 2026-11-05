@@ -9,23 +9,31 @@ import {
 } from './effectTakes'
 import { problemsFrom, type Problem } from './project'
 
-/** A sound effect as the game lists it. The id names the effect everywhere, so it is a slug. */
-export const EffectEntrySchema = z.object({
-  id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
-  description: z.string().min(1),
-  /** How long the effect is, in seconds; set by the game. */
-  seconds: z.number().positive(),
-  /** The effect plays round and round (ambience); absent: it plays once. */
-  loops: z.boolean().optional(),
-})
+/**
+ * A sound effect as the game lists it. The id names the effect everywhere, so it is a slug. Its
+ * words are `text` in the list; the studio calls them the effect's description.
+ */
+export const EffectEntrySchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
+    /** What the studio calls the effect; absent, a name is made from the id. */
+    title: z.string().min(1).optional(),
+    /** What the effect sounds like, in the game's words. */
+    text: z.string().min(1),
+    /** How long the effect is, in seconds; set by the game. */
+    seconds: z.number().positive(),
+    /** The effect plays round and round (ambience); absent: it plays once. */
+    loops: z.boolean().optional(),
+  })
+  .transform(({ text, ...rest }) => ({ ...rest, description: text }))
 
-/** A sound effect of the game's list. */
-export type EffectEntry = z.infer<typeof EffectEntrySchema>
+/** A sound effect of the game's list, its words as its description. */
+export type EffectEntry = z.output<typeof EffectEntrySchema>
 
-/** The studio's own words for an effect, with the game's words they were written over. */
-const OwnWords = z.object({ words: z.string().min(1), gameWas: z.string() })
+/** A rewording: the studio's own words for an effect (`text`), with the game's words they were written over. */
+const OwnWords = z.object({ text: z.string().min(1), gameWas: z.string() })
 
-/** `content-studio/cache/effects.json`: the studio's own descriptions, by effect id. */
+/** `content-studio/effects/edits.json`: the studio's own descriptions, by effect id. */
 export const EffectOverridesSchema = z.record(z.string(), OwnWords)
 
 /** The studio's own descriptions, by effect id. */
@@ -115,7 +123,7 @@ export function applyDescription(
   const { [id]: _dropped, ...rest } = overrides
   const words = text?.trim() ?? ''
   if (words === '' || words === gameWords) return rest
-  return { ...rest, [id]: { words, gameWas: gameWords } }
+  return { ...rest, [id]: { text: words, gameWas: gameWords } }
 }
 
 /** The studio's descriptions after "Keep mine": yours stay, and the game's present words are the ones they are over. */
@@ -240,7 +248,7 @@ export function summarizeEffects(input: {
   }
   const rows: EffectRow[] = list.effects.map((effect) => {
     const own = overrides[effect.id]
-    const description = own?.words ?? effect.description
+    const description = own?.text ?? effect.description
     const loops = Boolean(effect.loops)
     const now = { description, seconds: effect.seconds, loops }
     const entry = state.chosen?.[effect.id]
@@ -252,7 +260,7 @@ export function summarizeEffects(input: {
     })
     return {
       id: effect.id,
-      name: effectName(effect.id),
+      name: effect.title ?? effectName(effect.id),
       description,
       gameDescription: effect.description,
       seconds: effect.seconds,
@@ -273,7 +281,7 @@ export function summarizeEffects(input: {
   const listed = new Set([...rows.map((r) => r.id), ...list.seenIds])
   const dropped = Object.entries(overrides)
     .filter(([id]) => !listed.has(id))
-    .map(([id, own]) => ({ id, name: effectName(id), words: own.words }))
+    .map(([id, own]) => ({ id, name: effectName(id), words: own.text }))
   return {
     status: 'ok',
     canRefresh,

@@ -7,14 +7,10 @@ import {
   type EffectsSummary,
 } from '../core/effects'
 import { resolveInRoot } from '../core/paths'
-import type { Problem, Project } from '../core/project'
+import { EFFECTS_EDITS_FILE, type Problem, type Project } from '../core/project'
 import { effectsWithTakes } from './effectBoards'
 import { readEffectChosen } from './effectClips'
 import { readJson, readResource } from './files'
-import { CACHE_DIR } from '../core/project'
-
-/** The studio's own descriptions of sound effects: its state, not the game's. */
-export const EFFECTS_OVERRIDES_FILE = `${CACHE_DIR}/effects.json`
 
 /**
  * The game's effects list at `path`, entry by entry. Its problems (with their file and place) are
@@ -39,7 +35,7 @@ export async function readEffectOverrides(
   root: string,
   problems: Problem[],
 ): Promise<EffectOverrides | 'invalid'> {
-  const read = await readResource(root, EFFECTS_OVERRIDES_FILE, EffectOverridesSchema, problems)
+  const read = await readResource(root, EFFECTS_EDITS_FILE, EffectOverridesSchema, problems)
   return read === 'missing' ? {} : read
 }
 
@@ -54,7 +50,7 @@ export async function readEffects(
 ): Promise<EffectsSummary | null> {
   const { effects } = project
   if (!effects) return null
-  const list = await readEffectsList(root, effects.paths.list)
+  const list = await readEffectsList(root, effects.from.shared)
   const overrides = await readEffectOverrides(root, problems)
   return summarizeEffects({
     list,
