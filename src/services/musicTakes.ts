@@ -32,6 +32,7 @@ import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { movedBoardTake } from '../core/musicMove'
 import { TAKES_EACH, planMakeAll } from '../core/musicMakeAll'
+import { applyFades, fadesProblem, hasFades, type Fades } from '../core/fades'
 import {
   NOTHING_LINE,
   SILENT_LINE,
@@ -216,6 +217,12 @@ export interface MusicTakes {
    * is up to date. A changed length is refused.
    */
   accept(projectFile: string, id: string): Promise<ChooseResult>
+  /**
+   * Saves the fades of a stinger take, or removes them (null). The take on the board stays as
+   * generated; if it is the chosen one, the game's file is written again with the faded sound first,
+   * and nothing changes if that fails.
+   */
+  setFades(projectFile: string, id: string, name: string, fades: Fades | null): Promise<DropResult>
   /** Takes a take off the board and deletes its file; the chosen take stays. */
   drop(projectFile: string, id: string, name: string): Promise<DropResult>
   /**
@@ -268,14 +275,18 @@ function plainReason(message: string): string {
 }
 
 /**
- * What the game plays of a take: its WAV between the cuts if it was trimmed, and the take as the
- * board should hand it to the encoder, with the length that is left.
+ * What the game plays of a take: its WAV between the cuts if it was trimmed, then with its fades if
+ * it has some, and the take as the board should hand it to the encoder, with the length that is left.
  */
 function playedOf(take: BoardTake, bytes: Uint8Array): { take: BoardTake; wav: Uint8Array } {
-  if (!take.trim) return { take, wav: bytes }
+  const fades = take.fades && hasFades(take.fades) ? take.fades : null
+  if (!take.trim && !fades) return { take, wav: bytes }
+  let wav = readWav(bytes)
+  if (take.trim) wav = trimWav(wav, take.trim)
+  if (fades) wav = applyFades(wav, fades)
   return {
-    take: { ...take, seconds: trimmedSeconds(take.seconds, take.trim) },
-    wav: writeWav(trimWav(readWav(bytes), take.trim)),
+    take: take.trim ? { ...take, seconds: trimmedSeconds(take.seconds, take.trim) } : take,
+    wav: writeWav(wav),
   }
 }
 
@@ -524,6 +535,7 @@ export function createMusicTakes({
             trim: { ...take.trim, seconds: trimmedSeconds(take.seconds, take.trim) },
           }),
           ...(trimmable && { trimmable }),
+          ...(take.fades && { fades: take.fades }),
         })
       }
       const making: MakingView[] = entries
@@ -799,6 +811,54 @@ export function createMusicTakes({
       return { ok: true }
     },
 
+    async setFades(projectFile, id, name, fades) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      return changeBoard(projectFile, found, async (board): Promise<DropResult> => {
+        const problems: Problem[] = []
+        const chosenTracks = await readChosen(found.root, found.music, problems)
+        // Which take the game plays is not known: nothing is changed.
+        if (!chosenTracks || problems.length)
+          return { ok: false, file: found.music.paths.lock, problems }
+        if (found.inputs.kind !== 'stinger')
+          return { ok: false, message: 'Only a stinger can fade.' }
+        const take = board.takes.find((t) => fileOf(t) === name)
+        if (!take) return { ok: false, message: 'That take is not on the board.' }
+        // The fades are of what the game plays: the take between its cuts, if it is trimmed.
+        const wrong =
+          fades &&
+          fadesProblem(fades, take.trim ? trimmedSeconds(take.seconds, take.trim) : take.seconds)
+        if (wrong) return { ok: false, message: wrong }
+        const next: BoardTake = { ...take }
+        delete next.fades
+        if (fades && hasFades(fades)) next.fades = fades
+        const chosen = chosenTracks[id]?.lock
+        if (chosen?.take === take.n && chosen.fp === take.hash) {
+          let wav: Uint8Array
+          try {
+            wav = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
+          } catch {
+            return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
+          }
+          // Only the sound changes: the manifest and the lock (an accepted change too) stay as they are.
+          const done = await commitChoice({
+            root: found.root,
+            projectFile,
+            music: found.music,
+            id,
+            listId: chosen.list,
+            take: next,
+            wav: playedOf(next, wav).wav,
+            encode,
+            soundOnly: true,
+          })
+          if (!done.ok) return done
+        }
+        board.takes = board.takes.map((t) => (t === take ? next : t))
+        return { ok: true }
+      })
+    },
+
     async choose(projectFile, id, name) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
@@ -903,7 +963,11 @@ export function createMusicTakes({
       if ('ok' in board) return null
       const take = board.takes.find((t) => fileOf(t) === name)
       if (!take?.trim) return null
-      return playedOf(take, new Uint8Array(await Bun.file(path).arrayBuffer())).wav
+      // Only the cuts: the fades are asked for in the address, or saved ones would be applied twice.
+      return playedOf(
+        { ...take, fades: undefined },
+        new Uint8Array(await Bun.file(path).arrayBuffer()),
+      ).wav
     },
 
     async unchoose(projectFile, id) {

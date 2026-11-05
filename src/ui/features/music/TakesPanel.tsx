@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { acceptable, changedLine } from '../../../core/musicChoose'
+import { fadesLine, heardAs } from '../../../core/fades'
 import { trackFor, type MusicListSummary, type TrackRow } from '../../../core/music'
 import {
   actName,
@@ -44,9 +45,11 @@ import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
+import { FadesEditor } from './FadesEditor'
 import { InTheGame, Wave } from './InTheGame'
 import {
   cutShares,
+  playedSeconds,
   takeLength,
   takeSoundUrl,
   TrimmedTag,
@@ -82,6 +85,25 @@ export function TakesPanel({
   const movedLine = useRef<HTMLDivElement>(null)
   const openers = useRef(new Map<number, HTMLButtonElement>())
   const refocus = useRef<number | null>(null)
+  // The take whose fades are open (one editor at a time), and the Fades… buttons to give focus back to.
+  const [fading, setFading] = useState<number | null>(null)
+  const fadeOpeners = useRef(new Map<number, HTMLButtonElement>())
+  const refocusFades = useRef<number | null>(null)
+  useEffect(() => {
+    if (fading === null && refocusFades.current !== null) {
+      fadeOpeners.current.get(refocusFades.current)?.focus()
+      refocusFades.current = null
+    }
+  }, [fading])
+  /** Closes the fades editor and returns focus to its take's Fades… button. */
+  const closeFades = (n: number) => {
+    refocusFades.current = n
+    setFading(null)
+  }
+  const fadesOpener = (n: number) => (button: HTMLButtonElement | null) => {
+    if (button) fadeOpeners.current.set(n, button)
+    else fadeOpeners.current.delete(n)
+  }
   useEffect(() => {
     if (moved) movedLine.current?.focus()
   }, [moved])
@@ -251,7 +273,15 @@ export function TakesPanel({
           )}
         </div>
       )}
-      <InTheGame track={track} view={view} player={player} />
+      <InTheGame
+        track={track}
+        view={view}
+        player={player}
+        fading={fading}
+        onFades={setFading}
+        onFadesClosed={closeFades}
+        fadesOpener={fadesOpener}
+      />
       <section className="panel takes-panel">
         <div className="takes-head">
           <h2>Takes</h2>
@@ -321,8 +351,8 @@ export function TakesPanel({
         )}
         {!none && view.lockUnread && (
           <span className="takes-missing small">
-            Choosing, dropping, moving and trimming wait until the music lock can be read. You can
-            still listen and make more takes.
+            Choosing, dropping, moving, trimming and fading wait until the music lock can be read.
+            You can still listen and make more takes.
           </span>
         )}
         {!none && missing}
@@ -361,6 +391,10 @@ export function TakesPanel({
                 player={player}
                 locked={view.lockUnread}
                 nowhere={nowhere}
+                fading={fading}
+                onFades={setFading}
+                onFadesClosed={closeFades}
+                fadesOpener={fadesOpener(take.n)}
                 onMove={() => setMoving(take.n)}
                 opener={(button) => {
                   if (button) openers.current.set(take.n, button)
@@ -411,6 +445,10 @@ function TakeCard({
   player,
   locked,
   nowhere,
+  fading,
+  onFades,
+  onFadesClosed,
+  fadesOpener,
   onMove,
   opener,
 }: {
@@ -422,6 +460,12 @@ function TakeCard({
   locked: boolean
   /** Why Move… is greyed when there is nowhere to move the take; null when there is. */
   nowhere: string | null
+  /** The take whose fades are open, if any. */
+  fading: number | null
+  onFades: (n: number) => void
+  onFadesClosed: (n: number) => void
+  /** Hands the Fades… button to the panel, to give it focus back when the editor closes. */
+  fadesOpener: (button: HTMLButtonElement | null) => void
   onMove: () => void
   /** Hands the Move… button to the panel, to give it focus back when the dialog closes. */
   opener: (button: HTMLButtonElement | null) => void
@@ -442,85 +486,123 @@ function TakeCard({
       if (playing) player.stop()
     },
   })
+  const editing = fading === take.n
+  const otherOpen = fading !== null && !editing
+  const heard = heardAs(url, take.fades)
   return (
     <div className="take">
       <div className="take-row">
         <b className="grow">Take {take.n}</b>
         <TrimmedTag take={take} />
+        {editing && <span className="chip chip-fade">fading</span>}
         {take.earlier && <span className="faint small">earlier brief</span>}
       </div>
       {take.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
       <span className="faint small">{take.model}</span>
-      <div className="take-row">
-        <button
-          type="button"
-          className="play"
-          aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-          onClick={() => player.toggle(id, url, { fade: true, loop: kind === 'loop' })}
-        >
-          {playing ? '■' : '▶'}
-        </button>
-        <Wave
-          peaks={take.peaks}
-          loop={kind === 'loop'}
-          cut={cutShares(take)}
-          position={playing ? wavePosition(take, player.position) : undefined}
+      {editing ? (
+        <FadesEditor
+          trackId={trackId}
+          take={take}
+          chosen={false}
+          player={player}
+          onClose={() => onFadesClosed(take.n)}
         />
-        <span className="faint small">{takeLength(take)}</span>
-      </div>
-      {trim.note}
-      <div className="take-row take-actions">
-        {trim.button}
-        {kind === 'loop' && (
-          <button
-            type="button"
-            className="btn btn-small"
-            onClick={() => player.toggle(seamId, `${url}?seam=1`, { fade: true })}
-          >
-            {seamPlaying ? 'Stop' : 'Hear the seam'}
-          </button>
-        )}
-        <span className="grow" />
-        <span className="move-wrap">
-          <button
-            type="button"
-            ref={opener}
-            className="btn btn-ghost btn-small"
-            disabled={locked}
-            aria-disabled={nowhere ? true : undefined}
-            aria-describedby={nowhere ? `${id}-nowhere` : undefined}
-            onClick={() => {
-              if (!nowhere) onMove()
-            }}
-          >
-            Move…
-          </button>
-          {nowhere && (
-            <span className="move-tip small" role="tooltip" id={`${id}-nowhere`}>
-              {nowhere}
+      ) : (
+        <>
+          <div className="take-row">
+            <button
+              type="button"
+              className="play"
+              aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
+              onClick={() =>
+                player.toggle(id, heard.url, { fade: heard.fade, loop: kind === 'loop' })
+              }
+            >
+              {playing ? '■' : '▶'}
+            </button>
+            <Wave
+              peaks={take.peaks}
+              loop={kind === 'loop'}
+              cut={cutShares(take)}
+              position={playing ? wavePosition(take, player.position) : undefined}
+              fades={take.fades ? { fades: take.fades, seconds: playedSeconds(take) } : undefined}
+            />
+            <span className="faint small">{takeLength(take)}</span>
+          </div>
+          {trim.note}
+          {take.fades && <span className="faint small">{fadesLine(take.fades)}</span>}
+          <div className="take-row take-actions">
+            {trim.button}
+            {kind === 'stinger' && (
+              <button
+                type="button"
+                ref={fadesOpener}
+                className="btn btn-small"
+                disabled={locked}
+                aria-disabled={otherOpen ? true : undefined}
+                title={otherOpen ? `Close the fades of Take ${fading} first.` : undefined}
+                onClick={() => {
+                  if (!otherOpen) {
+                    if (playing) player.stop()
+                    onFades(take.n)
+                  }
+                }}
+              >
+                Fades…
+              </button>
+            )}
+            {kind === 'loop' && (
+              <button
+                type="button"
+                className="btn btn-small"
+                onClick={() => player.toggle(seamId, `${url}?seam=1`, { fade: true })}
+              >
+                {seamPlaying ? 'Stop' : 'Hear the seam'}
+              </button>
+            )}
+            <span className="grow" />
+            <span className="move-wrap">
+              <button
+                type="button"
+                ref={opener}
+                className="btn btn-ghost btn-small"
+                disabled={locked}
+                aria-disabled={nowhere ? true : undefined}
+                aria-describedby={nowhere ? `${id}-nowhere` : undefined}
+                onClick={() => {
+                  if (!nowhere) onMove()
+                }}
+              >
+                Move…
+              </button>
+              {nowhere && (
+                <span className="move-tip small" role="tooltip" id={`${id}-nowhere`}>
+                  {nowhere}
+                </span>
+              )}
             </span>
-          )}
-        </span>
-        <button
-          type="button"
-          className="btn btn-ghost btn-small"
-          disabled={locked || drop.isPending || choose.isPending}
-          onClick={() => {
-            if (playing || seamPlaying) player.stop()
-            drop.mutate(take.file)
-          }}
-        >
-          Drop
-        </button>
-        <button
-          type="button"
-          className="btn btn-small"
-          disabled={locked || choose.isPending}
-          onClick={() => choose.mutate(take.file)}
-        >
-          {choose.isPending ? 'Choosing…' : 'Choose'}
-        </button>
-      </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-small"
+              disabled={locked || drop.isPending || choose.isPending}
+              onClick={() => {
+                if (playing || seamPlaying) player.stop()
+                drop.mutate(take.file)
+              }}
+            >
+              Drop
+            </button>
+            <button
+              type="button"
+              className="btn btn-small"
+              disabled={locked || choose.isPending}
+              onClick={() => choose.mutate(take.file)}
+            >
+              {choose.isPending ? 'Choosing…' : 'Choose'}
+            </button>
+          </div>
+        </>
+      )}
       {trim.failure}
       {(choose.isError || (choose.data && !choose.data.ok)) && (
         <span className="adopt-error">

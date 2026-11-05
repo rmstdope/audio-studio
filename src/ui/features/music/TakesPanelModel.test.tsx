@@ -112,7 +112,7 @@ function render(data: MusicTakesView, row: TrackRow = track) {
 
 describe('the Takes panel while the music lock cannot be read', () => {
   const why =
-    'Choosing, dropping, moving and trimming wait until the music lock can be read. You can still listen and make more takes.'
+    'Choosing, dropping, moving, trimming and fading wait until the music lock can be read. You can still listen and make more takes.'
 
   it('says why above the cards and greys out Choose and Drop, leaving Make 2 more takes alone', () => {
     const page = render(view({ lockUnread: true }))

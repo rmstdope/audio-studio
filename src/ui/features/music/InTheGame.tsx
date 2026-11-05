@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { TrackRow } from '../../../core/music'
+import { envelopePoints, fadesLine, heardAs, type Fades } from '../../../core/fades'
 import { inTheGame, unchooseFailure, unchooseQuestion } from '../../../core/musicChoose'
 import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 import { useChooseTake, useUnchooseTake } from '../../api'
@@ -8,6 +9,7 @@ import { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import {
   cutShares,
+  playedSeconds,
   takeLength,
   takeSoundUrl,
   TrimmedTag,
@@ -15,6 +17,7 @@ import {
   wavePosition,
 } from './trimSilence'
 import { movedFromLine } from '../../../core/musicMove'
+import { FadesEditor } from './FadesEditor'
 
 /** One clip at a time, shared with the takes below. */
 type Player = ReturnType<typeof useClipPlayer>
@@ -30,6 +33,7 @@ export function Wave({
   position,
   quiet,
   cut,
+  fades,
 }: {
   peaks: number[]
   loop: boolean
@@ -38,6 +42,8 @@ export function Wave({
   quiet?: number
   /** The shares of the waveform, from each end, a trim cut away (hatched and dimmed), 0 to 1. */
   cut?: { start: number; end: number } | null
+  /** A stinger take's fades, of the sound that plays (the part between the cuts): the fade line is drawn over it. */
+  fades?: { fades: Fades; seconds: number }
 }) {
   const head = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -73,6 +79,19 @@ export function Wave({
       {quiet !== undefined && quiet > 0 && (
         <span className="quiet" style={{ width: `${Math.round(quiet * 100)}%` }} />
       )}
+      {fades && (
+        <svg
+          className="env"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          style={{
+            left: `${(cut?.start ?? 0) * 100}%`,
+            width: `${(1 - (cut?.start ?? 0) - (cut?.end ?? 0)) * 100}%`,
+          }}
+        >
+          <polyline points={envelopePoints(fades.fades, fades.seconds)} />
+        </svg>
+      )}
       {loop && <span className="seam" />}
       {position && <span className="playhead" ref={head} />}
     </div>
@@ -88,10 +107,20 @@ export function InTheGame({
   track,
   view,
   player,
+  fading,
+  onFades,
+  onFadesClosed,
+  fadesOpener,
 }: {
   track: TrackRow
   view: MusicTakesView
   player: Player
+  /** The take whose fades are open, if any. */
+  fading: number | null
+  onFades: (n: number) => void
+  onFadesClosed: (n: number) => void
+  /** Hands a take's Fades… button to the panel, to give it focus back when the editor closes. */
+  fadesOpener: (n: number) => (button: HTMLButtonElement | null) => void
 }) {
   const state = inTheGame(track)
   const take = view.takes.find((t) => t.chosen)
@@ -258,17 +287,50 @@ export function InTheGame({
         {take && <span className="faint small">{take.model}</span>}
       </div>
       {take?.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
-      {take && (
-        <Playback
-          trackId={track.id}
-          kind={view.kind}
-          take={take}
-          player={player}
-          note={trimControl.note}
-        />
+      {take?.fades && fading !== take.n && (
+        <span className="faint small">{fadesLine(take.fades)}</span>
       )}
-      <div className="track-in-game-actions">
+      {take && fading === take.n ? (
+        <FadesEditor
+          trackId={track.id}
+          take={take}
+          chosen
+          player={player}
+          onClose={() => onFadesClosed(take.n)}
+        />
+      ) : (
+        take && (
+          <Playback
+            trackId={track.id}
+            kind={view.kind}
+            take={take}
+            player={player}
+            note={trimControl.note}
+          />
+        )
+      )}
+      <div className="track-in-game-actions" hidden={take !== undefined && fading === take.n}>
         {trimControl.button}
+        {take && view.kind === 'stinger' && (
+          <button
+            type="button"
+            className="btn btn-small"
+            ref={fadesOpener(take.n)}
+            aria-disabled={fading !== null && fading !== take.n ? true : undefined}
+            title={
+              fading !== null && fading !== take.n
+                ? `Close the fades of Take ${fading} first.`
+                : undefined
+            }
+            onClick={() => {
+              if (fading !== null) return
+              if (player.playing === `music-take-${track.id}-${take.n}`) player.stop()
+              onFades(take.n)
+            }}
+          >
+            Fades…
+          </button>
+        )}
         <span className="grow" />
         <button
           type="button"
@@ -324,6 +386,7 @@ function Playback({
 }) {
   const id = `music-take-${trackId}-${take.n}`
   const url = takeSoundUrl(trackId, take)
+  const heard = heardAs(url, take.fades)
   const seamId = `${id}-seam`
   const playing = player.playing === id
   return (
@@ -333,7 +396,7 @@ function Playback({
           type="button"
           className="play"
           aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-          onClick={() => player.toggle(id, url, { fade: true, loop: kind === 'loop' })}
+          onClick={() => player.toggle(id, heard.url, { fade: heard.fade, loop: kind === 'loop' })}
         >
           {playing ? '■' : '▶'}
         </button>
@@ -342,6 +405,7 @@ function Playback({
           loop={kind === 'loop'}
           cut={cutShares(take)}
           position={playing ? wavePosition(take, player.position) : undefined}
+          fades={take.fades ? { fades: take.fades, seconds: playedSeconds(take) } : undefined}
         />
         <span className="faint small">{takeLength(take)}</span>
         {kind === 'loop' && (

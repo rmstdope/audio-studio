@@ -114,13 +114,14 @@ describe('Trim silence on a stinger’s takes', () => {
     ).toHaveLength(0)
   })
 
-  it('sits at the left of the bottom row, before Move…, Drop and Choose', () => {
+  it('sits at the left of the bottom row, before Fades…, Move…, Drop and Choose', () => {
     const { container } = render(view([take(1)]))
     const row = [...container.querySelectorAll('.take-row')].find((r) =>
       [...r.querySelectorAll('button')].some((b) => b.textContent === 'Choose'),
     )!
     expect([...row.querySelectorAll('button')].map((b) => b.textContent)).toEqual([
       'Trim silence',
+      'Fades…',
       'Move…',
       'Drop',
       'Choose',

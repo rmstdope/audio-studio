@@ -16,6 +16,11 @@ export function takeSoundUrl(trackId: string, take: TakeView): string {
   return take.trim ? `${base}?trimmed=1` : base
 }
 
+/** How long a take plays: the part between its cuts if it is trimmed, else all of it, in seconds. */
+export function playedSeconds(take: TakeView): number {
+  return take.trim ? take.trim.seconds : take.seconds
+}
+
 /** A trimmed take's length as m:ss.s, an untrimmed take's as m:ss. */
 export function takeLength(take: TakeView): string {
   return take.trim ? preciseClock(take.trim.seconds) : clock(take.seconds)

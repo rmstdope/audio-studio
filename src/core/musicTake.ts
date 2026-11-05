@@ -7,6 +7,7 @@ import {
   musicModel,
   type MusicModelId,
 } from './musicModels'
+import { FadesSchema, type Fades } from './fades'
 import { TrimSchema } from './musicTrim'
 import { readWav, writeWav, type Wav } from './wav'
 
@@ -173,6 +174,8 @@ export interface TakeView {
   model: string
   /** The track it was moved from and its number there; absent on a take made for this track. */
   movedFrom?: MovedFrom
+  /** The fades saved with a stinger take; absent when it has none. */
+  fades?: Fades
   /** A stinger take trimmed: what is cut from each end, and the length that is left. */
   trim?: { start: number; end: number; seconds: number }
   /**
@@ -249,6 +252,8 @@ export const BoardTakeSchema = z.object({
   inputs: TakeInputsSchema,
   /** Set when the take was moved here from another track, for good. */
   movedFrom: MovedFromSchema.optional(),
+  /** The fades of a stinger take, applied when it is chosen; absent when it has none. */
+  fades: FadesSchema.optional(),
   /** Set when a stinger take was trimmed: what is cut from each end. Its WAV stays as generated. */
   trim: TrimSchema.optional(),
 })
@@ -296,6 +301,8 @@ export const ChooseTakeBody = z.object({ file: z.string().min(1) }).strict()
 /** The body of a move: the take's file on this track's board, and the id of the track it moves to. */
 export const MoveTakeBody = z.object({ file: z.string().min(1), to: z.string().min(1) }).strict()
 
+/** The body of a save of fades: both lengths in seconds and the shape of both. */
+export const SetFadesBody = FadesSchema.strict()
 /** The body of a trim: the take's file on this track's board, and whether to undo its trim. */
 export const TrimTakeBody = z
   .object({ file: z.string().min(1), undo: z.boolean().optional() })

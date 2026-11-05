@@ -1,3 +1,4 @@
+import type { Fades } from '../core/fades'
 import type { AuditionSession } from '../core/audition'
 import type { FreedResult } from '../services/elevenVoices'
 import {
@@ -1134,6 +1135,33 @@ export function useDropTake(trackId: string) {
       )
       if (!response.ok && response.status !== 409) {
         throw new Error(`dropping the take answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<DropResult>
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+  })
+}
+
+/**
+ * Saves a stinger take's fades, or removes them (null), then reloads the track's takes. When the
+ * take is the chosen one, the game's file is written again at once.
+ */
+export function useSetFades(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ file, fades }: { file: string; fades: Fades | null }) => {
+      const response = await fetch(
+        `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${encodeURIComponent(file)}/fades`,
+        fades
+          ? {
+              method: 'PUT',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(fades),
+            }
+          : { method: 'DELETE' },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the fades answered ${response.status}`)
       }
       return (await response.json()) as NonNullable<DropResult>
     },
