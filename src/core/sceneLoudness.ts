@@ -155,11 +155,11 @@ export const SceneKeptSchema = z.object({
 /** The kept measures of one scene. */
 export type SceneKept = z.infer<typeof SceneKeptSchema>
 
-/** The kept file: scene id to its measures, per act. */
-export const LoudnessFileSchema = z.record(z.string(), z.record(z.string(), SceneKeptSchema))
+/** A part's scenes lock: scene id to its kept measures. */
+export const SceneLockSchema = z.record(z.string(), SceneKeptSchema)
 
-/** The kept file. */
-export type LoudnessFile = z.infer<typeof LoudnessFileSchema>
+/** A part's scenes lock. */
+export type SceneLock = z.infer<typeof SceneLockSchema>
 
 /** The `scenes.loudness` figure as the panel writes it: "−19.4 LUFS". */
 export function formatLufs(lufs: number): string {

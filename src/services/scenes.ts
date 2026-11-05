@@ -64,7 +64,6 @@ export async function readScenes(
   const { scenes } = project
   if (!scenes) return null
   const acts = []
-  const measures = await readMeasures(root, problems)
   for (const part of project.parts) {
     const mixFile = partPathFor(scenes.mix, part.id)
     acts.push({
@@ -74,7 +73,7 @@ export async function readScenes(
       canRefresh: Boolean(project.refresh?.part),
       declarations: await readDeclarations(root, partPathFor(scenes.from.part, part.id), problems),
       mix: await readMix(root, mixFile, problems),
-      loudness: measures[part.id],
+      loudness: await readMeasures(root, part.id, problems),
     })
   }
   return summarizeScenes({

@@ -5819,7 +5819,7 @@ describe('server, measuring the loudness of scenes', () => {
 
   it('starts from the studio’s own page only', async () => {
     expect((await post('/api/scene-loudness/act1', {}, 'https://evil.example')).status).toBe(403)
-    expect(existsSync(join(root, 'content-studio/cache/scene-loudness.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/scenes/act1.lock.json'))).toBe(false)
   })
 
   it('answers 404 for an act it does not know and 400 for a body that is not an open scene', async () => {
@@ -5832,10 +5832,10 @@ describe('server, measuring the loudness of scenes', () => {
       open: { scene: 'store', entry: { effects: [] } },
     })
     expect([started.status, await started.json()]).toEqual([200, { ok: true }])
-    const file = join(root, 'content-studio/cache/scene-loudness.json')
+    const file = join(root, 'content-studio/scenes/act1.lock.json')
     for (let i = 0; i < 100 && !existsSync(file); i++) await Bun.sleep(20)
     const kept = JSON.parse(readFileSync(file, 'utf8'))
-    expect(kept.act1.store.draft.states).toEqual([{ state: null, lufs: null }])
+    expect(kept.store.draft.states).toEqual([{ state: null, lufs: null }])
     for (let i = 0; i < 100; i++) {
       const making = await (await fetch(new URL('/api/scene-loudness', studio.url))).json()
       if (Object.keys(making).length === 0) break

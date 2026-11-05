@@ -10,7 +10,8 @@ import {
   type SceneEffectChoice,
   type SceneMix,
 } from '../core/scenes'
-import { keepMeasure, LOUDNESS_FILE } from './sceneMeasures'
+import { scenesLockFile } from '../core/project'
+import { keepMeasure } from './sceneMeasures'
 import {
   making,
   measureScenes,
@@ -341,10 +342,13 @@ const measureOf = (entry: SceneMix | null): SceneMeasure => ({
   error: null,
 })
 
-const kept = (root: string) => JSON.parse(readFileSync(join(root, LOUDNESS_FILE), 'utf8'))
+/** A part's scenes lock, as written. */
+const lockText = (root: string, part = 'act1') =>
+  readFileSync(join(root, scenesLockFile(part)), 'utf8')
+const kept = (root: string, part = 'act1') => JSON.parse(lockText(root, part))
 
 describe('startMeasure', () => {
-  it('measures the act in the background, keeps the figures in the studio folder, and counts', async () => {
+  it("measures the act in the background, keeps the figures in the act's scenes lock, and counts", async () => {
     const { root, projectFile } = repo()
     const started = await startMeasure(projectFile, 'act1', null, { audio: fakeAudio().audio })
     if (!started.ok) throw new Error(started.message)
@@ -352,9 +356,10 @@ describe('startMeasure', () => {
     await started.done
     expect(making(projectFile)).toEqual({})
     const file = kept(root)
-    expect(Object.keys(file.act1)).toEqual(['a', 'b'])
-    expect(file.act1.a.saved.states).toEqual([{ state: null, lufs: null }])
-    expect(file.act1.a.draft).toBeNull()
+    expect(Object.keys(file)).toEqual(['a', 'b'])
+    expect(file.a.saved.states).toEqual([{ state: null, lufs: null }])
+    expect(file.a.draft).toBeNull()
+    expect(existsSync(join(root, 'content-studio/cache/scene-loudness.json'))).toBe(false)
   })
 
   it('refuses a second press while the act is being measured', async () => {
@@ -374,8 +379,8 @@ describe('startMeasure', () => {
       { audio: fakeAudio().audio },
     )
     if (started.ok) await started.done
-    expect(kept(root).act1.a.draft).toBeNull()
-    expect(kept(root).act1.a.saved).not.toBeNull()
+    expect(kept(root).a.draft).toBeNull()
+    expect(kept(root).a.saved).not.toBeNull()
   })
 
   it('knows no act that is not in the project', async () => {
@@ -405,10 +410,10 @@ describe('the kept figures', () => {
     await keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)
     const draft = measureOf({ effects: [] })
     await keepMeasure(projectFile, 'act1', 'a', draft, true)
-    expect(kept(root).act1.a.saved.entry).toBeNull()
-    expect(kept(root).act1.a.draft.entry).toEqual({ effects: [] })
+    expect(kept(root).a.saved.entry).toBeNull()
+    expect(kept(root).a.draft.entry).toEqual({ effects: [] })
     await keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)
-    expect(kept(root).act1.a.draft).toBeNull()
+    expect(kept(root).a.draft).toBeNull()
   })
 
   it('make a saved draft the saved figures, and drop one that is not what was saved', async () => {
@@ -417,14 +422,14 @@ describe('the kept figures', () => {
     await keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)
     await keepMeasure(projectFile, 'act1', 'a', measureOf(entry), true)
     expect((await saveScene(projectFile, 'act1', 'a', entry, null)).ok).toBe(true)
-    expect(kept(root).act1.a.saved.entry).toEqual(entry)
-    expect(kept(root).act1.a.draft).toBeNull()
+    expect(kept(root).a.saved.entry).toEqual(entry)
+    expect(kept(root).a.draft).toBeNull()
 
     const other: SceneMix = { music: { track: null, level: 2 }, effects: [] }
     await keepMeasure(projectFile, 'act1', 'a', measureOf({ effects: [] }), true)
     expect((await saveScene(projectFile, 'act1', 'a', other, entry)).ok).toBe(true)
-    expect(kept(root).act1.a.draft).toBeNull()
-    expect(kept(root).act1.a.saved.entry).toEqual(entry)
+    expect(kept(root).a.draft).toBeNull()
+    expect(kept(root).a.saved.entry).toEqual(entry)
   })
 
   it('keep the expected figures when a scene is saved as the measured one moved', async () => {
@@ -447,8 +452,8 @@ describe('the kept figures', () => {
       },
     )
     expect(answer.ok).toBe(true)
-    expect(kept(root).act1.a.saved.moved).toEqual({ db: 4 })
-    expect(kept(root).act1.a.saved.entry).toEqual(entry)
+    expect(kept(root).a.saved.moved).toEqual({ db: 4 })
+    expect(kept(root).a.saved.entry).toEqual(entry)
   })
 
   it('ignore a move that is not what was saved', async () => {
@@ -462,27 +467,67 @@ describe('the kept figures', () => {
       db: 4,
       measuredAt: '2026-11-05T14:02:00.000Z',
     })
-    expect(kept(root).act1.a.saved ?? null).toBeNull()
+    expect(kept(root).a.saved ?? null).toBeNull()
   })
 
   it('write nothing when a scene is saved that has no kept figures', async () => {
     const { root, projectFile } = repo()
     await saveScene(projectFile, 'act1', 'a', { effects: [] }, null)
-    expect(existsSync(join(root, LOUDNESS_FILE))).toBe(false)
+    expect(existsSync(join(root, scenesLockFile('act1')))).toBe(false)
   })
 
-  it('never write over a file that cannot be read, and refuse to start a measure', async () => {
+  it('are written one scene per line, in id order, each act in its own lock', async () => {
+    const { root, projectFile } = repo()
+    await keepMeasure(projectFile, 'act1', 'b', measureOf(null), false)
+    await keepMeasure(projectFile, 'act1', 'a', measureOf({ effects: [] }), true)
+    await keepMeasure(projectFile, 'act2', 'c', measureOf(null), false)
+    const lines = lockText(root).split('\n')
+    expect(lines.map((l) => l.slice(0, 6))).toEqual(['{', ' "a": ', ' "b": ', '}', ''])
+    expect(kept(root).a).toEqual({ saved: null, draft: measureOf({ effects: [] }) })
+    expect(Object.keys(kept(root, 'act2'))).toEqual(['c'])
+  })
+
+  it('never write over a lock that cannot be read, and refuse to measure its act only', async () => {
     const { root, projectFile } = repo()
     const { writeFileSync, mkdirSync } = await import('node:fs')
-    mkdirSync(join(root, 'content-studio/cache'), { recursive: true })
-    writeFileSync(join(root, LOUDNESS_FILE), 'not json')
-    await expect(keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)).rejects.toThrow(
-      'cannot be read',
+    mkdirSync(join(root, 'tts/act2'), { recursive: true })
+    writeFileSync(
+      join(root, 'tts/act2/scenes.json'),
+      JSON.stringify([{ id: 'c', title: 'C', states: [], triggers: [] }]),
     )
-    expect(readFileSync(join(root, LOUDNESS_FILE), 'utf8')).toBe('not json')
-    expect(await startMeasure(projectFile, 'act1', null)).toMatchObject({
+    mkdirSync(join(root, 'content-studio/scenes'), { recursive: true })
+    writeFileSync(join(root, scenesLockFile('act1')), 'not json')
+    await expect(keepMeasure(projectFile, 'act1', 'a', measureOf(null), false)).rejects.toThrow(
+      'content-studio/scenes/act1.lock.json cannot be read',
+    )
+    expect(lockText(root)).toBe('not json')
+    expect(await startMeasure(projectFile, 'act1', null)).toEqual({
       ok: false,
       kind: 'unreadable',
+      message:
+        'content-studio/scenes/act1.lock.json cannot be read; fix or delete it, and measure again',
+    })
+    const other = await startMeasure(projectFile, 'act2', null, { audio: fakeAudio().audio })
+    if (!other.ok) throw new Error(other.message)
+    await other.done
+    expect(Object.keys(kept(root, 'act2'))).toEqual(['c'])
+  })
+
+  it('report a lock that cannot be read with the project, its act showing no figures', async () => {
+    const { root, projectFile } = repo()
+    await keepMeasure(projectFile, 'act2', 'c', measureOf(null), false)
+    const { writeFileSync, mkdirSync } = await import('node:fs')
+    mkdirSync(join(root, 'content-studio/scenes'), { recursive: true })
+    writeFileSync(join(root, scenesLockFile('act1')), JSON.stringify({ a: { saved: 3 } }))
+    const { loadProject } = await import('./workspace')
+    const loaded = await loadProject(projectFile)
+    if (!loaded.ok) throw new Error('project')
+    expect(loaded.summary.problems.map((p) => [p.file, p.path])).toEqual([
+      ['content-studio/scenes/act1.lock.json', 'a.saved'],
+    ])
+    expect(loaded.summary.scenes!.acts[0]!.scenes[0]!.loudness).toEqual({
+      saved: null,
+      draft: null,
     })
   })
 })
