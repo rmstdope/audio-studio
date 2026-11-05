@@ -171,6 +171,18 @@ describe('fading a stinger take on its page', () => {
     expect(game.contains(document.activeElement)).toBe(true)
   })
 
+  it('hides the Un-choose hint while the chosen take’s editor is open, and brings it back', () => {
+    const { container, fadesButtons } = render('stinger', [take(1, { chosen: true }), take(2)])
+    const game = container.querySelector('.track-in-game')!
+    const unchooseHint = 'Un-choose and the game plays nothing here.'
+    expect(game.textContent).toContain(unchooseHint)
+    act(() => fadesButtons()[0]!.click())
+    expect(game.textContent).not.toContain(unchooseHint)
+    const cancel = [...game.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!
+    act(() => cancel.click())
+    expect(game.textContent).toContain(unchooseHint)
+  })
+
   it('says one line under a take with fades, and nothing under one without', () => {
     const { container } = render('stinger', [
       take(1, { fades: { in: 0.3, out: 1.5, shape: 'smooth' } }),
