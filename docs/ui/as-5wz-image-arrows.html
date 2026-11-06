@@ -1,4 +1,8 @@
-<!doctype html><html><head><meta charset="utf-8"/><title>Option B — on an image page the arrows stay with the takes</title>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Option B — on an image page the arrows stay with the takes</title>
     <style>
       :root {
         --bg: #06070c;
@@ -189,17 +193,110 @@
         color: var(--text);
       }
     </style>
-<style>.strip{display:flex;gap:10px;margin-top:14px}.th{width:120px;height:78px;border-radius:10px;background:var(--raised);border:1px solid var(--line-strong);display:flex;align-items:flex-end;padding:6px 8px;font-size:12px;color:var(--muted)}.th.on{outline:2px solid var(--accent)}.cmp{display:flex;gap:12px;margin-top:14px}.cmp div{flex:1;height:120px;border-radius:12px;background:rgb(255 255 255/4%);border:1px solid var(--line);padding:10px;color:var(--faint);font-size:12.5px}kbd{border:1px solid var(--line-strong);border-radius:5px;padding:0 5px;font-size:11.5px;background:var(--raised);color:var(--soft)}.strip-box{padding:8px;border-radius:12px;border:1px dashed transparent}.strip-box.focus{border-color:var(--accent)}ul.k{color:var(--muted);margin:10px 0 0;padding-left:18px}</style>
-</head><body>
-<div class="intro"><h1>Option B — on an image page the arrows stay with the takes</h1>On an image page, ← and → keep stepping the takes from anywhere on the page, exactly as today. The ‹ › buttons still go to the previous or next image; only the arrow keys do not. Every other page is unchanged. Cost: the image page is the one page where the arrows do not step items, so its hover words leave out the key.</div>
-<h3 class="label">An image, the 4th of 9 in Act 1, comparing takes</h3>
-<div class="frame">
- <div class="ph"><div><span class="crumbs"><a>Images</a> › Act 1</span><h1 class="t">Harbour at dawn</h1><span class="muted">Shown in: The Docks</span></div>
- <div class="actions"><span class="pager"><button class="btn icon">‹</button><span class="count">4 of 9</span><button class="btn icon">›</button></span></div></div>
- <span class="tip">Previous: Lighthouse</span>
- <div class="cmp"><div>The image the game uses</div><div>Take 3 — beside it</div></div>
- <div class="strip-box "><div class="strip"><div class="th">Take 1</div><div class="th">Take 2</div><div class="th on">Take 3</div><div class="th">Take 4</div></div></div>
- <span class="faint small muted">Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the image the game uses.</span>
- <ul class="k"><li>← →: step the takes, from anywhere on the page, as today.</li><li>‹ ›: the previous or next image (hover: “Previous: Lighthouse”, no key).</li><li>C and D: anywhere on the page, as today.</li></ul>
-</div>
-</body></html>
+    <style>
+      .strip {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .th {
+        width: 120px;
+        height: 78px;
+        border-radius: 10px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        display: flex;
+        align-items: flex-end;
+        padding: 6px 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .th.on {
+        outline: 2px solid var(--accent);
+      }
+      .cmp {
+        display: flex;
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .cmp div {
+        flex: 1;
+        height: 120px;
+        border-radius: 12px;
+        background: rgb(255 255 255/4%);
+        border: 1px solid var(--line);
+        padding: 10px;
+        color: var(--faint);
+        font-size: 12.5px;
+      }
+      kbd {
+        border: 1px solid var(--line-strong);
+        border-radius: 5px;
+        padding: 0 5px;
+        font-size: 11.5px;
+        background: var(--raised);
+        color: var(--soft);
+      }
+      .strip-box {
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px dashed transparent;
+      }
+      .strip-box.focus {
+        border-color: var(--accent);
+      }
+      ul.k {
+        color: var(--muted);
+        margin: 10px 0 0;
+        padding-left: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Option B — on an image page the arrows stay with the takes</h1>
+      On an image page, ← and → keep stepping the takes from anywhere on the page, exactly as today.
+      The ‹ › buttons still go to the previous or next image; only the arrow keys do not. Every
+      other page is unchanged. Cost: the image page is the one page where the arrows do not step
+      items, so its hover words leave out the key.
+    </div>
+    <h3 class="label">An image, the 4th of 9 in Act 1, comparing takes</h3>
+    <div class="frame">
+      <div class="ph">
+        <div>
+          <span class="crumbs"><a>Images</a> › Act 1</span>
+          <h1 class="t">Harbour at dawn</h1>
+          <span class="muted">Shown in: The Docks</span>
+        </div>
+        <div class="actions">
+          <span class="pager"
+            ><button class="btn icon">‹</button><span class="count">4 of 9</span
+            ><button class="btn icon">›</button></span
+          >
+        </div>
+      </div>
+      <span class="tip">Previous: Lighthouse</span>
+      <div class="cmp">
+        <div>The image the game uses</div>
+        <div>Take 3 — beside it</div>
+      </div>
+      <div class="strip-box">
+        <div class="strip">
+          <div class="th">Take 1</div>
+          <div class="th">Take 2</div>
+          <div class="th on">Take 3</div>
+          <div class="th">Take 4</div>
+        </div>
+      </div>
+      <span class="faint small muted"
+        >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the image the game
+        uses.</span
+      >
+      <ul class="k">
+        <li>← →: step the takes, from anywhere on the page, as today.</li>
+        <li>‹ ›: the previous or next image (hover: “Previous: Lighthouse”, no key).</li>
+        <li>C and D: anywhere on the page, as today.</li>
+      </ul>
+    </div>
+  </body>
+</html>
