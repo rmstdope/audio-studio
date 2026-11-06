@@ -1,5 +1,7 @@
 import type { MusicListSummary, TrackRow } from '../../../core/music'
+import { Pager } from '../../components/Pager'
 import { shortTitle } from '../../format'
+import { pagerFor } from '../../pager'
 import { routeHref } from '../../route'
 import { BriefPanel } from './BriefPanel'
 import { TakesPanel } from './TakesPanel'
@@ -20,6 +22,10 @@ export function TrackView({
     list.kind === 'stingers'
       ? ({ view: 'music', page: 'stingers' } as const)
       : ({ view: 'music', page: 'act', part: list.id } as const)
+  const pager = pagerFor(list.tracks, track.id, (t) => ({
+    name: t.title,
+    href: routeHref({ view: 'music', page: 'track', track: t.id }),
+  }))
   return (
     <>
       <header className="page-header">
@@ -30,6 +36,7 @@ export function TrackView({
           <h1>{track.title}</h1>
           {track.plays && <span className="muted">Plays in: {track.plays}</span>}
         </div>
+        {pager && <Pager {...pager} />}
       </header>
       <BriefPanel key={track.id} track={track} kind={list.kind} />
       <TakesPanel key={`takes-${track.id}`} track={track} lists={lists} />

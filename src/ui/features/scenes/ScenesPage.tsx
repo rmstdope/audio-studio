@@ -3,9 +3,11 @@ import { draftOf, fixHeading, toMix, type SceneDraft } from '../../../core/scene
 import { expectedFigures, shiftStates, type SceneMeasure } from '../../../core/sceneLoudness'
 import type { SceneAct, SceneRow, ScenesSummary } from '../../../core/scenes'
 import { useRefreshDialog, useSceneLoudness } from '../../api'
+import { Pager } from '../../components/Pager'
+import { pagerFor } from '../../pager'
 import { Problems } from '../../components/Problems'
 import { shortTitle } from '../../format'
-import type { ScenesRoute } from '../../route'
+import { routeHref, type ScenesRoute } from '../../route'
 import { currentScene, statesLine } from '../../scenesText'
 import { useSceneClip } from '../../sceneClip'
 import { useScenePlay } from '../../sceneRun'
@@ -157,6 +159,10 @@ export function ScenesPage({
       : status.kind === 'saved'
         ? { text: 'Saved', className: 'scene-status scene-status-ok' }
         : null
+  const pager = pagerFor(act.scenes, scene.id, (s) => ({
+    name: s.name,
+    href: routeHref({ view: 'scenes', page: 'act', part: act.id, scene: s.id }),
+  }))
   const saving = status.kind === 'saving'
   const save = async () => {
     await editor.save()
@@ -195,6 +201,7 @@ export function ScenesPage({
           </button>
           {refresh(false)}
         </div>
+        {pager && <Pager {...pager} />}
       </header>
       {status.kind === 'failed' && (
         <section className="panel scene-problem" aria-label="Save failed">

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import { useKeepMineEffect, useSetEffectDescription } from '../../api'
 import { Failure } from '../../components/Failure'
+import { Pager, type PagerProps } from '../../components/Pager'
+import { pagerFor } from '../../pager'
 import { WordsField } from '../images/WordsField'
 import { effectLengthLine } from '../../effectsText'
 import { routeHref } from '../../route'
@@ -13,7 +15,11 @@ const BACK = routeHref({ view: 'effects', page: null })
 export function EffectPage({ effects, id }: { effects: EffectsSummary; id: string }) {
   const row = effects.rows.find((r) => r.id === id)
   if (!row) return <Gone id={id} />
-  return <Found row={row} />
+  const pager = pagerFor(effects.rows, id, (r) => ({
+    name: r.name,
+    href: routeHref({ view: 'effects', page: 'effect', effect: r.id }),
+  }))
+  return <Found row={row} pager={pager} />
 }
 
 /** An old link to an effect the game no longer lists. */
@@ -36,7 +42,7 @@ function Gone({ id }: { id: string }) {
   )
 }
 
-function Found({ row }: { row: EffectRow }) {
+function Found({ row, pager }: { row: EffectRow; pager: PagerProps | null }) {
   const field = useSetEffectDescription(row.id)
   const save = useSetEffectDescription(row.id)
   const keep = useKeepMineEffect(row.id)
@@ -51,6 +57,7 @@ function Found({ row }: { row: EffectRow }) {
           <h1 tabIndex={-1}>{row.name}</h1>
           <span className="mono muted">{row.id}</span>
         </div>
+        {pager && <Pager {...pager} />}
       </header>
       {row.gameChanged && (
         <section className="notice notice-warn" aria-label="The game's description changed">
