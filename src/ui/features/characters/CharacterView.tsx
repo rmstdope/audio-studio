@@ -216,7 +216,7 @@ export function CharacterView({
             }}
           />
         )}
-        <div className="header-actions">
+        <div className="header-actions character-actions">
           <button
             ref={designButton}
             className="btn"
@@ -259,8 +259,8 @@ export function CharacterView({
               </button>
             )
           )}
+          {pager && <Pager {...pager} />}
         </div>
-        {pager && <Pager {...pager} />}
       </header>
       {designing && (
         <DesignVoice
