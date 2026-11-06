@@ -7,6 +7,7 @@ import type { SceneMix } from '../../../core/scenes'
 import type { ProjectSummary } from '../../../core/summary'
 import { ProjectSchema } from '../../../core/project'
 import { projectJson } from '../../../../test/helpers'
+import { valuesInEveryWindow } from '../../../../test/stylesheet'
 import { fakeHistory } from '../../../../test/fakeHistory'
 import { useRoute, type ScenesRoute } from '../../route'
 
@@ -474,6 +475,13 @@ describe('moving between scenes', () => {
     const middle = render({ ...open, scene: 'act1-forest' })
     const pager = middle.querySelector('.pager')!
     expect(pager.textContent).toBe('‹2 of 3›')
+    // One piece with the header's buttons, at the header's right end when it wraps (as-85z).
+    expect(pager.parentElement!.classList.contains('header-actions')).toBe(true)
+    expect(valuesInEveryWindow(pager.parentElement!, 'margin-left').at(-1)).toEndWith(': auto')
+    expect(valuesInEveryWindow(pager.parentElement!, 'justify-content').at(-1)).toEndWith(
+      ': flex-end',
+    )
+    expect(pager.parentElement!.textContent).toContain('Save')
     const [prev, next] = [...pager.querySelectorAll('button')]
     expect(prev!.title).toBe('Previous: General store (←)')
     expect(next!.title).toBe('Next: Village chapel (→)')

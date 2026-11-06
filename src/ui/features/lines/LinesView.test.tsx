@@ -4,6 +4,7 @@ import { cpSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ProjectSummary } from '../../../core/summary'
 import { tempRepo } from '../../../../test/helpers'
+import { valuesInEveryWindow } from '../../../../test/stylesheet'
 import { startServer } from '../../../server/index'
 
 // The studio itself, on a copy of the sample whose cast is broken as when the bug was seen: a
@@ -117,6 +118,12 @@ describe('a part’s All lines page, previous and next', () => {
       )
       const pager = container.querySelector('.pager')!
       expect(pager.textContent).toBe(`‹1 of ${summary.parts.length}›`)
+      // One piece with the header's buttons, at the header's right end when it wraps (as-85z).
+      expect(pager.parentElement!.classList.contains('header-actions')).toBe(true)
+      expect(valuesInEveryWindow(pager.parentElement!, 'margin-left').at(-1)).toEndWith(': auto')
+      expect(valuesInEveryWindow(pager.parentElement!, 'justify-content').at(-1)).toEndWith(
+        ': flex-end',
+      )
       const [prev, next] = [...pager.querySelectorAll('button')]
       expect(prev!.getAttribute('aria-disabled')).toBe('true')
       window.location.hash = '#/start'

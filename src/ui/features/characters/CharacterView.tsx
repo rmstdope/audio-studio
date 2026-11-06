@@ -216,7 +216,7 @@ export function CharacterView({
             }}
           />
         )}
-        <div className="header-actions character-actions">
+        <div className="header-actions header-end">
           <button
             ref={designButton}
             className="btn"

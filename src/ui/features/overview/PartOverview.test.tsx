@@ -3,6 +3,7 @@ import { cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { tempRepo } from '../../../../test/helpers'
+import { valuesInEveryWindow } from '../../../../test/stylesheet'
 import { loadPart, loadProject } from '../../../services/workspace'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
@@ -140,6 +141,13 @@ describe('a part’s overview, previous and next', () => {
     )
     const pager = container.querySelector('.pager')!
     expect(pager.textContent).toBe(`‹${parts.length} of ${parts.length}›`)
+    // One piece with the header's buttons, at the header's right end when it wraps (as-85z).
+    expect(pager.parentElement!.classList.contains('header-actions')).toBe(true)
+    expect(valuesInEveryWindow(pager.parentElement!, 'margin-left').at(-1)).toEndWith(': auto')
+    expect(valuesInEveryWindow(pager.parentElement!, 'justify-content').at(-1)).toEndWith(
+      ': flex-end',
+    )
+    expect(pager.parentElement!.textContent).toContain('Refresh dialog')
     const [prev, next] = [...pager.querySelectorAll('button')]
     expect(next!.getAttribute('aria-disabled')).toBe('true')
     window.location.hash = '#/start'

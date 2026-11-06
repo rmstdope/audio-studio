@@ -176,7 +176,7 @@ export function ScenesPage({
           <h1 tabIndex={-1}>{scene.name}</h1>
           <span className="muted">{statesLine(scene)}</span>
         </div>
-        <div className="header-actions">
+        <div className="header-actions header-end">
           {word && (
             <span className={word.className} role="status">
               {word.text}
@@ -200,8 +200,8 @@ export function ScenesPage({
             {saving ? 'Saving…' : 'Save'}
           </button>
           {refresh(false)}
+          {pager && <Pager {...pager} />}
         </div>
-        {pager && <Pager {...pager} />}
       </header>
       {status.kind === 'failed' && (
         <section className="panel scene-problem" aria-label="Save failed">
