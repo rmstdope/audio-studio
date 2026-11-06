@@ -242,7 +242,11 @@ export function LinesView({
           }}
         />
       )}
-      {pager && <Pager {...pager} />}
+      {pager && (
+        <div className="header-actions header-end">
+          <Pager {...pager} />
+        </div>
+      )}
     </header>
   )
 

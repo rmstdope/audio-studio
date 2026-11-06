@@ -207,9 +207,11 @@ wrapping and never crossing acts. A step sets `window.location.hash` as the brea
 route hold that asks before leaving a scene's unsaved changes applies unchanged. ← and → step too,
 unless the press is in a field or inside a control that uses the arrows (`ARROW_USERS` in
 `ui/pager.ts`); the image page passes `keys={false}` because its take strip keeps the arrows
-page-wide. The language chosen stays in the address of the neighbour. On a character's page the
-control sits inside the header's action group, held to the right end, so a narrower window wraps
-it with Design a voice… and Start audition and never on a row of its own (as-ped).
+page-wide. The language chosen stays in the address of the neighbour. On a character's page, a
+part's overview and Lines page and an act's Scenes page, the pages whose header has buttons or a
+language switch, the control sits inside the header's action group (`.header-end`), held to the
+right end, so a narrower window wraps it with the buttons and never alone at the left (as-ped,
+as-85z).
 
 Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows. `core/` has no
 imports from the others, so the rules for status, staleness and alignment are tested without

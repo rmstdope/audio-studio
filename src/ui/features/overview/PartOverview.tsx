@@ -73,8 +73,8 @@ export function PartOverview({
             }}
           />
         )}
-        {(hasDialog || summary.canRefresh) && (
-          <div className="header-actions">
+        {(hasDialog || summary.canRefresh || pager) && (
+          <div className="header-actions header-end">
             {summary.canRefresh && (
               <button
                 className="btn"
@@ -99,9 +99,9 @@ export function PartOverview({
                 Generate {plural(toRecord, 'line')}
               </a>
             )}
+            {pager && <Pager {...pager} />}
           </div>
         )}
-        {pager && <Pager {...pager} />}
       </header>
       {refresh.outcome && (
         <RefreshOutcome

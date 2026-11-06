@@ -1522,12 +1522,6 @@ button.cue-chip[aria-expanded='true'] {
   align-self: center;
 }
 
-/* The buttons and ‹ › keep to the header's right end, on its first row or wrapped (as-ped). */
-.character-actions {
-  margin-left: auto;
-  justify-content: flex-end;
-}
-
 .brief-panel,
 .voice-panel,
 .character-lines,
@@ -2075,6 +2069,12 @@ button.cue-chip[aria-expanded='true'] {
 
 .header-actions .btn {
   align-self: auto;
+}
+
+/* A header's buttons and ‹ › keep to its right end, on its first row or wrapped (as-ped, as-85z). */
+.header-end {
+  margin-left: auto;
+  justify-content: flex-end;
 }
 
 .generate .measure {
