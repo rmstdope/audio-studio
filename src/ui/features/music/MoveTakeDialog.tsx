@@ -37,7 +37,7 @@ export function MoveTakeDialog({
   lists: readonly MusicListSummary[]
   making: Record<string, MakingSummary>
   onClose: () => void
-  /** The move was pressed: a take that is playing stops. */
+  /** The move was pressed: the take moved stops if it is playing; anything else plays on. */
   onMoving: () => void
   onMoved: (to: { id: string; n: number }) => void
 }) {
