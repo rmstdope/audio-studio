@@ -5,10 +5,12 @@ import {
   type ImagesAct,
   type ImagesSummary,
 } from '../../../core/images'
+import { Pager } from '../../components/Pager'
 import { Problems } from '../../components/Problems'
 import { useAcceptImageChange, useImageCompare, useSetImageWords } from '../../api'
 import { shortTitle } from '../../format'
 import { outOfDateText } from '../../imagesText'
+import { pagerFor } from '../../pager'
 import { routeHref } from '../../route'
 import { ActStyleBox } from './ActStyleBox'
 import { ActStyleMenu } from './ActStyleMenu'
@@ -45,6 +47,12 @@ export function ImagePage({
         if (result.ok) field.current?.focus()
       },
     })
+  // The act's images in the list's order; one with no row (the lists disagree) is not stepped to.
+  const listed = act.order.flatMap((id) => act.rows.find((r) => r.id === id) ?? [])
+  const pager = pagerFor(listed, row.id, (r) => ({
+    name: r.title,
+    href: routeHref({ view: 'images', page: 'image', image: r.id, from: act.id }),
+  }))
   return (
     <>
       <header className="page-header">
@@ -67,6 +75,7 @@ export function ImagePage({
             {row.looksOld && <span className="chip chip-warn">Old look</span>}
           </span>
         </div>
+        {pager && <Pager {...pager} />}
       </header>
       {row.status === 'out of date' && (
         <section className="notice notice-warn">
