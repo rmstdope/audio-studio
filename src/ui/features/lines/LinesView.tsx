@@ -23,6 +23,8 @@ import { RefreshOutcome } from '../overview/PartOverview'
 import { GeneratePanel } from './GeneratePanel'
 import { CuedText, LineWords } from './CueGaps'
 import { DialogGonePanel } from './DialogGonePanel'
+import { Pager } from '../../components/Pager'
+import { pagerFor } from '../../pager'
 import { PartLanguageSwitch } from './PartLanguageSwitch'
 import { HeardComparison } from './HeardComparison'
 import { LineTakes } from './LineTakes'
@@ -212,6 +214,10 @@ export function LinesView({
     if (inTurn) playingRow.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [playing, inTurn])
 
+  const pager = pagerFor(summary.parts, part.id, (p) => ({
+    name: shortTitle(p.title),
+    href: routeHref({ view: 'lines', part: p.id, ...(language ? { language } : {}) }),
+  }))
   const header = (
     <header className="page-header">
       <div>
@@ -236,6 +242,7 @@ export function LinesView({
           }}
         />
       )}
+      {pager && <Pager {...pager} />}
     </header>
   )
 

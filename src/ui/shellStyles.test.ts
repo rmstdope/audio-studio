@@ -27,3 +27,11 @@ describe('the room the shell leaves the pages', () => {
     expect(rule(css, '.content')).toContain('padding: 20px 24px 32px')
   })
 })
+
+// The previous/next control wraps below a title as one piece (as-5wz).
+describe('the previous/next control', () => {
+  it('never splits its buttons from the count', () => {
+    expect(rule(css, '.pager')).toContain('white-space: nowrap')
+    expect(rule(css, '.pager')).toContain('display: inline-flex')
+  })
+})

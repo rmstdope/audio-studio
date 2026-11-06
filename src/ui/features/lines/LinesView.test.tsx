@@ -92,3 +92,40 @@ describe('a part’s All lines page, with the cast file broken', () => {
     }
   })
 })
+
+describe('a part’s All lines page, previous and next', () => {
+  it('steps through the parts, the first with no previous, keeping the language', async () => {
+    globalThis.fetch = ((input: string, init?: RequestInit) =>
+      realFetch(new URL(input, server.url), init)) as typeof fetch
+    try {
+      const project = (await (await fetch('/api/project')).json()) as {
+        summary: ProjectSummary
+      }
+      const { summary } = project
+      const part = summary.parts[0]!
+      const container = document.createElement('div')
+      document.body.append(container)
+      const page = createRoot(container)
+      await act(() =>
+        page.render(
+          createElement(
+            QueryClientProvider,
+            { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+            createElement(LinesView, { summary, part, language: 'en' }),
+          ),
+        ),
+      )
+      const pager = container.querySelector('.pager')!
+      expect(pager.textContent).toBe(`‹1 of ${summary.parts.length}›`)
+      const [prev, next] = [...pager.querySelectorAll('button')]
+      expect(prev!.getAttribute('aria-disabled')).toBe('true')
+      window.location.hash = '#/start'
+      await act(() => next!.click())
+      expect(window.location.hash).toBe(`#/parts/${summary.parts[1]!.id}/lines?language=en`)
+      await act(() => page.unmount())
+    } finally {
+      globalThis.fetch = realFetch
+      document.body.innerHTML = ''
+    }
+  })
+})

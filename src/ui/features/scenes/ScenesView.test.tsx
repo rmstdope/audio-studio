@@ -309,6 +309,8 @@ describe('an act with its scenes', () => {
       'Discard',
       'Save',
       'Refresh from the game',
+      '‹',
+      '›',
     ])
     expect(text(page.querySelector('.scene-status'))).toBeUndefined()
     expect(text(page.querySelector('[aria-label="Music"]'))).toBe('MusicGeneral Store100%MS')
@@ -466,6 +468,21 @@ describe('moving between scenes', () => {
       links[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
     })
     expect(document.activeElement).toBe(links[1]!)
+  })
+
+  it('has the previous/next control, stepping through the act’s scenes without wrapping', () => {
+    const middle = render({ ...open, scene: 'act1-forest' })
+    const pager = middle.querySelector('.pager')!
+    expect(pager.textContent).toBe('‹2 of 3›')
+    const [prev, next] = [...pager.querySelectorAll('button')]
+    expect(prev!.title).toBe('Previous: General store (←)')
+    expect(next!.title).toBe('Next: Village chapel (→)')
+    window.location.hash = '#/start'
+    act(() => next!.click())
+    expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-chapel')
+    const last = render({ ...open, scene: 'act1-chapel' })
+    expect(last.querySelector('.pager')!.textContent).toBe('‹3 of 3›')
+    expect(last.querySelectorAll('.pager button')[1]!.getAttribute('aria-disabled')).toBe('true')
   })
 
   it('has a menu of the scenes for a narrow window, showing the open one', () => {
@@ -1107,6 +1124,34 @@ describe('leaving a scene with unsaved changes', () => {
     act(() => button(page, 'Refresh from the game').click())
     await flush()
   }
+
+  it('asks before the next-scene button moves on, and Cancel stays on the scene', async () => {
+    window.location.hash = '#/scenes/parts/act1?scene=act1-store'
+    const { useRoute } = await import('../../route')
+    const router = document.createElement('div')
+    document.body.append(router)
+    const routerRoot = createRoot(router)
+    cleanups.push(() => act(() => routerRoot.unmount()))
+    // The router the page holds the route with, as App mounts it.
+    act(() => routerRoot.render(createElement(() => (useRoute(), null))))
+    const page = render(open)
+    type(musicLevel(page), '40')
+    act(() => page.querySelectorAll<HTMLButtonElement>('.pager button')[1]!.click())
+    // The hashchange event arrives a moment after the click.
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
+    expect(text(dialog()!.querySelector('h2'))).toBe('Save the changes to General store?')
+    // An arrow key inside the question does not step again.
+    act(() => {
+      dialog()!
+        .querySelector('button')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    })
+    act(() => button(page, 'Cancel').click())
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-store')
+    expect(status(page)).toBe('Unsaved changes')
+  })
 
   it('asks before Refresh from the game, focus on Save, and Cancel goes back', async () => {
     const page = render(open)

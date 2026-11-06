@@ -113,6 +113,46 @@ describe('CharacterView', () => {
     await act(() => page.unmount())
   })
 
+  it('has the previous/next control over the Characters list, keeping the language', async () => {
+    globalThis.fetch = studio
+    const both = (c: (typeof summary.characters)[number]) => ({
+      ...c,
+      languages: { en: uncast, sv: uncast },
+    })
+    const two: ProjectSummary = {
+      ...summary,
+      languages: [
+        { id: 'en', name: 'English' },
+        { id: 'sv', name: 'Svenska' },
+      ],
+      characters: [
+        both(summary.characters[0]!),
+        both({ ...summary.characters[0]!, id: 'miller', name: 'Miller' }),
+      ],
+    }
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(CharacterView, { summary: two, characterId: 'keeper', asked: 'sv' }),
+        ),
+      ),
+    )
+    const pager = container.querySelector('.pager')!
+    expect(pager.textContent).toBe('‹1 of 2›')
+    const [prev, next] = [...pager.querySelectorAll('button')]
+    expect(prev!.getAttribute('aria-disabled')).toBe('true')
+    expect(next!.title).toBe('Next: Miller (→)')
+    window.location.hash = '#/start'
+    await act(() => next!.click())
+    expect(window.location.hash).toBe('#/characters/miller?language=sv')
+    await act(() => page.unmount())
+  })
+
   it('shows an ElevenLabs voice as ElevenLabs gives it, with its preview and a take on ElevenLabs', async () => {
     const cast: CharacterLanguage = { ...uncast, voice: 'eleven:g1', voiceName: 'George' }
     const castSummary: ProjectSummary = {

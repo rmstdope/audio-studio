@@ -5,6 +5,8 @@ import type { PartDetail } from '../../../services/workspace'
 import { useAdopt, useMoveCue, useMoveSceneCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
 import { DialogGonePanel } from '../lines/DialogGonePanel'
+import { Pager } from '../../components/Pager'
+import { pagerFor } from '../../pager'
 import { PartLanguageSwitch } from '../lines/PartLanguageSwitch'
 import { noDialogPanel } from '../../languages'
 import { CharacterCard } from '../../components/CharacterCard'
@@ -46,6 +48,10 @@ export function PartOverview({
   const showsLines = (several ? loaded?.dialog === 'ok' : hasDialog) && loaded !== null
   const lineCount = several ? (loaded?.lines.length ?? 0) : part.lineCount
 
+  const pager = pagerFor(summary.parts, part.id, (p) => ({
+    name: shortTitle(p.title),
+    href: routeHref({ view: 'part', part: p.id, ...(language ? { language } : {}) }),
+  }))
   return (
     <>
       <header className="page-header">
@@ -95,6 +101,7 @@ export function PartOverview({
             )}
           </div>
         )}
+        {pager && <Pager {...pager} />}
       </header>
       {refresh.outcome && (
         <RefreshOutcome

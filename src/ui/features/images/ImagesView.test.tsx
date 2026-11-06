@@ -291,6 +291,23 @@ describe('an image’s page', () => {
     )
   })
 
+  it('steps to the other image of the act by its buttons only, and the arrow keys leave it alone', () => {
+    window.location.hash = '#/start'
+    const page = render(route)
+    const [prev, next] = [...page.querySelectorAll<HTMLButtonElement>('.pager button')]
+    expect(text(page.querySelector('.pager'))).toBe('‹1 of 2›')
+    expect(prev!.getAttribute('aria-disabled')).toBe('true')
+    expect(next!.title).toBe('Next: The Barn')
+    act(() => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      )
+    })
+    expect(window.location.hash).toBe('#/start')
+    act(() => next!.click())
+    expect(window.location.hash).toBe('#/images/items/barn?from=act1')
+  })
+
   it('saves the words when the field is left, and shows Saved', async () => {
     const page = render(route)
     const field = page.querySelector('textarea')!

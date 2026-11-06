@@ -61,6 +61,8 @@ import { DesignVoice } from '../audition/DesignVoice'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
+import { Pager } from '../../components/Pager'
+import { pagerFor } from '../../pager'
 import { CloneVoice } from './CloneVoice'
 import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefEditors'
 
@@ -158,6 +160,14 @@ export function CharacterView({
           { onSuccess: (result) => result.ok && (window.location.hash = audition) },
         )
 
+  const pager = pagerFor(summary.characters, character.id, (c) => ({
+    name: c.name,
+    href: routeHref({
+      view: 'character',
+      character: c.id,
+      ...(queried ? { language: queried } : {}),
+    }),
+  }))
   return (
     <>
       <header className="page-header">
@@ -250,6 +260,7 @@ export function CharacterView({
             )
           )}
         </div>
+        {pager && <Pager {...pager} />}
       </header>
       {designing && (
         <DesignVoice
