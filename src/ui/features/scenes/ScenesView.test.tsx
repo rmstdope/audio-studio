@@ -1493,8 +1493,14 @@ describe('playing a scene', () => {
   })
 })
 
+/** Today at 14:02, so "Measured today 14:02" holds on whatever day the tests run. */
+const todayAt1402 = () => {
+  const at = new Date()
+  at.setHours(14, 2, 0, 0)
+  return at.toISOString()
+}
 const measureOf = (over: Partial<SceneMeasure> = {}): SceneMeasure => ({
-  measuredAt: new Date(2026, 10, 5, 14, 2).toISOString(),
+  measuredAt: todayAt1402(),
   entry: null,
   clips: {},
   states: [

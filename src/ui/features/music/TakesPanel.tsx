@@ -435,7 +435,11 @@ export function TakesPanel({
               refocus.current = movingTake.n
               setMoving(null)
             }}
-            onMoving={() => player.stop()}
+            onMoving={() => {
+              // Only the take that leaves stops, or its seam; anything else plays on.
+              const id = `music-take-${trackId}-${movingTake.n}`
+              if (player.playing === id || player.playing === `${id}-seam`) player.stop()
+            }}
             onMoved={({ id, n }) => {
               setMoved({ n: movingTake.n, id, became: n })
               setMoving(null)
