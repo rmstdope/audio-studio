@@ -1137,7 +1137,8 @@ describe('leaving a scene with unsaved changes', () => {
     const page = render(open)
     type(musicLevel(page), '40')
     act(() => page.querySelectorAll<HTMLButtonElement>('.pager button')[1]!.click())
-    await flush()
+    // The hashchange event arrives a moment after the click.
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
     expect(text(dialog()!.querySelector('h2'))).toBe('Save the changes to General store?')
     // An arrow key inside the question does not step again.
     act(() => {
