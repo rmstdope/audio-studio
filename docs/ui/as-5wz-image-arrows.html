@@ -1,0 +1,205 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Option B — on an image page the arrows stay with the takes</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --raised-h: #20242e;
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      h3.label {
+        max-width: 1100px;
+        margin: 30px auto 8px;
+        font-size: 13px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 500;
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 24px 28px;
+      }
+      .frame.narrow {
+        max-width: 400px;
+      }
+      .ph {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .crumbs {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      .crumbs a {
+        color: var(--faint);
+        text-decoration: none;
+      }
+      h1.t {
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        margin: 6px 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 13px;
+        border-radius: 10px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: var(--raised-h);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: transparent;
+        font-weight: 600;
+      }
+      .btn[aria-disabled] {
+        opacity: 0.38;
+        cursor: default;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .panel {
+        margin-top: 18px;
+        padding: 18px 20px;
+        border-radius: 16px;
+        background: rgb(255 255 255/3.5%);
+        border: 1px solid var(--line);
+        color: var(--faint);
+        height: 70px;
+      }
+      .pager {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pager .count {
+        font-size: 12.5px;
+        color: var(--muted);
+        min-width: 56px;
+        text-align: center;
+      }
+      .icon {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        justify-content: center;
+        border-radius: 9px;
+      }
+      .cr-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .mini {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .mini button {
+        background: none;
+        border: 1px solid transparent;
+        color: var(--muted);
+        border-radius: 7px;
+        padding: 1px 7px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .mini button:hover {
+        background: var(--raised);
+        color: var(--text);
+      }
+      .mini button[aria-disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .tip {
+        display: inline-block;
+        margin-left: 10px;
+        padding: 4px 8px;
+        border-radius: 7px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .note b {
+        color: var(--text);
+      }
+    </style>
+<style>.strip{display:flex;gap:10px;margin-top:14px}.th{width:120px;height:78px;border-radius:10px;background:var(--raised);border:1px solid var(--line-strong);display:flex;align-items:flex-end;padding:6px 8px;font-size:12px;color:var(--muted)}.th.on{outline:2px solid var(--accent)}.cmp{display:flex;gap:12px;margin-top:14px}.cmp div{flex:1;height:120px;border-radius:12px;background:rgb(255 255 255/4%);border:1px solid var(--line);padding:10px;color:var(--faint);font-size:12.5px}kbd{border:1px solid var(--line-strong);border-radius:5px;padding:0 5px;font-size:11.5px;background:var(--raised);color:var(--soft)}.strip-box{padding:8px;border-radius:12px;border:1px dashed transparent}.strip-box.focus{border-color:var(--accent)}ul.k{color:var(--muted);margin:10px 0 0;padding-left:18px}</style>
+</head><body>
+<div class="intro"><h1>Option B — on an image page the arrows stay with the takes</h1>On an image page, ← and → keep stepping the takes from anywhere on the page, exactly as today. The ‹ › buttons still go to the previous or next image; only the arrow keys do not. Every other page is unchanged. Cost: the image page is the one page where the arrows do not step items, so its hover words leave out the key.</div>
+<h3 class="label">An image, the 4th of 9 in Act 1, comparing takes</h3>
+<div class="frame">
+ <div class="ph"><div><span class="crumbs"><a>Images</a> › Act 1</span><h1 class="t">Harbour at dawn</h1><span class="muted">Shown in: The Docks</span></div>
+ <div class="actions"><span class="pager"><button class="btn icon">‹</button><span class="count">4 of 9</span><button class="btn icon">›</button></span></div></div>
+ <span class="tip">Previous: Lighthouse</span>
+ <div class="cmp"><div>The image the game uses</div><div>Take 3 — beside it</div></div>
+ <div class="strip-box "><div class="strip"><div class="th">Take 1</div><div class="th">Take 2</div><div class="th on">Take 3</div><div class="th">Take 4</div></div></div>
+ <span class="faint small muted">Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the image the game uses.</span>
+ <ul class="k"><li>← →: step the takes, from anywhere on the page, as today.</li><li>‹ ›: the previous or next image (hover: “Previous: Lighthouse”, no key).</li><li>C and D: anywhere on the page, as today.</li></ul>
+</div>
+</body></html>
