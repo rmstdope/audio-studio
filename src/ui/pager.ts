@@ -20,6 +20,7 @@ export const ARROW_USERS = [
   '.scene-list',
   '.modal-back',
   '[role="dialog"]',
+  '[role="alertdialog"]',
   '[role="menu"]',
   '[role="listbox"]',
   '[role="slider"]',

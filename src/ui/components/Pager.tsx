@@ -51,7 +51,7 @@ export function Pager({ place, previous, next, keys = true }: PagerProps) {
     if (!keys) return
     const onKey = (event: KeyboardEvent) => {
       const target = event.target
-      if (event.defaultPrevented || !(target instanceof Element)) return
+      if (event.defaultPrevented || event.repeat || !(target instanceof Element)) return
       const way = pagerStep({
         key: event.key,
         modifier: event.metaKey || event.ctrlKey || event.altKey,

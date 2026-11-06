@@ -133,6 +133,7 @@ describe('a part’s overview, previous and next', () => {
           createElement(PartOverview, {
             summary: project.summary,
             part: parts[parts.length - 1]!,
+            language: 'en',
           }),
         ),
       ),
@@ -143,7 +144,7 @@ describe('a part’s overview, previous and next', () => {
     expect(next!.getAttribute('aria-disabled')).toBe('true')
     window.location.hash = '#/start'
     await act(() => prev!.click())
-    expect(window.location.hash).toBe(`#/parts/${parts[parts.length - 2]!.id}`)
+    expect(window.location.hash).toBe(`#/parts/${parts[parts.length - 2]!.id}?language=en`)
     await act(() => view.unmount())
     globalThis.fetch = realFetch
     document.body.innerHTML = ''

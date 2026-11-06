@@ -1125,6 +1125,33 @@ describe('leaving a scene with unsaved changes', () => {
     await flush()
   }
 
+  it('asks before the next-scene button moves on, and Cancel stays on the scene', async () => {
+    window.location.hash = '#/scenes/parts/act1?scene=act1-store'
+    const { useRoute } = await import('../../route')
+    const router = document.createElement('div')
+    document.body.append(router)
+    const routerRoot = createRoot(router)
+    cleanups.push(() => act(() => routerRoot.unmount()))
+    // The router the page holds the route with, as App mounts it.
+    act(() => routerRoot.render(createElement(() => (useRoute(), null))))
+    const page = render(open)
+    type(musicLevel(page), '40')
+    act(() => page.querySelectorAll<HTMLButtonElement>('.pager button')[1]!.click())
+    await flush()
+    expect(text(dialog()!.querySelector('h2'))).toBe('Save the changes to General store?')
+    // An arrow key inside the question does not step again.
+    act(() => {
+      dialog()!
+        .querySelector('button')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    })
+    act(() => button(page, 'Cancel').click())
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-store')
+    expect(status(page)).toBe('Unsaved changes')
+  })
+
   it('asks before Refresh from the game, focus on Save, and Cancel goes back', async () => {
     const page = render(open)
     button(page, 'Refresh from the game').focus()

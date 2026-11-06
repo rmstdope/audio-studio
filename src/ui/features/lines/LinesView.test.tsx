@@ -111,7 +111,7 @@ describe('a part’s All lines page, previous and next', () => {
           createElement(
             QueryClientProvider,
             { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-            createElement(LinesView, { summary, part }),
+            createElement(LinesView, { summary, part, language: 'en' }),
           ),
         ),
       )
@@ -121,7 +121,7 @@ describe('a part’s All lines page, previous and next', () => {
       expect(prev!.getAttribute('aria-disabled')).toBe('true')
       window.location.hash = '#/start'
       await act(() => next!.click())
-      expect(window.location.hash).toBe(`#/parts/${summary.parts[1]!.id}/lines`)
+      expect(window.location.hash).toBe(`#/parts/${summary.parts[1]!.id}/lines?language=en`)
       await act(() => page.unmount())
     } finally {
       globalThis.fetch = realFetch

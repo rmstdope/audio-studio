@@ -93,6 +93,31 @@ describe('the previous/next control', () => {
     p.unmount()
   })
 
+  it('leaves the arrows to the controls and dialogs that use them, and ignores a held key', () => {
+    window.location.hash = '#/start'
+    const p = show(middle)
+    for (const markup of [
+      '<ul class="scene-list"><li><a href="#x">a</a></li></ul>',
+      '<div role="slider" tabindex="0"></div>',
+      '<div role="tablist"><button role="tab">en</button></div>',
+      '<div role="alertdialog"><button>Save</button></div>',
+    ]) {
+      const holder = document.createElement('div')
+      holder.innerHTML = markup
+      document.body.append(holder)
+      press('ArrowRight', holder.querySelector('a, button, [role=slider]')!)
+      expect(window.location.hash).toBe('#/start')
+      holder.remove()
+    }
+    act(() => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', repeat: true, bubbles: true }),
+      )
+    })
+    expect(window.location.hash).toBe('#/start')
+    p.unmount()
+  })
+
   it('leaves the arrows to a field', () => {
     window.location.hash = '#/start'
     const p = show(middle)
