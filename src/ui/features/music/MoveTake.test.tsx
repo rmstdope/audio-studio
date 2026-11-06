@@ -509,12 +509,11 @@ describe('what plays while a take is moved', () => {
   })
   const playing = (label: string) =>
     document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
-  async function moveTake(page: ReturnType<typeof render>, n: number) {
-    const card = [...document.querySelectorAll('.take')].find((t) =>
-      t.textContent!.startsWith(`Take ${n}`),
-    )!
-    await click([...card.querySelectorAll('button')].find((b) => b.textContent === 'Move…'))
-    await click(option('Game over'))
+  const card = (n: number) =>
+    [...document.querySelectorAll('.take')].find((t) => t.textContent!.startsWith(`Take ${n}`))!
+  async function moveTake(page: ReturnType<typeof render>, n: number, to = 'Game over') {
+    await click([...card(n).querySelectorAll('button')].find((b) => b.textContent === 'Move…'))
+    await click(option(to))
     await click(page.buttons(`Move take ${n}`)[0])
   }
 
@@ -523,6 +522,30 @@ describe('what plays while a take is moved', () => {
     await click(playing('Play take 3')!)
     await moveTake(page, 1)
     expect(playing('Stop take 3')).not.toBeNull()
+    expect(card(3).querySelector('.wave .playhead')).not.toBeNull()
+  })
+
+  it("lets the game's own file play on", async () => {
+    const own = row('win', 'Victory', {
+      current: { kind: 'game', file: 'music/win.mp3', exists: true },
+      gameFile: { file: 'music/win.mp3', exists: true },
+    })
+    const page = render(own, view([take(1)], { kind: 'stinger' }))
+    await click(playing("Play the game's own file")!)
+    await moveTake(page, 1, 'Game over')
+    expect(playing("Stop the game's own file")).not.toBeNull()
+  })
+
+  it("stops a loop take's seam when that take is moved, and lets another's play on", async () => {
+    const loops = view([take(1), take(3)])
+    const page = render(village, loops)
+    const seam = (n: number) =>
+      [...card(n).querySelectorAll('button')].find((b) => b.textContent === 'Hear the seam')!
+    await click(seam(3))
+    await moveTake(page, 1, "Witch's hut")
+    expect(seam(3)).toBeUndefined()
+    await moveTake(page, 3, "Witch's hut")
+    expect(seam(3)).not.toBeUndefined()
   })
 
   it('lets the chosen take in the game play on', async () => {
