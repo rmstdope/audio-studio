@@ -33,3 +33,27 @@ export function minWidthsInEveryWindow(element: Element): string[] {
   }
   return found
 }
+
+/**
+ * The values that the stylesheet's rules for every window width give `property` on an element,
+ * each with the selector that gives it, in stylesheet order. Media and container blocks, the
+ * cascade and inheritance are not looked at.
+ */
+export function valuesInEveryWindow(element: Element, property: string): string[] {
+  const found: string[] = []
+  const declaration = new RegExp(`(?:^|[;\\s])${property}:\\s*([^;]+);`)
+  for (const rule of alwaysRules()) {
+    const value = declaration.exec(rule.body)?.[1]?.trim()
+    if (!value) continue
+    for (const selector of rule.selectors) {
+      let matches = false
+      try {
+        matches = element.matches(selector)
+      } catch {
+        // A selector the DOM cannot test (a pseudo-element) applies to no element.
+      }
+      if (matches) found.push(`${selector}: ${value}`)
+    }
+  }
+  return found
+}

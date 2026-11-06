@@ -1,6 +1,7 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { CharacterLanguage, ProjectSummary } from '../../../core/summary'
+import { valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -144,6 +145,11 @@ describe('CharacterView', () => {
     )
     const pager = container.querySelector('.pager')!
     expect(pager.textContent).toBe('‹1 of 2›')
+    // One piece with the header's buttons, so a narrow window wraps them together (as-ped).
+    expect(pager.parentElement!.classList.contains('header-actions')).toBe(true)
+    expect(pager.parentElement!.textContent).toContain('Design a voice…')
+    // ... and the piece keeps to the header's right end when it wraps onto a row of its own.
+    expect(valuesInEveryWindow(pager.parentElement!, 'margin-left').at(-1)).toEndWith(': auto')
     const [prev, next] = [...pager.querySelectorAll('button')]
     expect(prev!.getAttribute('aria-disabled')).toBe('true')
     expect(next!.title).toBe('Next: Miller (→)')
