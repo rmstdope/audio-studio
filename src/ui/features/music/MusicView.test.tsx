@@ -81,6 +81,7 @@ function render(
   orphans: OrphanRow[] = [],
   making: Record<string, unknown> = {},
   roof: Partial<TrackRow> = {},
+  openTrack?: string,
 ) {
   const id = kind === 'act' ? 'act1' : 'stingers'
   const shown = list(id, kind)
@@ -89,9 +90,11 @@ function render(
     music: { lists: [{ ...shown, tracks, orphans }] },
   } as unknown as ProjectSummary
   const route = (
-    kind === 'act'
-      ? { view: 'music', page: 'act', part: id, show }
-      : { view: 'music', page: 'stingers', show }
+    openTrack
+      ? { view: 'music', page: 'track', track: openTrack }
+      : kind === 'act'
+        ? { view: 'music', page: 'act', part: id, show }
+        : { view: 'music', page: 'stingers', show }
   ) as MusicRoute
   const container = document.createElement('div')
   document.body.append(container)
@@ -171,6 +174,25 @@ describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kin
     expect(playCell(container, 'Roof').parentElement!.textContent).toContain('Nothing to play yet')
   })
 })
+
+describe.each(['act', 'stingers'] as const)(
+  'the previous/next control on a %s track page',
+  (kind) => {
+    it('steps through that list only, not wrapping', () => {
+      const first = render(kind, undefined, [], {}, {}, 'hall').container.querySelector('.pager')!
+      expect(first.textContent).toBe('‹1 of 5›')
+      const [prev, next] = [...first.querySelectorAll('button')]
+      expect(prev!.getAttribute('aria-disabled')).toBe('true')
+      expect(next!.title).toBe('Next: Cellar (→)')
+      window.location.hash = '#/start'
+      act(() => next!.click())
+      expect(window.location.hash).toBe('#/music/tracks/cellar')
+      const last = render(kind, undefined, [], {}, {}, 'gate').container.querySelector('.pager')!
+      expect(last.textContent).toBe('‹5 of 5›')
+      expect(last.querySelectorAll('button')[0]!.title).toBe('Previous: Roof (←)')
+    })
+  },
+)
 
 describe.each(['act', 'stingers'] as const)('what needs attention on a %s page', (kind) => {
   const titles = (container: HTMLElement) =>

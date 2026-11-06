@@ -499,6 +499,18 @@ describe("an effect's page", () => {
     expect(text()).not.toContain('Saved')
   })
 
+  it('has the previous/next control, in the list’s order, with an end greyed out', () => {
+    const { container } = render(page('door-creak'), effects())
+    const pager = container.querySelector('.pager')!
+    expect(pager.textContent).toBe('‹1 of 2›')
+    const [prev, next] = [...pager.querySelectorAll('button')]
+    expect(prev!.getAttribute('aria-disabled')).toBe('true')
+    expect(next!.title).toBe('Next: Coins (→)')
+    window.location.hash = '#/start'
+    act(() => next!.click())
+    expect(window.location.hash).toBe('#/effects/items/coins')
+  })
+
   it('saves the words when the box is left, and says Saved', async () => {
     const { container, calls, text, settle } = render(page('door-creak'), effects())
     const box = container.querySelector('textarea')!

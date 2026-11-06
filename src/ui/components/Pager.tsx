@@ -12,6 +12,8 @@ export interface PagerProps {
   place: { position: number; count: number }
   previous: PagerStep | null
   next: PagerStep | null
+  /** False on a page whose arrow keys belong to something else (an image page's takes): buttons only. */
+  keys?: boolean
 }
 
 /** The button a press went from, kept for the page it opens, so focus can stay on that button. */
@@ -25,7 +27,7 @@ const PENDING_MS = 3000
  * and the arrow keys when focus is not in a field or a control that uses them. A step moves the
  * address, as the breadcrumb does, so whatever asks before leaving a page asks the same here.
  */
-export function Pager({ place, previous, next }: PagerProps) {
+export function Pager({ place, previous, next, keys = true }: PagerProps) {
   const buttons = useRef<Record<'previous' | 'next', HTMLButtonElement | null>>({
     previous: null,
     next: null,
@@ -46,6 +48,7 @@ export function Pager({ place, previous, next }: PagerProps) {
   const latest = useRef({ previous, next })
   latest.current = { previous, next }
   useEffect(() => {
+    if (!keys) return
     const onKey = (event: KeyboardEvent) => {
       const target = event.target
       if (event.defaultPrevented || !(target instanceof Element)) return
@@ -65,7 +68,7 @@ export function Pager({ place, previous, next }: PagerProps) {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  }, [keys])
   const button = (side: 'previous' | 'next', step: PagerStep | null) => {
     const label = step
       ? `${side === 'previous' ? 'Previous' : 'Next'}: ${step.name}`
@@ -79,7 +82,7 @@ export function Pager({ place, previous, next }: PagerProps) {
         }}
         className="btn pager-btn"
         type="button"
-        title={step ? `${label} (${side === 'previous' ? '←' : '→'})` : label}
+        title={step && keys ? `${label} (${side === 'previous' ? '←' : '→'})` : label}
         aria-label={label}
         aria-disabled={step ? undefined : 'true'}
         onClick={() => go(side, step, true)}

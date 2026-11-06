@@ -193,10 +193,21 @@ audio-studio/
 │       │   └── narration/       line table, plan, job progress, inspector
 │       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in (from the element's playing event) and out for the person's `takeFade` setting, the game's file does not
 │       ├── loopAudio.ts         the player's audio: a loop decoded once and played round on Web Audio with no gap (an audio element's loop clicks where it comes round), every other clip on the element
+│       ├── pager.ts             the previous/next control's rules: which key press steps (not in a field or in a control that uses ←/→), and the control's props for an item of a list
 │       └── components/          buttons, chips, waveform, player, status pills
 ├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
 └── docs/
 ```
+
+**Previous and next** (as-5wz; drawn in `docs/ui/as-5wz-pager.html` and `docs/ui/as-5wz-image-arrows.html`). Every
+one-item page (a music loop or stinger, an image, a sound effect, a character, a part's overview and
+lines page, a scene) ends its header with `components/Pager.tsx`: ‹ and › around "3 of 12", built
+from the list the breadcrumb goes back to (`core/neighbours.ts`, `ui/pager.ts` `pagerFor`), never
+wrapping and never crossing acts. A step sets `window.location.hash` as the breadcrumb does, so the
+route hold that asks before leaving a scene's unsaved changes applies unchanged. ← and → step too,
+unless the press is in a field or inside a control that uses the arrows (`ARROW_USERS` in
+`ui/pager.ts`); the image page passes `keys={false}` because its take strip keeps the arrows
+page-wide. The language chosen stays in the address of the neighbour.
 
 Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows. `core/` has no
 imports from the others, so the rules for status, staleness and alignment are tested without

@@ -23,9 +23,7 @@ describe('pagerStep', () => {
     ).toBeNull()
   })
   test('a control that uses the arrows keeps them', () => {
-    expect(
-      plain('ArrowRight', { target: { tagName: 'BUTTON', closest: () => ({}) } }),
-    ).toBeNull()
+    expect(plain('ArrowRight', { target: { tagName: 'BUTTON', closest: () => ({}) } })).toBeNull()
   })
 })
 

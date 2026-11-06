@@ -80,6 +80,19 @@ describe('the previous/next control', () => {
     p.unmount()
   })
 
+  it('without keys, leaves the arrows alone and leaves the key out of the hover', () => {
+    window.location.hash = '#/start'
+    const p = show({ ...middle, keys: false })
+    expect(p.prev.title).toBe('Previous: Harbour morning')
+    expect(p.next.title).toBe('Next: Market bustle')
+    press('ArrowRight')
+    press('ArrowLeft')
+    expect(window.location.hash).toBe('#/start')
+    act(() => p.next.click())
+    expect(window.location.hash).toBe('#/music/tracks/c')
+    p.unmount()
+  })
+
   it('leaves the arrows to a field', () => {
     window.location.hash = '#/start'
     const p = show(middle)

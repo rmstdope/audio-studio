@@ -9,7 +9,8 @@ import { loadPart, loadProject } from '../../../services/workspace'
 GlobalRegistrator.register()
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { CastSection, StatusPanel } = await import('./PartOverview')
+const { CastSection, StatusPanel, PartOverview } = await import('./PartOverview')
+const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -109,5 +110,42 @@ describe('the lines up to date on a part’s overview', () => {
     expect(container.querySelector('a.stat-lead')).toBeNull()
     expect(container.querySelector('.stat-lead')?.textContent).toBe('100%Lines up to date2 / 2')
     done()
+  })
+})
+
+describe('a part’s overview, previous and next', () => {
+  it('steps through the parts, the last with no next', async () => {
+    const root = tempRepo({})
+    cpSync(join(import.meta.dir, '../../../../test/fixtures/sample'), root, { recursive: true })
+    const project = await loadProject(join(root, 'content-studio.json'))
+    if (!project.ok) throw new Error('the sample did not load')
+    const parts = project.summary.parts
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const view = createRoot(container)
+    await act(() =>
+      view.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(PartOverview, {
+            summary: project.summary,
+            part: parts[parts.length - 1]!,
+          }),
+        ),
+      ),
+    )
+    const pager = container.querySelector('.pager')!
+    expect(pager.textContent).toBe(`‹${parts.length} of ${parts.length}›`)
+    const [prev, next] = [...pager.querySelectorAll('button')]
+    expect(next!.getAttribute('aria-disabled')).toBe('true')
+    window.location.hash = '#/start'
+    await act(() => prev!.click())
+    expect(window.location.hash).toBe(`#/parts/${parts[parts.length - 2]!.id}`)
+    await act(() => view.unmount())
+    globalThis.fetch = realFetch
+    document.body.innerHTML = ''
   })
 })

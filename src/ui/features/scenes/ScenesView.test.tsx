@@ -309,6 +309,8 @@ describe('an act with its scenes', () => {
       'Discard',
       'Save',
       'Refresh from the game',
+      '‹',
+      '›',
     ])
     expect(text(page.querySelector('.scene-status'))).toBeUndefined()
     expect(text(page.querySelector('[aria-label="Music"]'))).toBe('MusicGeneral Store100%MS')
@@ -466,6 +468,21 @@ describe('moving between scenes', () => {
       links[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
     })
     expect(document.activeElement).toBe(links[1]!)
+  })
+
+  it('has the previous/next control, stepping through the act’s scenes without wrapping', () => {
+    const middle = render({ ...open, scene: 'act1-forest' })
+    const pager = middle.querySelector('.pager')!
+    expect(pager.textContent).toBe('‹2 of 3›')
+    const [prev, next] = [...pager.querySelectorAll('button')]
+    expect(prev!.title).toBe('Previous: General store (←)')
+    expect(next!.title).toBe('Next: Village chapel (→)')
+    window.location.hash = '#/start'
+    act(() => next!.click())
+    expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-chapel')
+    const last = render({ ...open, scene: 'act1-chapel' })
+    expect(last.querySelector('.pager')!.textContent).toBe('‹3 of 3›')
+    expect(last.querySelectorAll('.pager button')[1]!.getAttribute('aria-disabled')).toBe('true')
   })
 
   it('has a menu of the scenes for a narrow window, showing the open one', () => {

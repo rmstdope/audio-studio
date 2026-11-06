@@ -75,7 +75,7 @@ export function ImagePage({
             {row.looksOld && <span className="chip chip-warn">Old look</span>}
           </span>
         </div>
-        {pager && <Pager {...pager} />}
+        {pager && <Pager {...pager} keys={false} />}
       </header>
       {row.status === 'out of date' && (
         <section className="notice notice-warn">
