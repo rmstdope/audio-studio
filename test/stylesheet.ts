@@ -17,27 +17,14 @@ function alwaysRules(): { selectors: string[]; body: string }[] {
  * gives the element itself a minimum width; widths, cells and the cascade are not looked at.
  */
 export function minWidthsInEveryWindow(element: Element): string[] {
-  const found: string[] = []
-  for (const rule of alwaysRules()) {
-    const width = /(?:^|[;\s])min-width:\s*([^;]+);/.exec(rule.body)?.[1]?.trim()
-    if (!width || /^0(px)?$/.test(width)) continue
-    for (const selector of rule.selectors) {
-      let matches = false
-      try {
-        matches = element.matches(selector)
-      } catch {
-        // A selector the DOM cannot test (a pseudo-element) applies to no element.
-      }
-      if (matches) found.push(`${selector}: ${width}`)
-    }
-  }
-  return found
+  return valuesInEveryWindow(element, 'min-width').filter((found) => !/: 0(px)?$/.test(found))
 }
 
 /**
  * The values that the stylesheet's rules for every window width give `property` on an element,
- * each with the selector that gives it, in stylesheet order. Media and container blocks, the
- * cascade and inheritance are not looked at.
+ * each with the selector that gives it, in stylesheet order. Only the property written out is
+ * seen, never a shorthand (`margin: 0 auto` gives no `margin-left`); media and container blocks,
+ * the cascade and inheritance are not looked at.
  */
 export function valuesInEveryWindow(element: Element, property: string): string[] {
   const found: string[] = []

@@ -150,6 +150,9 @@ describe('CharacterView', () => {
     expect(pager.parentElement!.textContent).toContain('Design a voice…')
     // ... and the piece keeps to the header's right end when it wraps onto a row of its own.
     expect(valuesInEveryWindow(pager.parentElement!, 'margin-left').at(-1)).toEndWith(': auto')
+    expect(valuesInEveryWindow(pager.parentElement!, 'justify-content').at(-1)).toEndWith(
+      ': flex-end',
+    )
     const [prev, next] = [...pager.querySelectorAll('button')]
     expect(prev!.getAttribute('aria-disabled')).toBe('true')
     expect(next!.title).toBe('Next: Miller (→)')
