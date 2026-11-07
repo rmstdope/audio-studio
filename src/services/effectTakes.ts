@@ -25,6 +25,7 @@ import { resolveInRoot } from '../core/paths'
 import { shapeEffectLoop, loopRequestSeconds } from '../core/effectLoop'
 import { peaks, wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
+import { applyFades, fadesProblem, hasFades, type Fades } from '../core/fades'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { EFFECT_BOARD_DIR, EFFECT_TAKES_DIR, boardFile, readEffectBoard } from './effectBoards'
 import { acceptEffect, commitEffect, readEffectChosen, uncommitEffect } from './effectClips'
@@ -56,7 +57,16 @@ const CPU = 'effects'
 export type MakeEffectRequest = { count: number; model?: EffectModelId } | { retry: number }
 
 /** What asking for takes, dropping or stopping answered; null for an effect the project does not list. */
-export type EffectMakeResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
+export type EffectMakeResult =
+  | { ok: true }
+  | {
+      ok: false
+      message: string
+      /** Set when saving fades failed and the game's file could not be put back as it was. */
+      gameChanged?: true
+    }
+  | ProjectFailure
+  | null
 
 /** What stopping answered: how many takes were stopped, made or waiting; null for an unknown effect. */
 export type EffectStopResult = { ok: true; stopped: number } | ProjectFailure | null
@@ -74,6 +84,15 @@ export type EffectTakesResult = EffectTakesView | ProjectFailure | null
 export function effectTakeHash(inputs: EffectInputs): string {
   const parts = [inputs.description, inputs.seconds, ...(inputs.loops ? ['loop'] : [])]
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16)
+}
+
+/**
+ * What the game plays of a take: its sound, with its fades if it has some (the board's WAV stays as
+ * generated). Without fades the bytes are the take's own.
+ */
+function playedWav(take: EffectBoardTake, bytes: Uint8Array): Uint8Array {
+  if (!take.fades || !hasFades(take.fades)) return bytes
+  return writeWav(applyFades(readWav(bytes), take.fades))
 }
 
 /** The takes the latest Make all started, by effect, and how many of them were stopped. */
@@ -130,6 +149,17 @@ export interface EffectTakes {
   unchoose(projectFile: string, id: string): Promise<EffectChooseResult>
   /** Accepts a changed description: the chosen take counts as made from it. A changed length is refused. */
   accept(projectFile: string, id: string): Promise<EffectChooseResult>
+  /**
+   * Saves the fades of a take made to play once, or removes them (null). The take on the board stays
+   * as generated; if it is the chosen one, the game's file is written again with the faded sound
+   * first (the lock and manifest untouched), and nothing changes if that fails.
+   */
+  setFades(
+    projectFile: string,
+    id: string,
+    name: string,
+    fades: Fades | null,
+  ): Promise<EffectMakeResult>
   /** Takes a take off the board and deletes its file; the chosen take stays. */
   drop(projectFile: string, id: string, name: string): Promise<EffectMakeResult>
   /** What is being made in the project, by effect, for the list's status. */
@@ -230,6 +260,8 @@ export function createEffectTakes({
     projectFile: string,
     found: Found,
     change: (board: EffectBoard) => T | Promise<T>,
+    /** Called when the board cannot be written, to take back what `change` did elsewhere. */
+    undo?: () => Promise<void>,
   ): Promise<T | ProjectFailure> {
     return boards.run(keyOf(projectFile, found.id), async () => {
       const board = await readEffectBoard(found.root, found.id)
@@ -237,7 +269,14 @@ export function createEffectTakes({
       const before = JSON.stringify(board, null, 2)
       const answer = await change(board)
       const after = JSON.stringify(board, null, 2)
-      if (after !== before) await writeAtomic(found.root, boardFile(found.id), `${after}\n`)
+      if (after !== before) {
+        try {
+          await writeAtomic(found.root, boardFile(found.id), `${after}\n`)
+        } catch (error) {
+          await undo?.()
+          throw error
+        }
+      }
       return answer
     })
   }
@@ -388,6 +427,7 @@ export function createEffectTakes({
           model: modelName(take.model),
           loops: Boolean(take.inputs.loops),
           quietAt: take.quietAt ?? null,
+          ...(take.fades && { fades: take.fades }),
         })
       }
       const pending = entries.filter(
@@ -562,9 +602,94 @@ export function createEffectTakes({
           id,
           take,
           inUse: found.inputs,
-          wav,
+          wav: playedWav(take, wav),
           encode,
         })
+      })
+    },
+
+    async setFades(projectFile, id, name, fades) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      /** Puts the game's file back, once the board turned out not to be writable. */
+      let putBack: (() => Promise<void>) | null = null
+      let stuck = false
+      return changeBoard(
+        projectFile,
+        found,
+        async (board): Promise<EffectMakeResult> => {
+          const chosenEffects = await readEffectChosen(found.root, found.effects, [])
+          // Which take the game plays is not known: nothing is changed.
+          if (!chosenEffects) {
+            return { ok: false, message: 'The sound effects lock could not be read.' }
+          }
+          const take = board.takes.find((t) => fileOf(t) === name)
+          if (!take) return { ok: false, message: 'That take is not on the board.' }
+          if (take.inputs.loops || found.inputs.loops) {
+            return { ok: false, message: 'Only a sound that plays once can fade.' }
+          }
+          const wrong = fades && fadesProblem(fades, take.seconds)
+          if (wrong) return { ok: false, message: wrong }
+          const next: EffectBoardTake = { ...take }
+          delete next.fades
+          if (fades && hasFades(fades)) next.fades = fades
+          const chosen = chosenEffects[id]?.lock
+          if (chosen?.take === take.n && chosen.fp === take.hash) {
+            let wav: Uint8Array
+            try {
+              wav = new Uint8Array(
+                await Bun.file(join(found.root, found.folder, name)).arrayBuffer(),
+              )
+            } catch {
+              return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
+            }
+            let played: Uint8Array
+            try {
+              played = playedWav(next, wav)
+            } catch {
+              return { ok: false, message: 'That take’s sound cannot be faded.' }
+            }
+            const game = join(found.effects.clips, `${id}.mp3`)
+            const was = await Bun.file(resolveInRoot(found.root, game))
+              .bytes()
+              .catch(() => null)
+            putBack = async () => {
+              if (was) await writeAtomic(found.root, game, was)
+              else await rm(resolveInRoot(found.root, game), { force: true })
+            }
+            // Only the sound changes: the manifest and the lock (an accepted change too) stay as they are.
+            const done = await commitEffect({
+              root: found.root,
+              projectFile,
+              effects: found.effects,
+              id,
+              take: next,
+              inUse: found.inputs,
+              wav: played,
+              encode,
+              soundOnly: true,
+            })
+            if (!done.ok) return done
+          }
+          board.takes = board.takes.map((t) => (t === take ? next : t))
+          return { ok: true }
+        },
+        () =>
+          (putBack?.() ?? Promise.resolve()).catch((error) => {
+            stuck = true
+            console.error('putting the game’s file back failed', error)
+          }),
+      ).catch((error): EffectMakeResult => {
+        // Kept in the server log: the person is told the plain reason, not the stack.
+        console.error('saving the fades failed', error)
+        return stuck
+          ? {
+              ok: false,
+              message:
+                'The take board could not be written, and the game’s file could not be put back.',
+              gameChanged: true,
+            }
+          : { ok: false, message: 'The take board could not be written.' }
       })
     },
 

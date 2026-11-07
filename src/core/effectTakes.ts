@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { FadesSchema, hasFades, type Fades } from './fades'
 import { EFFECT_MODEL_IDS, type EffectModelId } from './effectModels'
 import type { ImageDownload } from './imageModels'
 
@@ -74,6 +75,8 @@ export const EffectBoardTakeSchema = z.object({
   inputs: EffectInputsSchema,
   /** For a loop whose sound ended before its length: where, in seconds. */
   quietAt: z.number().optional(),
+  /** The fades of a take made to play once, applied when it is chosen; absent when it has none. The WAV stays as generated. */
+  fades: FadesSchema.optional(),
 })
 
 /** An effect's board: the takes kept, and the number the next take gets (numbers are never reused). */
@@ -101,6 +104,9 @@ export const MakeEffectTakesBody = z.union([
     .strict(),
   z.object({ retry: z.number().int().positive() }).strict(),
 ])
+
+/** The body of a save of fades: both lengths in seconds and the shape of both. */
+export const SetEffectFadesBody = FadesSchema.strict()
 
 /** The body of a choice: the file name of the take on the effect's board. */
 export const ChooseEffectTakeBody = z.object({ file: z.string().min(1) }).strict()
@@ -203,6 +209,24 @@ export function effectTakeChoosable(take: { loops: boolean }, effectLoops: boole
   return effectTakeKind(take, effectLoops) === null
 }
 
+/** Whether a take can fade: made to play once, on an effect that plays once. */
+export function effectFadable(take: { loops: boolean }, effectLoops: boolean): boolean {
+  return !take.loops && !effectLoops
+}
+
+/**
+ * The fades a take has as the game will play them: those saved with it, while it can fade. A take
+ * keeps them while its effect loops, but they are not shown or played then.
+ */
+export function effectFadesOf(
+  take: { loops: boolean; fades?: Fades | undefined },
+  effectLoops: boolean,
+): Fades | undefined {
+  return take.fades && hasFades(take.fades) && effectFadable(take, effectLoops)
+    ? take.fades
+    : undefined
+}
+
 /** What an effect's In the game block shows. */
 export type EffectInTheGameState =
   | { kind: 'take'; take: number; missing: boolean; hint: string }
@@ -263,6 +287,8 @@ export interface EffectTakeView {
   loops: boolean
   /** For a loop whose sound ended early: where it goes quiet, in seconds. */
   quietAt: number | null
+  /** The fades saved with a take made to play once; absent when it has none. */
+  fades?: Fades
 }
 
 /** What is using the GPU: a music take, an image take, a sound effect take, or a check of a recording. */

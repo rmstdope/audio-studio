@@ -87,6 +87,7 @@ export async function commitEffect({
   wav,
   encode,
   now = () => new Date(),
+  soundOnly = false,
 }: {
   root: string
   /** What names the project in the queue; the root by default. */
@@ -103,6 +104,8 @@ export async function commitEffect({
   wav: Uint8Array
   encode: Encoder
   now?: () => Date
+  /** Only the clip is written again; the manifest and the lock entry stay exactly as they are (fades). */
+  soundOnly?: boolean
 }): Promise<CommitResult> {
   const file = `${id}.mp3`
   const target = resolveInRoot(root, join(effects.clips, file))
@@ -122,6 +125,10 @@ export async function commitEffect({
         const unread = !manifest ? 'manifest' : 'lock'
         const message = `Take ${take.n} could not be chosen: the sound effects ${unread} could not be read.`
         return { ok: false, message: `${message} Nothing was changed.` }
+      }
+      if (soundOnly) {
+        await rename(temporary, target)
+        return { ok: true }
       }
       manifest[id] = { file, duration: pyRound(take.seconds) }
       lock[id] = {

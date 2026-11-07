@@ -14,11 +14,20 @@ export const FadesSchema = z.object({
 /** The fades of a stinger take. */
 export type Fades = z.infer<typeof FadesSchema>
 
-/** The step of the length boxes and handles, in seconds. */
-export const FADE_STEP = 0.05
+/** The step of the length boxes and handles, and the big step of a handle (Shift with an arrow), in seconds. */
+export interface FadeSteps {
+  step: number
+  big: number
+}
 
-/** The big step of a handle (Shift with an arrow), in seconds. */
-export const FADE_BIG_STEP = 0.5
+/** A stinger's steps: 0.05 s, and 0.5 s with Shift. */
+export const FADE_STEPS: FadeSteps = { step: 0.05, big: 0.5 }
+
+/** A sound effect's steps, which last a second or two: 0.01 s, and 0.1 s with Shift. */
+export const EFFECT_FADE_STEPS: FadeSteps = { step: 0.01, big: 0.1 }
+
+/** The step of a stinger's length boxes and handles, in seconds. */
+export const FADE_STEP = FADE_STEPS.step
 
 /** Whether a take has any fade at all. */
 export function hasFades(fades: Fades): boolean {
@@ -109,23 +118,29 @@ export function applyFades(wav: Wav, fades: Fades): Wav {
   }
 }
 
-/** A handle's length after an arrow key: 0.05 s, or 0.5 s with Shift, kept between `min` and `max`. */
+/** A handle's length after an arrow key: one step, or the big one with Shift, kept between `min` and `max`. */
 export function stepHandle(
   length: number,
   direction: 1 | -1,
   shift: boolean,
   min: number,
   max: number,
+  steps: FadeSteps = FADE_STEPS,
 ): number {
-  const next = hundredths(length + direction * (shift ? FADE_BIG_STEP : FADE_STEP))
+  const next = hundredths(length + direction * (shift ? steps.big : steps.step))
   return Math.min(max, Math.max(min, next))
 }
 
-/** The length a handle dragged to `x` pixels of a `width`-pixel waveform means, on the 0.05 s grid. */
-export function lengthAtX(x: number, width: number, seconds: number): number {
+/** The length a handle dragged to `x` pixels of a `width`-pixel waveform means, on the step's grid. */
+export function lengthAtX(
+  x: number,
+  width: number,
+  seconds: number,
+  steps: FadeSteps = FADE_STEPS,
+): number {
   if (width <= 0) return 0
   const raw = (x / width) * seconds
-  const snapped = hundredths(Math.round(raw / FADE_STEP) * FADE_STEP)
+  const snapped = hundredths(Math.round(raw / steps.step) * steps.step)
   return Math.min(seconds, Math.max(0, snapped))
 }
 
