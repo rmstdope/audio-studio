@@ -2,18 +2,19 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import {
   EMPTY_LINE,
   FADE_SHAPES,
-  FADE_STEP,
+  FADE_STEPS,
   envelopePoints,
   fadeGain,
   heardAs,
   fadesProblem,
   lengthAtX,
   stepHandle,
+  type FadeSteps,
   type Fades,
 } from '../../../core/fades'
 import type { TakeView } from '../../../core/musicTake'
 import { cutShares, playedSeconds, takeSoundUrl } from './trimSilence'
-import { useTrackActions } from './trackActions'
+import { useTrackActions, type TrackActions } from './trackActions'
 import { useSetFades } from '../../api'
 import type { useClipPlayer } from '../../components/useClipPlayer'
 
@@ -39,6 +40,7 @@ function FadeWave({
   part,
   fades,
   position,
+  steps,
   onIn,
   onOut,
 }: {
@@ -47,6 +49,8 @@ function FadeWave({
   /** The fades as they last could be used. */
   fades: Fades
   position?: () => number | null
+  /** The step of a handle dragged or moved by the keys. */
+  steps: FadeSteps
   /** A handle moved: the length it now means. */
   onIn: (seconds: number) => void
   onOut: (seconds: number) => void
@@ -66,7 +70,7 @@ function FadeWave({
   const { seconds } = part
   const lengthAt = (event: PointerEvent) => {
     const box = well.current?.getBoundingClientRect()
-    return lengthAtX(event.clientX - (box?.left ?? 0), box?.width ?? 0, seconds)
+    return lengthAtX(event.clientX - (box?.left ?? 0), box?.width ?? 0, seconds, steps)
   }
   /** A press on a handle takes the pointer, so the drag follows it out of the handle. */
   const grab = (event: PointerEvent<HTMLElement>) => {
@@ -104,7 +108,7 @@ function FadeWave({
         aria-valuenow={fades.in}
         style={{ left: `calc(${(fades.in / seconds) * 100}% - 6px)` }}
         onKeyDown={(event) =>
-          key(event, (d, shift) => onIn(stepHandle(fades.in, d, shift, 0, seconds)))
+          key(event, (d, shift) => onIn(stepHandle(fades.in, d, shift, 0, seconds, steps)))
         }
         onPointerDown={grab}
         onPointerMove={(event) => {
@@ -123,7 +127,7 @@ function FadeWave({
         // The out handle sits at the fade's inner end: right shortens the fade.
         onKeyDown={(event) =>
           key(event, (d, shift) =>
-            onOut(stepHandle(fades.out, d === 1 ? -1 : 1, shift, 0, seconds)),
+            onOut(stepHandle(fades.out, d === 1 ? -1 : 1, shift, 0, seconds, steps)),
           )
         }
         onPointerDown={grab}
@@ -136,21 +140,51 @@ function FadeWave({
   )
 }
 
+/** What a save or removal of fades answered, as far as the editor reads it. */
+export type FadesAnswer =
+  { ok: true } | { ok: false; message: string; gameChanged?: true } | { ok: false; file: string }
+
+/** The save of fades the editor drives: a mutation, whichever page's it is. */
+export interface FadesSetter {
+  mutate(
+    variables: { file: string; fades: Fades | null },
+    options: { onSuccess: (result: { ok: boolean }) => void },
+  ): void
+  isPending: boolean
+  isError: boolean
+  error: Error | null
+  data?: FadesAnswer | undefined
+}
+
 /**
- * The editor of a stinger take's fades, in place of the card's own waveform and buttons (or inside
- * the In the game block when the take is the chosen one): play it with the fades as they stand,
- * drag the handles or type the lengths, pick the shape, then Save fades, Cancel, or Remove fades
- * when the take has some. Saving a chosen take writes the game's file at once.
+ * The editor of a take's fades, for stingers and sound effects alike, in place of the card's own
+ * waveform and buttons (or inside the In the game block when the take is the chosen one): play it
+ * with the fades as they stand, drag the handles or type the lengths, pick the shape, then Save
+ * fades, Cancel, or Remove fades when the take has some. Saving a chosen take writes the game's
+ * file at once.
  */
-export function FadesEditor({
-  trackId,
+export function FadesEditorBody({
   take,
+  part,
+  soundUrl,
+  playId,
+  steps,
+  set,
+  actions,
   chosen,
   player,
   onClose,
 }: {
-  trackId: string
-  take: TakeView
+  take: { n: number; file: string; fades?: Fades | undefined }
+  /** The sound that plays: its length and the bars of it. */
+  part: { seconds: number; peaks: number[] }
+  /** Where the take's sound is served from (the fades are asked for in the address). */
+  soundUrl: string
+  /** The id the player knows the editor's play button by. */
+  playId: string
+  steps: FadeSteps
+  set: FadesSetter
+  actions: TrackActions
   /** The take is the one the game plays. */
   chosen: boolean
   player: Player
@@ -163,8 +197,6 @@ export function FadesEditor({
   /** Which button was pressed last: the failure line says saved or removed. */
   const [removing, setRemoving] = useState(false)
   const [shape, setShape] = useState<Fades['shape']>(saved.shape)
-  const set = useSetFades(trackId)
-  const actions = useTrackActions()
   const inBox = useRef<HTMLInputElement>(null)
   useEffect(() => {
     inBox.current?.focus()
@@ -172,17 +204,6 @@ export function FadesEditor({
   }, [])
 
   const typed: Fades = { in: lengthOf(inText), out: lengthOf(outText), shape }
-  // A trimmed take is faded after the cut: the length, the bars and the sound are of the part between the cuts.
-  const cut = cutShares(take)
-  const part = {
-    seconds: playedSeconds(take),
-    peaks: cut
-      ? take.peaks.slice(
-          Math.floor(cut.start * take.peaks.length),
-          Math.ceil((1 - cut.end) * take.peaks.length),
-        )
-      : take.peaks,
-  }
   const problem = fadesProblem(typed, part.seconds)
   // The handles and the sound stay where they last could be while the boxes hold lengths that cannot be used.
   const lastGood = useRef<Fades>(saved)
@@ -193,8 +214,8 @@ export function FadesEditor({
   const saving = set.isPending
   const canSave = changed && !saving
 
-  const id = `music-take-${trackId}-${take.n}`
-  const { url, fade } = heardAs(takeSoundUrl(trackId, take), good)
+  const id = playId
+  const { url, fade } = heardAs(soundUrl, good)
   const how = { fade }
   const playing = player.playing === id
   const heard = useRef(url)
@@ -226,7 +247,7 @@ export function FadesEditor({
   const failure = !actions.shows(`fades:${take.n}`)
     ? null
     : set.isError
-      ? set.error.message
+      ? (set.error?.message ?? '')
       : set.data && !set.data.ok
         ? 'message' in set.data
           ? set.data.message
@@ -242,7 +263,7 @@ export function FadesEditor({
         {label}
         <input
           type="number"
-          step={FADE_STEP}
+          step={steps.step}
           min={0}
           value={text}
           ref={label === 'Fade in' ? inBox : undefined}
@@ -279,6 +300,7 @@ export function FadesEditor({
       <FadeWave
         part={part}
         fades={good}
+        steps={steps}
         position={playing ? player.position : undefined}
         onIn={(seconds) =>
           setInText(boxText(Math.min(seconds, Math.max(0, part.seconds - good.out))))
@@ -353,5 +375,53 @@ export function FadesEditor({
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * The editor of a stinger take's fades: the shared editor over the take's sound between its cuts,
+ * saved on the track's board.
+ */
+export function FadesEditor({
+  trackId,
+  take,
+  chosen,
+  player,
+  onClose,
+}: {
+  trackId: string
+  take: TakeView
+  /** The take is the one the game plays. */
+  chosen: boolean
+  player: Player
+  /** The editor is done (saved, removed or cancelled). */
+  onClose: () => void
+}) {
+  const set = useSetFades(trackId)
+  const actions = useTrackActions()
+  // A trimmed take is faded after the cut: the length, the bars and the sound are of the part between the cuts.
+  const cut = cutShares(take)
+  const part = {
+    seconds: playedSeconds(take),
+    peaks: cut
+      ? take.peaks.slice(
+          Math.floor(cut.start * take.peaks.length),
+          Math.ceil((1 - cut.end) * take.peaks.length),
+        )
+      : take.peaks,
+  }
+  return (
+    <FadesEditorBody
+      take={take}
+      part={part}
+      soundUrl={takeSoundUrl(trackId, take)}
+      playId={`music-take-${trackId}-${take.n}`}
+      steps={FADE_STEPS}
+      set={set}
+      actions={actions}
+      chosen={chosen}
+      player={player}
+      onClose={onClose}
+    />
   )
 }

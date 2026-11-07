@@ -1,6 +1,8 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { effectSeconds, type EffectRow } from '../../../core/effects'
 import {
+  effectFadable,
+  effectFadesOf,
   effectInTheGame,
   effectQuietLine,
   effectTakeChoosable,
@@ -10,6 +12,7 @@ import {
   type EffectTakesView,
   type EffectTakeView,
 } from '../../../core/effectTakes'
+import { fadesLine, heardAs } from '../../../core/fades'
 import { unchooseFailure } from '../../../core/musicChoose'
 import { useChooseEffectTake, useUnchooseEffect } from '../../api'
 import { Confirm } from '../../components/Confirm'
@@ -17,6 +20,7 @@ import type { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { takePlayId, takeUrl } from '../../effectsPlay'
 import { Wave } from '../music/InTheGame'
+import { EffectFadesEditor } from './EffectFadesEditor'
 
 /** One clip at a time, shared with the takes below. */
 export type Player = ReturnType<typeof useClipPlayer>
@@ -29,10 +33,20 @@ export function EffectInTheGame({
   row,
   view,
   player,
+  fading,
+  onFades,
+  onFadesClosed,
+  fadesOpener,
 }: {
   row: EffectRow
   view: EffectTakesView
   player: Player
+  /** The take whose fades are open, if any. */
+  fading: number | null
+  onFades: (n: number) => void
+  onFadesClosed: (n: number) => void
+  /** Hands a take's Fades… button to the panel, to give it focus back when the editor closes. */
+  fadesOpener: (n: number) => (button: HTMLButtonElement | null) => void
 }) {
   const state = effectInTheGame(row.current)
   const take = view.takes.find((t) => t.chosen)
@@ -118,6 +132,8 @@ export function EffectInTheGame({
       : state.kind === 'unknown' || (state.kind === 'take' && state.missing)
         ? 'track-in-game track-in-game-warn'
         : 'track-in-game'
+  // The chosen take's fade editor is open: it stands in for the buttons and the line naming them.
+  const editing = take !== undefined && fading === take.n
   const label = <span className="track-in-game-label">In the game</span>
   const hint = <span className="faint small">{state.hint}</span>
 
@@ -152,38 +168,71 @@ export function EffectInTheGame({
         ) : (
           <span className="chip chip-ok">chosen</span>
         )}
+        {editing && <span className="chip chip-fade">fading</span>}
         {take && <KindChip take={take} effectLoops={row.loops} />}
         {take && <span className="faint small">{take.model}</span>}
       </div>
-      {take && <Playback effect={row.id} take={take} player={player} />}
-      <div className="track-in-game-actions">
-        {take?.loops && <HearTheSeam effect={row.id} take={take} player={player} />}
-        <span className="grow" />
-        <button
-          type="button"
-          className="btn btn-small"
-          ref={opener}
-          disabled={unchoose.isPending}
-          onClick={() => {
-            unchoose.reset()
-            setAsked(state.take)
-            setAsking(true)
-          }}
-        >
-          Un-choose
-        </button>
-        {state.missing && take && effectTakeChoosable(take, row.loops) && (
+      {take && !editing && effectFadesOf(take, row.loops) && (
+        <span className="faint small">{fadesLine(effectFadesOf(take, row.loops)!)}</span>
+      )}
+      {take && editing ? (
+        <EffectFadesEditor
+          effect={row.id}
+          take={take}
+          chosen
+          player={player}
+          onClose={() => onFadesClosed(take.n)}
+        />
+      ) : (
+        take && <Playback effect={row.id} effectLoops={row.loops} take={take} player={player} />
+      )}
+      {!editing && (
+        <div className="track-in-game-actions">
+          {take && effectFadable(take, row.loops) && (
+            <button
+              type="button"
+              className="btn btn-small"
+              ref={fadesOpener(take.n)}
+              disabled={view.lockUnread}
+              aria-disabled={fading !== null ? true : undefined}
+              title={fading !== null ? `Close the fades of Take ${fading} first.` : undefined}
+              onClick={() => {
+                if (fading !== null) return
+                if (player.playing === takePlayId(row.id, take.n)) player.stop()
+                onFades(take.n)
+              }}
+            >
+              Fades…
+            </button>
+          )}
+          {take?.loops && <HearTheSeam effect={row.id} take={take} player={player} />}
+          <span className="grow" />
           <button
             type="button"
-            className="btn btn-primary btn-small"
-            disabled={choose.isPending}
-            onClick={() => choose.mutate(take.file)}
+            className="btn btn-small"
+            ref={opener}
+            disabled={unchoose.isPending}
+            onClick={() => {
+              unchoose.reset()
+              setAsked(state.take)
+              setAsking(true)
+            }}
           >
-            {choose.isPending ? 'Choosing…' : 'Choose again'}
+            Un-choose
           </button>
-        )}
-      </div>
-      {hint}
+          {state.missing && take && effectTakeChoosable(take, row.loops) && (
+            <button
+              type="button"
+              className="btn btn-primary btn-small"
+              disabled={choose.isPending}
+              onClick={() => choose.mutate(take.file)}
+            >
+              {choose.isPending ? 'Choosing…' : 'Choose again'}
+            </button>
+          )}
+        </div>
+      )}
+      {!editing && hint}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
       {choose.data && !choose.data.ok && (
         <span className="adopt-error">The take could not be chosen.</span>
@@ -228,14 +277,19 @@ export function HearTheSeam({
  */
 export function Playback({
   effect,
+  effectLoops,
   take,
   player,
 }: {
   effect: string
+  /** How the effect plays now: a take's saved fades count only while it plays once. */
+  effectLoops: boolean
   take: EffectTakeView
   player: Player
 }) {
   const id = takePlayId(effect, take.n)
+  const fades = effectFadesOf(take, effectLoops)
+  const heard = heardAs(takeUrl(effect, take.file), fades)
   const playing = player.playing === id
   const quiet = take.quietAt !== null ? 1 - take.quietAt / take.seconds : undefined
   return (
@@ -245,9 +299,7 @@ export function Playback({
           type="button"
           className="play"
           aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-          onClick={() =>
-            player.toggle(id, takeUrl(effect, take.file), take.loops ? { loop: true } : {})
-          }
+          onClick={() => player.toggle(id, heard.url, take.loops ? { loop: true } : {})}
         >
           {playing ? '■' : '▶'}
         </button>
@@ -256,6 +308,7 @@ export function Playback({
           loop={take.loops}
           quiet={quiet}
           position={playing ? player.position : undefined}
+          fades={fades ? { fades, seconds: take.seconds } : undefined}
         />
         <span className="faint small">
           {take.loops ? effectSeconds(take.seconds) : effectTakeLength(take.seconds)}

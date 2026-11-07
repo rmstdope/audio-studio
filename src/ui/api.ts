@@ -2975,6 +2975,22 @@ export function useChooseEffectTake(id: string) {
   )
 }
 
+/**
+ * Saves a one-shot sound effect take's fades, or removes them (null). When the take is the chosen
+ * one, the game's file is written again at once.
+ */
+export function useSetEffectFades(id: string) {
+  return useEffectTakesAction<{ file: string; fades: Fades | null }, NonNullable<EffectMakeResult>>(
+    id,
+    'saving the fades',
+    ({ file, fades }) => ({
+      method: fades ? 'PUT' : 'DELETE',
+      path: `/takes/${encodeURIComponent(file)}/fades`,
+      ...(fades && { body: fades }),
+    }),
+  )
+}
+
 /** Takes a take off a sound effect's board. */
 export function useDropEffectTake(id: string) {
   return useEffectTakesAction<string, NonNullable<EffectMakeResult>>(

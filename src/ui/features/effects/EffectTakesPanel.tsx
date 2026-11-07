@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { EffectRow } from '../../../core/effects'
 import {
   EFFECT_MODEL_IDS,
@@ -16,6 +16,8 @@ import {
   effectChangedAdvice,
   effectChangedLine,
   effectCountEntry,
+  effectFadable,
+  effectFadesOf,
   effectTakeChoosable,
   effectTimeLeft,
   makeEffectTakesLabel,
@@ -30,11 +32,13 @@ import {
   useMakeEffectTakes,
   useStopEffectTakes,
 } from '../../api'
+import { fadesLine } from '../../../core/fades'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { compareClips, takePlayId } from '../../effectsPlay'
+import { EffectFadesEditor } from './EffectFadesEditor'
 import { EffectInTheGame, HearTheSeam, KindChip, Playback, type Player } from './EffectInTheGame'
 
 /**
@@ -56,6 +60,25 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
   useEffect(() => {
     if (!inTurn) setComparing(null)
   }, [inTurn])
+  // The take whose fades are open (one editor at a time), and the Fades… buttons to give focus back to.
+  const [fading, setFading] = useState<number | null>(null)
+  const fadeOpeners = useRef(new Map<number, HTMLButtonElement>())
+  const refocusFades = useRef<number | null>(null)
+  useEffect(() => {
+    if (fading === null && refocusFades.current !== null) {
+      fadeOpeners.current.get(refocusFades.current)?.focus()
+      refocusFades.current = null
+    }
+  }, [fading])
+  /** Closes the fades editor and returns focus to its take's Fades… button. */
+  const closeFades = (n: number) => {
+    refocusFades.current = n
+    setFading(null)
+  }
+  const fadesOpener = (n: number) => (button: HTMLButtonElement | null) => {
+    if (button) fadeOpeners.current.set(n, button)
+    else fadeOpeners.current.delete(n)
+  }
   // How many takes the next press makes: 4 at first, then the pick, while the page stays open.
   const [count, setCount] = useState(4)
   // The model the next press uses: Setup's, until a pick, which lasts while the page stays open.
@@ -140,7 +163,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
       return
     }
     setComparing(take.n)
-    player.playInTurn(compareClips(id, chosen, take))
+    player.playInTurn(compareClips(id, chosen, take, row.loops))
   }
   const changed = row.changed
   return (
@@ -202,7 +225,15 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
           )}
         </div>
       )}
-      <EffectInTheGame row={row} view={view} player={player} />
+      <EffectInTheGame
+        row={row}
+        view={view}
+        player={player}
+        fading={fading}
+        onFades={setFading}
+        onFadesClosed={closeFades}
+        fadesOpener={fadesOpener}
+      />
       <section className="panel takes-panel effect-takes" aria-label="Takes">
         <div className="takes-head">
           <h2>Takes</h2>
@@ -230,8 +261,8 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
         )}
         {view.lockUnread && (
           <span className="takes-missing small">
-            Choosing and dropping wait until the sound effects lock can be read. You can still
-            listen and make more takes.
+            Choosing, dropping and fading wait until the sound effects lock can be read. You can
+            still listen and make more takes.
           </span>
         )}
         {none ? (
@@ -263,6 +294,10 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
                 canCompare={Boolean(chosen)}
                 comparing={comparing === take.n}
                 onCompare={() => compare(take)}
+                fading={fading}
+                onFades={setFading}
+                onFadesClosed={closeFades}
+                fadesOpener={fadesOpener(take.n)}
               />
             ))}
             {view.making.map((making) => (
@@ -290,19 +325,29 @@ function TakeCard({
   canCompare,
   comparing,
   onCompare,
+  fading,
+  onFades,
+  onFadesClosed,
+  fadesOpener,
 }: {
   effect: string
   /** How the effect plays now: a take made the other way cannot be chosen. */
   effectLoops: boolean
   take: EffectTakeView
   player: Player
-  /** The lock cannot be read: Choose and Drop wait. */
+  /** The lock cannot be read: Choose, Drop and Fades… wait. */
   locked: boolean
   /** A take is chosen, so there is something to compare with. */
   canCompare: boolean
   /** This card's comparison is playing (or in its quiet). */
   comparing: boolean
   onCompare: () => void
+  /** The take whose fades are open, if any. */
+  fading: number | null
+  onFades: (n: number) => void
+  onFadesClosed: (n: number) => void
+  /** Hands the Fades… button to the panel, to give it focus back when the editor closes. */
+  fadesOpener: (button: HTMLButtonElement | null) => void
 }) {
   const id = takePlayId(effect, take.n)
   const playing = player.playing === id
@@ -311,47 +356,81 @@ function TakeCard({
   const choose = useChooseEffectTake(effect)
   const failedChoose = choose.isError || (choose.data && !choose.data.ok)
   const failedDrop = drop.isError || (drop.data && !drop.data.ok)
+  const editing = fading === take.n
+  const otherOpen = fading !== null && !editing
+  const fades = effectFadesOf(take, effectLoops)
   return (
     <div className="take">
       <div className="take-row">
         <b className="grow">Take {take.n}</b>
+        {editing && <span className="chip chip-fade">fading</span>}
         <KindChip take={take} effectLoops={effectLoops} />
       </div>
       <span className="faint small">{take.model}</span>
-      <Playback effect={effect} take={take} player={player} />
-      {(take.loops || canCompare) && (
-        <div className="take-row">
-          {take.loops && <HearTheSeam effect={effect} take={take} player={player} />}
-          {canCompare && (
-            <button type="button" className="btn btn-small" onClick={onCompare}>
-              {comparing ? '■ Stop' : '▶ The chosen, then this'}
-            </button>
+      {editing ? (
+        <EffectFadesEditor
+          effect={effect}
+          take={take}
+          chosen={false}
+          player={player}
+          onClose={() => onFadesClosed(take.n)}
+        />
+      ) : (
+        <>
+          <Playback effect={effect} effectLoops={effectLoops} take={take} player={player} />
+          {fades && <span className="faint small">{fadesLine(fades)}</span>}
+          {(take.loops || canCompare) && (
+            <div className="take-row">
+              {take.loops && <HearTheSeam effect={effect} take={take} player={player} />}
+              {canCompare && (
+                <button type="button" className="btn btn-small" onClick={onCompare}>
+                  {comparing ? '■ Stop' : '▶ The chosen, then this'}
+                </button>
+              )}
+            </div>
           )}
-        </div>
+          <div className="take-row">
+            {effectFadable(take, effectLoops) && (
+              <button
+                type="button"
+                ref={fadesOpener}
+                className="btn btn-small"
+                disabled={locked}
+                aria-disabled={otherOpen ? true : undefined}
+                title={otherOpen ? `Close the fades of Take ${fading} first.` : undefined}
+                onClick={() => {
+                  if (otherOpen) return
+                  if (playing || comparing) player.stop()
+                  onFades(take.n)
+                }}
+              >
+                Fades…
+              </button>
+            )}
+            {effectTakeChoosable(take, effectLoops) && (
+              <button
+                type="button"
+                className="btn btn-small"
+                disabled={locked || choose.isPending || drop.isPending}
+                onClick={() => choose.mutate(take.file)}
+              >
+                {choose.isPending ? 'Choosing…' : 'Choose'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-ghost btn-small"
+              disabled={locked || drop.isPending || choose.isPending}
+              onClick={() => {
+                if (playing || comparing || seamPlaying) player.stop()
+                drop.mutate(take.file)
+              }}
+            >
+              Drop
+            </button>
+          </div>
+        </>
       )}
-      <div className="take-row">
-        {effectTakeChoosable(take, effectLoops) && (
-          <button
-            type="button"
-            className="btn btn-small"
-            disabled={locked || choose.isPending || drop.isPending}
-            onClick={() => choose.mutate(take.file)}
-          >
-            {choose.isPending ? 'Choosing…' : 'Choose'}
-          </button>
-        )}
-        <button
-          type="button"
-          className="btn btn-ghost btn-small"
-          disabled={locked || drop.isPending || choose.isPending}
-          onClick={() => {
-            if (playing || comparing || seamPlaying) player.stop()
-            drop.mutate(take.file)
-          }}
-        >
-          Drop
-        </button>
-      </div>
       {failedChoose && <span className="adopt-error">The take could not be chosen.</span>}
       {failedDrop && <span className="adopt-error">The take could not be dropped.</span>}
     </div>

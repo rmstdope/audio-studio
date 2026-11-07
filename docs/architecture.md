@@ -1766,6 +1766,24 @@ unchanged. **Accept** (`POST /api/effects/:id/accept`) counts the chosen take as
 description now, when the description alone changed; a changed length needs a new take (409).
 `CONTENT_STUDIO_FAKE_EFFECTS=1` swaps the generator for a stand-in that makes short tones.
 
+**Fades of a one-shot sound effect take** (as-dgh.2; drawn in `docs/ui/as-dgh.2-effect-fades.html`). The stingers' fade editor
+(above, §8.5: `FadesEditorBody`, shared) on every take made to play once of an effect that plays once, and on the take in the
+In the game block; a take made to loop, and every take of a looping effect, gets none (`effectFadable`, `effectFadesOf` in
+`core/effectTakes.ts`), and a take keeps its saved fades while its effect loops, shown and played again when it goes back to
+playing once. The lengths move in steps of 0.01 s (0.1 s with Shift; `EFFECT_FADE_STEPS` in `core/fades.ts`), a sound effect
+lasting a second or two. Fades belong to the board take (`fades: { in, out, shape }` in
+`content-studio/cache/effect-boards/<effect>.json`, absent when it has none), go with a drop, and are never in the lock or
+manifest, so fading never marks an effect "changed". The take's WAV stays as generated. `PUT`/`DELETE
+/api/effects/:id/takes/:file/fades` run in the board's turn (`setFades` in `services/effectTakes.ts`) and refuse a take made
+to loop or an effect that loops, a take that is not there, lengths together longer than the take or negative, and a lock that
+cannot be read; when the take is the chosen one the game's `<effect>.mp3` is written first with the faded sound
+(`commitEffect` with `soundOnly`: the manifest and lock untouched) and the board second, and a board that cannot be written
+puts the game's previous file back (`gameChanged` on the refusal if even that fails). **Choose** encodes `playedWav`, the take
+with its fades, so the game's clip always holds the faded sound, never settings for the game to apply. Every play (the card's ▶,
+the In the game block, "The chosen, then this", the editor) asks for the take with its saved fades in the address
+(`heardAs`); the editor, its states and its words are the stingers', with the lock line "Choosing, dropping and fading wait
+until the sound effects lock can be read." A trim (as-dgh.1) is applied before the fades, as on stingers.
+
 **Effects that loop** (as-5wc.6; drawn in `docs/ui/as-5wc.6-looping-effects.html`). The list's `loops` flag is read
 on every read, never stored. A looping effect's take is asked of the model at `seconds` plus a seam
 plus a spare second (`loopRequestSeconds` in `core/effectLoop.ts`; the seam is 1 s, at most half of a
@@ -2124,6 +2142,7 @@ GET    /api/effects/:id/takes                    the effect's takes, those being
 POST   /api/effects/:id/takes                    make takes ({ count, model? } 1–8, or { retry })
 GET    /api/effects/:id/takes/:file              a take's WAV (?seam=1: its seam, the last 4 seconds then the first 4)
 DELETE /api/effects/:id/takes/:file              drop a take that is not chosen
+PUT    /api/effects/:id/takes/:file/fades        save a one-shot take's fades ({ in, out, shape }; DELETE removes them); GET …/takes/:file?fadeIn&fadeOut&shape hears them
 POST   /api/effects/:id/choose|unchoose|accept|stop   choose a take ({ file }), take it back, accept a changed description, stop the batch
 GET    /api/effects/clips/:file                  a chosen clip (plain `.mp3` only)
 GET    /api/effects/:id/current                  the clip the game plays for the effect
@@ -2580,6 +2599,8 @@ Small, independently useful increments:
        effect plays is a change since chosen.
     6. **The second model** (as-5wc.5, done: §8.8): Stable Audio Open 1.0 on the GPU queue, Setup checking both
        models and choosing the main one (`effects.model`), and a model menu on an effect's page.
+    7. **Fades on a one-shot take** (as-dgh.2, done: §8.10, `docs/ui/as-dgh.2-effect-fades.html`): the stingers'
+       Fades… editor on each take made to play once, in steps of 0.01 s, written into the game's clip.
 
 17. **Scenes** (epic as-p86), in small pull requests:
     1. **The mockup round and the contract** (as-p86.1, done: §8.11, `docs/ui/as-p86.1-scenes.html`): the
