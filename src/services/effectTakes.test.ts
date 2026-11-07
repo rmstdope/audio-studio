@@ -943,6 +943,33 @@ describe('fades of a sound effect take', () => {
     expect(Math.abs(sampleAt(cuts, 50))).toBeGreaterThan(Math.abs(sampleAt(wav, 50)))
   })
 
+  it('trims the take in the game that already has fades: the game gets the cut sound faded, and Undo trim the whole take, still faded', async () => {
+    const made = setup(undefined, undefined, {}, 1.4, {
+      encode: keeping,
+      silence: { lead: 0.1, tail: 0.05 },
+    })
+    await made.takes.make(made.file, 'door-creak', { count: 1 })
+    const take = (await made.settled('door-creak')).takes[0]!
+    await made.takes.setFades(made.file, 'door-creak', take.file, {
+      in: 0.1,
+      out: 0.1,
+      shape: 'straight',
+    })
+    await made.takes.choose(made.file, 'door-creak', take.file)
+    expect(wavSeconds(clip(made.root))).toBeCloseTo(1.4, 2)
+    expect(await made.takes.trim(made.file, 'door-creak', take.file, false)).toEqual({ ok: true })
+    expect(wavSeconds(clip(made.root))).toBeCloseTo(1.27, 2)
+    expect(sampleAt(clip(made.root), 0)).toBe(0)
+    expect(await made.takes.trim(made.file, 'door-creak', take.file, true)).toEqual({ ok: true })
+    expect(wavSeconds(clip(made.root))).toBeCloseTo(1.4, 2)
+    expect(sampleAt(clip(made.root), 0)).toBe(0)
+    expect((await made.settled('door-creak')).takes[0]!.fades).toEqual({
+      in: 0.1,
+      out: 0.1,
+      shape: 'straight',
+    })
+  })
+
   it('drops the fades with the take', async () => {
     const { root, file, takes, take } = await withTake()
     await takes.setFades(file, 'door-creak', take.file, fades)
