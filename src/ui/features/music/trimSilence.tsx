@@ -18,7 +18,7 @@ export function takeSoundUrl(trackId: string, take: TakeView): string {
 }
 
 /** How long a take plays: the part between its cuts if it is trimmed, else all of it, in seconds. */
-export function playedSeconds(take: TakeView): number {
+export function playedSeconds(take: Pick<TakeView, 'trim' | 'seconds'>): number {
   return take.trim ? take.trim.seconds : take.seconds
 }
 

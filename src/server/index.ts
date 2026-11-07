@@ -159,7 +159,12 @@ import {
 } from '../services/effects'
 import { createEffectTakes } from '../services/effectTakes'
 import { createFakeEffects } from '../services/effectsFake'
-import { ChooseEffectTakeBody, MakeEffectTakesBody, TrimEffectTakeBody } from '../core/effectTakes'
+import {
+  ChooseEffectTakeBody,
+  MakeEffectTakesBody,
+  SetEffectFadesBody,
+  TrimEffectTakeBody,
+} from '../core/effectTakes'
 import { MakeAllBody } from '../core/effectsMakeAll'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
@@ -1813,6 +1818,32 @@ export function startServer({
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await effectTakes.drop(projectFile, request.params.id, request.params.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id/takes/:file/fades': {
+        PUT: fromOwnPage(async (request) => {
+          const body = SetEffectFadesBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { in, out, shape }' }, { status: 400 })
+          }
+          const result = await effectTakes.setFades(
+            projectFile,
+            request.params.id,
+            request.params.file,
+            body.data,
+          )
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const result = await effectTakes.setFades(
+            projectFile,
+            request.params.id,
+            request.params.file,
+            null,
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

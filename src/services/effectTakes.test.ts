@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { wavSeconds } from '../core/musicTake'
@@ -80,6 +88,7 @@ function setup(
     failed?: EffectModelId[]
     main?: EffectModelId
     gpu?: ReturnType<typeof createSerial>
+    encode?: Encoder
     silence?: { lead: number; tail: number }
   } = {},
 ) {
@@ -96,11 +105,13 @@ function setup(
   let seed = 100
   // The sound each choice was encoded from.
   const encoded: Uint8Array[] = []
-  const encode: Encoder = async (wav, out) => {
-    encoded.push(wav)
-    mkdirSync(dirname(out), { recursive: true })
-    writeFileSync(out, 'mp3')
-  }
+  const encode: Encoder =
+    options.encode ??
+    (async (wav, out) => {
+      encoded.push(wav)
+      mkdirSync(dirname(out), { recursive: true })
+      writeFileSync(out, 'mp3')
+    })
   const takes = createEffectTakes({
     generator,
     health,
@@ -707,6 +718,266 @@ describe('takes of an effect that loops', () => {
       ok: false,
       message: 'A change of how the effect plays cannot be accepted: the effect needs a new take.',
     })
+  })
+})
+
+describe('fades of a sound effect take', () => {
+  const fades = { in: 0.1, out: 0.2, shape: 'straight' as const }
+  const lockFile = 'content-studio/effects/lock.json'
+  const manifestFile = 'audio/effects/manifest.json'
+
+  /** An encoder that keeps the sound it was given as the clip's bytes, so a test can read what the game would play. */
+  const keeping: Encoder = async (wav, out) => {
+    mkdirSync(dirname(out), { recursive: true })
+    writeFileSync(out, wav)
+  }
+  /** Sets up with one door take made (1.4 s at 1000 Hz). */
+  async function withTake(options: Parameters<typeof setup>[4] = {}, list?: unknown) {
+    const made = setup(undefined, list, {}, 1.4, { encode: keeping, ...options })
+    await made.takes.make(made.file, 'door-creak', { count: 2 })
+    const view = await made.settled('door-creak')
+    return { ...made, view, take: view.takes[0]! }
+  }
+  const clip = (root: string) =>
+    readWav(new Uint8Array(readFileSync(join(root, 'audio/effects/door-creak.mp3'))))
+  const sampleAt = (wav: ReturnType<typeof readWav>, frame: number) =>
+    new Int16Array(wav.data.buffer, wav.data.byteOffset, wav.data.length / 2)[frame]!
+
+  it('saves the fades with the take and shows them; the sound on the board stays as made', async () => {
+    const { root, file, takes, take, settled } = await withTake()
+    const before = readFileSync(
+      join(root, 'content-studio/cache/effect-takes/door-creak', take.file),
+    )
+    expect(await takes.setFades(file, 'door-creak', take.file, fades)).toEqual({ ok: true })
+    const view = await settled('door-creak')
+    expect(view.takes[0]!.fades).toEqual(fades)
+    expect(view.takes[1]!.fades).toBeUndefined()
+    expect(
+      readFileSync(join(root, 'content-studio/cache/effect-takes/door-creak', take.file)),
+    ).toEqual(before)
+  })
+
+  it('removes them with null, and treats lengths of 0 as none', async () => {
+    const { file, takes, take, settled } = await withTake()
+    await takes.setFades(file, 'door-creak', take.file, fades)
+    expect(await takes.setFades(file, 'door-creak', take.file, null)).toEqual({ ok: true })
+    expect((await settled('door-creak')).takes[0]!.fades).toBeUndefined()
+    await takes.setFades(file, 'door-creak', take.file, { in: 0, out: 0, shape: 'smooth' })
+    expect((await settled('door-creak')).takes[0]!.fades).toBeUndefined()
+  })
+
+  it('writes the faded sound when a take with fades is chosen, with the take’s real length in the manifest', async () => {
+    const { root, file, takes, take } = await withTake()
+    await takes.setFades(file, 'door-creak', take.file, fades)
+    expect(await takes.choose(file, 'door-creak', take.file)).toEqual({ ok: true })
+    const wav = clip(root)
+    expect(sampleAt(wav, 0)).toBe(0)
+    expect(Math.abs(sampleAt(wav, 1399))).toBeLessThan(100)
+    // The middle is untouched: the made sound is a sine of amplitude 8000.
+    expect(sampleAt(wav, 700)).toBe(Math.round(8000 * Math.sin(700 / 20)))
+    expect(JSON.parse(readFileSync(join(root, manifestFile), 'utf8'))).toEqual({
+      'door-creak': { file: 'door-creak.mp3', duration: 1.4 },
+    })
+  })
+
+  it('chooses a take without fades exactly as made', async () => {
+    const { root, file, takes, take } = await withTake()
+    await takes.choose(file, 'door-creak', take.file)
+    expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'))).toEqual(
+      readFileSync(join(root, 'content-studio/cache/effect-takes/door-creak', take.file)),
+    )
+  })
+
+  it('rewrites only the game’s sound for the chosen take: the manifest and the lock stay byte for byte', async () => {
+    const { root, file, takes, take } = await withTake()
+    await takes.choose(file, 'door-creak', take.file)
+    const lock = readFileSync(join(root, lockFile), 'utf8')
+    const manifest = readFileSync(join(root, manifestFile), 'utf8')
+    expect(await takes.setFades(file, 'door-creak', take.file, fades)).toEqual({ ok: true })
+    expect(sampleAt(clip(root), 0)).toBe(0)
+    expect(Math.abs(sampleAt(clip(root), 1399))).toBeLessThan(100)
+    expect(readFileSync(join(root, lockFile), 'utf8')).toBe(lock)
+    expect(readFileSync(join(root, manifestFile), 'utf8')).toBe(manifest)
+    // Removing them writes the sound as made again.
+    expect(await takes.setFades(file, 'door-creak', take.file, null)).toEqual({ ok: true })
+    expect(sampleAt(clip(root), 1399)).toBe(Math.round(8000 * Math.sin(1399 / 20)))
+  })
+
+  it('does not touch the game’s file for a take that is not the chosen one', async () => {
+    const { root, file, takes, view } = await withTake()
+    await takes.choose(file, 'door-creak', view.takes[0]!.file)
+    const before = readFileSync(join(root, 'audio/effects/door-creak.mp3'))
+    await takes.setFades(file, 'door-creak', view.takes[1]!.file, fades)
+    expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'))).toEqual(before)
+  })
+
+  it('refuses lengths together longer than the take, and negative ones, changing nothing', async () => {
+    const { file, takes, take, settled } = await withTake()
+    expect(
+      await takes.setFades(file, 'door-creak', take.file, { in: 1, out: 0.5, shape: 'smooth' }),
+    ).toEqual({ ok: false, message: "The fades together can't be longer than the take (1.4 s)." })
+    expect(
+      await takes.setFades(file, 'door-creak', take.file, { in: -1, out: 0, shape: 'smooth' }),
+    ).toEqual({ ok: false, message: 'Type a length of 0 s or more.' })
+    expect((await settled('door-creak')).takes[0]!.fades).toBeUndefined()
+  })
+
+  it('refuses a take that is not on the board, and an effect that is not listed', async () => {
+    const { file, takes } = await withTake()
+    expect(await takes.setFades(file, 'door-creak', '0123456789abcdef.9.wav', fades)).toEqual({
+      ok: false,
+      message: 'That take is not on the board.',
+    })
+    expect(await takes.setFades(file, 'no-such', 'x', fades)).toBeNull()
+  })
+
+  it('refuses a take made to loop, and any take of an effect that loops', async () => {
+    const rain = { id: 'rain', text: 'Steady rain on a tin roof', seconds: 10, loops: true }
+    const made = setup(undefined, [rain], {}, 12, { encode: keeping })
+    await made.takes.make(made.file, 'rain', { count: 1 })
+    const loop = (await made.settled('rain')).takes[0]!
+    const plain = 'Only a sound that plays once can fade.'
+    expect(await made.takes.setFades(made.file, 'rain', loop.file, fades)).toEqual({
+      ok: false,
+      message: plain,
+    })
+    // A take made to play once, left on an effect that now loops, cannot fade either.
+    const once = setup(undefined, undefined, {}, 1.4, { encode: keeping })
+    await once.takes.make(once.file, 'door-creak', { count: 1 })
+    const take = (await once.settled('door-creak')).takes[0]!
+    await once.takes.setFades(once.file, 'door-creak', take.file, fades)
+    writeFileSync(
+      join(once.root, 'tts/effects.json'),
+      JSON.stringify([{ id: 'door-creak', text: 'A door', seconds: 3, loops: true }]),
+    )
+    expect(await once.takes.setFades(once.file, 'door-creak', take.file, fades)).toEqual({
+      ok: false,
+      message: plain,
+    })
+    // It keeps its saved fades meanwhile, and the view still carries them.
+    expect((await once.settled('door-creak')).takes[0]!.fades).toEqual(fades)
+  })
+
+  it('refuses while the lock cannot be read, changing nothing', async () => {
+    const { root, file, takes, take, settled } = await withTake()
+    mkdirSync(join(root, 'content-studio/effects'), { recursive: true })
+    writeFileSync(join(root, lockFile), '{ not json')
+    const answer = await takes.setFades(file, 'door-creak', take.file, fades)
+    expect(answer).toMatchObject({ ok: false })
+    expect((await settled('door-creak')).takes[0]!.fades).toBeUndefined()
+  })
+
+  it('leaves the board and the game as they were when the sound cannot be encoded', async () => {
+    let failing = false
+    const flaky: Encoder = async (wav, out) => {
+      if (failing) throw new Error('The disk is full.')
+      return keeping(wav, out, { bitrate: '160k', channels: 2 })
+    }
+    const { root, file, takes, take, settled } = await withTake({ encode: flaky })
+    await takes.choose(file, 'door-creak', take.file)
+    const game = readFileSync(join(root, 'audio/effects/door-creak.mp3'))
+    failing = true
+    expect(await takes.setFades(file, 'door-creak', take.file, fades)).toEqual({
+      ok: false,
+      message: 'The disk is full.',
+    })
+    expect((await settled('door-creak')).takes[0]!.fades).toBeUndefined()
+    expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'))).toEqual(game)
+  })
+
+  it('puts the game’s file back when the board cannot be written', async () => {
+    const { root, file, takes, take } = await withTake()
+    await takes.choose(file, 'door-creak', take.file)
+    const game = readFileSync(join(root, 'audio/effects/door-creak.mp3'))
+    // A folder that takes no new file: the board cannot be written after the game's file was.
+    const folder = join(root, 'content-studio/cache/effect-boards')
+    chmodSync(folder, 0o555)
+    const answer = await takes.setFades(file, 'door-creak', take.file, fades)
+    chmodSync(folder, 0o755)
+    expect(answer).toEqual({ ok: false, message: 'The take board could not be written.' })
+    expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'))).toEqual(game)
+  })
+
+  it('fades the chosen take without reading the manifest, which it never writes', async () => {
+    const { root, file, takes, take } = await withTake()
+    await takes.choose(file, 'door-creak', take.file)
+    writeFileSync(join(root, manifestFile), '{ not json')
+    expect(await takes.setFades(file, 'door-creak', take.file, fades)).toEqual({ ok: true })
+    expect(readFileSync(join(root, manifestFile), 'utf8')).toBe('{ not json')
+    expect(sampleAt(clip(root), 0)).toBe(0)
+  })
+
+  it('fades a trimmed take after the cut: the lengths are of the part left, the game gets the cut sound faded, and the cuts alone are served without fades', async () => {
+    const made = setup(undefined, undefined, {}, 1.4, {
+      encode: keeping,
+      silence: { lead: 0.1, tail: 0.05 },
+    })
+    await made.takes.make(made.file, 'door-creak', { count: 1 })
+    const take = (await made.settled('door-creak')).takes[0]!
+    await made.takes.trim(made.file, 'door-creak', take.file, false)
+    const left = (await made.settled('door-creak')).takes[0]!.trim!.seconds
+    // Longer than what is left, though shorter than the take as generated.
+    expect(
+      await made.takes.setFades(made.file, 'door-creak', take.file, {
+        in: left,
+        out: 0.2,
+        shape: 'smooth',
+      }),
+    ).toEqual({
+      ok: false,
+      message: `The fades together can't be longer than the take (${left.toFixed(1)} s).`,
+    })
+    expect(
+      await made.takes.setFades(made.file, 'door-creak', take.file, {
+        in: 0.1,
+        out: 0.1,
+        shape: 'straight',
+      }),
+    ).toEqual({ ok: true })
+    await made.takes.choose(made.file, 'door-creak', take.file)
+    const wav = clip(made.root)
+    expect(wavSeconds(wav)).toBeCloseTo(left, 2)
+    expect(sampleAt(wav, 0)).toBe(0)
+    const cuts = readWav((await made.takes.trimmedSound(made.file, 'door-creak', take.file))!)
+    // Halfway into the fade-in the cuts alone are louder than the game's faded sound.
+    expect(Math.abs(sampleAt(cuts, 50))).toBeGreaterThan(Math.abs(sampleAt(wav, 50)))
+  })
+
+  it('trims the take in the game that already has fades: the game gets the cut sound faded, and Undo trim the whole take, still faded', async () => {
+    const made = setup(undefined, undefined, {}, 1.4, {
+      encode: keeping,
+      silence: { lead: 0.1, tail: 0.05 },
+    })
+    await made.takes.make(made.file, 'door-creak', { count: 1 })
+    const take = (await made.settled('door-creak')).takes[0]!
+    await made.takes.setFades(made.file, 'door-creak', take.file, {
+      in: 0.1,
+      out: 0.1,
+      shape: 'straight',
+    })
+    await made.takes.choose(made.file, 'door-creak', take.file)
+    expect(wavSeconds(clip(made.root))).toBeCloseTo(1.4, 2)
+    expect(await made.takes.trim(made.file, 'door-creak', take.file, false)).toEqual({ ok: true })
+    expect(wavSeconds(clip(made.root))).toBeCloseTo(1.27, 2)
+    expect(sampleAt(clip(made.root), 0)).toBe(0)
+    expect(await made.takes.trim(made.file, 'door-creak', take.file, true)).toEqual({ ok: true })
+    expect(wavSeconds(clip(made.root))).toBeCloseTo(1.4, 2)
+    expect(sampleAt(clip(made.root), 0)).toBe(0)
+    expect((await made.settled('door-creak')).takes[0]!.fades).toEqual({
+      in: 0.1,
+      out: 0.1,
+      shape: 'straight',
+    })
+  })
+
+  it('drops the fades with the take', async () => {
+    const { root, file, takes, take } = await withTake()
+    await takes.setFades(file, 'door-creak', take.file, fades)
+    expect(await takes.drop(file, 'door-creak', take.file)).toEqual({ ok: true })
+    const board = JSON.parse(
+      readFileSync(join(root, 'content-studio/cache/effect-boards/door-creak.json'), 'utf8'),
+    )
+    expect(JSON.stringify(board)).not.toContain('"fades"')
   })
 })
 

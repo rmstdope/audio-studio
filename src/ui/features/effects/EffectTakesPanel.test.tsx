@@ -277,10 +277,8 @@ describe('Un-choose', () => {
   })
 
   it('un-chooses on the second Un-choose', async () => {
-    const { container, calls, click } = render(chosenRow(), data)
-    await click(
-      container.querySelector<HTMLButtonElement>('[aria-label="In the game"] button.btn-small')!,
-    )
+    const { container, calls, click, button } = render(chosenRow(), data)
+    await click(button('Un-choose'))
     await click(container.querySelector<HTMLButtonElement>('[role="alertdialog"] .btn-primary')!)
     expect(calls[0]).toMatchObject({ url: '/api/effects/chest-open/unchoose', method: 'POST' })
   })
@@ -291,10 +289,8 @@ describe('Un-choose', () => {
         { ok: false, message: 'The sound effects lock could not be read.' },
         { status: 409 },
       )
-    const { container, text, click } = render(chosenRow(), data, refuse)
-    await click(
-      container.querySelector<HTMLButtonElement>('[aria-label="In the game"] button.btn-small')!,
-    )
+    const { container, text, click, button } = render(chosenRow(), data, refuse)
+    await click(button('Un-choose'))
     await click(container.querySelector<HTMLButtonElement>('[role="alertdialog"] .btn-primary')!)
     expect(text()).toContain(
       'Take 2 could not be un-chosen: the sound effects lock could not be read. Nothing was changed.',
@@ -447,7 +443,7 @@ describe('the lock cannot be read', () => {
     expect(text()).toContain('The sound effects lock could not be read')
     expect(text()).toContain('Which take the game plays is not known.')
     expect(text()).toContain(
-      'Choosing and dropping wait until the sound effects lock can be read. You can still listen and make more takes.',
+      'Choosing, dropping and fading wait until the sound effects lock can be read. You can still listen and make more takes.',
     )
     expect(buttons('Choose').every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
     expect(buttons('Drop').every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
@@ -787,7 +783,7 @@ describe('Trim silence', () => {
   it('sits at the left of a card’s bottom row, with Drop and Choose at the right', () => {
     const { container } = render(row({ status: 'not-chosen' }), view({ takes: [trimmable(1)] }))
     const card = container.querySelector('.take')!
-    expect(labels(bottomRow(card))).toEqual(['Trim silence', 'Drop', 'Choose'])
+    expect(labels(bottomRow(card))).toEqual(['Trim silence', 'Fades…', 'Drop', 'Choose'])
     expect(bottomRow(card).querySelector('.grow')).not.toBeNull()
   })
 
@@ -882,7 +878,9 @@ describe('Trim silence', () => {
     )
     expect(buttons('Trim silence')[0]!.disabled).toBe(true)
     expect(buttons('Undo trim')[0]!.disabled).toBe(true)
-    expect(text()).toContain('Choosing and dropping wait until the sound effects lock can be read.')
+    expect(text()).toContain(
+      'Choosing, dropping and fading wait until the sound effects lock can be read.',
+    )
   })
 
   it('says why it failed, next to the button, and the take is as it was', async () => {
@@ -911,6 +909,7 @@ describe('Trim silence', () => {
     const block = container.querySelector('[aria-label="In the game"]')!
     expect(labels(block.querySelector('.track-in-game-actions')!)).toEqual([
       'Trim silence',
+      'Fades…',
       'Un-choose',
     ])
     expect(buttons('Trim silence')).toHaveLength(1)
@@ -941,7 +940,7 @@ describe('Trim silence', () => {
       view({ takes: [trimmable(2, { chosen: true })] }),
     )
     const actions = container.querySelector('.track-in-game-actions')!
-    expect(labels(actions)).toEqual(['Trim silence', 'Un-choose', 'Choose again'])
+    expect(labels(actions)).toEqual(['Trim silence', 'Fades…', 'Un-choose', 'Choose again'])
   })
 
   it('plays only the part between the cuts, in Play and in the comparison', async () => {

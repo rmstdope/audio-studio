@@ -10,6 +10,7 @@ import {
   fadesLine,
   fadesProblem,
   hasFades,
+  EFFECT_FADE_STEPS,
   lengthAtX,
   stepHandle,
   tooLongLine,
@@ -145,5 +146,18 @@ describe('fades', () => {
     )
     expect(heardAs('/t/a.wav', undefined)).toEqual({ url: '/t/a.wav', fade: true })
     expect(heardAs('/t/a.wav', none)).toEqual({ url: '/t/a.wav', fade: true })
+  })
+
+  it('steps a sound effect handle by hundredths, and a tenth with Shift', () => {
+    expect(stepHandle(0.3, 1, false, 0, 2, EFFECT_FADE_STEPS)).toBe(0.31)
+    expect(stepHandle(0.3, -1, true, 0, 2, EFFECT_FADE_STEPS)).toBe(0.2)
+    expect(stepHandle(0.005, -1, false, 0, 2, EFFECT_FADE_STEPS)).toBe(0)
+    expect(stepHandle(1.95, 1, true, 0, 2, EFFECT_FADE_STEPS)).toBe(2)
+  })
+
+  it('snaps a dragged sound effect handle to hundredths', () => {
+    expect(lengthAtX(11, 100, 1.4, EFFECT_FADE_STEPS)).toBe(0.15)
+    expect(lengthAtX(10.4, 100, 1.4, EFFECT_FADE_STEPS)).toBe(0.15)
+    expect(lengthAtX(200, 100, 1.4, EFFECT_FADE_STEPS)).toBe(1.4)
   })
 })

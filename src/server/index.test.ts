@@ -5630,6 +5630,58 @@ describe('server, sound effect takes', () => {
     expect((await fetch(new URL('/api/effects/clips/.coins.mp3', studio.url))).status).toBe(404)
   })
 
+  it('saves and removes the fades of a one-shot take from the studio’s own page only, and shows them on the take', async () => {
+    await send('POST', '/api/effects/door-creak/takes', { count: 1 })
+    const made = await settled('door-creak')
+    const file = made.takes[0].file as string
+    const path = `/api/effects/door-creak/takes/${file}/fades`
+    const fades = { in: 0.1, out: 0.2, shape: 'straight' }
+    expect((await send('PUT', path, fades, 'https://evil.example')).status).toBe(403)
+    expect((await send('DELETE', path, undefined, 'https://evil.example')).status).toBe(403)
+    expect((await send('PUT', path, { in: -1, out: 0, shape: 'smooth' })).status).toBe(400)
+    expect((await send('PUT', path, { in: 'x' })).status).toBe(400)
+    expect((await send('PUT', `/api/effects/nobody/takes/${file}/fades`, fades)).status).toBe(404)
+    expect((await send('PUT', path, { in: 50, out: 50, shape: 'smooth' })).status).toBe(409)
+    expect(await send('PUT', path, fades).then((r) => r.json())).toEqual({ ok: true })
+    expect((await view('door-creak')).takes[0].fades).toEqual(fades)
+    expect(await send('DELETE', path).then((r) => r.json())).toEqual({ ok: true })
+    expect((await view('door-creak')).takes[0].fades).toBeUndefined()
+  })
+
+  it('refuses fades on a take of an effect that loops', async () => {
+    await send('POST', '/api/effects/wind/takes', { count: 1 })
+    const file = (await settled('wind')).takes[0].file as string
+    const answer = await send('PUT', `/api/effects/wind/takes/${file}/fades`, {
+      in: 0.1,
+      out: 0.1,
+      shape: 'smooth',
+    })
+    expect(answer.status).toBe(409)
+    expect(await answer.json()).toEqual({
+      ok: false,
+      message: 'Only a sound that plays once can fade.',
+    })
+  })
+
+  it('serves a take with the fades asked for in the address, to hear them before saving', async () => {
+    await send('POST', '/api/effects/coins/takes', { count: 1 })
+    const file = (await settled('coins')).takes[0].file as string
+    const url = `/api/effects/coins/takes/${file}`
+    const faded = readWav(
+      new Uint8Array(
+        await (
+          await fetch(new URL(`${url}?fadeIn=0.1&fadeOut=0.1&shape=straight`, studio.url))
+        ).arrayBuffer(),
+      ),
+    )
+    const samples = new Int16Array(faded.data.buffer, faded.data.byteOffset, faded.data.length / 2)
+    expect(samples[0]).toBe(0)
+    expect(samples[samples.length - 1]).toBe(0)
+    expect(
+      (await fetch(new URL(`${url}?fadeIn=-1&fadeOut=1&shape=straight`, studio.url))).status,
+    ).toBe(400)
+  })
+
   it('refuses Make all and Stop all from another page, and a body that is not { ids }', async () => {
     for (const [path, body] of [
       ['/api/effects/make-all', { ids: ['coins'] }],

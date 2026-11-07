@@ -17,6 +17,10 @@ import {
   effectTakeKind,
   makeEffectTakesLabel,
   EffectLockSchema,
+  EffectBoardTakeSchema,
+  SetEffectFadesBody,
+  effectFadable,
+  effectFadesOf,
   type EffectLockEntry,
 } from './effectTakes'
 
@@ -270,5 +274,46 @@ describe('the effects lock file', () => {
     const old = { coins: { ...lock, inputs: { description: 'Coins', seconds: 1 } } }
     const parsed = EffectLockSchema.safeParse(old)
     expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual(['coins.inputs.text'])
+  })
+})
+
+describe('fades of a sound effect take', () => {
+  const fades = { in: 0.01, out: 0.4, shape: 'smooth' as const }
+
+  it('keeps fades on a board take, and a take without them parses as before', () => {
+    const take = {
+      n: 1,
+      hash: 'a'.repeat(16),
+      model: 'small-sfx',
+      seconds: 1.4,
+      peaks: [0.5],
+      inputs: { description: 'A door', seconds: 2 },
+    }
+    expect(EffectBoardTakeSchema.parse(take).fades).toBeUndefined()
+    expect(EffectBoardTakeSchema.parse({ ...take, fades }).fades).toEqual(fades)
+  })
+
+  it('takes a body of two lengths and a shape, and nothing else', () => {
+    expect(SetEffectFadesBody.safeParse(fades).success).toBe(true)
+    expect(SetEffectFadesBody.safeParse({ ...fades, extra: 1 }).success).toBe(false)
+    expect(SetEffectFadesBody.safeParse({ ...fades, in: -1 }).success).toBe(false)
+  })
+
+  it('is fadable only for a take made to play once on an effect that plays once', () => {
+    expect(effectFadable({ loops: false }, false)).toBe(true)
+    expect(effectFadable({ loops: true }, true)).toBe(false)
+    expect(effectFadable({ loops: true }, false)).toBe(false)
+    expect(effectFadable({ loops: false }, true)).toBe(false)
+  })
+
+  it('gives the saved fades while fadable, none while the effect loops, and again after', () => {
+    expect(effectFadesOf({ loops: false, fades }, false)).toEqual(fades)
+    expect(effectFadesOf({ loops: false, fades }, true)).toBeUndefined()
+    expect(effectFadesOf({ loops: false, fades }, false)).toEqual(fades)
+    expect(effectFadesOf({ loops: false }, false)).toBeUndefined()
+    expect(
+      effectFadesOf({ loops: false, fades: { ...fades, in: 0, out: 0 } }, false),
+    ).toBeUndefined()
+    expect(effectFadesOf({ loops: true, fades }, true)).toBeUndefined()
   })
 })
