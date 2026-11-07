@@ -185,6 +185,18 @@ describe('fading a stinger take on its page', () => {
     expect(game.textContent).toContain(unchooseHint)
   })
 
+  it('puts the chosen take’s fades line under its waveform in the In the game block', () => {
+    const { container } = render('stinger', [
+      take(1, { chosen: true, fades: { in: 0.3, out: 1.5, shape: 'smooth' } }),
+    ])
+    const game = container.querySelector('.track-in-game')!
+    const line = [...game.querySelectorAll('span')].find((e) =>
+      e.textContent?.startsWith('Fades in 0.3 s'),
+    )!
+    const wave = game.querySelector('.wave')!
+    expect(wave.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('says one line under a take with fades, and nothing under one without', () => {
     const { container } = render('stinger', [
       take(1, { fades: { in: 0.3, out: 1.5, shape: 'smooth' } }),

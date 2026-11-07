@@ -296,9 +296,6 @@ export function InTheGame({
         {take && <span className="faint small">{take.model}</span>}
       </div>
       {take?.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
-      {take?.fades && fading !== take.n && (
-        <span className="faint small">{fadesLine(take.fades)}</span>
-      )}
       {take && editing ? (
         <FadesEditor
           trackId={track.id}
@@ -309,13 +306,16 @@ export function InTheGame({
         />
       ) : (
         take && (
-          <Playback
-            trackId={track.id}
-            kind={view.kind}
-            take={take}
-            player={player}
-            note={trimControl.note}
-          />
+          <>
+            <Playback
+              trackId={track.id}
+              kind={view.kind}
+              take={take}
+              player={player}
+              note={trimControl.note}
+            />
+            {take.fades && <span className="faint small">{fadesLine(take.fades)}</span>}
+          </>
         )
       )}
       {!editing && (
