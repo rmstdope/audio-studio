@@ -229,6 +229,7 @@ describe('Fades… on a sound effect take', () => {
     expect(JSON.parse(put.body!)).toEqual({ in: 0.01, out: 0, shape: 'smooth' })
     expect(container.querySelector('.editor')).toBeNull()
     expect(document.activeElement?.textContent).toBe('Fades…')
+    expect(document.activeElement?.closest('.take')?.textContent).toContain('Take 1')
   })
 
   it('removes the fades in one press, with no question', async () => {
@@ -364,5 +365,6 @@ describe('Fades… on a sound effect take', () => {
     })
     expect(container.querySelector('.editor')).toBeNull()
     expect(document.activeElement?.textContent).toBe('Fades…')
+    expect(document.activeElement?.closest('.take')?.textContent).toContain('Take 1')
   })
 })

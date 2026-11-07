@@ -889,6 +889,15 @@ describe('fades of a sound effect take', () => {
     expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'))).toEqual(game)
   })
 
+  it('fades the chosen take without reading the manifest, which it never writes', async () => {
+    const { root, file, takes, take } = await withTake()
+    await takes.choose(file, 'door-creak', take.file)
+    writeFileSync(join(root, manifestFile), '{ not json')
+    expect(await takes.setFades(file, 'door-creak', take.file, fades)).toEqual({ ok: true })
+    expect(readFileSync(join(root, manifestFile), 'utf8')).toBe('{ not json')
+    expect(sampleAt(clip(root), 0)).toBe(0)
+  })
+
   it('drops the fades with the take', async () => {
     const { root, file, takes, take } = await withTake()
     await takes.setFades(file, 'door-creak', take.file, fades)

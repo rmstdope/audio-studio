@@ -119,7 +119,8 @@ export async function commitEffect({
   try {
     return await choices().run(turn(projectFile), async (): Promise<CommitResult> => {
       const found: Problem[] = []
-      const manifest = await manifestNow(root, effects, found)
+      // Only the sound is written for fades: the manifest is neither read nor written.
+      const manifest = soundOnly ? {} : await manifestNow(root, effects, found)
       const lock = await lockNow(root, found)
       if (!manifest || !lock) {
         const unread = !manifest ? 'manifest' : 'lock'
