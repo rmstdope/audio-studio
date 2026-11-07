@@ -87,7 +87,15 @@ export type EffectMakeResult =
 export type EffectStopResult = { ok: true; stopped: number } | ProjectFailure | null
 
 /** What trimming or untrimming a take answered; null for an effect the project does not list. */
-export type EffectTrimResult = CommitResult | null
+export type EffectTrimResult =
+  | CommitResult
+  | {
+      ok: false
+      message: string
+      /** Set when the board could not be written and the game's files could not be put back as they were. */
+      gameChanged: true
+    }
+  | null
 
 /** What choosing, un-choosing or accepting answered; null for an effect the project does not list. */
 export type EffectChooseResult = CommitResult | null
@@ -917,12 +925,13 @@ export function createEffectTakes({
         if (!(error instanceof BoardNotWritten)) throw error
         // Kept in the server log: the person is told which file, not the stack.
         console.error('saving the trim failed', error)
-        return {
-          ok: false,
-          message: stuck
-            ? `${error.message}, and the game’s files could not be put back`
-            : error.message,
-        }
+        return stuck
+          ? {
+              ok: false,
+              message: `${error.message}, and the game’s files could not be put back`,
+              gameChanged: true,
+            }
+          : { ok: false, message: error.message }
       })
     },
 

@@ -949,6 +949,33 @@ describe('Trim silence', () => {
     )
   })
 
+  it('on the take in the game: claims nothing about the game when its files could not be put back', async () => {
+    const stuck = () =>
+      Response.json(
+        {
+          ok: false,
+          message:
+            'content-studio/cache/effect-boards/door-creak.json could not be written, and the game’s files could not be put back',
+          gameChanged: true,
+        },
+        { status: 409 },
+      )
+    const said = (word: string) =>
+      `Take 2 could not be ${word}: content-studio/cache/effect-boards/door-creak.json could not be written, and the game’s files could not be put back.`
+    const trimming = render(chosenRow(), view({ takes: [trimmable(2, { chosen: true })] }), stuck)
+    await trimming.click(trimming.buttons('Trim silence')[0]!)
+    expect(trimming.text()).toContain(said('trimmed'))
+    expect(trimming.text()).not.toContain('still plays')
+    const undoing = render(
+      chosenRow(),
+      view({ takes: [take(2, { chosen: true, trim: cut })] }),
+      stuck,
+    )
+    await undoing.click(undoing.buttons('Undo trim')[0]!)
+    expect(undoing.text()).toContain(said('untrimmed'))
+    expect(undoing.text()).not.toContain('still plays')
+  })
+
   describe('a failed trim, then a later action on the take that works', () => {
     const fades = { in: 0.05, out: 0.1, shape: 'straight' as const }
     const untrimmed = 'Take 2 could not be untrimmed'
