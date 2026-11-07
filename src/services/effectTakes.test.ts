@@ -328,7 +328,7 @@ describe('createEffectTakes', () => {
     expect(held.calls).toEqual([])
   })
 
-  it('records the model as failed when the board cannot be saved after the WAV is written', async () => {
+  it('records the model as failed when the board cannot be read after the WAV is written', async () => {
     const held = await heldAtTheBoard()
     writeFileSync(join(held.root, 'content-studio/cache/effect-boards/coins.json'), '{ nope')
     held.release()
@@ -357,10 +357,14 @@ describe('createEffectTakes', () => {
       console.error = quietLog
       chmodSync(folder, 0o755)
     }
-    await new Promise((r) => setTimeout(r, 40))
-    expect(held.calls.filter((c) => c.startsWith('record'))).toEqual([])
     // The take's sound is not kept without its place on the board.
-    expect(readdirSync(join(held.root, 'content-studio/cache/effect-takes/coins'))).toEqual([])
+    const takes = join(held.root, 'content-studio/cache/effect-takes/coins')
+    for (let i = 0; i < 400 && readdirSync(takes).length; i++) {
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    expect(readdirSync(takes)).toEqual([])
+    // The model made the take: no failure is recorded, and an earlier one is cleared.
+    expect(held.calls).toEqual(['clear small-sfx'])
   })
 
   it('names the board file when the take numbers cannot be reserved, and makes nothing', async () => {

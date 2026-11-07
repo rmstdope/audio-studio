@@ -220,7 +220,7 @@ class BoardNotWritten extends Error {
  * Turns a board that could not be saved into a refusal naming its file, kept with its stack in the
  * server log under `what`; any other error goes on.
  */
-function boardRefusal(what: string, say: (reason: string) => string = (reason) => reason) {
+function boardRefusal(what: string, say: (reason: string) => string) {
   return (error: unknown): { ok: false; message: string } => {
     if (!(error instanceof BoardNotWritten)) throw error
     console.error(what, error)

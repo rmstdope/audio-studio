@@ -1742,8 +1742,8 @@ the description and length (the model is the take's own field). A take made for 
 A take that fails is kept in memory as "could not be made" with **Try again**; success clears and
 failure records the model's health (Setup's row, §8.8), a stopped take neither. A made take whose board
 cannot be written is no failure of the model: it is "could not be made" with the board file as its reason
-("content-studio/cache/effect-boards/<id>.json could not be written."), its WAV removed, and the health left as
-it was (as-ct9). **Stop** discards the one being made and the ones waiting.
+("content-studio/cache/effect-boards/<id>.json could not be written."), its WAV removed, and no failure recorded
+(the model worked, so an earlier failure of it is cleared; as-ct9). **Stop** discards the one being made and the ones waiting.
 
 **Compare.** "▶ The chosen, then this" plays the chosen take, one second of quiet, then the take
 (`Clip.after` in `ui/player.ts`); "■ Stop", a second press or any other sound ends it.
