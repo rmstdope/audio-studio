@@ -184,9 +184,6 @@ export function EffectInTheGame({
         {take && <KindChip take={take} effectLoops={row.loops} />}
         {take && <span className="faint small">{take.model}</span>}
       </div>
-      {take && !editing && effectFadesOf(take, row.loops) && (
-        <span className="faint small">{fadesLine(effectFadesOf(take, row.loops)!)}</span>
-      )}
       {take && editing ? (
         <EffectFadesEditor
           effect={row.id}
@@ -197,13 +194,18 @@ export function EffectInTheGame({
         />
       ) : (
         take && (
-          <Playback
-            effect={row.id}
-            effectLoops={row.loops}
-            take={take}
-            player={player}
-            note={trimControl.note}
-          />
+          <>
+            <Playback
+              effect={row.id}
+              effectLoops={row.loops}
+              take={take}
+              player={player}
+              note={trimControl.note}
+            />
+            {effectFadesOf(take, row.loops) && (
+              <span className="faint small">{fadesLine(effectFadesOf(take, row.loops)!)}</span>
+            )}
+          </>
         )
       )}
       {!editing && (

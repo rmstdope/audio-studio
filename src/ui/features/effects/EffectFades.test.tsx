@@ -283,6 +283,16 @@ describe('Fades… on a sound effect take', () => {
     expect(document.activeElement?.textContent).toBe('Fades…')
   })
 
+  it('puts the chosen take’s fades line under its waveform in the In the game block', () => {
+    const { container } = render(chosenRow(), view({ takes: [take(2, { chosen: true, fades })] }))
+    const game = container.querySelector('.track-in-game')!
+    const line = [...game.querySelectorAll('span')].find((e) =>
+      e.textContent?.startsWith('Fades in 0.02 s'),
+    )!
+    const wave = game.querySelector('.wave')!
+    expect(wave.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('says one line under a take with fades and draws the fade line, and nothing under one without', () => {
     const { container } = render(
       chosenRow(),
