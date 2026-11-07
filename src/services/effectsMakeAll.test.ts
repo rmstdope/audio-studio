@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { writeWav } from '../core/wav'
@@ -251,6 +251,26 @@ describe('a press that is stopped, or cannot start one effect', () => {
     const result = await takes.makeAll(file, ['door-creak', 'coins'])
     expect(result).toEqual({ ok: true, started: [{ id: 'coins', takes: 4 }] })
     await idle()
+  })
+
+  it('names the board file when an effect’s board cannot be written, and starts nothing for it', async () => {
+    const { root, file, takes, requests } = setup()
+    const folder = join(root, 'content-studio/cache/effect-boards')
+    mkdirSync(folder, { recursive: true })
+    chmodSync(folder, 0o555)
+    const quietLog = console.error
+    console.error = () => {}
+    try {
+      expect(await takes.makeAll(file, ['door-creak'])).toEqual({
+        ok: false,
+        message:
+          'No takes were made: content-studio/cache/effect-boards/door-creak.json could not be written.',
+      })
+    } finally {
+      console.error = quietLog
+      chmodSync(folder, 0o755)
+    }
+    expect(requests).toEqual([])
   })
 })
 

@@ -453,7 +453,13 @@ function TakeCard({
         </>
       )}
       {failedChoose && <span className="adopt-error">The take could not be chosen.</span>}
-      {failedDrop && <span className="adopt-error">The take could not be dropped.</span>}
+      {failedDrop && (
+        <span className="adopt-error">
+          {drop.data && 'message' in drop.data
+            ? drop.data.message
+            : 'The take could not be dropped.'}
+        </span>
+      )}
     </div>
   )
 }

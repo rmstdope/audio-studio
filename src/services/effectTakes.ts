@@ -224,6 +224,18 @@ class BoardNotWritten extends Error {
   }
 }
 
+/**
+ * Turns a board that could not be saved into a refusal naming its file, kept with its stack in the
+ * server log under `what`; any other error goes on.
+ */
+function boardRefusal(what: string, say: (reason: string) => string) {
+  return (error: unknown): { ok: false; message: string } => {
+    if (!(error instanceof BoardNotWritten)) throw error
+    console.error(what, error)
+    return { ok: false, message: say(error.message) }
+  }
+}
+
 /** A refusal of a choice as a bare reason: "Take 1 could not be chosen: X. Nothing was changed." gives "X". */
 function plainReason(message: string): string {
   return message
@@ -426,6 +438,14 @@ export function createEffectTakes({
       if (stop.signal.aborted) return
       entry.state = 'failed'
       entry.message = describeFailure(error)
+      // The model made the take; only its board could not be saved, which is no news of the model.
+      if (error instanceof BoardNotWritten) {
+        console.error('saving the take failed', error)
+        await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
+          force: true,
+        }).catch(() => {})
+        return
+      }
       const last = entry.message.split('\n').filter(Boolean).pop() ?? entry.message
       await health
         ?.record(projectFile, entry.model, { error: last, effect: found.id })
@@ -593,7 +613,12 @@ export function createEffectTakes({
           const first = Math.max(board.next, ...[...entries.values()].map((entry) => entry.n + 1))
           board.next = first + request.count
           return first
-        })
+        }).catch(
+          boardRefusal(
+            'reserving the take numbers failed',
+            (reason) => `No takes were made: ${reason}.`,
+          ),
+        )
         if (typeof reserved !== 'number') return reserved
         for (let i = 0; i < request.count; i++) {
           const entry: Entry = {
@@ -654,6 +679,11 @@ export function createEffectTakes({
           board.takes = board.takes.filter((t) => t !== take)
           return { dropped: take }
         },
+      ).catch(
+        boardRefusal(
+          'dropping the take failed',
+          (reason) => `The take could not be dropped: ${reason}.`,
+        ),
       )
       if (!outcome || !('dropped' in outcome)) return outcome
       await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(outcome.dropped)}`), {

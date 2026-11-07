@@ -328,7 +328,7 @@ describe('createEffectTakes', () => {
     expect(held.calls).toEqual([])
   })
 
-  it('records the model as failed when the board cannot be saved after the WAV is written', async () => {
+  it('records the model as failed when the board cannot be read after the WAV is written', async () => {
     const held = await heldAtTheBoard()
     writeFileSync(join(held.root, 'content-studio/cache/effect-boards/coins.json'), '{ nope')
     held.release()
@@ -339,6 +339,76 @@ describe('createEffectTakes', () => {
     expect(held.calls.at(-1)).toBe(
       'record small-sfx content-studio/cache/effect-boards/coins.json cannot be used. on coins',
     )
+  })
+
+  it('names the board file, not the model, when a take’s board cannot be written after its WAV is', async () => {
+    const held = await heldAtTheBoard()
+    const folder = join(held.root, 'content-studio/cache/effect-boards')
+    chmodSync(folder, 0o555)
+    const quietLog = console.error
+    console.error = () => {}
+    try {
+      held.release()
+      const view = await held.done()
+      expect(view.failed).toEqual([
+        { n: 1, message: 'content-studio/cache/effect-boards/coins.json could not be written.' },
+      ])
+    } finally {
+      console.error = quietLog
+      chmodSync(folder, 0o755)
+    }
+    // The take's sound is not kept without its place on the board.
+    const takes = join(held.root, 'content-studio/cache/effect-takes/coins')
+    for (let i = 0; i < 400 && readdirSync(takes).length; i++) {
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    expect(readdirSync(takes)).toEqual([])
+    // The model made the take: no failure is recorded, and an earlier one is cleared.
+    expect(held.calls).toEqual(['clear small-sfx'])
+  })
+
+  it('names the board file when the take numbers cannot be reserved, and makes nothing', async () => {
+    const { root, file, takes, requests, settled } = setup()
+    await takes.make(file, 'coins', { count: 1 })
+    await settled('coins')
+    const folder = join(root, 'content-studio/cache/effect-boards')
+    chmodSync(folder, 0o555)
+    const quietLog = console.error
+    console.error = () => {}
+    try {
+      expect(await takes.make(file, 'coins', { count: 2 })).toEqual({
+        ok: false,
+        message:
+          'No takes were made: content-studio/cache/effect-boards/coins.json could not be written.',
+      })
+    } finally {
+      console.error = quietLog
+      chmodSync(folder, 0o755)
+    }
+    expect((await settled('coins')).takes.map((t) => t.n)).toEqual([1])
+    expect(requests).toHaveLength(1)
+  })
+
+  it('names the board file when a dropped take’s board cannot be written, and keeps the take', async () => {
+    const { root, file, takes, settled } = setup()
+    await takes.make(file, 'coins', { count: 1 })
+    const take = (await settled('coins')).takes[0]!
+    const folder = join(root, 'content-studio/cache/effect-boards')
+    chmodSync(folder, 0o555)
+    const quietLog = console.error
+    console.error = () => {}
+    try {
+      expect(await takes.drop(file, 'coins', take.file)).toEqual({
+        ok: false,
+        message:
+          'The take could not be dropped: content-studio/cache/effect-boards/coins.json could not be written.',
+      })
+    } finally {
+      console.error = quietLog
+      chmodSync(folder, 0o755)
+    }
+    expect((await settled('coins')).takes.map((t) => t.n)).toEqual([1])
+    expect(existsSync(join(root, 'content-studio/cache/effect-takes/coins', take.file))).toBe(true)
   })
 
   it('chooses a take: the clip, the manifest and the lock are written, and the take is shown as chosen', async () => {

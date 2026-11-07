@@ -1740,8 +1740,10 @@ takes (starts on 4, page state); a batch goes on when the page is left or reload
 when takes are asked for), the WAV `content-studio/cache/effect-takes/<effect>/<hash>.<n>.wav`, the hash of
 the description and length (the model is the take's own field). A take made for an earlier description stays a take, with no mark.
 A take that fails is kept in memory as "could not be made" with **Try again**; success clears and
-failure records the model's health (Setup's row, §8.8), a stopped take neither. **Stop** discards the
-one being made and the ones waiting.
+failure records the model's health (Setup's row, §8.8), a stopped take neither. A made take whose board
+cannot be written is no failure of the model: it is "could not be made" with the board file as its reason
+("content-studio/cache/effect-boards/<id>.json could not be written."), its WAV removed, and no failure recorded
+(the model worked, so an earlier failure of it is cleared; as-ct9). **Stop** discards the one being made and the ones waiting.
 
 **Compare.** "▶ The chosen, then this" plays the chosen take, one second of quiet, then the take
 (`Clip.after` in `ui/player.ts`); "■ Stop", a second press or any other sound ends it.
@@ -1755,7 +1757,10 @@ per effect, one per line in id order through `formatEffectLock`, `text` read bac
 description so the fingerprint and the comparison are as before) records the
 take's own inputs. **Un-choose** asks first, then deletes the manifest entry, the clip and the lock
 entry last; the take stays on the board. **Drop** removes a take that is not chosen, at once; a
-chosen take is refused (409).
+chosen take is refused (409), and the take's line under its buttons says why. A board that cannot be written
+refuses Make takes ("No takes were made: content-studio/cache/effect-boards/<id>.json could not be written.") and
+Drop ("The take could not be dropped: … could not be written.", the take kept) with a line naming it, never a bare
+500 (as-ct9).
 
 **Trim silence** (built, as-dgh.1; one-shot effects only, as stingers' in §8.5 and drawn in
 `docs/ui/as-dgh.1-effect-trim-silence.html`): a take card, and the take in the In the game block, has **Trim silence**
