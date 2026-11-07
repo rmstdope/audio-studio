@@ -212,7 +212,16 @@ describe('takes made, none chosen', () => {
     await click(buttons('Choose')[0]!)
     expect(text()).toContain('The take could not be chosen.')
     await click(buttons('Drop')[1]!)
-    expect(text()).toContain('The take could not be dropped.')
+    expect(text()).toContain('nope')
+  })
+
+  it('names the file when dropping a take could not save its board', async () => {
+    const message =
+      'The take could not be dropped: content-studio/cache/effect-boards/chest-open.json could not be written.'
+    const refuse = () => Response.json({ ok: false, message }, { status: 409 })
+    const { text, click, buttons } = render(row({ status: 'not-chosen' }), data, refuse)
+    await click(buttons('Drop')[1]!)
+    expect(text()).toContain(message)
   })
 })
 
