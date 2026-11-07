@@ -966,7 +966,7 @@ describe('fades of a sound effect take', () => {
     chmodSync(folder, 0o755)
     expect(answer).toEqual({
       ok: false,
-      message: 'content-studio/cache/effect-boards/door-creak.json could not be written',
+      message: 'content-studio/cache/effect-boards/door-creak.json could not be written.',
     })
     expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'))).toEqual(game)
   })

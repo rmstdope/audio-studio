@@ -821,7 +821,7 @@ export function createEffectTakes({
               message: `${board}, and the game’s file could not be put back.`,
               gameChanged: true,
             }
-          : { ok: false, message: `${board}${error instanceof BoardNotWritten ? '' : '.'}` }
+          : { ok: false, message: `${board}.` }
       })
     },
 
