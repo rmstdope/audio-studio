@@ -105,10 +105,8 @@ export function EffectInTheGame({
               unchoose.mutate(undefined, {
                 onSuccess: (result) => {
                   setAsking(false)
-                  if (result.ok) {
-                    trimControl.clear()
-                    focusBlock()
-                  } else refocus()
+                  if (result.ok) focusBlock()
+                  else refocus()
                 },
                 // The question was refused by the server or never got there: the block stays.
                 onError: () => {

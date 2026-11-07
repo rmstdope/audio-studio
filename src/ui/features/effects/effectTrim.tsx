@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 import { effectCutLine } from '../../../core/effectTrim'
 import type { EffectTakeView } from '../../../core/effectTakes'
 import { NOTHING_LINE, SILENT_LINE, trimFailure } from '../../../core/musicTrim'
@@ -14,7 +14,8 @@ export function EffectTrimmedTag({ take }: { take: EffectTakeView }) {
  * (null on an untrimmed take that cannot go into the game), `note` (the line under the
  * waveform: how much was cut, or why the button is greyed out) and `failure` (the red line, next to
  * the button), and `clear`, which the card calls when a later action on the take works, so the red
- * line never outlives the take it was about. The line is only ever about the take shown now.
+ * line never outlives the take it was about. The line is only ever about the take shown now, and goes
+ * for good once another take (or none) is shown.
  * `onPress` runs as a press begins, to stop a take that is playing, since its sound is about to
  * change.
  */
@@ -36,7 +37,19 @@ export function useEffectTrimControl({
 }): { button: ReactNode; note: ReactNode; failure: ReactNode; clear: () => void } {
   const trim = useTrimEffectTake(effect)
   const noteId = useId()
-  const clear = () => trim.reset()
+  // A trim still working is left alone: its answer is still to come, and its failure to be said.
+  const clear = () => {
+    if (!trim.isPending) trim.reset()
+  }
+  // Another take shown (or none), the old failure goes: it is never shown again, even when that take
+  // comes back.
+  const shown = take?.file
+  const about = trim.variables?.file
+  const pending = trim.isPending
+  useEffect(() => {
+    if (about !== undefined && about !== shown && !pending) trim.reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, about, pending])
   const undo = take?.trim !== undefined
   // A trimmed take always keeps Undo trim; the studio says an untrimmed one has something to cut,
   // or why not, only when it can go into the game.

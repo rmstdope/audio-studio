@@ -77,7 +77,7 @@ type Call = { url: string; method: string; body: string | null }
 function render(
   effect: EffectRow,
   data: EffectTakesView,
-  answer: (call: Call) => Response = () => Response.json({ ok: true }),
+  answer: (call: Call) => Response | Promise<Response> = () => Response.json({ ok: true }),
 ) {
   const calls: Call[] = []
   globalThis.fetch = ((url: string, init?: RequestInit) => {
@@ -1003,6 +1003,66 @@ describe('Trim silence', () => {
         view({ takes: [take(1, { chosen: true, trim: cut }), take(2, { trim: cut })] }),
       )
       expect(text()).not.toContain('could not be untrimmed')
+    })
+
+    it('in the game: chosen again from its card after another take, the red line does not come back', async () => {
+      const { text, buttons, click, rerender } = render(
+        chosenRow(),
+        view({ takes: [take(1), take(2, { chosen: true, trim: cut })] }),
+        refuseTrim,
+      )
+      await click(buttons('Undo trim')[0]!)
+      rerender(
+        chosenRow({ current: { kind: 'take', take: 1, exists: true } }),
+        view({ takes: [take(1, { chosen: true }), take(2, { trim: cut })] }),
+      )
+      rerender(chosenRow(), view({ takes: [take(1), take(2, { chosen: true, trim: cut })] }))
+      expect(text()).not.toContain(untrimmed)
+    })
+
+    it('on a card: saving changed fades takes the red line away', async () => {
+      const { container, text, buttons, button, click } = render(
+        row({ status: 'not-chosen' }),
+        view({ takes: [trimmable(6)] }),
+        refuseTrim,
+      )
+      await click(buttons('Trim silence')[0]!)
+      expect(text()).toContain('Take 6 could not be trimmed')
+      await click(button('Fades…'))
+      const box = container.querySelector<HTMLInputElement>('.editor input[type="number"]')!
+      await act(async () => {
+        const set = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value',
+        )!.set!
+        set.call(box, '0.05')
+        box.dispatchEvent(new window.Event('input', { bubbles: true }))
+      })
+      await click(button('Save fades'))
+      expect(text()).not.toContain('Take 6 could not be trimmed')
+    })
+
+    it('a fade saved while a trim is still working leaves the trim working, and its failure shown', async () => {
+      let refuse: (() => void) | null = null
+      const answer = (call: Call) =>
+        call.url.endsWith('/trim')
+          ? new Promise<Response>((done) => {
+              refuse = () => done(refuseTrim(call))
+            })
+          : Response.json({ ok: true })
+      const { text, buttons, button, click } = render(
+        chosenRow(),
+        view({ takes: [take(2, { chosen: true, trim: cut, fades })] }),
+        answer,
+      )
+      await click(buttons('Undo trim')[0]!)
+      expect(buttons('Trimming…')).toHaveLength(1)
+      await click(button('Fades…'))
+      await click(button('Remove fades'))
+      expect(buttons('Trimming…')).toHaveLength(1)
+      await act(async () => refuse!())
+      await act(async () => void (await new Promise((r) => setTimeout(r, 5))))
+      expect(text()).toContain(untrimmed)
     })
 
     it('in the game: un-chosen, then chosen again, the red line does not come back', async () => {

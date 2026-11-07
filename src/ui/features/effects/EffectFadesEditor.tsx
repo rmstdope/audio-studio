@@ -3,7 +3,7 @@ import type { EffectTakeView } from '../../../core/effectTakes'
 import { useSetEffectFades } from '../../api'
 import { takePlayId, takeUrl } from '../../effectsPlay'
 import { cutShares, playedSeconds } from '../music/trimSilence'
-import { FadesEditorBody, type FadesSetter } from '../music/FadesEditor'
+import { FadesEditorBody } from '../music/FadesEditor'
 import type { Player } from './EffectInTheGame'
 
 /** A page of its own, without a track's "last pressed" key: its one editor shows its own failure. */
@@ -32,17 +32,7 @@ export function EffectFadesEditor({
   /** The fades were saved or removed. */
   onSaved: () => void
 }) {
-  const mutation = useSetEffectFades(effect)
-  const set: FadesSetter = {
-    ...mutation,
-    mutate: (variables, options) =>
-      mutation.mutate(variables, {
-        onSuccess: (result) => {
-          if (result.ok) onSaved()
-          options.onSuccess(result)
-        },
-      }),
-  }
+  const set = useSetEffectFades(effect)
   // A trimmed take is faded after the cut: the length, the bars and the sound are of the part between the cuts.
   const cut = cutShares(take)
   const part = {
@@ -66,6 +56,7 @@ export function EffectFadesEditor({
       chosen={chosen}
       player={player}
       onClose={onClose}
+      onSaved={onSaved}
     />
   )
 }
