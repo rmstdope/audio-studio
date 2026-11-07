@@ -1809,7 +1809,7 @@ manifest, so fading never marks an effect "changed". The take's WAV stays as gen
 to loop or an effect that loops, a take that is not there, lengths together longer than the take or negative, and a lock that
 cannot be read; when the take is the chosen one the game's `<effect>.mp3` is written first with the faded sound
 (`commitEffect` with `soundOnly`: the manifest and lock untouched) and the board second, and a board that cannot be written
-puts the game's previous file back (`gameChanged` on the refusal if even that fails). **Choose** encodes `playedWav`, the take
+puts the game's previous file back (`gameChanged` on the refusal if even that fails); the refusal names the board ("content-studio/cache/effect-boards/<id>.json could not be written", as-v6w). **Choose** encodes `playedWav`, the take
 with its fades, so the game's clip always holds the faded sound, never settings for the game to apply. Every play (the card's ▶,
 the In the game block, "The chosen, then this", the editor) asks for the take with its saved fades in the address
 (`heardAs`); the editor, its states and its words are the stingers', with the lock line "Choosing, dropping and fading wait
