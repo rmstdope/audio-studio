@@ -159,7 +159,12 @@ import {
 } from '../services/effects'
 import { createEffectTakes } from '../services/effectTakes'
 import { createFakeEffects } from '../services/effectsFake'
-import { ChooseEffectTakeBody, MakeEffectTakesBody, SetEffectFadesBody } from '../core/effectTakes'
+import {
+  ChooseEffectTakeBody,
+  MakeEffectTakesBody,
+  SetEffectFadesBody,
+  TrimEffectTakeBody,
+} from '../core/effectTakes'
 import { MakeAllBody } from '../core/effectsMakeAll'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
@@ -1803,7 +1808,13 @@ export function startServer({
             request.params.id,
             request.params.file,
           )
-          return file ? takeResponse(request, file) : notFound()
+          if (!file) return notFound()
+          // `?trimmed=1`: only the part between a trimmed take's cuts (the whole sound if not trimmed).
+          const part =
+            new URL(request.url).searchParams.get('trimmed') === '1'
+              ? await effectTakes.trimmedSound(projectFile, request.params.id, request.params.file)
+              : null
+          return takeResponse(request, file, part ?? undefined)
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await effectTakes.drop(projectFile, request.params.id, request.params.file)
@@ -1842,6 +1853,22 @@ export function startServer({
           const body = ChooseEffectTakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { file }' }, { status: 400 })
           const result = await effectTakes.choose(projectFile, request.params.id, body.data.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id/trim': {
+        POST: fromOwnPage(async (request) => {
+          const body = TrimEffectTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { file, undo? }' }, { status: 400 })
+          }
+          const result = await effectTakes.trim(
+            projectFile,
+            request.params.id,
+            body.data.file,
+            body.data.undo ?? false,
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

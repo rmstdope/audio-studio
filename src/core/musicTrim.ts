@@ -10,6 +10,15 @@ export const KEEP_SECONDS = 0.05
 /** A side with less than this to cut is left alone, in seconds. */
 export const MIN_CUT_SECONDS = 0.05
 
+/** What is kept of the near-silence at each cut, and the least a side must have to cut to be cut, in seconds. */
+export interface TrimRules {
+  keep: number
+  minCut: number
+}
+
+/** A stinger's rules. */
+export const STINGER_TRIM_RULES: TrimRules = { keep: KEEP_SECONDS, minCut: MIN_CUT_SECONDS }
+
 /** How much of a take is cut away, in seconds from each end. */
 export const TrimSchema = z.object({
   start: z.number().min(0),
@@ -43,17 +52,17 @@ function soundSpan(wav: Wav): { first: number; last: number; frames: number } | 
 }
 
 /**
- * What to cut from a take: the near-silent start and end, each leaving `KEEP_SECONDS` of
- * lead-in. A side with under `MIN_CUT_SECONDS` to cut is left alone; with both left alone there is
+ * What to cut from a take: the near-silent start and end, each leaving `rules.keep` of
+ * lead-in. A side with under `rules.minCut` to cut is left alone; with both left alone there is
  * nothing to cut; with no sound above `NEAR_SILENT` there is none to keep.
  */
-export function findTrim(wav: Wav): TrimFinding {
+export function findTrim(wav: Wav, rules: TrimRules = STINGER_TRIM_RULES): TrimFinding {
   const span = soundSpan(wav)
   if (!span) return { kind: 'silent' }
   const { sampleRate } = wav.format
   const side = (frames: number) => {
-    const seconds = frames / sampleRate - KEEP_SECONDS
-    return seconds >= MIN_CUT_SECONDS ? seconds : 0
+    const seconds = frames / sampleRate - rules.keep
+    return seconds >= rules.minCut ? seconds : 0
   }
   const start = side(span.first)
   const end = side(span.frames - 1 - span.last)

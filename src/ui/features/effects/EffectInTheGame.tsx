@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { effectSeconds, type EffectRow } from '../../../core/effects'
 import {
   effectFadable,
@@ -20,7 +20,9 @@ import type { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { takePlayId, takeUrl } from '../../effectsPlay'
 import { Wave } from '../music/InTheGame'
+import { cutShares, wavePosition } from '../music/trimSilence'
 import { EffectFadesEditor } from './EffectFadesEditor'
+import { EffectTrimmedTag, useEffectTrimControl } from './effectTrim'
 
 /** One clip at a time, shared with the takes below. */
 export type Player = ReturnType<typeof useClipPlayer>
@@ -52,6 +54,15 @@ export function EffectInTheGame({
   const take = view.takes.find((t) => t.chosen)
   const unchoose = useUnchooseEffect(row.id)
   const choose = useChooseEffectTake(row.id)
+  const trimControl = useEffectTrimControl({
+    effect: row.id,
+    take,
+    inGame: true,
+    locked: view.lockUnread,
+    onPress: () => {
+      if (take && player.playing === takePlayId(row.id, take.n)) player.stop()
+    },
+  })
   const [asking, setAsking] = useState(false)
   // The take the question was about: a refusal is still named after the page re-reads.
   const [asked, setAsked] = useState<number | null>(null)
@@ -163,6 +174,7 @@ export function EffectInTheGame({
       <div className="take-row">
         {label}
         <b>Take {state.take}</b>
+        {take && <EffectTrimmedTag take={take} />}
         {state.missing ? (
           <span className="chip chip-warn">clip missing</span>
         ) : (
@@ -184,10 +196,19 @@ export function EffectInTheGame({
           onClose={() => onFadesClosed(take.n)}
         />
       ) : (
-        take && <Playback effect={row.id} effectLoops={row.loops} take={take} player={player} />
+        take && (
+          <Playback
+            effect={row.id}
+            effectLoops={row.loops}
+            take={take}
+            player={player}
+            note={trimControl.note}
+          />
+        )
       )}
       {!editing && (
         <div className="track-in-game-actions">
+          {trimControl.button}
           {take && effectFadable(take, row.loops) && (
             <button
               type="button"
@@ -233,6 +254,7 @@ export function EffectInTheGame({
         </div>
       )}
       {!editing && hint}
+      {!editing && trimControl.failure}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
       {choose.data && !choose.data.ok && (
         <span className="adopt-error">The take could not be chosen.</span>
@@ -263,7 +285,7 @@ export function HearTheSeam({
     <button
       type="button"
       className="btn btn-small"
-      onClick={() => player.toggle(seamId, `${takeUrl(effect, take.file)}?seam=1`, {})}
+      onClick={() => player.toggle(seamId, `${takeUrl(effect, { file: take.file })}?seam=1`, {})}
     >
       {player.playing === seamId ? 'Stop' : 'Hear the seam'}
     </button>
@@ -280,16 +302,19 @@ export function Playback({
   effectLoops,
   take,
   player,
+  note,
 }: {
   effect: string
   /** How the effect plays now: a take's saved fades count only while it plays once. */
   effectLoops: boolean
   take: EffectTakeView
   player: Player
+  /** The line under the waveform (what a trim cut, or why Trim silence is greyed out), if any. */
+  note?: ReactNode
 }) {
   const id = takePlayId(effect, take.n)
   const fades = effectFadesOf(take, effectLoops)
-  const heard = heardAs(takeUrl(effect, take.file), fades)
+  const heard = heardAs(takeUrl(effect, take), fades)
   const playing = player.playing === id
   const quiet = take.quietAt !== null ? 1 - take.quietAt / take.seconds : undefined
   return (
@@ -307,13 +332,19 @@ export function Playback({
           peaks={take.peaks}
           loop={take.loops}
           quiet={quiet}
-          position={playing ? player.position : undefined}
-          fades={fades ? { fades, seconds: take.seconds } : undefined}
+          cut={cutShares(take)}
+          position={playing ? wavePosition(take, player.position) : undefined}
+          fades={
+            fades ? { fades, seconds: take.trim ? take.trim.seconds : take.seconds } : undefined
+          }
         />
         <span className="faint small">
-          {take.loops ? effectSeconds(take.seconds) : effectTakeLength(take.seconds)}
+          {take.loops
+            ? effectSeconds(take.seconds)
+            : effectTakeLength(take.trim ? take.trim.seconds : take.seconds)}
         </span>
       </div>
+      {note}
       {take.quietAt !== null && <span className="take-quiet">{effectQuietLine(take.quietAt)}</span>}
     </>
   )

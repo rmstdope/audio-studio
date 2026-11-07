@@ -1757,6 +1757,24 @@ take's own inputs. **Un-choose** asks first, then deletes the manifest entry, th
 entry last; the take stays on the board. **Drop** removes a take that is not chosen, at once; a
 chosen take is refused (409).
 
+**Trim silence** (built, as-dgh.1; one-shot effects only, as stingers' in §8.5 and drawn in
+`docs/ui/as-dgh.1-effect-trim-silence.html`): a take card, and the take in the In the game block, has **Trim silence**
+at the left of its bottom row (Drop and Choose at the right). It is offered only on a take made to play once for
+an effect that plays once (`effectTrimOffered`); a take made to loop never has it. One press cuts the
+near-silent start and end (`findTrim` with `EFFECT_TRIM_RULES` in `core/effectTrim.ts`: samples at or under 300
+of 32768 are near-silence, 0.01 s of lead-in is kept, a side with under 0.02 s to cut is left alone, so cuts well
+under a tenth of a second work). The take's WAV stays as generated; the cut is kept on its board entry as
+`trim: { start, end }`, so it survives a reload, goes when the take is dropped, and stays through Un-choose. The
+view carries `trim` (with the length left) or `trimmable` (`cut`, `nothing`, `silent`, scanned once per file and
+cached in memory; absent on a take that cannot go into the game). The card shows the waveform at its full width
+with the cut ends hatched, the new length (one decimal), a "trimmed" tag and a line naming the ends that lost
+something, in hundredths of a second (`effectCutLine`). Play, the In the game block and "The chosen, then this"
+use `GET …/takes/:file?trimmed=1`, the part between the cuts. **Choose** encodes the trimmed sound, so the
+game's file holds it and the manifest the trimmed duration; Trim silence and Undo trim on the take in the game
+re-commit it (`commitEffect`, keeping the lock's accepted words and time) first and write the board only if that
+worked, and on a take in the game whose clip is missing change only the board. **Undo trim** is always allowed, so
+a trim made before the effect began to loop is never stuck (the server refuses a new trim there).
+
 **Status** (`effectStatus`): "none yet" (no take on the board), "not chosen", "chosen", "changed since
 chosen" (the description in use or the length differs from the chosen take's own inputs), "clip missing"
 (ahead of changed), "not known" (the lock cannot be read; Choose, Drop and Un-choose wait), and, in
@@ -2144,6 +2162,7 @@ GET    /api/effects/:id/takes/:file              a take's WAV (?seam=1: its seam
 DELETE /api/effects/:id/takes/:file              drop a take that is not chosen
 PUT    /api/effects/:id/takes/:file/fades        save a one-shot take's fades ({ in, out, shape }; DELETE removes them); GET …/takes/:file?fadeIn&fadeOut&shape hears them
 POST   /api/effects/:id/choose|unchoose|accept|stop   choose a take ({ file }), take it back, accept a changed description, stop the batch
+POST   /api/effects/:id/trim                     { file, undo? } cut the near-silence of a one-shot take, or give it back as generated; rewrites the game's file when it is the one in the game (409 and why if it cannot)
 GET    /api/effects/clips/:file                  a chosen clip (plain `.mp3` only)
 GET    /api/effects/:id/current                  the clip the game plays for the effect
 GET    /api/effects/making                       the batches being made, by effect
@@ -2599,7 +2618,9 @@ Small, independently useful increments:
        effect plays is a change since chosen.
     6. **The second model** (as-5wc.5, done: §8.8): Stable Audio Open 1.0 on the GPU queue, Setup checking both
        models and choosing the main one (`effects.model`), and a model menu on an effect's page.
-    7. **Fades on a one-shot take** (as-dgh.2, done: §8.10, `docs/ui/as-dgh.2-effect-fades.html`): the stingers'
+    7. **Trim silence on a one-shot effect take** (as-dgh.1, done: §8.10): one press cuts the near-silent start and
+       end, kept with the take and written into the game's file when the take is chosen.
+    8. **Fades on a one-shot take** (as-dgh.2, done: §8.10, `docs/ui/as-dgh.2-effect-fades.html`): the stingers'
        Fades… editor on each take made to play once, in steps of 0.01 s, written into the game's clip.
 
 17. **Scenes** (epic as-p86), in small pull requests:

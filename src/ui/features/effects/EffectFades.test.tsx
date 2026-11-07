@@ -132,8 +132,8 @@ describe('Fades… on a sound effect take', () => {
     for (const card of cards) {
       expect(names([...card.querySelectorAll('.take-row')].at(-1)!)).toEqual([
         'Fades…',
-        'Choose',
         'Drop',
+        'Choose',
       ])
     }
     const game = container.querySelector('.track-in-game')!

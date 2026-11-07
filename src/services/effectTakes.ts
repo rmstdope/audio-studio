@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { rm } from 'node:fs/promises'
+import { rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
   DEFAULT_EFFECT_MODEL,
@@ -21,6 +21,15 @@ import {
   type EffectTakesView,
   type EffectTakeView,
 } from '../core/effectTakes'
+import { EFFECT_TRIM_RULES, effectTrimOffered } from '../core/effectTrim'
+import {
+  NOTHING_LINE,
+  SILENT_LINE,
+  findTrim,
+  trimWav,
+  trimmedSeconds,
+  type Trim,
+} from '../core/musicTrim'
 import { resolveInRoot } from '../core/paths'
 import { shapeEffectLoop, loopRequestSeconds } from '../core/effectLoop'
 import { peaks, wavSeconds } from '../core/musicTake'
@@ -71,6 +80,9 @@ export type EffectMakeResult =
 /** What stopping answered: how many takes were stopped, made or waiting; null for an unknown effect. */
 export type EffectStopResult = { ok: true; stopped: number } | ProjectFailure | null
 
+/** What trimming or untrimming a take answered; null for an effect the project does not list. */
+export type EffectTrimResult = CommitResult | null
+
 /** What choosing, un-choosing or accepting answered; null for an effect the project does not list. */
 export type EffectChooseResult = CommitResult | null
 
@@ -84,15 +96,6 @@ export type EffectTakesResult = EffectTakesView | ProjectFailure | null
 export function effectTakeHash(inputs: EffectInputs): string {
   const parts = [inputs.description, inputs.seconds, ...(inputs.loops ? ['loop'] : [])]
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16)
-}
-
-/**
- * What the game plays of a take: its sound, with its fades if it has some (the board's WAV stays as
- * generated). Without fades the bytes are the take's own.
- */
-function playedWav(take: EffectBoardTake, bytes: Uint8Array): Uint8Array {
-  if (!take.fades || !hasFades(take.fades)) return bytes
-  return writeWav(applyFades(readWav(bytes), take.fades))
 }
 
 /** The takes the latest Make all started, by effect, and how many of them were stopped. */
@@ -162,6 +165,15 @@ export interface EffectTakes {
   ): Promise<EffectMakeResult>
   /** Takes a take off the board and deletes its file; the chosen take stays. */
   drop(projectFile: string, id: string, name: string): Promise<EffectMakeResult>
+  /**
+   * Cuts the near-silent start and end of a take made to play once (or, with `undo`, gives it back
+   * as generated). The WAV stays as generated; the cut is kept on the board. A take that is the
+   * one in the game, with its clip there, has the game's file rewritten first, and nothing changes
+   * if that fails.
+   */
+  trim(projectFile: string, id: string, name: string, undo: boolean): Promise<EffectTrimResult>
+  /** A trimmed take's sound between its cuts as a WAV; null for a take that is not trimmed. */
+  trimmedSound(projectFile: string, id: string, name: string): Promise<Uint8Array | null>
   /** What is being made in the project, by effect, for the list's status. */
   making(projectFile: string): Promise<Record<string, EffectMakingSummary>>
   /** The path of a take's WAV, or null for an effect not listed or a name that is not a take's. */
@@ -170,6 +182,30 @@ export interface EffectTakes {
 
 /** A take's file name on the board. */
 const fileOf = (take: Pick<EffectBoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.wav`
+
+/**
+ * What the game plays of a take: its WAV between the cuts if it was trimmed, then with its fades if
+ * it has some, and the take as the board should hand it to the encoder, with the length that is left.
+ */
+function playedOf(take: EffectBoardTake, bytes: Uint8Array) {
+  const fades = take.fades && hasFades(take.fades) ? take.fades : null
+  if (!take.trim && !fades) return { take, wav: bytes }
+  let wav = readWav(bytes)
+  if (take.trim) wav = trimWav(wav, take.trim)
+  if (fades) wav = applyFades(wav, fades)
+  return {
+    take: take.trim ? { ...take, seconds: trimmedSeconds(take.seconds, take.trim) } : take,
+    wav: writeWav(wav),
+  }
+}
+
+/** A refusal of a choice as a bare reason: "Take 1 could not be chosen: X. Nothing was changed." gives "X". */
+function plainReason(message: string): string {
+  return message
+    .replace(/^Take \d+ could not be chosen: /, '')
+    .replace(/\.? Nothing was changed\.$/, '')
+    .replace(/\.$/, '')
+}
 
 /** A model's full name; an id the studio does not know is shown as it is. */
 const modelName = (id: string) =>
@@ -228,6 +264,27 @@ export function createEffectTakes({
   const keyOf = (projectFile: string, id: string) => `${projectFile}\0${id}`
   // Set while Make all starts its own takes, which are not hand starts.
   let pressing = false
+  // What a take has to cut, by its file's path, size and time, so a poll reads no WAV again.
+  const scans = new Map<string, NonNullable<EffectTakeView['trimmable']>>()
+
+  /** What the WAV at `path` has to cut; null when it cannot be read. */
+  async function scan(path: string): Promise<NonNullable<EffectTakeView['trimmable']> | null> {
+    try {
+      // The time to the nanosecond, so a sound written again at once is not taken for the one before.
+      const { size, mtimeMs, ctimeMs } = await stat(path)
+      const key = `${path}\0${size}\0${mtimeMs}\0${ctimeMs}`
+      const known = scans.get(key)
+      if (known) return known
+      const found = findTrim(
+        readWav(new Uint8Array(await Bun.file(path).arrayBuffer())),
+        EFFECT_TRIM_RULES,
+      )
+      scans.set(key, found.kind)
+      return found.kind
+    } catch {
+      return null
+    }
+  }
 
   async function resolve(projectFile: string, id: string) {
     if (!SAFE_ID.test(id)) return null
@@ -417,7 +474,13 @@ export function createEffectTakes({
       const chosen = chosenEffects?.[id]?.lock
       const takes: EffectTakeView[] = []
       for (const take of board.takes) {
-        if (!(await Bun.file(join(root, folder, fileOf(take))).exists())) continue
+        const path = join(root, folder, fileOf(take))
+        if (!(await Bun.file(path).exists())) continue
+        const loops = Boolean(take.inputs.loops)
+        const trimmable =
+          !take.trim && effectTrimOffered({ loops }, Boolean(found.inputs.loops))
+            ? await scan(path)
+            : null
         takes.push({
           n: take.n,
           file: fileOf(take),
@@ -425,9 +488,13 @@ export function createEffectTakes({
           peaks: take.peaks,
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
           model: modelName(take.model),
-          loops: Boolean(take.inputs.loops),
+          loops,
           quietAt: take.quietAt ?? null,
           ...(take.fades && { fades: take.fades }),
+          ...(take.trim && {
+            trim: { ...take.trim, seconds: trimmedSeconds(take.seconds, take.trim) },
+          }),
+          ...(trimmable && { trimmable }),
         })
       }
       const pending = entries.filter(
@@ -595,14 +662,20 @@ export function createEffectTakes({
         } catch {
           return { ok: false, message: 'That take’s sound is gone, so it cannot be chosen.' }
         }
+        let played: ReturnType<typeof playedOf>
+        try {
+          played = playedOf(take, wav)
+        } catch {
+          return { ok: false, message: 'That take’s sound is gone, so it cannot be chosen.' }
+        }
         return commitEffect({
           root: found.root,
           projectFile,
           effects: found.effects,
           id,
-          take,
+          take: played.take,
           inUse: found.inputs,
-          wav: playedWav(take, wav),
+          wav: played.wav,
           encode,
         })
       })
@@ -628,7 +701,10 @@ export function createEffectTakes({
           if (take.inputs.loops || found.inputs.loops) {
             return { ok: false, message: 'Only a sound that plays once can fade.' }
           }
-          const wrong = fades && fadesProblem(fades, take.seconds)
+          // The fades are of what the game plays: the take between its cuts, if it is trimmed.
+          const wrong =
+            fades &&
+            fadesProblem(fades, take.trim ? trimmedSeconds(take.seconds, take.trim) : take.seconds)
           if (wrong) return { ok: false, message: wrong }
           const next: EffectBoardTake = { ...take }
           delete next.fades
@@ -643,9 +719,9 @@ export function createEffectTakes({
             } catch {
               return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
             }
-            let played: Uint8Array
+            let played: ReturnType<typeof playedOf>
             try {
-              played = playedWav(next, wav)
+              played = playedOf(next, wav)
             } catch {
               return { ok: false, message: 'That take’s sound cannot be faded.' }
             }
@@ -663,9 +739,9 @@ export function createEffectTakes({
               projectFile,
               effects: found.effects,
               id,
-              take: next,
+              take: played.take,
               inUse: found.inputs,
-              wav: played,
+              wav: played.wav,
               encode,
               soundOnly: true,
             })
@@ -691,6 +767,102 @@ export function createEffectTakes({
             }
           : { ok: false, message: 'The take board could not be written.' }
       })
+    },
+
+    async trim(projectFile, id, name, undo) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      return changeBoard(projectFile, found, async (board): Promise<EffectTrimResult> => {
+        const take = board.takes.find((t) => fileOf(t) === name)
+        if (!take) return { ok: false, message: 'That take is not on the board.' }
+        // Undo is always allowed, so a trim made before the effect began to loop is never stuck.
+        if (
+          !undo &&
+          !effectTrimOffered({ loops: Boolean(take.inputs.loops) }, Boolean(found.inputs.loops))
+        ) {
+          return {
+            ok: false,
+            message:
+              'Only a take made to play once, for an effect that plays once, can be trimmed.',
+          }
+        }
+        // The sound is read only when it is needed: a new trim, or the game's file rewritten.
+        const sound = async () => {
+          try {
+            return new Uint8Array(
+              await Bun.file(join(found.root, found.folder, name)).arrayBuffer(),
+            )
+          } catch {
+            return null
+          }
+        }
+        let trim: Trim | undefined
+        if (undo) {
+          if (!take.trim) return { ok: false, message: 'That take is not trimmed.' }
+        } else {
+          const bytes = await sound()
+          if (!bytes) return { ok: false, message: 'The take’s sound file could not be read.' }
+          let finding: ReturnType<typeof findTrim>
+          try {
+            finding = findTrim(readWav(bytes), EFFECT_TRIM_RULES)
+          } catch {
+            return { ok: false, message: 'The take’s sound file could not be read.' }
+          }
+          if (finding.kind === 'nothing') return { ok: false, message: NOTHING_LINE }
+          if (finding.kind === 'silent') return { ok: false, message: SILENT_LINE }
+          trim = { start: finding.start, end: finding.end }
+        }
+        const { trim: _was, ...rest } = take
+        const next: EffectBoardTake = trim ? { ...rest, trim } : rest
+        const chosenEffects = await readEffectChosen(found.root, found.effects, [])
+        if (!chosenEffects)
+          return { ok: false, message: 'The sound effects lock could not be read.' }
+        const chosen = chosenEffects[id]
+        // The take in the game, with its clip there, is rewritten first; with the clip missing only
+        // the take changes, and Choose again writes it.
+        if (chosen?.fileExists && chosen.lock.take === take.n && chosen.lock.fp === take.hash) {
+          let played: ReturnType<typeof playedOf>
+          try {
+            played = playedOf(next, (await sound()) ?? new Uint8Array())
+          } catch {
+            return { ok: false, message: 'The take’s sound file could not be read.' }
+          }
+          const committed = await commitEffect({
+            root: found.root,
+            projectFile,
+            effects: found.effects,
+            id,
+            take: played.take,
+            // The lock keeps what Accept made it count the take as made from, and when it was chosen.
+            inUse: chosen.lock.inputs,
+            now: () => new Date(chosen.lock.at),
+            wav: played.wav,
+            encode,
+          })
+          if (!committed.ok) {
+            return 'message' in committed
+              ? { ok: false, message: plainReason(committed.message) }
+              : { ok: false, message: `${committed.file} could not be read` }
+          }
+        }
+        board.takes = board.takes.map((t) => (t === take ? next : t))
+        return { ok: true }
+      })
+    },
+
+    async trimmedSound(projectFile, id, name) {
+      const path = await api.takeFile(projectFile, id, name)
+      const found = await resolve(projectFile, id)
+      if (!path || !found || !('inputs' in found)) return null
+      const board = await readEffectBoard(found.root, id)
+      if ('ok' in board) return null
+      const take = board.takes.find((t) => fileOf(t) === name)
+      if (!take?.trim) return null
+      // Only the cuts: the fades are asked for in the address, or saved ones would be applied twice.
+      return playedOf(
+        { ...take, fades: undefined },
+        new Uint8Array(await Bun.file(path).arrayBuffer()),
+      ).wav
     },
 
     async unchoose(projectFile, id) {
