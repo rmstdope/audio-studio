@@ -4,9 +4,9 @@ import type { Clip } from './player'
 /** The id a take's play button is known by to the player. */
 export const takePlayId = (effect: string, n: number) => `effect-take-${effect}-${n}`
 
-/** Where a take's sound is served from. */
-export const takeUrl = (effect: string, file: string) =>
-  `/api/effects/${encodeURIComponent(effect)}/takes/${encodeURIComponent(file)}`
+/** Where a take's sound is served from: for a trimmed take, only the part between its cuts. */
+export const takeUrl = (effect: string, take: Pick<EffectTakeView, 'file' | 'trim'>) =>
+  `/api/effects/${encodeURIComponent(effect)}/takes/${encodeURIComponent(take.file)}${take.trim ? '?trimmed=1' : ''}`
 
 /** The seconds of quiet between the chosen take and the one compared with it. */
 const QUIET_SECONDS = 1
@@ -17,7 +17,7 @@ const COMPARE_ROUNDS = 2
 /** A take as the player plays it in a comparison: a loop round twice, a take made to play once once. */
 const compareClip = (effect: string, take: EffectTakeView, after?: number): Clip => ({
   id: takePlayId(effect, take.n),
-  url: takeUrl(effect, take.file),
+  url: takeUrl(effect, take),
   ...(take.loops && { loop: true, rounds: COMPARE_ROUNDS }),
   ...(after !== undefined && { after }),
 })

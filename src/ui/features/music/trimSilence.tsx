@@ -28,7 +28,9 @@ export function takeLength(take: TakeView): string {
 }
 
 /** The share of a take's waveform, 0 to 1, cut away at each end; null for a take not trimmed. */
-export function cutShares(take: TakeView): { start: number; end: number } | null {
+export function cutShares(
+  take: Pick<TakeView, 'trim' | 'seconds'>,
+): { start: number; end: number } | null {
   if (!take.trim || take.seconds <= 0) return null
   return { start: take.trim.start / take.seconds, end: take.trim.end / take.seconds }
 }
@@ -37,7 +39,10 @@ export function cutShares(take: TakeView): { start: number; end: number } | null
  * Maps how far into the part between the cuts a trimmed take has played (0 to 1) to where that is
  * on the full-width waveform; a take not trimmed plays as it is.
  */
-export function wavePosition(take: TakeView, position: () => number | null): () => number | null {
+export function wavePosition(
+  take: Pick<TakeView, 'trim' | 'seconds'>,
+  position: () => number | null,
+): () => number | null {
   const cut = cutShares(take)
   if (!cut) return position
   return () => {

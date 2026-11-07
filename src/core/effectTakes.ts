@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { EFFECT_MODEL_IDS, type EffectModelId } from './effectModels'
 import type { ImageDownload } from './imageModels'
+import { TrimSchema } from './musicTrim'
 
 /** What a sound-effect take is made from: the description in use and the length the game asks. */
 export const EffectInputsSchema = z.object({
@@ -74,6 +75,8 @@ export const EffectBoardTakeSchema = z.object({
   inputs: EffectInputsSchema,
   /** For a loop whose sound ended before its length: where, in seconds. */
   quietAt: z.number().optional(),
+  /** Set when a one-shot take was trimmed: what is cut from each end. Its WAV stays as generated. */
+  trim: TrimSchema.optional(),
 })
 
 /** An effect's board: the takes kept, and the number the next take gets (numbers are never reused). */
@@ -104,6 +107,11 @@ export const MakeEffectTakesBody = z.union([
 
 /** The body of a choice: the file name of the take on the effect's board. */
 export const ChooseEffectTakeBody = z.object({ file: z.string().min(1) }).strict()
+
+/** The body of a trim: the take's file on the effect's board, and whether to undo its trim. */
+export const TrimEffectTakeBody = z
+  .object({ file: z.string().min(1), undo: z.boolean().optional() })
+  .strict()
 
 /** What can have changed since a take was chosen: the words, the length, or how the effect plays. */
 export type EffectChangedField = 'description' | 'length' | 'now loops' | 'no longer loops'
@@ -263,6 +271,14 @@ export interface EffectTakeView {
   loops: boolean
   /** For a loop whose sound ended early: where it goes quiet, in seconds. */
   quietAt: number | null
+  /** A take trimmed: what is cut from each end, and the length that is left. */
+  trim?: { start: number; end: number; seconds: number }
+  /**
+   * A take that can be trimmed and is not: whether it has near-silence to cut, starts and ends on
+   * its sound (`nothing`) or has no sound (`silent`). Absent on a take that cannot go into the
+   * game (made to loop, or made to play once for an effect that now loops) and on a trimmed one.
+   */
+  trimmable?: 'cut' | 'nothing' | 'silent'
 }
 
 /** What is using the GPU: a music take, an image take, a sound effect take, or a check of a recording. */

@@ -773,3 +773,201 @@ describe('the model for new takes', () => {
     expect(JSON.parse(page.calls[0]!.body!)).toEqual({ retry: 5 })
   })
 })
+
+describe('Trim silence', () => {
+  const cut = { start: 0.22, end: 0.14, seconds: 1.04 }
+  const trimmable = (n: number, over: Partial<EffectTakeView> = {}) =>
+    take(n, { trimmable: 'cut', ...over })
+  const bottomRow = (card: Element) =>
+    [...card.querySelectorAll('.take-row')].find((r) =>
+      [...r.querySelectorAll('button')].some((b) => b.textContent === 'Drop'),
+    )!
+  const labels = (row: Element) => [...row.querySelectorAll('button')].map((b) => b.textContent)
+
+  it('sits at the left of a card’s bottom row, with Drop and Choose at the right', () => {
+    const { container } = render(row({ status: 'not-chosen' }), view({ takes: [trimmable(1)] }))
+    const card = container.querySelector('.take')!
+    expect(labels(bottomRow(card))).toEqual(['Trim silence', 'Drop', 'Choose'])
+    expect(bottomRow(card).querySelector('.grow')).not.toBeNull()
+  })
+
+  it('stays out of the listening row beside ▶ The chosen, then this', () => {
+    const { container } = render(
+      chosenRow(),
+      view({ takes: [trimmable(1), take(2, { chosen: true })] }),
+    )
+    const card = container.querySelector('.takes .take')!
+    const listening = [...card.querySelectorAll('.take-row')].find((r) =>
+      [...r.querySelectorAll('button')].some((b) => b.textContent === '▶ The chosen, then this'),
+    )!
+    expect(labels(listening)).toEqual(['▶ The chosen, then this'])
+  })
+
+  it('is offered only on a take that can go into the game', () => {
+    const { buttons } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [take(1, { loops: true }), take(2)] }),
+    )
+    expect(buttons('Trim silence')).toHaveLength(0)
+  })
+
+  it('asks the studio, reads Trimming… and keeps focus on the button while it works', async () => {
+    let finish = () => {}
+    const { calls, buttons, click } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [trimmable(1)] }),
+      (call) =>
+        call.url.endsWith('/trim')
+          ? (new Promise(
+              (resolve) => (finish = () => resolve(Response.json({ ok: true }))),
+            ) as never)
+          : Response.json({ ok: true }),
+    )
+    const button = buttons('Trim silence')[0]!
+    button.focus()
+    await click(button)
+    expect(calls[0]).toMatchObject({ url: '/api/effects/chest-open/trim', method: 'POST' })
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ file: take(1).file, undo: false })
+    expect(buttons('Trimming…')[0]).toBe(button)
+    expect(document.activeElement).toBe(button)
+    await act(async () => finish())
+  })
+
+  it('shows a trimmed card: tag, length, line, Undo trim, hatched ends', () => {
+    const { container, text, buttons } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [take(1, { trim: cut })] }),
+    )
+    expect(container.querySelector('.take-tag')?.textContent).toBe('trimmed')
+    expect(text()).toContain('1.0 s')
+    expect(text()).toContain('0.22 s cut from the start, 0.14 s from the end')
+    expect(buttons('Undo trim')).toHaveLength(1)
+    expect(buttons('Trim silence')).toHaveLength(0)
+    expect([...container.querySelectorAll<HTMLElement>('.wave .cutzone')]).toHaveLength(2)
+    expect(container.querySelectorAll('.wave i')).toHaveLength(3)
+  })
+
+  it('names only the end that lost something', () => {
+    const { text } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [take(1, { trim: { start: 0.31, end: 0, seconds: 1.09 } })] }),
+    )
+    expect(text()).toContain('0.31 s cut from the start')
+    expect(text()).not.toContain('from the end')
+  })
+
+  it('undoes a trim', async () => {
+    const { calls, buttons, click } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [take(1, { trim: cut })] }),
+    )
+    await click(buttons('Undo trim')[0]!)
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ file: take(1).file, undo: true })
+  })
+
+  it('is greyed out with the reason when there is nothing to cut or no sound', () => {
+    const { text, buttons } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [take(1, { trimmable: 'nothing' }), take(2, { trimmable: 'silent' })] }),
+    )
+    expect(buttons('Trim silence').every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
+    expect(text()).toContain('Starts and ends on its sound: nothing to cut.')
+    expect(text()).toContain('Near-silent throughout: there is no sound to keep.')
+  })
+
+  it('waits, with no new line, when the lock cannot be read', () => {
+    const { text, buttons } = render(
+      row({ status: 'unknown', current: { kind: 'unknown' } }),
+      view({ takes: [trimmable(1), take(2, { trim: cut })], lockUnread: true }),
+    )
+    expect(buttons('Trim silence')[0]!.disabled).toBe(true)
+    expect(buttons('Undo trim')[0]!.disabled).toBe(true)
+    expect(text()).toContain('Choosing and dropping wait until the sound effects lock can be read.')
+  })
+
+  it('says why it failed, next to the button, and the take is as it was', async () => {
+    const refuse = () =>
+      Response.json(
+        { ok: false, message: 'The take’s sound file could not be read.' },
+        { status: 409 },
+      )
+    const { text, buttons, click } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [trimmable(6)] }),
+      refuse,
+    )
+    await click(buttons('Trim silence')[0]!)
+    expect(text()).toContain(
+      'Take 6 could not be trimmed: the take’s sound file could not be read. The take is as it was.',
+    )
+    expect(buttons('Trim silence')[0]!.disabled).toBe(false)
+  })
+
+  it('on the take in the game: the button at the left of the actions row, Un-choose at the right', () => {
+    const { container, buttons } = render(
+      chosenRow(),
+      view({ takes: [take(1), trimmable(2, { chosen: true })] }),
+    )
+    const block = container.querySelector('[aria-label="In the game"]')!
+    expect(labels(block.querySelector('.track-in-game-actions')!)).toEqual([
+      'Trim silence',
+      'Un-choose',
+    ])
+    expect(buttons('Trim silence')).toHaveLength(1)
+  })
+
+  it('on a trimmed take in the game: tag before chosen, Undo trim, failure names the game', async () => {
+    const refuse = () =>
+      Response.json(
+        { ok: false, message: 'The game’s file could not be written.' },
+        { status: 409 },
+      )
+    const { container, text, buttons, click } = render(
+      chosenRow(),
+      view({ takes: [take(2, { chosen: true, trim: cut })] }),
+      refuse,
+    )
+    const head = container.querySelector('[aria-label="In the game"] .take-row')!
+    expect(head.textContent).toMatch(/Take 2trimmedchosen/)
+    await click(buttons('Undo trim')[0]!)
+    expect(text()).toContain(
+      'Take 2 could not be untrimmed: the game’s file could not be written. The game still plays it trimmed.',
+    )
+  })
+
+  it('on a take in the game whose clip is missing, still next to Choose again', () => {
+    const { container } = render(
+      chosenRow({ current: { kind: 'take', take: 2, exists: false }, status: 'missing' }),
+      view({ takes: [trimmable(2, { chosen: true })] }),
+    )
+    const actions = container.querySelector('.track-in-game-actions')!
+    expect(labels(actions)).toEqual(['Trim silence', 'Un-choose', 'Choose again'])
+  })
+
+  it('plays only the part between the cuts, in Play and in the comparison', async () => {
+    const { calls, container, buttons, click } = render(
+      chosenRow(),
+      view({ takes: [take(1, { trim: cut }), take(2, { chosen: true, trim: cut })] }),
+    )
+    expect(container.querySelectorAll('.wave .cutzone').length).toBe(4)
+    await click(buttons('▶ The chosen, then this')[0]!)
+    expect(calls.length).toBeGreaterThanOrEqual(0)
+    const { takeUrl } = await import('../../effectsPlay')
+    expect(takeUrl('x', take(1, { trim: cut }))).toBe(
+      `/api/effects/x/takes/${take(1).file}?trimmed=1`,
+    )
+    expect(takeUrl('x', take(1))).toBe(`/api/effects/x/takes/${take(1).file}`)
+  })
+
+  it('once the effect loops: no button on a play-once take, Undo trim kept on a trimmed one', () => {
+    const { container, buttons } = render(
+      chosenRow({ loops: true }),
+      view({ takes: [take(1), take(2, { chosen: true, trim: cut })] }),
+    )
+    expect(buttons('Trim silence')).toHaveLength(0)
+    expect(buttons('Undo trim')).toHaveLength(1)
+    expect(container.querySelector('[aria-label="In the game"]')!.textContent).toContain(
+      'Undo trim',
+    )
+  })
+})

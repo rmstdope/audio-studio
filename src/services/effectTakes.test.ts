@@ -25,6 +25,8 @@ function fakeGenerator(
   length = 1.4,
   /** Per model, what differs from a model that is here and ready. */
   models: Partial<Record<EffectModelId, { ready?: EffectReady; download?: ImageDownload }>> = {},
+  /** Seconds of silence at the start and end of each one-shot take. */
+  silence: { lead: number; tail: number } = { lead: 0, tail: 0 },
 ) {
   const requests: (EffectRequest & { model: EffectModelId })[] = []
   const generator: EffectGenerator = {
@@ -34,7 +36,10 @@ function fakeGenerator(
       requests.push(request)
       if (request.prompt.includes('fail')) throw new Error('The effects generator stopped.')
       const samples = new Int16Array(Math.round(length * 1000))
-      samples.forEach((_, i) => (samples[i] = Math.round(8000 * Math.sin(i / 20))))
+      samples.forEach((_, i) => {
+        const quiet = i < silence.lead * 1000 || i >= samples.length - silence.tail * 1000
+        samples[i] = quiet ? 0 : Math.round(8000 * Math.sin(i / 20))
+      })
       const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
       return { wav: writeWav({ format, data: new Uint8Array(samples.buffer) }), seed: request.seed }
     },
@@ -75,6 +80,7 @@ function setup(
     failed?: EffectModelId[]
     main?: EffectModelId
     gpu?: ReturnType<typeof createSerial>
+    silence?: { lead: number; tail: number }
   } = {},
 ) {
   const root = tempRepo({
@@ -85,10 +91,13 @@ function setup(
     ...extra,
   })
   const file = join(root, 'content-studio.json')
-  const { generator, requests } = fakeGenerator(ready, length, options.models)
+  const { generator, requests } = fakeGenerator(ready, length, options.models, options.silence)
   const { health, calls } = fakeHealth(options.failed)
   let seed = 100
-  const encode: Encoder = async (_wav, out) => {
+  // The sound each choice was encoded from.
+  const encoded: Uint8Array[] = []
+  const encode: Encoder = async (wav, out) => {
+    encoded.push(wav)
     mkdirSync(dirname(out), { recursive: true })
     writeFileSync(out, 'mp3')
   }
@@ -112,7 +121,7 @@ function setup(
     }
     throw new Error('takes never finished')
   }
-  return { root, file, takes, requests, calls, settled }
+  return { root, file, takes, requests, calls, settled, encoded }
 }
 
 describe('createEffectTakes', () => {
@@ -698,5 +707,210 @@ describe('takes of an effect that loops', () => {
       ok: false,
       message: 'A change of how the effect plays cannot be accepted: the effect needs a new take.',
     })
+  })
+})
+
+describe('Trim silence on an effect take', () => {
+  const quiet = { silence: { lead: 0.1, tail: 0.05 } }
+  const door = (silence?: { lead: number; tail: number }) =>
+    setup(undefined, undefined, {}, 1.4, silence ? { silence } : {})
+  const board = (root: string, id: string) =>
+    JSON.parse(readFileSync(join(root, `content-studio/cache/effect-boards/${id}.json`), 'utf8'))
+  const manifest = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))
+  const lock = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
+
+  async function made(ctx: ReturnType<typeof setup>, id = 'door-creak') {
+    await ctx.takes.make(ctx.file, id, { count: 1 })
+    return (await ctx.settled(id)).takes[0]!
+  }
+
+  it('says what a take has to cut, and nothing of a loop’s take', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    expect(take.trimmable).toBe('cut')
+    expect(take.trim).toBeUndefined()
+    const flat = door()
+    expect((await made(flat)).trimmable).toBe('nothing')
+    const rain = setup(undefined, [{ id: 'rain', text: 'Rain', seconds: 10, loops: true }], {}, 12)
+    expect((await made(rain, 'rain')).trimmable).toBeUndefined()
+  })
+
+  it('says a take with no sound is near-silent throughout', async () => {
+    const ctx = setup(undefined, undefined, {}, 1.4, { silence: { lead: 1.4, tail: 0 } })
+    expect((await made(ctx)).trimmable).toBe('silent')
+  })
+
+  it('cuts the near-silence, keeps the WAV as generated and the cut with the take', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    const path = join(ctx.root, 'content-studio/cache/effect-takes/door-creak', take.file)
+    const before = readFileSync(path)
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)).toEqual({ ok: true })
+    expect(readFileSync(path).equals(before)).toBe(true)
+    const trimmed = (await ctx.settled('door-creak')).takes[0]!
+    expect(trimmed.trimmable).toBeUndefined()
+    expect(trimmed.trim!.start).toBeCloseTo(0.09, 2)
+    expect(trimmed.trim!.end).toBeCloseTo(0.04, 2)
+    expect(trimmed.trim!.seconds).toBeCloseTo(1.4 - 0.13, 2)
+    expect(board(ctx.root, 'door-creak').takes[0].trim.start).toBeCloseTo(0.09, 2)
+    // The part between the cuts is what plays.
+    const part = readWav((await ctx.takes.trimmedSound(ctx.file, 'door-creak', take.file))!)
+    expect(wavSeconds(part)).toBeCloseTo(1.27, 2)
+  })
+
+  it('gives the take back as generated on Undo trim', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, true)).toEqual({ ok: true })
+    const back = (await ctx.settled('door-creak')).takes[0]!
+    expect(back.trim).toBeUndefined()
+    expect(back.trimmable).toBe('cut')
+    expect(board(ctx.root, 'door-creak').takes[0].trim).toBeUndefined()
+    expect(await ctx.takes.trimmedSound(ctx.file, 'door-creak', take.file)).toBeNull()
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, true)).toEqual({
+      ok: false,
+      message: 'That take is not trimmed.',
+    })
+  })
+
+  it('refuses a take with nothing to cut or no sound, with the reasons the page greys it out by', async () => {
+    const flat = door()
+    const a = await made(flat)
+    expect(await flat.takes.trim(flat.file, 'door-creak', a.file, false)).toEqual({
+      ok: false,
+      message: 'Starts and ends on its sound: nothing to cut.',
+    })
+    const silent = setup(undefined, undefined, {}, 1.4, { silence: { lead: 1.4, tail: 0 } })
+    const b = await made(silent)
+    expect(await silent.takes.trim(silent.file, 'door-creak', b.file, false)).toEqual({
+      ok: false,
+      message: 'Near-silent throughout: there is no sound to keep.',
+    })
+  })
+
+  it('refuses a take that is not on the board, and one whose sound cannot be read', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', '0123456789abcdef.9.wav', false)).toEqual({
+      ok: false,
+      message: 'That take is not on the board.',
+    })
+    writeFileSync(
+      join(ctx.root, 'content-studio/cache/effect-takes/door-creak', take.file),
+      'not a wav',
+    )
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)).toEqual({
+      ok: false,
+      message: 'The take’s sound file could not be read.',
+    })
+    expect(await ctx.takes.trim(ctx.file, 'no-such', take.file, false)).toBeNull()
+  })
+
+  it('refuses a take made to loop, and a take made to play once on an effect that loops', async () => {
+    const rain = setup(undefined, [{ id: 'rain', text: 'Rain', seconds: 10, loops: true }], {}, 12)
+    const loop = await made(rain, 'rain')
+    expect(await rain.takes.trim(rain.file, 'rain', loop.file, false)).toMatchObject({
+      ok: false,
+    })
+    const ctx = door(quiet.silence)
+    const once = await made(ctx)
+    writeFileSync(
+      join(ctx.root, 'tts/effects.json'),
+      JSON.stringify([{ id: 'door-creak', text: 'A door', seconds: 3, loops: true }]),
+    )
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', once.file, false)).toMatchObject({
+      ok: false,
+    })
+    expect((await ctx.settled('door-creak')).takes[0]!.trimmable).toBeUndefined()
+  })
+
+  it('chooses the trimmed sound: the game’s file and its length are the trimmed ones', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)
+    expect(await ctx.takes.choose(ctx.file, 'door-creak', take.file)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(ctx.encoded.at(-1)!))).toBeCloseTo(1.27, 2)
+    expect(manifest(ctx.root)['door-creak'].duration).toBeCloseTo(1.27, 1)
+    expect((await ctx.settled('door-creak')).takes[0]).toMatchObject({ chosen: true })
+  })
+
+  it('rewrites the game’s file at once on the take in the game, keeping the lock’s time and words', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.choose(ctx.file, 'door-creak', take.file)
+    const was = lock(ctx.root)['door-creak']
+    expect(manifest(ctx.root)['door-creak'].duration).toBeCloseTo(1.4, 1)
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(ctx.encoded.at(-1)!))).toBeCloseTo(1.27, 2)
+    expect(manifest(ctx.root)['door-creak'].duration).toBeCloseTo(1.27, 1)
+    expect(lock(ctx.root)['door-creak']).toEqual(was)
+    const view = (await ctx.settled('door-creak')).takes[0]!
+    expect(view).toMatchObject({ chosen: true })
+    expect(view.trim).toBeDefined()
+    // And back.
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, true)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(ctx.encoded.at(-1)!))).toBeCloseTo(1.4, 2)
+    expect(manifest(ctx.root)['door-creak'].duration).toBeCloseTo(1.4, 1)
+    expect(lock(ctx.root)['door-creak']).toEqual(was)
+  })
+
+  it('changes nothing when the game’s file cannot be rewritten', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.choose(ctx.file, 'door-creak', take.file)
+    const manifestBefore = readFileSync(join(ctx.root, 'audio/effects/manifest.json'), 'utf8')
+    // The manifest cannot be read, so the clip cannot be written again.
+    writeFileSync(join(ctx.root, 'audio/effects/manifest.json'), '{ nope')
+    const answer = await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)
+    expect(answer).toMatchObject({ ok: false })
+    expect(board(ctx.root, 'door-creak').takes[0].trim).toBeUndefined()
+    writeFileSync(join(ctx.root, 'audio/effects/manifest.json'), manifestBefore)
+  })
+
+  it('changes only the take when the game’s clip is missing, and Choose again writes it', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.choose(ctx.file, 'door-creak', take.file)
+    rmSync(join(ctx.root, 'audio/effects/door-creak.mp3'))
+    const encodedBefore = ctx.encoded.length
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)).toEqual({ ok: true })
+    expect(ctx.encoded.length).toBe(encodedBefore)
+    expect(existsSync(join(ctx.root, 'audio/effects/door-creak.mp3'))).toBe(false)
+    expect(board(ctx.root, 'door-creak').takes[0].trim).toBeDefined()
+    await ctx.takes.choose(ctx.file, 'door-creak', take.file)
+    expect(wavSeconds(readWav(ctx.encoded.at(-1)!))).toBeCloseTo(1.27, 2)
+  })
+
+  it('keeps a trim through Un-choose, and a trimmed take in the game can be untrimmed once the effect loops', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)
+    await ctx.takes.choose(ctx.file, 'door-creak', take.file)
+    await ctx.takes.unchoose(ctx.file, 'door-creak')
+    expect((await ctx.settled('door-creak')).takes[0]!.trim).toBeDefined()
+    await ctx.takes.choose(ctx.file, 'door-creak', take.file)
+    writeFileSync(
+      join(ctx.root, 'tts/effects.json'),
+      JSON.stringify([
+        { id: 'door-creak', text: 'A slow wooden door creaks open', seconds: 3, loops: true },
+      ]),
+    )
+    const shown = (await ctx.settled('door-creak')).takes[0]!
+    expect(shown.trim).toBeDefined()
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, true)).toEqual({ ok: true })
+    expect(wavSeconds(readWav(ctx.encoded.at(-1)!))).toBeCloseTo(1.4, 2)
+    // The lock still counts the take as made to play once.
+    expect(lock(ctx.root)['door-creak'].inputs.loops).toBeUndefined()
+  })
+
+  it('goes with the take when it is dropped', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)
+    await ctx.takes.drop(ctx.file, 'door-creak', take.file)
+    expect(board(ctx.root, 'door-creak').takes).toEqual([])
   })
 })
