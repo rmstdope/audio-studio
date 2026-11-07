@@ -13,8 +13,10 @@ export function EffectTrimmedTag({ take }: { take: EffectTakeView }) {
  * Trim silence / Undo trim for an effect's take, in three parts for the card to place: the `button`
  * (null on an untrimmed take that cannot go into the game), `note` (the line under the
  * waveform: how much was cut, or why the button is greyed out) and `failure` (the red line, next to
- * the button). `onPress` runs as a press begins, to stop a take that is playing, since its sound is
- * about to change.
+ * the button), and `clear`, which the card calls when a later action on the take works, so the red
+ * line never outlives the take it was about. The line is only ever about the take shown now.
+ * `onPress` runs as a press begins, to stop a take that is playing, since its sound is about to
+ * change.
  */
 export function useEffectTrimControl({
   effect,
@@ -31,14 +33,15 @@ export function useEffectTrimControl({
   /** The effects lock cannot be read: whether the take is in the game is not known, so Trim waits. */
   locked: boolean
   onPress: () => void
-}): { button: ReactNode; note: ReactNode; failure: ReactNode } {
+}): { button: ReactNode; note: ReactNode; failure: ReactNode; clear: () => void } {
   const trim = useTrimEffectTake(effect)
   const noteId = useId()
+  const clear = () => trim.reset()
   const undo = take?.trim !== undefined
   // A trimmed take always keeps Undo trim; the studio says an untrimmed one has something to cut,
   // or why not, only when it can go into the game.
   if (!take || (!undo && !take.trimmable)) {
-    return { button: null, note: null, failure: null }
+    return { button: null, note: null, failure: null, clear }
   }
   const greyed = !undo && take.trimmable !== 'cut'
   const working = trim.isPending
@@ -49,14 +52,19 @@ export function useEffectTrimControl({
       : take.trimmable === 'silent'
         ? SILENT_LINE
         : null
-  const reason = trim.isError
-    ? trim.error.message
-    : trim.data && !trim.data.ok
-      ? 'message' in trim.data
-        ? trim.data.message
-        : `${trim.data.file} could not be read`
-      : null
+  // A failure about another take (the game now plays a different one) is not this take's.
+  const reason =
+    trim.variables?.file !== take.file
+      ? null
+      : trim.isError
+        ? trim.error.message
+        : trim.data && !trim.data.ok
+          ? 'message' in trim.data
+            ? trim.data.message
+            : `${trim.data.file} could not be read`
+          : null
   return {
+    clear,
     button: (
       <button
         type="button"

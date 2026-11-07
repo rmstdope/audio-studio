@@ -105,8 +105,10 @@ export function EffectInTheGame({
               unchoose.mutate(undefined, {
                 onSuccess: (result) => {
                   setAsking(false)
-                  if (result.ok) focusBlock()
-                  else refocus()
+                  if (result.ok) {
+                    trimControl.clear()
+                    focusBlock()
+                  } else refocus()
                 },
                 // The question was refused by the server or never got there: the block stays.
                 onError: () => {
@@ -191,6 +193,7 @@ export function EffectInTheGame({
           chosen
           player={player}
           onClose={() => onFadesClosed(take.n)}
+          onSaved={trimControl.clear}
         />
       ) : (
         take && (
@@ -248,15 +251,21 @@ export function EffectInTheGame({
               type="button"
               className="btn btn-primary btn-small"
               disabled={choose.isPending}
-              onClick={() => choose.mutate(take.file)}
+              onClick={() =>
+                choose.mutate(take.file, {
+                  onSuccess: (result) => {
+                    if (result.ok) trimControl.clear()
+                  },
+                })
+              }
             >
               {choose.isPending ? 'Choosing…' : 'Choose again'}
             </button>
           )}
         </div>
       )}
-      {!editing && hint}
       {!editing && trimControl.failure}
+      {!editing && hint}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
       {choose.data && !choose.data.ok && (
         <span className="adopt-error">The take could not be chosen.</span>
