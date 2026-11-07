@@ -1036,15 +1036,51 @@ describe('Trim silence on an effect take', () => {
     const take = await made(ctx)
     const folder = join(ctx.root, 'content-studio/cache/effect-boards')
     chmodSync(folder, 0o555)
+    const quietLog = console.error
+    console.error = () => {}
     try {
       expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)).toEqual({
         ok: false,
         message: 'content-studio/cache/effect-boards/door-creak.json could not be written',
       })
     } finally {
+      console.error = quietLog
       chmodSync(folder, 0o755)
     }
     expect((await ctx.settled('door-creak')).takes[0]!.trim).toBeUndefined()
+  })
+
+  it('puts the game back when the take in the game is trimmed or untrimmed and its board cannot be written', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    await ctx.takes.choose(ctx.file, 'door-creak', take.file)
+    const game = () => [
+      readFileSync(join(ctx.root, 'audio/effects/door-creak.mp3')),
+      readFileSync(join(ctx.root, 'audio/effects/manifest.json')),
+      readFileSync(join(ctx.root, 'content-studio/effects/lock.json')),
+    ]
+    const unwritable = async (undo: boolean) => {
+      const before = game()
+      const folder = join(ctx.root, 'content-studio/cache/effect-boards')
+      chmodSync(folder, 0o555)
+      const quietLog = console.error
+      console.error = () => {}
+      try {
+        expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, undo)).toEqual({
+          ok: false,
+          message: 'content-studio/cache/effect-boards/door-creak.json could not be written',
+        })
+      } finally {
+        console.error = quietLog
+        chmodSync(folder, 0o755)
+      }
+      expect(game()).toEqual(before)
+    }
+    await unwritable(false)
+    expect((await ctx.settled('door-creak')).takes[0]!.trim).toBeUndefined()
+    expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)).toEqual({ ok: true })
+    await unwritable(true)
+    expect((await ctx.settled('door-creak')).takes[0]!.trim).toBeDefined()
   })
 
   it('gives the take back as generated on Undo trim', async () => {
