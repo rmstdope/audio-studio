@@ -945,18 +945,40 @@ describe('Trim silence', () => {
   })
 
   it('plays only the part between the cuts, in Play and in the comparison', async () => {
+    cleanups.push(installFakeWebAudio())
+    // A one-clip Play goes through an audio element: note the elements, and read their source.
+    const elements: { src: string }[] = []
+    const Fake = globalThis.Audio
+    globalThis.Audio = class extends Fake {
+      constructor() {
+        super()
+        elements.push(this)
+      }
+    }
     const { calls, container, buttons, click } = render(
       chosenRow(),
       view({ takes: [take(1, { trim: cut }), take(2, { chosen: true, trim: cut })] }),
     )
     expect(container.querySelectorAll('.wave .cutzone').length).toBe(4)
+    const sounds = () => [
+      ...calls.filter((c) => c.url.includes('/takes/')).map((c) => c.url),
+      ...elements
+        .map((element) => element.src)
+        .filter(Boolean)
+        .map((url) => url.replace(/^https?:\/\/[^/]+/, '')),
+    ]
+    await click(container.querySelector('.takes .play')!)
+    expect(sounds()).toEqual([`/api/effects/chest-open/takes/${take(1).file}?trimmed=1`])
+    calls.length = 0
+    elements.forEach((element) => (element.src = ''))
     await click(buttons('▶ The chosen, then this')[0]!)
-    expect(calls.length).toBeGreaterThanOrEqual(0)
-    const { takeUrl } = await import('../../effectsPlay')
-    expect(takeUrl('x', take(1, { trim: cut }))).toBe(
-      `/api/effects/x/takes/${take(1).file}?trimmed=1`,
-    )
-    expect(takeUrl('x', take(1))).toBe(`/api/effects/x/takes/${take(1).file}`)
+    // The chosen take comes first; the one compared with it follows when it has ended.
+    expect(sounds()).toEqual([`/api/effects/chest-open/takes/${take(2).file}?trimmed=1`])
+    calls.length = 0
+    elements.forEach((element) => (element.src = ''))
+    await click(buttons('■ Stop')[0]!)
+    await click(container.querySelector('[aria-label="In the game"] .play')!)
+    expect(sounds()).toEqual([`/api/effects/chest-open/takes/${take(2).file}?trimmed=1`])
   })
 
   it('once the effect loops: no button on a play-once take, Undo trim kept on a trimmed one', () => {

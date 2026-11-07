@@ -228,7 +228,7 @@ export function HearTheSeam({
     <button
       type="button"
       className="btn btn-small"
-      onClick={() => player.toggle(seamId, `${takeUrl(effect, take)}?seam=1`, {})}
+      onClick={() => player.toggle(seamId, `${takeUrl(effect, { file: take.file })}?seam=1`, {})}
     >
       {player.playing === seamId ? 'Stop' : 'Hear the seam'}
     </button>

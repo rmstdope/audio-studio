@@ -454,7 +454,7 @@ export function createEffectTakes({
           peaks: take.peaks,
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
           model: modelName(take.model),
-          loops: Boolean(take.inputs.loops),
+          loops,
           quietAt: take.quietAt ?? null,
           ...(take.trim && {
             trim: { ...take.trim, seconds: trimmedSeconds(take.seconds, take.trim) },
@@ -663,16 +663,22 @@ export function createEffectTakes({
               'Only a take made to play once, for an effect that plays once, can be trimmed.',
           }
         }
-        let bytes: Uint8Array
-        try {
-          bytes = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
-        } catch {
-          return { ok: false, message: 'The take’s sound file could not be read.' }
+        // The sound is read only when it is needed: a new trim, or the game's file rewritten.
+        const sound = async () => {
+          try {
+            return new Uint8Array(
+              await Bun.file(join(found.root, found.folder, name)).arrayBuffer(),
+            )
+          } catch {
+            return null
+          }
         }
         let trim: Trim | undefined
         if (undo) {
           if (!take.trim) return { ok: false, message: 'That take is not trimmed.' }
         } else {
+          const bytes = await sound()
+          if (!bytes) return { ok: false, message: 'The take’s sound file could not be read.' }
           let finding: ReturnType<typeof findTrim>
           try {
             finding = findTrim(readWav(bytes), EFFECT_TRIM_RULES)
@@ -694,7 +700,7 @@ export function createEffectTakes({
         if (chosen?.fileExists && chosen.lock.take === take.n && chosen.lock.fp === take.hash) {
           let played: ReturnType<typeof playedOf>
           try {
-            played = playedOf(next, bytes)
+            played = playedOf(next, (await sound()) ?? new Uint8Array())
           } catch {
             return { ok: false, message: 'The take’s sound file could not be read.' }
           }

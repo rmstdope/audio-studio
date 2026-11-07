@@ -1805,19 +1805,11 @@ export function startServer({
           )
           if (!file) return notFound()
           // `?trimmed=1`: only the part between a trimmed take's cuts (the whole sound if not trimmed).
-          if (new URL(request.url).searchParams.get('trimmed') === '1') {
-            const part = await effectTakes.trimmedSound(
-              projectFile,
-              request.params.id,
-              request.params.file,
-            )
-            if (part) {
-              return new Response(part as Uint8Array<ArrayBuffer>, {
-                headers: { 'content-type': 'audio/wav' },
-              })
-            }
-          }
-          return takeResponse(request, file)
+          const part =
+            new URL(request.url).searchParams.get('trimmed') === '1'
+              ? await effectTakes.trimmedSound(projectFile, request.params.id, request.params.file)
+              : null
+          return takeResponse(request, file, part ?? undefined)
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await effectTakes.drop(projectFile, request.params.id, request.params.file)

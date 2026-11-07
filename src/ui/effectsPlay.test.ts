@@ -43,4 +43,15 @@ describe('compareClips', () => {
       after: 1,
     })
   })
+
+  it('plays only the part between the cuts of a trimmed take, in both clips', () => {
+    const cut = { start: 0.2, end: 0.1, seconds: 1.1 }
+    const [chosen, other] = compareClips(
+      'rain',
+      { ...take(2, false), trim: cut },
+      { ...take(3, false), trim: cut },
+    )
+    expect(chosen!.url.endsWith('.2.wav?trimmed=1')).toBe(true)
+    expect(other!.url.endsWith('.3.wav?trimmed=1')).toBe(true)
+  })
 })

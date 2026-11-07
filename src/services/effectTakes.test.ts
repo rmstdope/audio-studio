@@ -865,7 +865,10 @@ describe('Trim silence on an effect take', () => {
     // The manifest cannot be read, so the clip cannot be written again.
     writeFileSync(join(ctx.root, 'audio/effects/manifest.json'), '{ nope')
     const answer = await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)
-    expect(answer).toMatchObject({ ok: false })
+    expect(answer).toEqual({
+      ok: false,
+      message: 'the sound effects manifest could not be read',
+    })
     expect(board(ctx.root, 'door-creak').takes[0].trim).toBeUndefined()
     writeFileSync(join(ctx.root, 'audio/effects/manifest.json'), manifestBefore)
   })
