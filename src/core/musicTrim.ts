@@ -95,11 +95,14 @@ export const NOTHING_LINE = 'Starts and ends on its sound: nothing to cut.'
 /** Why Trim silence is greyed out on a take with no sound in it. */
 export const SILENT_LINE = 'Near-silent throughout: there is no sound to keep.'
 
-/** The red line when Trim silence or Undo trim failed, naming the take and what the game plays. */
+/**
+ * The red line when Trim silence or Undo trim failed, naming the take and what the game plays; when
+ * the game's files may have changed (`gameChanged`), the reason says so and nothing is claimed.
+ */
 export function trimFailure(
   n: number,
   reason: string,
-  how: { inGame: boolean; undo: boolean },
+  how: { inGame: boolean; undo: boolean; gameChanged?: boolean },
 ): string {
   const plain = reason.replace(/\.$/, '')
   const said = plain.charAt(0).toLowerCase() + plain.slice(1)
@@ -109,6 +112,7 @@ export function trimFailure(
     : how.undo
       ? 'The game still plays it trimmed.'
       : 'The game still plays it as it was.'
+  if (how.gameChanged) return `Take ${n} could not be ${word}: ${said}.`
   return `Take ${n} could not be ${word}: ${said}. ${after}`
 }
 

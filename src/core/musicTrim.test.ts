@@ -103,6 +103,9 @@ describe('words', () => {
     expect(trimFailure(2, 'disk full', { inGame: false, undo: true })).toBe(
       'Take 2 could not be untrimmed: disk full. The take is as it was.',
     )
+    expect(trimFailure(1, 'disk full', { inGame: true, undo: false, gameChanged: true })).toBe(
+      'Take 1 could not be trimmed: disk full.',
+    )
   })
 })
 

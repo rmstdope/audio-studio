@@ -1780,8 +1780,8 @@ takes it away, and once another take (or none) is in the game it is gone for goo
 again; a trim still working is never cleared (as-9rs). A board that cannot be written is a refusal that names it,
 not a bare 500 ("Take n could not be trimmed: content-studio/cache/effect-boards/<id>.json could not be written.",
 as-inp); on the take in the game its clip and its own manifest and lock entries are put back first, in the project's turn so what another effect chose meanwhile stays (`keepEffect`), so "The game
-still plays it as it was." holds (if even that fails, the reason adds ", and the game’s files could not be put
-back").
+still plays it as it was." holds (if even that fails, the refusal carries `gameChanged` and the reason adds ", and
+the game’s files could not be put back", and the line says nothing about what the game plays, as-cy8).
 
 **Status** (`effectStatus`): "none yet" (no take on the board), "not chosen", "chosen", "changed since
 chosen" (the description in use or the length differs from the chosen take's own inputs), "clip missing"
