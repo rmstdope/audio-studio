@@ -1083,6 +1083,49 @@ describe('Trim silence on an effect take', () => {
     expect((await ctx.settled('door-creak')).takes[0]!.trim).toBeDefined()
   })
 
+  it('keeps what another effect chose meanwhile when it puts the game back', async () => {
+    /** Runs once, inside the next encode: another effect is chosen while the trim encodes. */
+    let meanwhile: (() => Promise<unknown>) | null = null
+    const ctx = setup(undefined, undefined, {}, 1.4, {
+      ...quiet,
+      encode: async (wav, out) => {
+        const other = meanwhile
+        meanwhile = null
+        await other?.()
+        mkdirSync(dirname(out), { recursive: true })
+        writeFileSync(out, wav)
+      },
+    })
+    const door = await made(ctx)
+    const coins = await made(ctx, 'coins')
+    await ctx.takes.choose(ctx.file, 'door-creak', door.file)
+    const doorBefore = {
+      manifest: manifest(ctx.root)['door-creak'],
+      lock: lock(ctx.root)['door-creak'],
+    }
+    const folder = join(ctx.root, 'content-studio/cache/effect-boards')
+    // Coins is chosen, its board written, and only then is the boards folder closed to door-creak.
+    meanwhile = async () => {
+      expect(await ctx.takes.choose(ctx.file, 'coins', coins.file)).toEqual({ ok: true })
+      expect(manifest(ctx.root).coins).toBeDefined()
+      chmodSync(folder, 0o555)
+    }
+    const quietLog = console.error
+    console.error = () => {}
+    try {
+      expect(await ctx.takes.trim(ctx.file, 'door-creak', door.file, false)).toMatchObject({
+        ok: false,
+      })
+    } finally {
+      console.error = quietLog
+      chmodSync(folder, 0o755)
+    }
+    expect(manifest(ctx.root).coins).toBeDefined()
+    expect(lock(ctx.root).coins.take).toBe(coins.n)
+    expect(manifest(ctx.root)['door-creak']).toEqual(doorBefore.manifest)
+    expect(lock(ctx.root)['door-creak']).toEqual(doorBefore.lock)
+  })
+
   it('gives the take back as generated on Undo trim', async () => {
     const ctx = door(quiet.silence)
     const take = await made(ctx)

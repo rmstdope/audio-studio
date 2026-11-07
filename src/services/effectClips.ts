@@ -158,6 +158,46 @@ export async function commitEffect({
 }
 
 /**
+ * What the game has of one effect now (its clip, manifest entry and lock entry), and a way to put
+ * exactly that back later. The put-back runs in the project's turn and touches only this effect's
+ * entries, so what other effects chose meanwhile stays.
+ */
+export async function keepEffect({
+  root,
+  projectFile = root,
+  effects,
+  id,
+}: {
+  root: string
+  projectFile?: string
+  effects: EffectsConfig
+  id: string
+}): Promise<() => Promise<void>> {
+  const clip = join(effects.clips, `${id}.mp3`)
+  const sound = await Bun.file(resolveInRoot(root, clip))
+    .bytes()
+    .catch(() => null)
+  const manifestWas = (await manifestNow(root, effects, []))?.[id]
+  const lockWas = (await lockNow(root, []))?.[id]
+  return () =>
+    choices().run(turn(projectFile), async () => {
+      if (sound) await writeAtomic(root, clip, sound)
+      else await rm(resolveInRoot(root, clip), { force: true })
+      const found: Problem[] = []
+      const manifest = await manifestNow(root, effects, found)
+      const lock = await lockNow(root, found)
+      if (!manifest || !lock)
+        throw new Error('The sound effects manifest or lock could not be read.')
+      if (manifestWas) manifest[id] = manifestWas
+      else delete manifest[id]
+      await writeAtomic(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
+      if (lockWas) lock[id] = lockWas
+      else delete lock[id]
+      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
+    })
+}
+
+/**
  * Takes the chosen take back: in the project's turn, once the manifest and lock could be read, the
  * effect's manifest entry, then its clip, then its lock entry last, so a failure part-way leaves it
  * chosen and the same click can be pressed again. An effect with no lock entry is refused; the

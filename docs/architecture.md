@@ -1779,7 +1779,7 @@ about Un-choose), and only about the take shown: a later fade saved or removed o
 takes it away, and once another take (or none) is in the game it is gone for good, also when the take is chosen
 again; a trim still working is never cleared (as-9rs). A board that cannot be written is a refusal that names it,
 not a bare 500 ("Take n could not be trimmed: content-studio/cache/effect-boards/<id>.json could not be written.",
-as-inp); on the take in the game the clip, manifest and lock it re-committed are put back first, so "The game
+as-inp); on the take in the game its clip and its own manifest and lock entries are put back first, in the project's turn so what another effect chose meanwhile stays (`keepEffect`), so "The game
 still plays it as it was." holds (if even that fails, the reason adds ", and the game’s files could not be put
 back").
 

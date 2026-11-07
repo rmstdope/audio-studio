@@ -37,13 +37,18 @@ import { readWav, writeWav } from '../core/wav'
 import { applyFades, fadesProblem, hasFades, type Fades } from '../core/fades'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { EFFECT_BOARD_DIR, EFFECT_TAKES_DIR, boardFile, readEffectBoard } from './effectBoards'
-import { acceptEffect, commitEffect, readEffectChosen, uncommitEffect } from './effectClips'
+import {
+  acceptEffect,
+  commitEffect,
+  keepEffect,
+  readEffectChosen,
+  uncommitEffect,
+} from './effectClips'
 import { readEffects } from './effectsLists'
 import type { EffectGenerator } from './effects'
 import type { EffectHealthStore } from './effectHealth'
 import { gpuInUse, gpuQueue, GPU, holdGpu } from './gpu'
 import { writeAtomic } from './files'
-import { EFFECTS_LOCK_FILE } from '../core/project'
 import type { CommitResult } from './musicClips'
 import { createSerial, type Serial } from './serial'
 import { MAKE_ALL_TAKES, type EffectBatch } from '../core/effectsMakeAll'
@@ -845,26 +850,13 @@ export function createEffectTakes({
             } catch {
               return { ok: false, message: 'The take’s sound file could not be read.' }
             }
-            // The clip, the manifest and the lock as they are, to be put back if the board cannot be.
-            const files = [
-              join(found.effects.clips, `${id}.mp3`),
-              found.effects.manifest,
-              EFFECTS_LOCK_FILE,
-            ]
-            const was = await Promise.all(
-              files.map((file) =>
-                Bun.file(resolveInRoot(found.root, file))
-                  .bytes()
-                  .catch(() => null),
-              ),
-            )
-            putBack = async () => {
-              for (const [i, file] of files.entries()) {
-                const bytes = was[i]
-                if (bytes) await writeAtomic(found.root, file, bytes)
-                else await rm(resolveInRoot(found.root, file), { force: true })
-              }
-            }
+            // This effect's clip, manifest and lock entries as they are, put back if the board cannot be.
+            putBack = await keepEffect({
+              root: found.root,
+              projectFile,
+              effects: found.effects,
+              id,
+            })
             const committed = await commitEffect({
               root: found.root,
               projectFile,
