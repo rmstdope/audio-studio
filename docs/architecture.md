@@ -1773,7 +1773,11 @@ use `GET …/takes/:file?trimmed=1`, the part between the cuts. **Choose** encod
 game's file holds it and the manifest the trimmed duration; Trim silence and Undo trim on the take in the game
 re-commit it (`commitEffect`, keeping the lock's accepted words and time) first and write the board only if that
 worked, and on a take in the game whose clip is missing change only the board. **Undo trim** is always allowed, so
-a trim made before the effect began to loop is never stuck (the server refuses a new trim there).
+a trim made before the effect began to loop is never stuck (the server refuses a new trim there). A failed
+Trim silence or Undo trim says why in red under the take's buttons (in the In the game block, above the line
+about Un-choose), and only about the take shown: a later fade saved or removed or Choose again that works
+takes it away, and once another take (or none) is in the game it is gone for good, also when the take is chosen
+again; a trim still working is never cleared (as-9rs).
 
 **Status** (`effectStatus`): "none yet" (no take on the board), "not chosen", "chosen", "changed since
 chosen" (the description in use or the length differs from the chosen take's own inputs), "clip missing"

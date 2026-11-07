@@ -174,6 +174,7 @@ export function FadesEditorBody({
   chosen,
   player,
   onClose,
+  onSaved,
 }: {
   take: { n: number; file: string; fades?: Fades | undefined }
   /** The sound that plays: its length and the bars of it. */
@@ -190,6 +191,8 @@ export function FadesEditorBody({
   player: Player
   /** The editor is done (saved, removed or cancelled). */
   onClose: () => void
+  /** The fades were saved or removed, before the editor closes. */
+  onSaved?: () => void
 }) {
   const saved: Fades = take.fades ?? { in: 0, out: 0, shape: 'smooth' }
   const [inText, setInText] = useState(boxText(saved.in))
@@ -235,7 +238,9 @@ export function FadesEditorBody({
     onClose()
   }
   const finish = (result: { ok: boolean }) => {
-    if (result.ok) close()
+    if (!result.ok) return
+    onSaved?.()
+    close()
   }
   const save = () => {
     if (!canSave) return

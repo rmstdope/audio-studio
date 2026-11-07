@@ -385,6 +385,7 @@ function TakeCard({
           chosen={false}
           player={player}
           onClose={() => onFadesClosed(take.n)}
+          onSaved={trim.clear}
         />
       ) : (
         <>

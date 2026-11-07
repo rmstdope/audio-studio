@@ -20,6 +20,7 @@ export function EffectFadesEditor({
   chosen,
   player,
   onClose,
+  onSaved,
 }: {
   effect: string
   take: EffectTakeView
@@ -28,6 +29,8 @@ export function EffectFadesEditor({
   player: Player
   /** The editor is done (saved, removed or cancelled). */
   onClose: () => void
+  /** The fades were saved or removed. */
+  onSaved: () => void
 }) {
   const set = useSetEffectFades(effect)
   // A trimmed take is faded after the cut: the length, the bars and the sound are of the part between the cuts.
@@ -53,6 +56,7 @@ export function EffectFadesEditor({
       chosen={chosen}
       player={player}
       onClose={onClose}
+      onSaved={onSaved}
     />
   )
 }
