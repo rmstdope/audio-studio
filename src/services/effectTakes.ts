@@ -199,6 +199,17 @@ function playedOf(take: EffectBoardTake, bytes: Uint8Array) {
   }
 }
 
+/** A take board that could not be saved: what was asked of it never happened. */
+class BoardNotWritten extends Error {
+  constructor(
+    /** The board's path in the project. */
+    readonly file: string,
+    cause: unknown,
+  ) {
+    super(`${file} could not be written`, { cause })
+  }
+}
+
 /** A refusal of a choice as a bare reason: "Take 1 could not be chosen: X. Nothing was changed." gives "X". */
 function plainReason(message: string): string {
   return message
@@ -331,7 +342,7 @@ export function createEffectTakes({
           await writeAtomic(found.root, boardFile(found.id), `${after}\n`)
         } catch (error) {
           await undo?.()
-          throw error
+          throw new BoardNotWritten(boardFile(found.id), error)
         }
       }
       return answer
@@ -847,6 +858,10 @@ export function createEffectTakes({
         }
         board.takes = board.takes.map((t) => (t === take ? next : t))
         return { ok: true }
+      }).catch((error): EffectTrimResult => {
+        // The person is told which file, not the stack.
+        if (error instanceof BoardNotWritten) return { ok: false, message: error.message }
+        throw error
       })
     },
 

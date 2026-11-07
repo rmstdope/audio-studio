@@ -1031,6 +1031,22 @@ describe('Trim silence on an effect take', () => {
     expect(wavSeconds(part)).toBeCloseTo(1.27, 2)
   })
 
+  it('names the board file when the board cannot be written, and the take stays as it was', async () => {
+    const ctx = door(quiet.silence)
+    const take = await made(ctx)
+    const folder = join(ctx.root, 'content-studio/cache/effect-boards')
+    chmodSync(folder, 0o555)
+    try {
+      expect(await ctx.takes.trim(ctx.file, 'door-creak', take.file, false)).toEqual({
+        ok: false,
+        message: 'content-studio/cache/effect-boards/door-creak.json could not be written',
+      })
+    } finally {
+      chmodSync(folder, 0o755)
+    }
+    expect((await ctx.settled('door-creak')).takes[0]!.trim).toBeUndefined()
+  })
+
   it('gives the take back as generated on Undo trim', async () => {
     const ctx = door(quiet.silence)
     const take = await made(ctx)

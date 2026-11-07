@@ -1775,7 +1775,8 @@ re-commit it (`commitEffect`, keeping the lock's accepted words and time) first 
 worked, and on a take in the game whose clip is missing change only the board. **Undo trim** is always allowed, so
 a trim made before the effect began to loop is never stuck (the server refuses a new trim there). A failed
 Trim silence or Undo trim says why in red under the take's buttons (in the In the game block, above the line
-about Un-choose), and only about the take shown: a later fade saved or removed or Choose again that works
+about Un-choose); a board that cannot be written is named ("content-studio/cache/effect-boards/<id>.json could
+not be written", as-inp), a refusal and not a bare 500, and only about the take shown: a later fade saved or removed or Choose again that works
 takes it away, and once another take (or none) is in the game it is gone for good, also when the take is chosen
 again; a trim still working is never cleared (as-9rs).
 
