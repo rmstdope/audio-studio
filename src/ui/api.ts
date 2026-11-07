@@ -54,6 +54,7 @@ import type { EffectMakingSummary, EffectModelsView, EffectTakesView } from '../
 import type { EffectBatch } from '../core/effectsMakeAll'
 import type {
   EffectChooseResult,
+  EffectTrimResult,
   EffectMakeAllResult,
   EffectMakeResult,
   EffectStopResult,
@@ -2972,6 +2973,15 @@ export function useChooseEffectTake(id: string) {
     id,
     'choosing the take',
     (file) => ({ method: 'POST', path: '/choose', body: { file } }),
+  )
+}
+
+/** Cuts the near-silence of a one-shot sound effect take, or (with `undo`) gives the take back as generated. */
+export function useTrimEffectTake(id: string) {
+  return useEffectTakesAction<{ file: string; undo: boolean }, NonNullable<EffectTrimResult>>(
+    id,
+    'trimming the take',
+    (body) => ({ method: 'POST', path: '/trim', body }),
   )
 }
 

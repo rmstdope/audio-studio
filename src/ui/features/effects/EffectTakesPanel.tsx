@@ -35,6 +35,7 @@ import { useClipPlayer } from '../../components/useClipPlayer'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { compareClips, takePlayId } from '../../effectsPlay'
+import { EffectTrimmedTag, useEffectTrimControl } from './effectTrim'
 import { EffectInTheGame, HearTheSeam, KindChip, Playback, type Player } from './EffectInTheGame'
 
 /**
@@ -309,16 +310,26 @@ function TakeCard({
   const seamPlaying = player.playing === `${id}-seam`
   const drop = useDropEffectTake(effect)
   const choose = useChooseEffectTake(effect)
+  const trim = useEffectTrimControl({
+    effect,
+    take,
+    inGame: false,
+    locked,
+    onPress: () => {
+      if (playing || seamPlaying) player.stop()
+    },
+  })
   const failedChoose = choose.isError || (choose.data && !choose.data.ok)
   const failedDrop = drop.isError || (drop.data && !drop.data.ok)
   return (
     <div className="take">
       <div className="take-row">
         <b className="grow">Take {take.n}</b>
+        <EffectTrimmedTag take={take} />
         <KindChip take={take} effectLoops={effectLoops} />
       </div>
       <span className="faint small">{take.model}</span>
-      <Playback effect={effect} take={take} player={player} />
+      <Playback effect={effect} take={take} player={player} note={trim.note} />
       {(take.loops || canCompare) && (
         <div className="take-row">
           {take.loops && <HearTheSeam effect={effect} take={take} player={player} />}
@@ -329,17 +340,9 @@ function TakeCard({
           )}
         </div>
       )}
-      <div className="take-row">
-        {effectTakeChoosable(take, effectLoops) && (
-          <button
-            type="button"
-            className="btn btn-small"
-            disabled={locked || choose.isPending || drop.isPending}
-            onClick={() => choose.mutate(take.file)}
-          >
-            {choose.isPending ? 'Choosing…' : 'Choose'}
-          </button>
-        )}
+      <div className="take-row take-actions">
+        {trim.button}
+        <span className="grow" />
         <button
           type="button"
           className="btn btn-ghost btn-small"
@@ -351,7 +354,18 @@ function TakeCard({
         >
           Drop
         </button>
+        {effectTakeChoosable(take, effectLoops) && (
+          <button
+            type="button"
+            className="btn btn-small"
+            disabled={locked || choose.isPending || drop.isPending}
+            onClick={() => choose.mutate(take.file)}
+          >
+            {choose.isPending ? 'Choosing…' : 'Choose'}
+          </button>
+        )}
       </div>
+      {trim.failure}
       {failedChoose && <span className="adopt-error">The take could not be chosen.</span>}
       {failedDrop && <span className="adopt-error">The take could not be dropped.</span>}
     </div>

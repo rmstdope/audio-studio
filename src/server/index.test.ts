@@ -5711,6 +5711,78 @@ describe('server, sound effect takes', () => {
   })
 })
 
+describe('server, trimming a sound effect take', () => {
+  const root = tempRepo({
+    'content-studio.json': projectJson({
+      effects: {
+        from: { shared: 'tts/effects.json' },
+        clips: 'audio/effects',
+        manifest: 'audio/effects/manifest.json',
+      },
+    }),
+    'content-studio/narration/cast.json': { speakers: {} },
+    'tts/effects.json': [{ id: 'coins', text: 'Coins spill on stone', seconds: 2 }],
+  })
+  const studio = startServer({
+    projectFile: join(root, 'content-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    effects: {
+      download: () => 'whole',
+      ready: () => ({ ok: true }),
+      async generate(request) {
+        // A tenth of a second of near-silence, sound, a tenth of near-silence.
+        const samples = new Int16Array(1000)
+        samples.forEach((_, i) => {
+          samples[i] = i < 100 || i >= 900 ? 20 : i % 2 ? 4000 : -4000
+        })
+        const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
+        return {
+          wav: writeWav({ format, data: new Uint8Array(samples.buffer) }),
+          seed: request.seed,
+        }
+      },
+      async close() {},
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const post = (path: string, body: unknown, origin = studio.url.origin) =>
+    fetch(at(path), {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('trims and untrims from the studio’s own page only, and plays only the part between the cuts', async () => {
+    await post('/api/effects/coins/takes', { count: 1 })
+    let view = await (await fetch(at('/api/effects/coins/takes'))).json()
+    for (let i = 0; i < 300 && (view.making.length || !view.takes.length); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      view = await (await fetch(at('/api/effects/coins/takes'))).json()
+    }
+    const file = view.takes[0].file
+    expect(view.takes[0].trimmable).toBe('cut')
+    const path = '/api/effects/coins/trim'
+    expect((await post(path, { file }, 'https://evil.example')).status).toBe(403)
+    expect((await post(path, { nope: 1 })).status).toBe(400)
+    expect((await post('/api/effects/nobody/trim', { file })).status).toBe(404)
+    expect((await post(path, { file: '0123456789abcdef.9.wav' })).status).toBe(409)
+    expect(await post(path, { file }).then((r) => r.json())).toEqual({ ok: true })
+    const after = await (await fetch(at('/api/effects/coins/takes'))).json()
+    expect(after.takes[0].trim.seconds).toBeCloseTo(0.82, 3)
+    const base = `/api/effects/coins/takes/${file}`
+    const whole = await (await fetch(at(base))).arrayBuffer()
+    const part = await (await fetch(at(`${base}?trimmed=1`))).arrayBuffer()
+    expect(part.byteLength).toBeLessThan(whole.byteLength)
+    expect(await post(path, { file, undo: true }).then((r) => r.json())).toEqual({ ok: true })
+    const undone = await (await fetch(at(`${base}?trimmed=1`))).arrayBuffer()
+    expect(undone.byteLength).toBe(whole.byteLength)
+  })
+})
+
 describe('server, saving a scene', () => {
   const mix = 'game/scenes/act1.mix.json'
   const entry = (level: number) => ({

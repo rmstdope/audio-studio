@@ -18,14 +18,14 @@ describe('compareClips', () => {
     expect(compareClips('rain', take(2, true), take(3, true))).toEqual([
       {
         id: takePlayId('rain', 2),
-        url: takeUrl('rain', take(2, true).file),
+        url: takeUrl('rain', take(2, true)),
         loop: true,
         rounds: 2,
         after: 1,
       },
       {
         id: takePlayId('rain', 3),
-        url: takeUrl('rain', take(3, true).file),
+        url: takeUrl('rain', take(3, true)),
         loop: true,
         rounds: 2,
       },
@@ -35,12 +35,23 @@ describe('compareClips', () => {
   it('plays a take made to play once once through, within the comparison', () => {
     const [chosen, other] = compareClips('rain', take(2, true), take(3, false))
     expect(chosen).toMatchObject({ loop: true, rounds: 2 })
-    expect(other).toEqual({ id: takePlayId('rain', 3), url: takeUrl('rain', take(3, false).file) })
+    expect(other).toEqual({ id: takePlayId('rain', 3), url: takeUrl('rain', take(3, false)) })
     const once = compareClips('rain', take(2, false), take(3, true))
     expect(once[0]).toEqual({
       id: takePlayId('rain', 2),
-      url: takeUrl('rain', take(2, false).file),
+      url: takeUrl('rain', take(2, false)),
       after: 1,
     })
+  })
+
+  it('plays only the part between the cuts of a trimmed take, in both clips', () => {
+    const cut = { start: 0.2, end: 0.1, seconds: 1.1 }
+    const [chosen, other] = compareClips(
+      'rain',
+      { ...take(2, false), trim: cut },
+      { ...take(3, false), trim: cut },
+    )
+    expect(chosen!.url.endsWith('.2.wav?trimmed=1')).toBe(true)
+    expect(other!.url.endsWith('.3.wav?trimmed=1')).toBe(true)
   })
 })
