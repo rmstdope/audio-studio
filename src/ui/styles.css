@@ -2386,10 +2386,12 @@ button.cue-chip[aria-expanded='true'] {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.take .faint {
+.take .faint,
+.track-in-game .faint {
   color: var(--faint);
 }
-.take .small {
+.take .small,
+.track-in-game .small {
   font-size: 12px;
 }
 .mshort {
