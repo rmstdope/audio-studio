@@ -813,14 +813,15 @@ export function createEffectTakes({
       ).catch((error): EffectMakeResult => {
         // Kept in the server log: the person is told the plain reason, not the stack.
         console.error('saving the fades failed', error)
+        const board =
+          error instanceof BoardNotWritten ? error.message : 'The take board could not be written'
         return stuck
           ? {
               ok: false,
-              message:
-                'The take board could not be written, and the game’s file could not be put back.',
+              message: `${board}, and the game’s file could not be put back.`,
               gameChanged: true,
             }
-          : { ok: false, message: 'The take board could not be written.' }
+          : { ok: false, message: `${board}.` }
       })
     },
 

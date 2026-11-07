@@ -964,7 +964,10 @@ describe('fades of a sound effect take', () => {
     chmodSync(folder, 0o555)
     const answer = await takes.setFades(file, 'door-creak', take.file, fades)
     chmodSync(folder, 0o755)
-    expect(answer).toEqual({ ok: false, message: 'The take board could not be written.' })
+    expect(answer).toEqual({
+      ok: false,
+      message: 'content-studio/cache/effect-boards/door-creak.json could not be written.',
+    })
     expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'))).toEqual(game)
   })
 
