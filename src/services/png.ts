@@ -97,7 +97,7 @@ function paeth(a: number, b: number, c: number): number {
 
 /**
  * The pixels of a PNG: 8 bits per sample, any colour type, not interlaced (what the image models
- * write). A picture with transparency is read as it is, its alpha ignored by the look. Anything
+ * write). A picture with transparency keeps its alpha (a patch's); the look ignores it. Anything
  * else throws a sentence saying why.
  */
 export function decodePng(bytes: Uint8Array): Pixels {
@@ -173,12 +173,14 @@ export function decodePng(bytes: Uint8Array): Pixels {
     let r: number
     let g: number
     let b: number
+    // Only RGBA and grey-with-alpha carry transparency; every other picture is opaque.
+    const alpha = type === 6 ? rows[s + 3]! : type === 4 ? rows[s + 1]! : 255
     if (type === 2 || type === 6) [r, g, b] = [rows[s]!, rows[s + 1]!, rows[s + 2]!]
     else if (type === 3) {
       const index = rows[s]! * 3
       ;[r, g, b] = [palette[index] ?? 0, palette[index + 1] ?? 0, palette[index + 2] ?? 0]
     } else r = g = b = rows[s]!
-    data.set([r, g, b, 255], p * 4)
+    data.set([r, g, b, alpha], p * 4)
   }
   return { width, height, data }
 }

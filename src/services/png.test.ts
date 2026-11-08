@@ -34,6 +34,14 @@ describe('png', () => {
     const raw = inflateSync(png.subarray(41, 41 + length))
     expect([raw[4], raw[8], raw[12]]).toEqual([0, 128, 255])
   })
+  it('reads the transparency back from a picture written with it', () => {
+    const picture = gradient(9, 5)
+    picture.data[3] = 0
+    picture.data[7] = 128
+    const back = decodePng(encodeTransparentPng(picture))
+    expect([back.data[3], back.data[7], back.data[11]]).toEqual([0, 128, 255])
+    expect(decodePng(encodePng(picture)).data[3]).toBe(255)
+  })
   it('reads what other encoders write: RGBA with filters, and a palette picture', async () => {
     const source = encodePng(gradient(40, 30))
     const filtered = await new Bun.Image(source).resize(20, 15).png().bytes()

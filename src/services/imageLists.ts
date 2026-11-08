@@ -1,4 +1,5 @@
 import { explainStyleProblem, lookOf, type Look } from '../core/imageLook'
+import { PatchBoardSchema } from '../core/imagePatches'
 import { ImageBoardSchema } from '../core/imageTakes'
 import {
   ImageLockSchema,
@@ -50,13 +51,28 @@ export async function readStyleLook(
   return styleLookOf(await readImageEdits(root))
 }
 
-/** What each listed image's takes were brought to (null for never), counting only takes whose model picture is there. */
+/**
+ * What each listed image's takes, and its patches' takes, were brought to (null for never),
+ * counting only takes whose model picture is there, and a patch take the game has whatever its picture.
+ */
 async function readTakeLooks(
   root: string,
-  ids: string[],
+  images: { id: string; patches: { id: string }[] }[],
 ): Promise<Record<string, (string | null)[]>> {
   const looks: Record<string, (string | null)[]> = {}
-  for (const id of ids) {
+  for (const { id, patches } of images) {
+    for (const patch of patches) {
+      const folder = `${CACHE_DIR}/image-patches/${id}/${patch.id}`
+      const board = await readResource(root, `${folder}/board.json`, PatchBoardSchema, [])
+      if (board === 'missing' || board === 'invalid') continue
+      const inGame = new Set(Object.values(board.inGame))
+      for (const take of board.takes) {
+        const picture = resolveInRoot(root, `${folder}/${take.n}.png`)
+        if (!(await Bun.file(picture).exists()) && !inGame.has(take.n)) continue
+        const game = resolveInRoot(root, `${folder}/${take.n}.game.png`)
+        ;(looks[id] ??= []).push((await Bun.file(game).exists()) ? (take.look ?? null) : null)
+      }
+    }
     const board = await readResource(root, `${IMAGE_BOARD_DIR}/${id}.json`, ImageBoardSchema, [])
     if (board === 'missing' || board === 'invalid') continue
     for (const take of board.takes) {
@@ -128,14 +144,12 @@ export async function readImages(
     }
   }
   const styleLook = styleLookOf(edits)
-  const ids = lists.flatMap((list) =>
-    list.state.status === 'ok' ? list.state.images.map((image) => image.id) : [],
-  )
+  const listed = lists.flatMap((list) => (list.state.status === 'ok' ? list.state.images : []))
   const summary = summarizeImages({
     gameFiles,
     look: styleLook.look,
     lookError: styleLook.error,
-    takeLooks: await readTakeLooks(root, ids),
+    takeLooks: await readTakeLooks(root, listed),
     editsInvalid: edits.styleBroken,
     parts: project.parts,
     lists,

@@ -44,6 +44,13 @@ import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import { createImageHealth, type ImageHealthStore } from './imageHealth'
 import { downloadOf, ImageToolError, makeImageTake, type ImageGenerator } from './images'
+import {
+  patchesInGame,
+  changePatchBoard,
+  patchPictureOf,
+  patchGameOf,
+  renderPatchGame,
+} from './imagePatchGame'
 import { decodePng, encodePng } from './png'
 import { choices, sorted } from './musicClips'
 import { gameFilePath } from './musicLists'
@@ -326,7 +333,7 @@ export function createImageTakes({
    */
   async function publish(
     found: Found,
-    png: Uint8Array,
+    png: Uint8Array | null,
     entry: (previous: ChosenEntry | undefined) => ChosenEntry | null,
   ): Promise<{ ok: true } | { ok: false; message: string }> {
     const { id } = found
@@ -342,23 +349,44 @@ export function createImageTakes({
         }
       }
       const next = entry(lock[id])
-      if (!next) return { ok: true as const }
+      if (!next && !manifest[id]) return { ok: true as const }
+      // The patches the game gets are those chosen on the take the game shows: choosing another
+      // take takes the others out of the list in this same save (their pictures stay in the folder).
+      const take = (next ?? lock[id])?.take
+      const patches =
+        take === undefined
+          ? {}
+          : await patchesInGame(
+              { root: found.root, clips: found.config.clips, row: found.row },
+              take,
+            )
       const file = `${id}.png`
       // The boxes read again in the turn: one placed since `found` was read is what the game gets.
       const fresh = await resolve(found.projectFile, id)
       const row = fresh && 'row' in fresh ? fresh.row : found.row
-      manifest[id] = withAreas(
-        { file, width: found.row.width, height: found.row.height },
+      const listed = withAreas(
+        {
+          file,
+          width: found.row.width,
+          height: found.row.height,
+          ...(Object.keys(patches).length ? { patches } : {}),
+        },
         areaFractions(row.areas, row),
       )
-      lock[id] = next
-      await writeAtomic(found.root, join(found.config.clips, file), png)
+      if (!next && JSON.stringify(manifest[id]) === JSON.stringify(listed)) {
+        return { ok: true as const }
+      }
+      manifest[id] = listed
+      if (next && png) {
+        lock[id] = next
+        await writeAtomic(found.root, join(found.config.clips, file), png)
+      }
       await writeAtomic(
         found.root,
         found.config.manifest,
         `${JSON.stringify(sorted(manifest), null, 2)}\n`,
       )
-      await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
+      if (next && png) await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
       return { ok: true as const }
     })
   }
@@ -476,6 +504,55 @@ export function createImageTakes({
     }
   }
 
+  /**
+   * Brings every take of the image's patches to the look now, from the model's stored pictures (a
+   * take whose picture is gone is skipped unless the game has it). The reason the first one could
+   * not be brought, naming its patch; null when all were.
+   */
+  async function bringPatches(found: Found, key: string): Promise<string | null> {
+    if (!found.look) return null
+    const look = found.look
+    let failure: string | null = null
+    for (const patch of found.row.patches) {
+      const where = {
+        projectFile: found.projectFile,
+        root: found.root,
+        image: found.id,
+        patch: patch.id,
+      }
+      const problem = await changePatchBoard(where, async (board) => {
+        const inGame = new Set(Object.values(board.inGame))
+        let problem: string | null = null
+        for (const take of board.takes) {
+          const exists = await Bun.file(
+            resolveInRoot(found.root, patchPictureOf(found.id, patch.id, take.n)),
+          ).exists()
+          if (!exists && !inGame.has(take.n)) continue
+          const there = await Bun.file(
+            resolveInRoot(found.root, patchGameOf(found.id, patch.id, take.n)),
+          ).exists()
+          if (take.look === key && there) continue
+          const made = await renderPatchGame(
+            { root: found.root, image: found.id, patch: patch.id, base: take.base, n: take.n },
+            look,
+            found.row,
+          )
+          if ('error' in made) {
+            problem ??=
+              made.error === 'missing'
+                ? `the model's picture of its patch "${patch.title}" is missing`
+                : `its patch "${patch.title}" ${made.error}`
+            continue
+          }
+          take.look = key
+        }
+        return problem
+      })
+      if (typeof problem === 'string') failure ??= problem
+    }
+    return failure
+  }
+
   /** Brings one image's takes and its chosen picture to the look now; null when done, else why not. */
   async function bringImage(projectFile: string, id: string): Promise<string | null> {
     const found = await resolve(projectFile, id)
@@ -507,14 +584,19 @@ export function createImageTakes({
       }
       await writeAtomic(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
       if (failure) return failure
+      const patchFailure = await bringPatches(found, key)
       if (chosen && chosen.look !== key) {
         if (!chosenPng) return 'missing'
         const answer = await publish(found, chosenPng, (previous) =>
           previous && previous.look !== key ? { ...previous, look: key } : null,
         )
         if (!answer.ok) return answer.message
+      } else if (chosen) {
+        // The patches in the game are written again from their new versions.
+        const answer = await publish(found, null, () => null)
+        if (!answer.ok) return answer.message
       }
-      return null
+      return patchFailure
     })
     return outcome
   }
