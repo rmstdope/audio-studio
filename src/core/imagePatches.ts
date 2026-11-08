@@ -138,20 +138,22 @@ const MATCH_SAME = 8
 /** At most this many offsets are compared with each other when grouping the places. */
 const MATCH_SAMPLES = 400
 
+/** Whether two offsets are within `limit` of each other on every channel. */
+const within = (a: number[], b: number[], limit: number) =>
+  [0, 1, 2].every((c) => Math.abs(a[c]! - b[c]!) <= limit)
+
 /**
  * The offset to take as the drift around the area: of the tones that many places agree on (within
  * `MATCH_SAME` on every channel; any group at least a quarter as big as the biggest), the one
- * nearest `anchor`, the median offset of the whole picture, as the median of that group, or the anchor itself when that group is more than `MATCH_FOLLOW` from it. The whole
+ * nearest `anchor`, the median offset of the whole picture, as the median of that group, or the anchor itself when that group is more than `MATCH_FOLLOW` from it and at least a tenth of the places agree with the anchor (within `MATCH_SAME`). The whole
  * picture is mostly untouched by the edit, so its median is the drift even where objects cover most
- * of the strip around the area, and among tones that are about equally common (a gradual drift) it
+ * of the strip around the area, unless no place of the strip agrees with it (a sky shifted far while the rest stayed), when the strip's own tone is taken, and among tones that are about equally common (a gradual drift) it
  * keeps the middle one instead of an end.
  */
 function driftAround(offsets: [number, number, number][], anchor: number[]): number[] {
   const step = Math.max(1, Math.ceil(offsets.length / MATCH_SAMPLES))
   const sample = offsets.filter((_, k) => k % step === 0)
-  const near = (a: number[], b: number[]) =>
-    [0, 1, 2].every((c) => Math.abs(a[c]! - b[c]!) <= MATCH_SAME)
-  const groups = sample.map((o) => sample.filter((other) => near(o, other)))
+  const groups = sample.map((o) => sample.filter((other) => within(o, other, MATCH_SAME)))
   const biggest = Math.max(...groups.map((g) => g.length))
   let best: number[] = anchor
   let nearest = Infinity
@@ -164,8 +166,13 @@ function driftAround(offsets: [number, number, number][], anchor: number[]): num
       best = centre
     }
   }
-  // A tone far from the picture's own median is objects, not drift.
-  return [0, 1, 2].every((c) => Math.abs(best[c]! - anchor[c]!) <= MATCH_FOLLOW) ? best : anchor
+  if (within(best, anchor, MATCH_FOLLOW)) return best
+  // A tone far from the picture's own median is objects, not drift, when the strip holds a real
+  // cluster of places at that median (a few blended or stray places are not one). With none, the
+  // edit changed all of what lies around the area (a sky shifted while the rest of the picture
+  // stayed) and the strip's own tone is the drift.
+  const atAnchor = sample.filter((o) => within(o, anchor, MATCH_SAME)).length
+  return atAnchor * 10 >= sample.length ? anchor : best
 }
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */

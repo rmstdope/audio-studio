@@ -246,6 +246,59 @@ describe('matchToTake', () => {
     }
   })
 
+  it('meets the take at the sides when the edit shifted the sky far while the rest of the picture stayed the same', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 20, width: 150, height: 60 }
+    // Sky above y=100 is paler by (22, 48, 60) in the edit; the house below is unchanged; dark birds cover a share of the strip.
+    for (const share of [0, 3, 6]) {
+      const edited = painted(300, 300, (x, y) => {
+        if (y >= 100) return [100, 140, 150]
+        const ring =
+          x >= 42 && x < 208 && y >= 12 && y < 88 && !(x >= 50 && x < 200 && y >= 20 && y < 80)
+        return ring && (x >= 50 && x < 200 ? x : y) % 10 < share ? [10, 10, 15] : [122, 188, 210]
+      })
+      const matched = matchToTake(edited, flat, bounds)
+      for (const [x, y] of [
+        [60, 79],
+        [100, 50],
+        [140, 79],
+        [51, 50],
+        [198, 40],
+        [120, 21],
+      ] as const) {
+        for (const [i, v] of rgbAt(matched, x, y).entries()) {
+          expect(Math.abs(v - [100, 140, 150][i]!)).toBeLessThanOrEqual(6)
+        }
+      }
+    }
+  })
+
+  it('is not held back by a few blended places or a thin stripe the edit left alone, in a sky shifted far', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 20, width: 150, height: 60 }
+    const sky: [number, number, number] = [122, 188, 210]
+    const cases: ((x: number, y: number) => [number, number, number])[] = [
+      // 3x3 dark birds, partly across the strip's depth, so some places average sky and bird.
+      (x, y) => (x % 17 < 3 && y % 11 < 3 && y >= 12 && y < 88 ? [10, 10, 15] : sky),
+      // A 3 px column the edit left as it was, in the top strip.
+      (x, y) => (x >= 100 && x < 103 && y >= 12 && y < 20 ? [100, 140, 150] : sky),
+    ]
+    for (const at of cases) {
+      const edited = painted(300, 300, (x, y) => (y >= 100 ? [100, 140, 150] : at(x, y)))
+      const matched = matchToTake(edited, flat, bounds)
+      for (const [x, y] of [
+        [60, 79],
+        [140, 79],
+        [51, 50],
+        [198, 40],
+      ] as const) {
+        for (const [i, v] of rgbAt(matched, x, y).entries()) {
+          expect(Math.abs(v - [100, 140, 150][i]!)).toBeLessThanOrEqual(10)
+        }
+      }
+    }
+  })
+
   it('meets the take at every side when the drift changes gradually across the area', () => {
     const flat = plain(300, 300, [100, 140, 150])
     const bounds = { x: 50, y: 50, width: 200, height: 100 }
