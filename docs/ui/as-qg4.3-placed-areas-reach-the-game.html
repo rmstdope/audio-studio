@@ -1,0 +1,467 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>What changes when placed areas reach the game</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --glass: rgb(255 255 255/3.5%);
+        --glass-strong: rgb(255 255 255/6%);
+        --edge: rgb(255 255 255/8%);
+        --line: rgb(255 255 255/7%);
+        --inset: #0d0f14;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft: #ff9a6b;
+        --ok-bg: #10291f;
+        --ok-ink: #5be3ae;
+        --warn: #ffc24b;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --attention-ink: #ffb38f;
+        --attention-bg: rgb(255 122 61/10%);
+        --attention-line: rgb(255 122 61/25%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        padding: 24px 16px 64px;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+      }
+      .tag {
+        color: var(--accent-soft);
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin: 0;
+      }
+      h1.doc {
+        font-size: 22px;
+        margin: 2px 0 4px;
+      }
+      .lede {
+        color: var(--soft);
+        margin: 0;
+        max-width: 75ch;
+      }
+      .state {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .state > h2 {
+        font-size: 15px;
+        margin: 0;
+        color: var(--accent-soft);
+      }
+      .state > p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        max-width: 80ch;
+      }
+      .frame {
+        border: 1px solid var(--edge);
+        border-radius: 14px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        background: rgb(255 255 255/1%);
+      }
+      .narrow {
+        max-width: 380px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .panel {
+        padding: 18px 20px;
+        border-radius: 20px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .panel h3 {
+        font-size: 16px;
+        margin: 0;
+      }
+      .panel p {
+        margin: 0;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--glass-strong);
+        color: var(--muted);
+        white-space: nowrap;
+        width: fit-content;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok-ink);
+      }
+      .todo {
+        background: var(--attention-bg);
+        color: var(--attention-ink);
+        box-shadow: inset 0 0 0 1px var(--attention-line);
+      }
+      .btn {
+        font: inherit;
+        font-size: 13px;
+        min-height: 34px;
+        padding: 0 14px;
+        border-radius: 11px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #14090a;
+        font-weight: 600;
+      }
+      .btn.tiny {
+        min-height: 26px;
+        padding: 0 10px;
+        font-size: 12px;
+        border-radius: 8px;
+      }
+      .notice {
+        padding: 12px 16px;
+        border-radius: 14px;
+        background: var(--danger-bg);
+        color: var(--danger-ink);
+        font-size: 13px;
+      }
+      .work {
+        display: grid;
+        grid-template-columns: minmax(0, 1.9fr) minmax(240px, 1fr);
+        gap: 18px;
+        align-items: start;
+      }
+      .work.stack {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .pic {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+      }
+      .stage {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16/9;
+        border-radius: 10px;
+        overflow: hidden;
+        cursor: crosshair;
+        background: #222;
+      }
+      .stage svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .stage .off {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: var(--faint);
+        font-size: 13px;
+        background: var(--inset);
+        border: 1px dashed var(--edge);
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+      }
+      .m {
+        position: absolute;
+        box-sizing: border-box;
+        border: 1.5px solid #fff;
+        background: rgb(255 255 255/8%);
+        box-shadow: 0 0 0 1px rgb(0 0 0/55%);
+      }
+      .m span {
+        position: absolute;
+        left: -1.5px;
+        top: -1.5px;
+        transform: translateY(-100%);
+        background: rgb(12 13 18/86%);
+        color: #fff;
+        font-size: 11px;
+        line-height: 1;
+        padding: 3px 6px;
+        border-radius: 4px 4px 0 0;
+        white-space: nowrap;
+      }
+      .m.low span {
+        transform: none;
+        top: auto;
+        bottom: -1.5px;
+        border-radius: 0 0 4px 4px;
+      }
+      .m.right span {
+        left: auto;
+        right: -1.5px;
+      }
+      .m.dim {
+        border-color: rgb(255 255 255/55%);
+        background: none;
+        box-shadow: none;
+      }
+      .m.dim span {
+        opacity: 0.7;
+      }
+      .m.sel {
+        border: 2px solid var(--accent);
+        background: rgb(255 107 44/14%);
+        cursor: move;
+      }
+      .m.sel span {
+        background: var(--accent);
+        color: #14090a;
+        font-weight: 600;
+      }
+      .m i {
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        background: #fff;
+        border: 1.5px solid var(--accent);
+        border-radius: 2px;
+      }
+      .m.draw {
+        border: 2px dashed var(--accent);
+        background: none;
+      }
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .switch b {
+        display: inline-block;
+        width: 30px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--glass-strong);
+        box-shadow: inset 0 0 0 1px var(--edge);
+        position: relative;
+        flex: none;
+      }
+      .switch b:after {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+      .switch.on b {
+        background: var(--accent);
+        box-shadow: none;
+      }
+      .switch.on b:after {
+        left: 14px;
+        background: #fff;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 16px;
+      }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border-top: 1px solid var(--line);
+        cursor: pointer;
+      }
+      .row .t {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .row .mono {
+        display: block;
+        color: var(--faint);
+      }
+      .row.sel {
+        background: rgb(255 107 44/9%);
+        box-shadow: inset 2px 0 0 var(--accent);
+      }
+      .row .r {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+      }
+      .chev {
+        color: var(--faint);
+        width: 14px;
+        flex: none;
+      }
+      .rowbody {
+        padding: 6px 0 14px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        column-gap: 28px;
+      }
+      .grid .row {
+        padding: 8px 0;
+        cursor: default;
+      }
+      .modal {
+        border: 1px solid var(--edge);
+        border-radius: 16px;
+        background: #0b0c12;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        box-shadow: 0 20px 60px rgb(0 0 0/60%);
+      }
+      .ghost {
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .note {
+        font-size: 12.5px;
+        color: var(--faint);
+        max-width: 70ch;
+      }
+      @media (max-width: 760px) {
+        .work {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+<style>
+.recv{width:100%;border-collapse:collapse;font-size:12.5px}
+.recv th,.recv td{text-align:left;padding:6px 10px;border-top:1px solid var(--line)}
+.recv th{color:var(--faint);font-weight:500}
+.recv td.mono{color:var(--soft)}
+.recv tr.gone td{color:var(--faint);text-decoration:line-through}
+.recv tr.new td{color:var(--ok-ink)}
+.cap{font-size:12px;color:var(--faint);margin:0}
+.rec{color:var(--ok-ink);font-size:12.5px;margin:0}
+.cost{color:var(--warn);font-size:12.5px;margin:0}
+.head2{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.warnline{padding:12px 16px;border-radius:14px;background:var(--attention-bg);color:var(--attention-ink);font-size:13px;box-shadow:inset 0 0 0 1px var(--attention-line)}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--glass-strong);color:var(--soft)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+.ban{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-radius:14px;background:var(--glass-strong);font-size:13px}
+</style>
+</head><body>    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="scene" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice">
+          <rect width="1280" height="720" fill="#8fb0c4" />
+          <rect y="400" width="1280" height="320" fill="#6c665c" />
+          <g fill="#5d6a55">
+            <ellipse cx="170" cy="120" rx="170" ry="80" />
+            <ellipse cx="1120" cy="100" rx="190" ry="80" />
+          </g>
+          <g>
+            <rect x="30" y="170" width="220" height="250" fill="#a58d6c" />
+            <path d="M15 175 140 80 265 175z" fill="#6d4a35" />
+            <rect x="520" y="130" width="250" height="220" fill="#b09a78" />
+            <path d="M500 135 645 40 790 135z" fill="#74503a" />
+            <rect x="1000" y="150" width="270" height="290" fill="#9a8466" />
+            <path d="M985 155 1135 55 1285 155z" fill="#654532" />
+            <rect x="1060" y="300" width="70" height="140" fill="#3f3226" />
+          </g>
+          <g fill="#7b4f39">
+            <rect x="260" y="330" width="16" height="85" />
+            <rect x="424" y="330" width="16" height="85" />
+          </g>
+          <path d="M250 330h200l-22-62H272z" fill="#a84a3a" />
+          <rect x="262" y="372" width="176" height="42" fill="#7a5a3a" />
+          <g>
+            <rect x="876" y="470" width="12" height="130" fill="#57412e" />
+            <rect x="826" y="352" width="112" height="122" fill="#6e5238" />
+            <rect x="842" y="366" width="80" height="94" fill="#d9cda8" />
+          </g>
+          <g>
+            <ellipse cx="632" cy="600" rx="176" ry="50" fill="#4e5358" />
+            <rect x="456" y="540" width="352" height="62" fill="#7e858a" />
+            <ellipse cx="632" cy="540" rx="176" ry="46" fill="#a0a7ab" />
+            <ellipse cx="632" cy="540" rx="150" ry="34" fill="#5c8aa3" />
+            <rect x="606" y="360" width="52" height="180" fill="#8c9397" />
+            <ellipse cx="632" cy="356" rx="70" ry="22" fill="#a0a7ab" />
+            <path d="M624 334q8-40 16 0z" fill="#b5d3e4" />
+          </g>
+          <g>
+            <circle cx="205" cy="384" r="22" fill="#d9b48f" />
+            <path d="M178 410h54l14 200h-82z" fill="#5a78a0" />
+          </g>
+          <g>
+            <path d="M1198 594h62l-8 88h-46z" fill="#7b5c3b" />
+            <path d="M1200 594q30-40 58 0" fill="none" stroke="#3f3226" stroke-width="5" />
+          </g>
+        </symbol>
+      </defs>
+    </svg><main><div><p class="tag">Named areas reach the game</p><h1 class="doc">What changes when placed areas reach the game</h1><p class="lede">Placing or clearing a box updates what the game receives in the same save, with nothing new on the marking page. Everything below is the agreed shape.</p></div><section class="state"><h2>Just drawn</h2><p>Saved as you let go, and the game has it. “Placed” means the game has it; there is no extra word.</p><div class="frame"><section class="panel"><div class="head"><h3>Named areas</h3><span class="muted small">3 of 5 placed</span></div>
+<p class="muted">The parts of this picture the game names, so that a player can click them.</p>
+<div class="work"><div class="pic"><div class="stage"><svg><use href="#scene"/></svg><div class="m" style="left:35.55%;top:41.11%;width:27.73%;height:49.44%"><span>Fountain</span></div><div class="m" style="left:64.5%;top:48.9%;width:8.75%;height:17%"><span>Old notice</span></div><div class="m sel" style="left:20%;top:36%;width:16%;height:22%"><span>Market stalls</span><i style="left:0;top:0;transform:translate(-50%,-50%)"></i><i style="left:50%;top:0;transform:translate(-50%,-50%)"></i><i style="left:100%;top:0;transform:translate(-50%,-50%)"></i><i style="left:0;top:50%;transform:translate(-50%,-50%)"></i><i style="left:100%;top:50%;transform:translate(-50%,-50%)"></i><i style="left:0;top:100%;transform:translate(-50%,-50%)"></i><i style="left:50%;top:100%;transform:translate(-50%,-50%)"></i><i style="left:100%;top:100%;transform:translate(-50%,-50%)"></i></div></div><p class="small muted">Drag the box to move it, or its corners and sides to resize it. Arrow keys move it; with Shift they resize it.</p></div><ul class="list"><li class="row"><span class="t" style="flex:1">Fountain<span class="mono">fountain</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row"><span class="t" style="flex:1">Old notice<span class="mono">old-notice</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row sel"><span class="t" style="flex:1">Market stalls<span class="mono">market-stalls</span></span><span class="r"><button class="btn tiny">Clear</button><span class="chip ok">Placed</span></span></li><li class="row"><span class="t" style="flex:1">Tilda<span class="mono">tilda</span></span><span class="r"><span class="chip todo">To place</span></span></li><li class="row"><span class="t" style="flex:1">Bucket<span class="mono">bucket</span></span><span class="r"><span class="chip todo">To place</span></span></li></ul></div></section><div><p class="cap">What the game receives for this image</p><table class="recv"><tr><th>Area</th><th>Where it is in the picture (left, top, width, height, as parts of the picture)</th></tr><tr class=""><td class="mono">fountain</td><td class="mono">0.3555, 0.4111, 0.2773, 0.4944</td></tr><tr class=""><td class="mono">old-notice</td><td class="mono">0.645, 0.489, 0.0875, 0.17</td></tr><tr class=""><td class="mono">market-stalls</td><td class="mono">0.2, 0.36, 0.16, 0.22</td></tr></table></div></div></section><section class="state"><h2>Cleared</h2><p>The box comes off and the game stops getting it.</p><div class="frame"><section class="panel"><div class="head"><h3>Named areas</h3><span class="muted small">2 of 5 placed</span></div>
+<p class="muted">The parts of this picture the game names, so that a player can click them.</p>
+<div class="work"><div class="pic"><div class="stage"><svg><use href="#scene"/></svg><div class="m" style="left:35.55%;top:41.11%;width:27.73%;height:49.44%"><span>Fountain</span></div><div class="m" style="left:64.5%;top:48.9%;width:8.75%;height:17%"><span>Old notice</span></div></div><p class="small muted">Drag over the picture to mark “Market stalls”.</p></div><ul class="list"><li class="row"><span class="t" style="flex:1">Fountain<span class="mono">fountain</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row"><span class="t" style="flex:1">Old notice<span class="mono">old-notice</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row sel"><span class="t" style="flex:1">Market stalls<span class="mono">market-stalls</span></span><span class="r"><span class="chip todo">To place</span></span></li><li class="row"><span class="t" style="flex:1">Tilda<span class="mono">tilda</span></span><span class="r"><span class="chip todo">To place</span></span></li><li class="row"><span class="t" style="flex:1">Bucket<span class="mono">bucket</span></span><span class="r"><span class="chip todo">To place</span></span></li></ul></div></section><div><p class="cap">What the game receives for this image</p><table class="recv"><tr><th>Area</th><th>Where it is in the picture (left, top, width, height, as parts of the picture)</th></tr><tr class=""><td class="mono">fountain</td><td class="mono">0.3555, 0.4111, 0.2773, 0.4944</td></tr><tr class=""><td class="mono">old-notice</td><td class="mono">0.645, 0.489, 0.0875, 0.17</td></tr></table></div></div></section><section class="state"><h2>The file the game reads cannot be read</h2><p>One save: the box goes back, the row and the count go back, and the line agreed for a failed save names the reason.</p><div class="frame"><section class="panel"><div class="head"><h3>Named areas</h3><span class="muted small">2 of 5 placed</span></div>
+<p class="muted">The parts of this picture the game names, so that a player can click them.</p><p class="notice">“Market stalls” could not be saved: the images manifest could not be read.</p>
+<div class="work"><div class="pic"><div class="stage"><svg><use href="#scene"/></svg><div class="m" style="left:35.55%;top:41.11%;width:27.73%;height:49.44%"><span>Fountain</span></div><div class="m" style="left:64.5%;top:48.9%;width:8.75%;height:17%"><span>Old notice</span></div></div><p class="small muted">Drag over the picture to mark “Market stalls”.</p></div><ul class="list"><li class="row"><span class="t" style="flex:1">Fountain<span class="mono">fountain</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row"><span class="t" style="flex:1">Old notice<span class="mono">old-notice</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row sel"><span class="t" style="flex:1">Market stalls<span class="mono">market-stalls</span></span><span class="r"><span class="chip todo">To place</span></span></li><li class="row"><span class="t" style="flex:1">Tilda<span class="mono">tilda</span></span><span class="r"><span class="chip todo">To place</span></span></li><li class="row"><span class="t" style="flex:1">Bucket<span class="mono">bucket</span></span><span class="r"><span class="chip todo">To place</span></span></li></ul></div></section><div><p class="cap">What the game receives for this image</p><table class="recv"><tr><th>Area</th><th>Where it is in the picture (left, top, width, height, as parts of the picture)</th></tr><tr class=""><td class="mono">fountain</td><td class="mono">0.3555, 0.4111, 0.2773, 0.4944</td></tr><tr class=""><td class="mono">old-notice</td><td class="mono">0.645, 0.489, 0.0875, 0.17</td></tr></table></div></div></section><section class="state"><h2>The disk is full</h2><p>The same line, with its own reason.</p><div class="frame"><section class="panel"><div class="head"><h3>Named areas</h3><span class="muted small">2 of 5 placed</span></div>
+<p class="muted">The parts of this picture the game names, so that a player can click them.</p><p class="notice">“Market stalls” could not be saved: the disk is full.</p>
+<div class="work"><div class="pic"><div class="stage"><svg><use href="#scene"/></svg><div class="m" style="left:35.55%;top:41.11%;width:27.73%;height:49.44%"><span>Fountain</span></div><div class="m" style="left:64.5%;top:48.9%;width:8.75%;height:17%"><span>Old notice</span></div></div><p class="small muted">Drag over the picture to mark “Market stalls”.</p></div><ul class="list"><li class="row"><span class="t" style="flex:1">Fountain<span class="mono">fountain</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row"><span class="t" style="flex:1">Old notice<span class="mono">old-notice</span></span><span class="r"><span class="chip ok">Placed</span></span></li><li class="row sel"><span class="t" style="flex:1">Market stalls<span class="mono">market-stalls</span></span><span class="r"><span class="chip todo">To place</span></span></li><li class="row"><span class="t" style="flex:1">Tilda<span class="mono">tilda</span></span><span class="r"><span class="chip todo">To place</span></span></li><li class="row"><span class="t" style="flex:1">Bucket<span class="mono">bucket</span></span><span class="r"><span class="chip todo">To place</span></span></li></ul></div></section></div></section><section class="state"><h2>The game stops asking for an area</h2><p>At the Refresh from the game that drops it, it leaves what the game receives. Its box stays in the studio.</p><div class="frame"><div><p class="cap">What the game receives for this image</p><table class="recv"><tr><th>Area</th><th>Where it is in the picture (left, top, width, height, as parts of the picture)</th></tr><tr class=""><td class="mono">fountain</td><td class="mono">0.3555, 0.4111, 0.2773, 0.4944</td></tr><tr class="gone"><td class="mono">old-notice</td><td class="mono">0.645, 0.489, 0.0875, 0.17</td></tr><tr class=""><td class="mono">market-stalls</td><td class="mono">0.2, 0.36, 0.16, 0.22</td></tr></table></div></div></section><section class="state"><h2>The game asks for it again</h2><p>At a later Refresh it is back, in the same spot.</p><div class="frame"><div><p class="cap">What the game receives for this image</p><table class="recv"><tr><th>Area</th><th>Where it is in the picture (left, top, width, height, as parts of the picture)</th></tr><tr class=""><td class="mono">fountain</td><td class="mono">0.3555, 0.4111, 0.2773, 0.4944</td></tr><tr class="new"><td class="mono">old-notice</td><td class="mono">0.645, 0.489, 0.0875, 0.17</td></tr><tr class=""><td class="mono">market-stalls</td><td class="mono">0.2, 0.36, 0.16, 0.22</td></tr></table></div></div></section><section class="state"><h2>Boxes marked before this arrived</h2><p>Refresh from the game on the act brings them up to date; marking anything on an image brings that image up to date.</p><div class="frame"><div class="ban"><strong>Act I · Images</strong><button class="btn">Refresh from the game</button></div><div><p class="cap">What the game receives for this image</p><table class="recv"><tr><th>Area</th><th>Where it is in the picture (left, top, width, height, as parts of the picture)</th></tr></table></div></div></section><section class="state"><h2>Refresh from the game, nothing wrong</h2><p>The panel’s words stay as they are.</p><div class="frame"><div class="ban"><strong>Act I · Images</strong><button class="btn">Refresh from the game</button></div><section class="panel"><div class="head2"><div><span class="muted small">Refreshed from the game</span><br/><strong>The game's lists were read again</strong></div><button class="btn tiny">Close</button></div></section></div></section><section class="state"><h2>Refresh from the game cannot update what the game receives</h2><p>The failure panel Refresh already has.</p><div class="frame"><div class="ban"><strong>Act I · Images</strong><button class="btn">Refresh from the game</button></div><section class="panel"><div class="head2"><div><span class="muted small">Refresh from the game</span><br/><strong>The command ran, but the named areas could not be passed to the game</strong></div><button class="btn tiny">Close</button></div><p class="notice">The images manifest could not be read. Fix it, then Refresh from the game again.</p></section></div></section><section class="state"><h2>The Changes page, after placing a box</h2><p>The Images section also lists the file the game reads, as narration and music do.</p><div class="frame"><section class="panel"><span class="muted small">Images</span><ul class="list"><li class="row" style="cursor:default"><span class="t mono" style="flex:1;color:var(--soft)">content-studio/images/lock.json</span><span class="r"><span class="muted small">Lock</span><span class="pill">Modified</span></span></li><li class="row" style="cursor:default"><span class="t mono" style="flex:1;color:var(--soft)">web/public/images/generated/manifest.json</span><span class="r"><span class="muted small">Manifest</span><span class="pill">Modified</span></span></li></ul></section></div></section><section class="state"><h2>The Changes page, after choosing a take</h2><p>The same row.</p><div class="frame"><section class="panel"><span class="muted small">Images</span><ul class="list"><li class="row" style="cursor:default"><span class="t mono" style="flex:1;color:var(--soft)">tts/act1/images.json</span><span class="r"><span class="muted small">Images from the game</span><span class="pill">Modified</span></span></li><li class="row" style="cursor:default"><span class="t mono" style="flex:1;color:var(--soft)">content-studio/images/lock.json</span><span class="r"><span class="muted small">Lock</span><span class="pill">Modified</span></span></li><li class="row" style="cursor:default"><span class="t mono" style="flex:1;color:var(--soft)">web/public/images/generated/manifest.json</span><span class="r"><span class="muted small">Manifest</span><span class="pill">Modified</span></span></li></ul></section></div></section></main></body></html>
