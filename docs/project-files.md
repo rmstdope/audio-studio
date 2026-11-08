@@ -200,13 +200,22 @@ effects and scenes are the same in every language, so their paths never do.
 
 ### `images`
 
-| Field               | What it is                                                                                          | Default  |
-| ------------------- | --------------------------------------------------------------------------------------------------- | -------- |
-| `from.part`         | Each part's images. An image several parts list is one image.                                       | required |
-| `model`             | The image model takes are made with: `klein` or `z-image-turbo`; a take can be made with the other. | `klein`  |
-| `clips`, `manifest` | Where the chosen pictures go, one `<id>.png` each.                                                  | required |
+| Field               | What it is                                                                                            | Default  |
+| ------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
+| `from.part`         | Each part's images. An image several parts list is one image.                                         | required |
+| `model`             | The image model takes are made with: `klein` or `z-image-turbo`; a take can be made with the other.   | `klein`  |
+| `clips`, `manifest` | Where the chosen pictures go, one `<id>.png` each, and a chosen patch's `<id>.<patch>.png` beside it. | required |
 
 The look every image shares is the studio's own, in the images edits (below).
+
+The manifest lists each chosen image as `"cottage": { "file": "cottage.png", "width": 640, "height": 400 }`.
+When a take of one of its patches is chosen, the entry also has `patches`, keyed by patch id and
+with the same fields as an image: `"patches": { "bread-taken": { "file": "cottage.bread-taken.png",
+"width": 640, "height": 400 } }`. The patch's picture is transparent, exactly the size of the image's,
+in the game's look, and holds only the dots that differ from the image's own picture, each fully
+solid or fully transparent. An image with no patch in the game has no `patches` key, so a game that
+ignores patches reads the manifest as before. Choosing another take of the image takes its patches
+out of the list (their pictures stay in the folder), and choosing the original take brings them back.
 
 ### `effects`
 

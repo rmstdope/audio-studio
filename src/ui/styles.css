@@ -5355,6 +5355,12 @@ button.cue-chip[aria-expanded='true'] {
   flex-direction: column;
   gap: 8px;
 }
+.patch-takes-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
 .patch-takes h3 {
   margin: 0;
   font-size: 12.5px;

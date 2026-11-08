@@ -120,6 +120,8 @@ export interface ImagePatchesView {
   game: { width: number; height: number }
   /** Why the takes cannot be brought to the game's look (the style); null when they can. */
   lookError: string | null
+  /** What the game's versions are brought to now (`lookKey`); null when the style cannot be used. */
+  lookKey: string | null
   /** The images lock cannot be read, so which take of the image is chosen is not known. */
   lockUnread: boolean
   /** Whether a take is chosen but its picture is missing or cannot be read. */

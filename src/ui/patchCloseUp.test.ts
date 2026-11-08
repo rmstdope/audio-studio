@@ -43,4 +43,10 @@ describe('closeUpLayer', () => {
       top: '-40%',
     })
   })
+
+  it('shows the whole picture for an area that lies wholly outside it', () => {
+    expect(
+      closeUp({ x: -300, y: 10, width: 100, height: 100 }, { width: 640, height: 400 }),
+    ).toEqual({ x: 0, y: 0, width: 640, height: 400 })
+  })
 })

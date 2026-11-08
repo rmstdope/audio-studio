@@ -443,6 +443,7 @@ export function createImagePatches({
         },
         game: { width: image.row.width, height: image.row.height },
         lookError: image.row.look.error,
+        lookKey: image.row.look.key,
         lockUnread: lock === 'invalid',
         pictureGone: image.chosen !== null && picture === null,
         maker: problem === null ? { ok: true } : { ok: false, message: problem },

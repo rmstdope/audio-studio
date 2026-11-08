@@ -40,6 +40,7 @@ const takeOf = (n: number, over: Partial<PatchWorkView['takes'][number]> = {}) =
   earlier: false,
   chosen: false,
   isNew: false,
+  look: 'ready' as const,
   ...over,
 })
 
@@ -48,6 +49,7 @@ const work = (id: string, over: Partial<PatchWorkView> = {}): PatchWorkView => (
   takes: [],
   making: [],
   failed: [],
+  oldLook: false,
   ...over,
 })
 
@@ -56,7 +58,11 @@ const view = (
   over: Partial<ImagePatchesView> = {},
 ): ImagePatchesView => ({
   ok: true,
-  take: { n: 3, width: 1024, height: 576 },
+  take: { n: 3, width: 1024, height: 576, cropped: false },
+  game: { width: 512, height: 288 },
+  lookError: null,
+  lookKey: 'k',
+  lockUnread: false,
   pictureGone: false,
   maker: { ok: true },
   patches,
@@ -222,7 +228,7 @@ describe('an open patch with no takes', () => {
     await open(host)
     expect(heading(host)).toBe('The chosen take of the image')
     const base = host.querySelector<HTMLImageElement>('img.patch-take')!
-    expect(base.getAttribute('src')).toBe('/api/images/inn/takes/3')
+    expect(base.getAttribute('src')).toStartWith('/api/images/inn/takes/3/game')
     expect(host.querySelector('img.patch-over')).toBeNull()
     expect(text(host)).toContain('Drag over the picture to mark what should change.')
     expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
@@ -327,8 +333,8 @@ describe('an open patch with takes', () => {
     const { host } = await render([patchRow('a')], made())
     await open(host)
     expect(heading(host)).toBe('Looking at Take 2 Chosen')
-    expect(host.querySelector('img.patch-over')!.getAttribute('src')).toBe(
-      '/api/images/inn/patches/a/takes/2',
+    expect(host.querySelector('img.patch-over')!.getAttribute('src')).toStartWith(
+      '/api/images/inn/patches/a/takes/2/game',
     )
     const none = await render([patchRow('a')], () =>
       view([work('a', { takes: [takeOf(1), takeOf(2)] })]),
@@ -854,5 +860,138 @@ describe('a patch tied to a named area', () => {
     await act(async () => button(host, 'Back to “Bucket”')!.click())
     await settle()
     expect(document.activeElement).toBe(host.querySelector('.patch-looking .lbl'))
+  })
+})
+
+describe('what the game gets', () => {
+  const one =
+    (over: Partial<PatchWorkView> = {}, more: Partial<ImagePatchesView> = {}) =>
+    () =>
+      view([work('a', over), work('b')], more)
+  const box = (host: Element, at = 0) =>
+    [...host.querySelectorAll<HTMLInputElement>('.patch-takes input[type=checkbox]')][at]!
+  const caption = (host: Element) =>
+    text(host.querySelector('.patch-stage + .faint, .look-empty + .faint'))
+
+  it('has a box in the Takes heading, ticked, also before any takes exist', async () => {
+    const { host } = await render([patchRow('a')], one())
+    await open(host)
+    expect(text(box(host).closest('label'))).toBe('What the game gets')
+    expect(box(host).checked).toBe(true)
+    expect(text(host.querySelector('.patch-takes-head'))).toContain('Takes')
+  })
+
+  it('shows the game’s version at the game’s size when ticked and the model’s picture when not', async () => {
+    const { host } = await render([patchRow('a')], one({ takes: [takeOf(1, { chosen: true })] }))
+    await open(host)
+    expect(host.querySelector('img.patch-take')!.getAttribute('src')).toStartWith(
+      '/api/images/inn/takes/3/game?v=',
+    )
+    expect(host.querySelector('img.patch-over')!.getAttribute('src')).toStartWith(
+      '/api/images/inn/patches/a/takes/1/game?v=',
+    )
+    expect(caption(host)).toBe('512 × 288')
+    await act(async () => box(host).click())
+    expect(host.querySelector('img.patch-take')!.getAttribute('src')).toBe(
+      '/api/images/inn/takes/3',
+    )
+    expect(host.querySelector('img.patch-over')!.getAttribute('src')).toBe(
+      '/api/images/inn/patches/a/takes/1',
+    )
+    expect(caption(host)).toBe('1024 × 576')
+  })
+
+  it('says the model’s picture is cropped to fit when it has another shape', async () => {
+    const { host } = await render(
+      [patchRow('a')],
+      one(
+        {},
+        {
+          take: { n: 3, width: 1024, height: 640, cropped: true },
+          game: { width: 640, height: 400 },
+        },
+      ),
+    )
+    await open(host)
+    await act(async () => box(host).click())
+    expect(caption(host)).toBe('1024 × 640 · cropped to fit')
+  })
+
+  it('changes only the patch it sits in, and keeps its state when the row is closed and opened', async () => {
+    const { host } = await render([patchRow('a'), patchRow('b')], one())
+    await open(host, 0)
+    await open(host, 1)
+    await act(async () => box(host, 0).click())
+    expect(box(host, 0).checked).toBe(false)
+    expect(box(host, 1).checked).toBe(true)
+    await open(host, 0)
+    await open(host, 0)
+    expect(box(host, 0).checked).toBe(false)
+  })
+
+  it('puts the mark on the same place of either version', async () => {
+    const { host } = await render([patchRow('a')], one())
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    const ticked = (host.querySelector('.patch-mark') as HTMLElement).style.left
+    await act(async () => box(host).click())
+    expect((host.querySelector('.patch-mark') as HTMLElement).style.left).toBe(ticked)
+  })
+
+  it('says a take is being brought, and turns Choose off, ticked or not', async () => {
+    const { host } = await render(
+      [patchRow('a')],
+      one({ takes: [takeOf(1, { look: 'bringing' })] }),
+    )
+    await open(host)
+    expect(text(host.querySelector('.look-empty'))).toBe("Bringing to the game's look…")
+    expect(button(host, 'Choose')!.disabled).toBe(true)
+    await act(async () => box(host).click())
+    expect(host.querySelector('.look-empty')).toBeNull()
+    expect(button(host, 'Choose')!.disabled).toBe(true)
+  })
+
+  it('says a take has not been brought', async () => {
+    const { host } = await render([patchRow('a')], one({ takes: [takeOf(1, { look: 'missing' })] }))
+    await open(host)
+    expect(text(host.querySelector('.look-empty'))).toBe("Not brought to the game's look yet.")
+  })
+
+  it('says what to fix when the style cannot be read, and will not choose', async () => {
+    const { host } = await render(
+      [patchRow('a')],
+      one({ takes: [takeOf(1)] }, { lookError: "Can't bring this take to the game's look: x." }),
+    )
+    await open(host)
+    expect(text(host.querySelector('.look-empty-err'))).toBe(
+      "Can't bring this take to the game's look: x.",
+    )
+    expect(text(host)).toContain('Fix the style to choose this take.')
+    expect(button(host, 'Choose')!.disabled).toBe(true)
+    expect(button(host, 'Drop')!.disabled).toBe(false)
+  })
+
+  it('turns Choose, Drop and Un-choose off while the lock cannot be read, and says why', async () => {
+    const { host } = await render(
+      [patchRow('a')],
+      one({ takes: [takeOf(1), takeOf(2, { chosen: true })] }, { lockUnread: true }),
+    )
+    await open(host)
+    expect(text(host)).toContain(
+      'Choosing, dropping and un-choosing wait until the images lock can be read. You can still look and make more takes.',
+    )
+    await act(async () => thumbs(host)[0]!.click())
+    expect(button(host, 'Choose')!.disabled).toBe(true)
+    expect(button(host, 'Drop')!.disabled).toBe(true)
+  })
+
+  it('wears “Old look” on the closed row and above the picture of a chosen patch in an old look', async () => {
+    const { host } = await render(
+      [patchRow('a')],
+      one({ takes: [takeOf(1, { chosen: true, look: 'old' })], oldLook: true }),
+    )
+    expect(text(rows(host)[0])).toContain('Take 1 chosen Old look')
+    await open(host)
+    expect(heading(host)).toBe('Looking at Take 1 Chosen Old look')
   })
 })
