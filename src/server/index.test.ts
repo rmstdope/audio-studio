@@ -5130,6 +5130,10 @@ describe('the images routes', () => {
         width: 320,
         height: 200,
         patches: [{ id: 'lamp-lit', title: 'Lamp lit', text: 'Light the lamp' }],
+        areas: [
+          { id: 'sign', title: 'Sign' },
+          { id: 'door', title: 'Door' },
+        ],
       },
     ],
     'content-studio/images/edits.json': {
@@ -5153,6 +5157,34 @@ describe('the images routes', () => {
     })
   const summary = async () =>
     (await (await fetch(new URL('/api/project', studio.url))).json()).summary.images
+
+  it('shows the named areas the game lists, read again each time, without making the image out of date', async () => {
+    const areas = async () => (await summary()).acts[0].rows[0].areas
+    expect(await areas()).toEqual([
+      { id: 'sign', title: 'Sign', placed: false },
+      { id: 'door', title: 'Door', placed: false },
+    ])
+    const file = join(imagesRoot, 'tts/act1/images.json')
+    const listed = JSON.parse(await Bun.file(file).text())
+    await Bun.write(
+      file,
+      JSON.stringify([
+        {
+          ...listed[0],
+          areas: [
+            { id: 'sign', title: 'Old sign' },
+            { id: 'well', title: 'Well' },
+          ],
+        },
+      ]),
+    )
+    expect(await areas()).toEqual([
+      { id: 'sign', title: 'Old sign', placed: false },
+      { id: 'well', title: 'Well', placed: false },
+    ])
+    expect((await summary()).acts[0].rows[0].status).toBe('none yet')
+    await Bun.write(file, JSON.stringify(listed))
+  })
 
   it('shows the images in the project summary', async () => {
     expect((await summary()).acts[0].rows[0]).toMatchObject({ id: 'inn', status: 'none yet' })

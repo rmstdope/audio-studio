@@ -3,6 +3,8 @@ import {
   bringFailureText,
   bringingText,
   chosenLine,
+  areasCountText,
+  areasToPlaceText,
   disagreeText,
   listSeparator,
   joined,
@@ -153,6 +155,18 @@ describe('the words of an image several acts list', () => {
       'Act I, Act III and Act V give it different words and sizes.',
     )
     expect(disagreeText(['Act I', 'Act III'], ['names'])).toContain('give it different names.')
+  })
+  it('says named areas among the things the lists disagree about', () => {
+    expect(disagreeText(['Act I', 'Act III'], ['words', 'named areas'])).toContain(
+      'give it different words and named areas.',
+    )
+  })
+  it('counts the named areas placed and left to place', () => {
+    expect(areasCountText(1, 5)).toBe('1 of 5 placed')
+    expect(areasToPlaceText(4, 5)).toBe('4 of 5 areas to place')
+    expect(areasToPlaceText(1, 1)).toBe('1 of 1 area to place')
+    expect(areasToPlaceText(0, 5)).toBeNull()
+    expect(areasToPlaceText(0, 0)).toBeNull()
   })
   it('keeps the act an image was opened from in its address', () => {
     expect(routeHref({ view: 'images', page: 'image', image: 'inn', from: 'act3' })).toBe(

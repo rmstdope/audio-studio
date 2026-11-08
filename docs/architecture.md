@@ -1423,14 +1423,17 @@ start on. It is saved from the Images row of Setup's Models panel (`PUT /api/ima
 `manifest` what the game reads there. Both are required.
 
 **The game's lists** (read only, `core/images.ts`). `from.part` holds an act's images in the game's
-order: `{ id, title, text, width, height, file?, patches? }`; `text` is what the studio calls the image's
+order: `{ id, title, text, width, height, file?, patches?, areas? }`; `text` is what the studio calls the image's
 **description**, in its pages, its API and its code. `file` is the picture the game shows for it now
 when the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or
 `.webp`; read only, never moved or written, shown as "The game's own image" until a take is chosen);
 the id a slug. `patches` (as-bo8.1) is the optional list of small changes the game lays over the
 image: `[{ id, title, text }]` in the game's order, `text` read as `description` as for the image.
 A patch with no id (a slug), title or words, or an id used twice in the image, makes the whole act's
-list unreadable, with the file and place named. An image id used twice in one list is a problem with both places, and neither image is
+list unreadable, with the file and place named. `areas` (as-qg4.1) is the optional list of named
+areas the game wants placed on the image: `[{ id, title }]` in the game's order, never coordinates;
+an area with no id (a slug) or title, or an id used twice in the image, makes the list unreadable
+the same way. An image id used twice in one list is a problem with both places, and neither image is
 shown. An id several acts list (as-94e) is one image, below. A list that is not there yet is not a
 problem (the game has not written it).
 
@@ -1485,6 +1488,19 @@ with the id. Patches are one more thing the lists of a shared image can disagree
 `patches`: id, title or words differ; the same patches in another order do not, and the page uses
 the first listing act's order). A rewording changes no prompt or take: it never makes an image out
 of date. Refresh's panel says nothing of patches. Screens: `docs/ui/as-bo8.1-image-patches.html`.
+
+**The named areas the game declares** (as-qg4.1; `ImageRow.areas`, `ui/features/images/NamedAreasPanel.tsx`).
+An image whose list carries areas gets a full-width, read-only panel, "Named areas", directly below
+the workbench and above "Patches the game asks for": its count ("1 of 5 placed"), one line of
+explanation, and a row per area in the game's order (title, id, and the mark "Placed" or "To place").
+`AreaRow.placed` is false for every area until placing exists (the next step of as-qg4 derives it);
+nothing of the studio's own is stored. The act's list adds "4 of 5 areas to place" under an image's
+status while some are left; it changes neither "n of m chosen" nor the needs-attention view. Areas
+are no part of what a picture is made from, so changing them never makes an image out of date, and
+Refresh's panel says nothing of them. They are one more thing a shared image's lists can disagree
+on (`ConflictKind` `named areas`: id or title differs or an area is missing; the same areas in
+another order do not, and the page uses the first listing act's order). Screens:
+`docs/ui/as-qg4.1-named-areas.html`.
 
 **The studio's own words** are the edits' `images`, committed like the music edits and joining the
 Changes panel: `{ <id>: { text, gameWas, partStyle, patches } }`. `gameWas` is the game's text when the words
@@ -2640,6 +2656,8 @@ Small, independently useful increments:
     10. **Patches** (as-b9x, an experiment, done: §8.7): an area of a chosen take edited in context and shown over it; nothing reaches the game.
     11. **The game's patches listed** (as-bo8.1, done: §8.7): the image list carries patches, an image's
         page lists them and they can be reworded; making and choosing them is the next step of as-bo8.
+    12. **The game's named areas listed** (as-qg4.1, done: §8.7): the image list carries named areas, an image's
+        page and the act's list show which are left to place; placing them is the next step of as-qg4.
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.

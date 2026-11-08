@@ -15,6 +15,7 @@ import { routeHref } from '../../route'
 import { ActStyleBox } from './ActStyleBox'
 import { ActStyleMenu } from './ActStyleMenu'
 import { ActLinks } from './ActLinks'
+import { NamedAreasPanel } from './NamedAreasPanel'
 import { GamePatchesPanel } from './GamePatchesPanel'
 import { PatchesSection } from './PatchesSection'
 import { TakesSection } from './TakesSection'
@@ -209,6 +210,7 @@ export function ImagePage({
           </section>
         }
       />
+      <NamedAreasPanel row={row} />
       <GamePatchesPanel key={row.id} row={row} />
       <PatchesSection key={row.chosenTake} imageId={row.id} />
     </>

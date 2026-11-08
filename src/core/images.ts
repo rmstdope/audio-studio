@@ -29,6 +29,32 @@ const GamePatchSchema = z
 /** A patch the game asks for on an image; its words are its description inside the studio. */
 export type GamePatch = z.infer<typeof GamePatchSchema>
 
+/** A named area the game wants placed on an image: an id and a title, never where it is. */
+const GameAreaSchema = z.object({
+  id: z.string().regex(SLUG, 'use lower-case letters, digits and - only'),
+  title: z.string().min(1),
+})
+
+/** A named area the game declares on an image. */
+export type GameArea = z.infer<typeof GameAreaSchema>
+
+/** Refines a list of things with ids: an id may be used once, or the later use is a problem at its place. */
+function uniqueIds(what: string) {
+  return (items: { id: string }[], ctx: z.RefinementCtx) => {
+    const seen = new Set<string>()
+    items.forEach((item, at) => {
+      if (seen.has(item.id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [at, 'id'],
+          message: `the ${what} id "${item.id}" is used more than once in this image`,
+        })
+      }
+      seen.add(item.id)
+    })
+  }
+}
+
 /** An image as the game lists it. The id names the image everywhere, so it is a slug. */
 const ImageShape = z.object({
   id: z.string().regex(SLUG, 'use lower-case letters, digits and - only'),
@@ -40,22 +66,9 @@ const ImageShape = z.object({
   /** The picture the game shows for it now, when it is not one the studio made. Read only. */
   file: GameFile.optional(),
   /** The patches the game asks for on it, in its order; an id may be used once. */
-  patches: z
-    .array(GamePatchSchema)
-    .default([])
-    .superRefine((patches, ctx) => {
-      const seen = new Set<string>()
-      patches.forEach((patch, at) => {
-        if (seen.has(patch.id)) {
-          ctx.addIssue({
-            code: 'custom',
-            path: [at, 'id'],
-            message: `the patch id "${patch.id}" is used more than once in this image`,
-          })
-        }
-        seen.add(patch.id)
-      })
-    }),
+  patches: z.array(GamePatchSchema).default([]).superRefine(uniqueIds('patch')),
+  /** The named areas the game wants placed on it, in its order; an id may be used once. */
+  areas: z.array(GameAreaSchema).default([]).superRefine(uniqueIds('area')),
 })
 
 /**
@@ -564,6 +577,7 @@ function lookChangeNames(pairs: [string | null, string][]): string[] {
 const KIND_PHRASE: Record<ConflictKind, string> = {
   words: 'other words',
   patches: 'other patches',
+  'named areas': 'other named areas',
   sizes: 'another size',
   names: 'another name',
 }
@@ -577,7 +591,14 @@ function patchesKey(image: GameImage): string {
   )
 }
 
-/** What differs between the listings of one image, in the order words, sizes, names. */
+/** An image's named areas as one string, by id, so the same areas in another order are the same. */
+function areasKey(image: GameImage): string {
+  return JSON.stringify(
+    image.areas.map(({ id, title }) => [id, title]).sort(([a], [b]) => (a! < b! ? -1 : 1)),
+  )
+}
+
+/** What differs between the listings of one image, in the order words, sizes, names, patches, named areas. */
 function differences(images: GameImage[]): ConflictKind[] {
   const [first, ...rest] = images
   const kinds: ConflictKind[] = []
@@ -585,6 +606,7 @@ function differences(images: GameImage[]): ConflictKind[] {
   if (rest.some((i) => i.width !== first!.width || i.height !== first!.height)) kinds.push('sizes')
   if (rest.some((i) => i.title !== first!.title)) kinds.push('names')
   if (rest.some((i) => patchesKey(i) !== patchesKey(first!))) kinds.push('patches')
+  if (rest.some((i) => areasKey(i) !== areasKey(first!))) kinds.push('named areas')
   return kinds
 }
 
@@ -628,6 +650,14 @@ export interface PatchRow {
   gameWas: string | null
 }
 
+/** One named area of an image as its page shows it. */
+export interface AreaRow {
+  id: string
+  title: string
+  /** The area has been placed on the picture. Nothing places one yet, so this is false. */
+  placed: boolean
+}
+
 /** The status chip of an image. */
 export type ImageStatus = 'none yet' | 'chosen' | 'out of date'
 
@@ -649,6 +679,8 @@ export interface ImageRow {
   gameWas: string | null
   /** The patches the game asks for on it, in the game's order (the first act's, for a shared image). */
   patches: PatchRow[]
+  /** The named areas the game wants placed on it, in the game's order (the first act's, for a shared image). */
+  areas: AreaRow[]
   /** The whole prompt. */
   prompt: string
   /**
@@ -683,7 +715,7 @@ export interface ActStyleChoice {
 }
 
 /** What the acts' lists can disagree about for one image. */
-export type ConflictKind = 'words' | 'sizes' | 'names' | 'patches'
+export type ConflictKind = 'words' | 'sizes' | 'names' | 'patches' | 'named areas'
 
 /** An image that several acts list differently: shown in none of them, but in place in each. */
 export interface ImageConflict {
@@ -873,6 +905,7 @@ export function summarizeImages(input: ImagesInput): {
           gameWas: mine?.gameWas ?? null,
         }
       }),
+      areas: image.areas.map((area) => ({ ...area, placed: false })),
       prompt: assemblePrompt(words, eff),
       actStyle: shared
         ? choices.length
