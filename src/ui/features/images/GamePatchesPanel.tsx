@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { makeAgainOf, overlappingPatches } from '../../../core/imagePatches'
+import { useEffect, useRef, useState } from 'react'
+import { makeAgainOf, overlappingPatches, tieOf } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
 import { Problems } from '../../components/Problems'
 import {
@@ -16,7 +16,10 @@ import {
   type PatchArea,
   type PatchWorkView,
 } from '../../../core/imagePatches'
+import { progressOf } from '../../musicTakesText'
 import { useImagePatchCompare, useImagePatches, useSetImagePatchWords } from '../../api'
+import { patchRowId, RemakeLine } from './RemakeLine'
+import { rowFailed, rowMaking } from '../../remakeText'
 import { PatchWorkbench } from './PatchWorkbench'
 import { WordsField } from './WordsField'
 
@@ -159,12 +162,6 @@ function PatchBody({
   )
 }
 
-/** The named area a patch is tied to, with the place it has now; null for a patch with no tie. */
-function tieOf(row: ImageRow, patch: PatchRow): PatchTie | null {
-  const area = patch.area === undefined ? undefined : row.areas.find((a) => a.id === patch.area)
-  return area ? { title: area.title, box: area.box } : null
-}
-
 /**
  * The patches the game asks for on an image, a list of titles that open in place to the words of
  * the edit, which can be reworded. Any number are open at once; a patch whose game words changed
@@ -182,6 +179,13 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [open, setOpen] = useState(
     () => new Set(row.patches.filter((patch) => patch.gameChanged).map((patch) => patch.id)),
   )
+  // A patch named in the press's summary opens and scrolls into view once its row is there.
+  const [reveal, setReveal] = useState<string | null>(null)
+  useEffect(() => {
+    if (reveal === null) return
+    document.getElementById(patchRowId(reveal))?.scrollIntoView?.({ block: 'nearest' })
+    setReveal(null)
+  }, [reveal, open])
   if (row.patches.length === 0) return null
   // Nothing is said until the patches are loaded, nor when the chosen picture or the lock cannot be read.
   const pairs = view && !view.pictureGone && !view.lockUnread ? overlappingPatches(row.patches) : []
@@ -225,6 +229,17 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
           </div>
         </section>
       )}
+      {view && (
+        <RemakeLine
+          row={row}
+          view={view}
+          marks={marks}
+          onOpen={(id) => {
+            setOpen((now) => new Set(now).add(id))
+            setReveal(id)
+          }}
+        />
+      )}
       <ul className="game-patch-list">
         {row.patches.map((patch) => {
           const isOpen = open.has(patch.id)
@@ -233,6 +248,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
           return (
             <li key={patch.id}>
               <button
+                id={patchRowId(patch.id)}
                 className="game-patch-row"
                 type="button"
                 aria-expanded={isOpen}
@@ -250,7 +266,26 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                         {patch.gameChanged ? 'the game changed its words' : 'changed here'}
                       </span>
                     )}
-                    {summary && <span className="game-patch-summary">{summary.text}</span>}
+                    {summary && (
+                      <span className="game-patch-summary">
+                        {work && work.making.length > 0 ? (
+                          <>
+                            <span className="bar game-patch-bar" aria-hidden="true">
+                              <i
+                                style={{
+                                  width: `${Math.round(progressOf(work.making[0]!) * 100)}%`,
+                                }}
+                              />
+                            </span>{' '}
+                            {rowMaking(work.making)}
+                          </>
+                        ) : (
+                          summary.text
+                        )}
+                        {work && rowFailed(work.failed.length)}
+                      </span>
+                    )}
+                    {work?.takes.some((t) => t.isNew) && <span className="chip chip-new">new</span>}
                     {summary?.chip && <span className="chip chip-ok">{summary.chip}</span>}
                     {again.has(patch.id) && <span className="chip chip-warn">Make again</span>}
                     {work?.oldLook && <span className="chip chip-warn">Old look</span>}

@@ -5448,3 +5448,37 @@ button.cue-chip[aria-expanded='true'] {
   margin: 6px 0;
   padding-left: 18px;
 }
+
+/* Remake patches on this take: the line under the panel's intro, wrapping in a narrow window */
+.remake,
+.remake-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.remake {
+  flex-direction: column;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+.remake-line {
+  padding: 10px 12px;
+  background: var(--raised);
+  border-radius: 9px;
+}
+.remake-grow {
+  flex: 1;
+  min-width: 200px;
+}
+.remake-leftout {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+}
+.game-patch-bar {
+  display: inline-block;
+  width: 90px;
+  height: 4px;
+  vertical-align: middle;
+}

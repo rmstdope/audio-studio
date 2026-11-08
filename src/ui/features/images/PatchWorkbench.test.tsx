@@ -67,6 +67,7 @@ const view = (
   lookKey: 'k',
   lockUnread: false,
   pictureGone: false,
+  remake: { earlier: {}, press: null },
   maker: { ok: true },
   patches,
   ...over,

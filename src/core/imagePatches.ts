@@ -130,6 +130,44 @@ export interface ImagePatchesView {
   maker: { ok: true } | { ok: false; message: string }
   /** The image's patches the game lists, each with its takes. */
   patches: PatchWorkView[]
+  /** What the press "Remake patches on this take" needs to know and has done. */
+  remake: RemakeView
+}
+
+/** The latest press of "Remake patches on this take" on an image, as the page shows it. */
+export interface RemakePressView {
+  /** Takes the press queued, and the patches (ids, in the game's order) they are of. */
+  total: number
+  ids: string[]
+  /** How many takes failed; `failed` names their patches. */
+  failedTakes: number
+  /** Takes of the press on the board, those stopped before they were made, and the patches with a failed take. */
+  made: number
+  stopped: number
+  failed: string[]
+  /** Any take of the press is waiting or being made. */
+  running: boolean
+  /** Seconds the takes still to make are expected to take (a guess). */
+  left: number
+}
+
+/** What the page needs for the press: the area of the earlier choice of each patch, and the latest press. */
+export interface RemakeView {
+  /** By patch id: the area of the take chosen on the newest earlier take of the image. */
+  earlier: Record<string, PatchArea>
+  press: RemakePressView | null
+}
+
+/** The body of the press: how many takes of each patch, and the marks the person drew (by patch id). */
+export const RemakePatchesBody = z.strictObject({
+  count: z.number().int().min(1).max(4),
+  marks: z.record(z.string(), PatchAreaSchema),
+})
+
+/** The named area the game ties a patch to, with the place it has now; null for a patch with no tie. */
+export function tieOf(row: Pick<ImageRow, 'areas'>, patch: PatchRow): PatchTie | null {
+  const area = patch.area === undefined ? undefined : row.areas.find((a) => a.id === patch.area)
+  return area ? { title: area.title, box: area.box } : null
 }
 
 /**
@@ -590,4 +628,59 @@ export function setAsideQuestion(
     to,
     returning: row.patches.filter(back).map((p) => p.title),
   }
+}
+
+/**
+ * The patches one press of "Remake patches on this take" covers, in the game's order: those that
+ * need making again (`makeAgainOf`) and have no take on the take in the game, none finished,
+ * waiting, being made or failed.
+ */
+export function remakeCovered(
+  row: Pick<ImageRow, 'chosenTake' | 'patches'>,
+  work: readonly Pick<PatchWorkView, 'id' | 'takes' | 'making' | 'failed'>[],
+): PatchRow[] {
+  if (row.chosenTake === null) return []
+  return makeAgainOf(row).filter((patch) => {
+    const w = work.find((p) => p.id === patch.id)
+    return !w || (w.takes.length === 0 && w.making.length === 0 && w.failed.length === 0)
+  })
+}
+
+/** What is known of a covered patch's place: the person's mark, its named area, the area it was chosen with. */
+export interface RemakeCandidate {
+  id: string
+  title: string
+  /** A mark the person drew on the patch and has not yet used. */
+  mark: PatchArea | null
+  /** The named area the game ties the patch to, with where it is now. */
+  tie: PatchTie | null
+  /** The area of the take chosen on the newest earlier take of the image. */
+  earlier: PatchArea | null
+}
+
+/** What a press makes: each patch with the area to make it from, and those left out for lack of one. */
+export interface RemakePlan {
+  make: { id: string; title: string; area: PatchArea }[]
+  leftOut: { id: string; title: string }[]
+}
+
+/**
+ * The area each covered patch is remade from, the first of these that exists and fits the picture:
+ * the person's own mark, the place its named area has now, the area it was chosen with. A patch
+ * with none is left out. Nothing here moves a saved area or a named area.
+ */
+export function planRemake(
+  candidates: readonly RemakeCandidate[],
+  image: { width: number; height: number },
+  take: { width: number; height: number },
+): RemakePlan {
+  const plan: RemakePlan = { make: [], leftOut: [] }
+  const fits = (area: PatchArea | null) => (area && !checkPatchArea(area, take) ? area : null)
+  for (const c of candidates) {
+    const area =
+      fits(c.mark) ?? (c.tie?.box ? markFromArea(c.tie.box, image, take) : null) ?? fits(c.earlier)
+    if (area) plan.make.push({ id: c.id, title: c.title, area })
+    else plan.leftOut.push({ id: c.id, title: c.title })
+  }
+  return plan
 }

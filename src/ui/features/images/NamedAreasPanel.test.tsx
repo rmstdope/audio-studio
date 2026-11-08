@@ -38,6 +38,7 @@ const view = (over: Partial<ImagePatchesView> = {}): ImagePatchesView => ({
   lookKey: 'k',
   lockUnread: false,
   pictureGone: false,
+  remake: { earlier: {}, press: null },
   maker: { ok: true },
   patches: [],
   ...over,
