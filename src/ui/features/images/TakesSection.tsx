@@ -32,6 +32,7 @@ import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import {
   lookZoom,
   makeTakesText,
+  refusal,
   pictureRendering,
   takeCountText,
   unchooseNote,
@@ -48,14 +49,6 @@ const MAX_AT_ONCE = 4
 
 /** The space between the two sides, in pixels (the stylesheet's `.image-stage` gap). */
 const STAGE_GAP = 14
-
-/** What a change to takes answered, as a line to show when it was refused. */
-function refusal(answer: unknown): string | null {
-  if (!answer || typeof answer !== 'object' || !('ok' in answer) || answer.ok) return null
-  return 'message' in answer && typeof answer.message === 'string'
-    ? answer.message
-    : 'That could not be done.'
-}
 
 /**
  * A take's picture; `shown` is its width on the page, when set, and a picture shown smaller than

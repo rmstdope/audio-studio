@@ -120,7 +120,7 @@ export function NamedAreasPanel({
   const placedCount = areas.filter((area) => area.placed).length
   const current = areas.find((area) => area.id === selected) ?? null
 
-  const view = picture && !('ok' in picture) ? picture : null
+  const view = picture && 'patches' in picture ? picture : null
   const state = !picture
     ? 'loading'
     : !view

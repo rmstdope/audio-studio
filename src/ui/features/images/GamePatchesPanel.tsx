@@ -1,7 +1,14 @@
 import { useRef, useState } from 'react'
 import type { ImageRow, PatchRow } from '../../../core/images'
 import { Problems } from '../../components/Problems'
-import { useImagePatchCompare, useSetImagePatchWords } from '../../api'
+import {
+  patchSummary,
+  type ImagePatchesView,
+  type PatchArea,
+  type PatchWorkView,
+} from '../../../core/imagePatches'
+import { useImagePatchCompare, useImagePatches, useSetImagePatchWords } from '../../api'
+import { PatchWorkbench } from './PatchWorkbench'
 import { WordsField } from './WordsField'
 
 /**
@@ -11,11 +18,20 @@ import { WordsField } from './WordsField'
 function PatchBody({
   imageId,
   patch,
+  view,
+  work,
+  mark,
+  onMark,
   onSaved,
   onEdit,
 }: {
   imageId: string
   patch: PatchRow
+  /** The image's patches with their takes, once they have been loaded. */
+  view: ImagePatchesView | null
+  work: PatchWorkView | null
+  mark: PatchArea | null
+  onMark: (area: PatchArea) => void
   onSaved: () => void
   onEdit: () => void
 }) {
@@ -28,8 +44,8 @@ function PatchBody({
         if (result.ok) field.current?.focus()
       },
     })
-  return (
-    <div className="game-patch-body">
+  const notice = (
+    <>
       {patch.gameChanged && (
         <section
           className="notice notice-warn images-compare"
@@ -73,6 +89,10 @@ function PatchBody({
           </div>
         </section>
       )}
+    </>
+  )
+  const words = (
+    <>
       <WordsField
         label="What should change"
         words={patch.words}
@@ -83,6 +103,24 @@ function PatchBody({
         inputRef={field}
       />
       {patch.changed && <span className="muted">The game&apos;s words: {patch.description}</span>}
+    </>
+  )
+  return (
+    <div className="game-patch-body">
+      {notice}
+      {view && work ? (
+        <PatchWorkbench
+          imageId={imageId}
+          patchId={patch.id}
+          view={view}
+          work={work}
+          words={words}
+          mark={mark}
+          onMark={onMark}
+        />
+      ) : (
+        words
+      )}
     </div>
   )
 }
@@ -94,6 +132,10 @@ function PatchBody({
  */
 export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [saved, setSaved] = useState(false)
+  const query = useImagePatches(row.id)
+  // Marked areas live here, not in the open patch, so closing and opening a row keeps its mark.
+  const [marks, setMarks] = useState<Record<string, PatchArea>>({})
+  const view = query.data && 'patches' in query.data ? query.data : null
   const [open, setOpen] = useState(
     () => new Set(row.patches.filter((patch) => patch.gameChanged).map((patch) => patch.id)),
   )
@@ -120,6 +162,8 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
       <ul className="game-patch-list">
         {row.patches.map((patch) => {
           const isOpen = open.has(patch.id)
+          const work = view?.patches.find((p) => p.id === patch.id) ?? null
+          const summary = work ? patchSummary(work.takes) : null
           return (
             <li key={patch.id}>
               <button
@@ -134,17 +178,25 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                 <span className="game-patch-words">
                   <b>{patch.title}</b>
                   <span className="mono muted">{patch.id}</span>
-                  {patch.changed && (
-                    <span className="game-patch-mark">
-                      {patch.gameChanged ? 'the game changed its words' : 'changed here'}
-                    </span>
-                  )}
+                  <span className="game-patch-end">
+                    {patch.changed && (
+                      <span className="game-patch-mark">
+                        {patch.gameChanged ? 'the game changed its words' : 'changed here'}
+                      </span>
+                    )}
+                    {summary && <span className="game-patch-summary">{summary.text}</span>}
+                    {summary?.chip && <span className="chip chip-ok">{summary.chip}</span>}
+                  </span>
                 </span>
               </button>
               {isOpen && (
                 <PatchBody
                   imageId={row.id}
                   patch={patch}
+                  view={view}
+                  work={work}
+                  mark={marks[patch.id] ?? null}
+                  onMark={(area) => setMarks((now) => ({ ...now, [patch.id]: area }))}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
                 />

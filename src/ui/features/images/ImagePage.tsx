@@ -17,7 +17,6 @@ import { ActStyleMenu } from './ActStyleMenu'
 import { ActLinks } from './ActLinks'
 import { NamedAreasPanel } from './NamedAreasPanel'
 import { GamePatchesPanel } from './GamePatchesPanel'
-import { PatchesSection } from './PatchesSection'
 import { TakesSection } from './TakesSection'
 import { WordsField } from './WordsField'
 
@@ -212,7 +211,6 @@ export function ImagePage({
       />
       <NamedAreasPanel key={row.id} row={row} />
       <GamePatchesPanel key={row.id} row={row} />
-      <PatchesSection key={row.chosenTake} imageId={row.id} />
     </>
   )
 }

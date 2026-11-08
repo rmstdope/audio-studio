@@ -13,7 +13,7 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
-import { MakePatchBody } from '../core/imagePatches'
+import { ChoosePatchTakeBody, MakePatchTakesBody } from '../core/imagePatches'
 import { createImagePatches, type ImagePatchAnswer } from '../services/imagePatches'
 import { ChooseImageTakeBody, MakeImageTakesBody } from '../core/imageTakes'
 import { BriefChangeBody } from '../core/music'
@@ -1716,22 +1716,56 @@ export function startServer({
           const view = await imagePatches.view(projectFile, request.params.id)
           return view ? Response.json(view) : notFound()
         }),
+      },
+      '/api/images/:id/patches/:patch/takes': {
         POST: fromOwnPage(async (request) => {
-          const body = MakePatchBody.safeParse(await request.json().catch(() => null))
+          const body = MakePatchTakesBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
-            return Response.json({ error: 'expected { area, instruction }' }, { status: 400 })
+            return Response.json(
+              { error: 'expected { count, area } or { retry }' },
+              { status: 400 },
+            )
           }
-          return imageAnswer(await imagePatches.make(projectFile, request.params.id, body.data))
+          const { id, patch } = request.params
+          return imageAnswer(await imagePatches.make(projectFile, id, patch, body.data))
         }),
       },
-      '/api/images/:id/patches/:n': {
+      '/api/images/:id/patches/:patch/takes/:n': {
         GET: guard(async (request) => {
-          const file = await imagePatches.patchFile(
-            projectFile,
-            request.params.id,
-            request.params.n,
-          )
+          const { id, patch, n } = request.params
+          const file = await imagePatches.takeFile(projectFile, id, patch, n)
           return file ? new Response(Bun.file(file)) : notFound()
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const { id, patch, n } = request.params
+          return imageAnswer(await imagePatches.drop(projectFile, id, patch, Number(n)))
+        }),
+      },
+      '/api/images/:id/patches/:patch/takes/:n/seen': {
+        POST: fromOwnPage(async (request) => {
+          const { id, patch, n } = request.params
+          return imageAnswer(await imagePatches.markSeen(projectFile, id, patch, Number(n)))
+        }),
+      },
+      '/api/images/:id/patches/:patch/choose': {
+        POST: fromOwnPage(async (request) => {
+          const body = ChoosePatchTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { n }' }, { status: 400 })
+          const { id, patch } = request.params
+          return imageAnswer(await imagePatches.choose(projectFile, id, patch, body.data.n))
+        }),
+      },
+      '/api/images/:id/patches/:patch/unchoose': {
+        POST: fromOwnPage(async (request) => {
+          const { id, patch } = request.params
+          return imageAnswer(await imagePatches.unchoose(projectFile, id, patch))
+        }),
+      },
+      '/api/images/:id/patches/:patch/stop': {
+        POST: fromOwnPage(async (request) => {
+          const { id, patch } = request.params
+          const result = await imagePatches.stop(projectFile, id, patch)
+          return result ? Response.json(result) : notFound()
         }),
       },
       '/api/images/:id/takes': {

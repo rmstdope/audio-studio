@@ -193,3 +193,11 @@ export const AREA_TAG_WIDEST = 16
 export function areaTagText(title: string): string {
   return title.length > AREA_TAG_WIDEST ? `${title.slice(0, AREA_TAG_WIDEST)}…` : title
 }
+
+/** What a change to takes answered, as a line to show when it was refused. */
+export function refusal(answer: unknown): string | null {
+  if (!answer || typeof answer !== 'object' || !('ok' in answer) || answer.ok) return null
+  return 'message' in answer && typeof answer.message === 'string'
+    ? answer.message
+    : 'That could not be done.'
+}
