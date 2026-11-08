@@ -1134,7 +1134,7 @@ describe('the named areas the game declares', () => {
     draw(summary({ areas: [fountain, notice], patches: [lamp] }))
     draw(summary({ areas: [fountain, notice], patches: [lamp] }))
     expect(container.querySelectorAll('.named-areas').length).toBe(1)
-    expect(container.querySelectorAll('h2').length).toBe(3)
+    expect(container.querySelectorAll('.game-patches').length).toBe(1)
   })
   it('leaves the page as it is when the game names none', () => {
     const page = render(image)
