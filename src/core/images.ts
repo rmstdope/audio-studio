@@ -23,6 +23,8 @@ const GamePatchSchema = z
     title: z.string().min(1),
     /** What should change, in the game's words. */
     text: z.string().min(1),
+    /** The id of one of the image's named areas this patch covers; the patch starts from its place. */
+    area: z.string().regex(SLUG, 'use lower-case letters, digits and - only').optional(),
   })
   .transform(({ text, ...patch }) => ({ ...patch, description: text }))
 
@@ -71,14 +73,30 @@ const ImageShape = z.object({
   areas: z.array(GameAreaSchema).default([]).superRefine(uniqueIds('area')),
 })
 
+/** Refines an image: a patch may only name one of the image's own named areas. */
+function tiesToListedAreas(image: z.infer<typeof ImageShape>, ctx: z.RefinementCtx) {
+  const listed = new Set(image.areas.map((area) => area.id))
+  image.patches.forEach((patch, at) => {
+    if (patch.area !== undefined && !listed.has(patch.area)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['patches', at, 'area'],
+        message: `the patch "${patch.id}" names the area "${patch.area}", which this image does not list`,
+      })
+    }
+  })
+}
+
 /**
  * An image of a list the game writes. The game's words (`text`) are the image's description inside
  * the studio, its pages and its API.
  */
-export const ImageSchema = ImageShape.transform(({ text, ...image }) => ({
-  ...image,
-  description: text,
-}))
+export const ImageSchema = ImageShape.superRefine(tiesToListedAreas).transform(
+  ({ text, ...image }) => ({
+    ...image,
+    description: text,
+  }),
+)
 
 /** An act's images, in the game's order (a list that is there and empty means the game asks for none). */
 export const ImageListSchema = z.array(ImageSchema)
@@ -690,7 +708,7 @@ const KIND_PHRASE: Record<ConflictKind, string> = {
 function patchesKey(image: GameImage): string {
   return JSON.stringify(
     image.patches
-      .map(({ id, title, description }) => [id, title, description])
+      .map(({ id, title, description, area }) => [id, title, description, area ?? null])
       .sort(([a], [b]) => (a! < b! ? -1 : 1)),
   )
 }
@@ -752,6 +770,8 @@ export interface PatchRow {
   gameChanged: boolean
   /** The game's words when the user's were written. */
   gameWas: string | null
+  /** The id of the named area the game ties it to, if any. */
+  area?: string | undefined
 }
 
 /** One named area of an image as its page shows it. */

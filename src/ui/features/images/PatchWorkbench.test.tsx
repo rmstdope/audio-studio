@@ -71,6 +71,7 @@ async function render(
   patches: PatchRow[],
   current: () => ImagePatchesView,
   posted: { status: number; body: unknown } = { status: 200, body: { ok: true } },
+  imageRow: Partial<ImageRow> = {},
 ) {
   const sent: { method: string; path: string; body: unknown }[] = []
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
@@ -88,7 +89,9 @@ async function render(
       createElement(
         QueryClientProvider,
         { client },
-        createElement(GamePatchesPanel, { row: { id: 'inn', patches } as ImageRow }),
+        createElement(GamePatchesPanel, {
+          row: { id: 'inn', width: 1024, height: 576, areas: [], patches, ...imageRow } as ImageRow,
+        }),
       ),
     )
   })
@@ -97,7 +100,20 @@ async function render(
     act(() => root.unmount())
     host.remove()
   })
-  return { host, sent }
+  return { host, sent, root, client, rerender: (row: Partial<ImageRow>) => renderRow(row) }
+  function renderRow(row: Partial<ImageRow>) {
+    return act(async () => {
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(GamePatchesPanel, {
+            row: { id: 'inn', width: 1024, height: 576, areas: [], patches, ...row } as ImageRow,
+          }),
+        ),
+      )
+    })
+  }
 }
 
 /** Lets what the page asked for arrive. */
@@ -645,5 +661,198 @@ describe('takes being made and failed', () => {
     await act(async () => button(host, 'Make 2 takes')!.click())
     await settle()
     expect(text(host)).toContain('Takes of this patch are being made.')
+  })
+})
+
+describe('a patch tied to a named area', () => {
+  const bucket = {
+    id: 'bucket',
+    title: 'Bucket',
+    placed: true,
+    box: { x: 100, y: 100, width: 200, height: 150 },
+  }
+  const unplaced = { ...bucket, placed: false, box: null }
+  const grown = { left: `${((100 - 24) / 1024) * 100}%`, width: `${((200 + 48) / 1024) * 100}%` }
+  const tied = () => [patchRow('a', { area: 'bucket' })]
+  const none = () => view([work('a')])
+  const markLeft = (host: Element) =>
+    (host.querySelector('.patch-mark') as HTMLElement | null)?.style.left
+  const LINE =
+    'Marked from the named area “Bucket”, with a little room around it. Drag over the picture to change it.'
+  const NOPLACE =
+    '“Bucket” has no place yet. Mark it under Named areas and this patch starts there, or drag over the picture to mark this patch by hand.'
+  const HINT = 'Drag over the picture to mark what should change.'
+
+  it('opens marked at the area grown by the feather, with the line, Make on and no hint', async () => {
+    const { host } = await render(tied(), none, undefined, { areas: [bucket] })
+    await open(host)
+    const mark = host.querySelector<HTMLElement>('.patch-mark')!
+    expect(mark.style.left).toBe(grown.left)
+    expect(mark.style.width).toBe(grown.width)
+    expect(text(host)).toContain(LINE)
+    expect(text(host)).not.toContain(HINT)
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(button(host, 'Back to “Bucket”')).toBeUndefined()
+  })
+
+  it('makes takes of the grown mark', async () => {
+    const { host, sent } = await render(tied(), none, undefined, { areas: [bucket] })
+    await open(host)
+    await act(async () => button(host, 'Make 2 takes')!.click())
+    expect(sent[0]!.body).toEqual({ count: 2, area: { x: 76, y: 76, width: 248, height: 198 } })
+  })
+
+  it('puts the line and the button before the number menu, so Tab reaches them first', async () => {
+    const { host } = await render(tied(), none, undefined, { areas: [bucket] })
+    await open(host)
+    const line = [...host.querySelectorAll('p, span')].find((e) => text(e) === LINE)!
+    const menu = host.querySelector('select.takes-count')!
+    expect(line.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('replaces the line by Back to the area once dragged; the button restores it and focuses Make', async () => {
+    const { host } = await render(tied(), none, undefined, { areas: [bucket] })
+    await open(host)
+    await drag(stageOf(host), [400, 300], [500, 380])
+    expect(markLeft(host)).toBe(`${(400 / 1024) * 100}%`)
+    expect(text(host)).not.toContain(LINE)
+    const back = button(host, 'Back to “Bucket”')!
+    await act(async () => back.click())
+    expect(markLeft(host)).toBe(grown.left)
+    expect(text(host)).toContain(LINE)
+    expect(button(host, 'Back to “Bucket”')).toBeUndefined()
+    expect(document.activeElement).toBe(button(host, 'Make 2 takes') ?? null)
+  })
+
+  it('shows the no-place line, Make off, and a hand mark with no button, when the area is not placed', async () => {
+    const { host } = await render(tied(), none, undefined, { areas: [unplaced] })
+    await open(host)
+    expect(host.querySelector('.patch-mark')).toBeNull()
+    expect(text(host)).toContain(NOPLACE)
+    expect(text(host)).not.toContain(HINT)
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    await drag(stageOf(host), [400, 300], [500, 380])
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(button(host, 'Back to “Bucket”')).toBeUndefined()
+    expect(text(host)).not.toContain(NOPLACE)
+  })
+
+  it('follows the area while the mark is not the person’s own: placed, moved, cleared', async () => {
+    const r = await render(tied(), none, undefined, { areas: [unplaced] })
+    await open(r.host)
+    await r.rerender({ areas: [bucket] })
+    expect(markLeft(r.host)).toBe(grown.left)
+    expect(text(r.host)).toContain(LINE)
+    await r.rerender({ areas: [{ ...bucket, box: { x: 300, y: 100, width: 200, height: 150 } }] })
+    expect(markLeft(r.host)).toBe(`${((300 - 24) / 1024) * 100}%`)
+    await r.rerender({ areas: [unplaced] })
+    expect(r.host.querySelector('.patch-mark')).toBeNull()
+    expect(text(r.host)).toContain(NOPLACE)
+    expect(button(r.host, 'Make 2 takes')!.disabled).toBe(true)
+  })
+
+  it('keeps the person’s own mark when the area moves, offering Back to the new place; clearing removes the button', async () => {
+    const r = await render(tied(), none, undefined, { areas: [bucket] })
+    await open(r.host)
+    await drag(stageOf(r.host), [400, 300], [500, 380])
+    await r.rerender({ areas: [{ ...bucket, box: { x: 300, y: 100, width: 200, height: 150 } }] })
+    expect(markLeft(r.host)).toBe(`${(400 / 1024) * 100}%`)
+    await act(async () => button(r.host, 'Back to “Bucket”')!.click())
+    expect(markLeft(r.host)).toBe(`${((300 - 24) / 1024) * 100}%`)
+    await drag(stageOf(r.host), [400, 300], [500, 380])
+    await r.rerender({ areas: [unplaced] })
+    expect(markLeft(r.host)).toBe(`${(400 / 1024) * 100}%`)
+    expect(button(r.host, 'Back to “Bucket”')).toBeUndefined()
+  })
+
+  it('makes a pressed take’s area the person’s own mark, even when it is the same place', async () => {
+    const same = { x: 76, y: 76, width: 248, height: 198 }
+    const made = () => view([work('a', { takes: [takeOf(1, { area: same }), takeOf(2)] })])
+    const r = await render(tied(), made, undefined, { areas: [bucket] })
+    await open(r.host)
+    await act(async () => thumbs(r.host)[0]!.click())
+    expect(text(r.host)).toContain(LINE)
+    expect(button(r.host, 'Back to “Bucket”')).toBeUndefined()
+    await r.rerender({ areas: [{ ...bucket, box: { x: 300, y: 100, width: 200, height: 150 } }] })
+    // The mark stayed where it was, so the line is gone and the way back is offered.
+    expect(text(r.host)).not.toContain(LINE)
+    expect(button(r.host, 'Back to “Bucket”')).toBeDefined()
+    await act(async () => thumbs(r.host)[1]!.click())
+    expect(button(r.host, 'Back to “Bucket”')).toBeDefined()
+  })
+
+  it('starts from the area again when coming back to a patch with takes and no mark', async () => {
+    const made = () => view([work('a', { takes: [takeOf(1)] })])
+    const { host } = await render(tied(), made, undefined, { areas: [bucket] })
+    await open(host)
+    expect(markLeft(host)).toBe(grown.left)
+    expect(text(host)).toContain(LINE)
+    expect(button(host, 'Make 2 more takes')!.disabled).toBe(false)
+  })
+
+  it('reads as before for a patch with no tie', async () => {
+    const plain = await render([patchRow('a')], none, undefined, { areas: [bucket] })
+    await open(plain.host)
+    expect(text(plain.host)).toContain(HINT)
+    expect(plain.host.querySelector('.patch-mark')).toBeNull()
+  })
+
+  it('says nothing of the area without a picture', async () => {
+    const gone = await render(
+      tied(),
+      () => view([work('a')], { take: null, pictureGone: true }),
+      undefined,
+      {
+        areas: [bucket],
+      },
+    )
+    await open(gone.host)
+    expect(text(gone.host)).not.toContain('Marked from')
+    expect(text(gone.host)).not.toContain('has no place yet')
+  })
+
+  it('keeps the mark and the line, with Make off, while the model is missing', async () => {
+    const { host } = await render(
+      tied(),
+      () => view([work('a')], { maker: { ok: false, message: 'No model.' } }),
+      undefined,
+      { areas: [bucket] },
+    )
+    await open(host)
+    expect(markLeft(host)).toBe(grown.left)
+    expect(text(host)).toContain(LINE)
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+  })
+
+  it('steps the dashes aside, with the line and Make on, for a take that covers the same place', async () => {
+    const same = { x: 76, y: 76, width: 248, height: 198 }
+    const made = () => view([work('a', { takes: [takeOf(1, { area: same })] })])
+    const { host } = await render(tied(), made, undefined, { areas: [bucket] })
+    await open(host)
+    expect(host.querySelector('.patch-mark')).toBeNull()
+    expect(text(host)).toContain(LINE)
+    expect(button(host, 'Make 2 more takes')!.disabled).toBe(false)
+  })
+
+  it('stops the mark at the picture’s edge for an area on it', async () => {
+    const edge = { ...bucket, box: { x: 0, y: 0, width: 100, height: 100 } }
+    const { host, sent } = await render(tied(), none, undefined, { areas: [edge] })
+    await open(host)
+    await act(async () => button(host, 'Make 2 takes')!.click())
+    expect(sent[0]!.body).toEqual({ count: 2, area: { x: 0, y: 0, width: 124, height: 124 } })
+  })
+
+  it('puts focus on the heading when Back is pressed with Make off', async () => {
+    const { host } = await render(
+      tied(),
+      () => view([work('a')], { maker: { ok: false, message: 'No model.' } }),
+      undefined,
+      { areas: [bucket] },
+    )
+    await open(host)
+    await drag(stageOf(host), [400, 300], [500, 380])
+    await act(async () => button(host, 'Back to “Bucket”')!.click())
+    await settle()
+    expect(document.activeElement).toBe(host.querySelector('.patch-looking .lbl'))
   })
 })

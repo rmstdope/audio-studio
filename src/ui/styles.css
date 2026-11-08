@@ -5410,3 +5410,18 @@ button.cue-chip[aria-expanded='true'] {
     grid-template-columns: 1fr;
   }
 }
+
+/* The button that gives a patch's mark back to its named area: a link that wraps with its column. */
+.patch-back {
+  all: unset;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.patch-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
