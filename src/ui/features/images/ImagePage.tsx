@@ -209,8 +209,8 @@ export function ImagePage({
           </section>
         }
       />
-      <NamedAreasPanel key={row.id} row={row} />
-      <GamePatchesPanel key={row.id} row={row} />
+      <NamedAreasPanel key={`areas-${row.id}`} row={row} />
+      <GamePatchesPanel key={`patches-${row.id}`} row={row} />
     </>
   )
 }
