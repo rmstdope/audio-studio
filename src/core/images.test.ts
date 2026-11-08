@@ -8,6 +8,7 @@ import {
   applyActStyleChange,
   applyActStylePick,
   applyStyleChange,
+  applyPatchWordsChange,
   applyWordsChange,
   assemblePrompt,
   effectiveStyle,
@@ -18,8 +19,10 @@ import {
   imagesDone,
   outOfDateReasons,
   resolveCompare,
+  resolvePatchCompare,
   summarizeImages,
   type ChosenEntry,
+  type GamePatch,
   type ImageEdits,
   type ImageStyle,
   type MadeFrom,
@@ -39,6 +42,7 @@ const inn = {
   description: 'a low inn at dusk',
   width: 320,
   height: 200,
+  patches: [] as GamePatch[],
 }
 
 describe('the game files', () => {
@@ -820,5 +824,189 @@ describe('readImageEditsValue', () => {
     const images = readImageEditsValue({ style, images: [] }, FILE)
     expect(images.edits).toEqual({ style, images: {} })
     expect(images.problems.map((p) => p.path)).toEqual(['images'])
+  })
+})
+
+describe('the patches the game asks for', () => {
+  const bread = { id: 'bread-taken', title: 'Bread taken', description: 'Remove the bread' }
+  const lamp = { id: 'lamp-lit', title: 'Lamp lit', description: 'Light the lamp' }
+  const withPatches = { ...inn, patches: [bread, lamp] }
+  const game = (patches: unknown) => ({
+    id: inn.id,
+    title: inn.title,
+    text: inn.description,
+    width: 320,
+    height: 200,
+    patches,
+  })
+  const asked = (patches: unknown) => ImageListSchema.safeParse([game(patches)])
+
+  it('reads them, as text, and an image with none has an empty list', () => {
+    const read = asked([{ id: 'bread-taken', title: 'Bread taken', text: 'Remove the bread' }])
+    expect(read.data?.[0]?.patches).toEqual([bread])
+    expect(ImageListSchema.parse([{ ...game(undefined), patches: undefined }])[0]!.patches).toEqual(
+      [],
+    )
+    expect(asked([]).data?.[0]?.patches).toEqual([])
+  })
+  it('refuses a patch with no id, title or words, or an id repeated in the image', () => {
+    const one = { id: 'bread-taken', title: 'Bread taken', text: 'Remove the bread' }
+    expect(asked([{ ...one, id: undefined }]).success).toBe(false)
+    expect(asked([{ ...one, id: 'Bread Taken' }]).success).toBe(false)
+    expect(asked([{ ...one, title: '' }]).success).toBe(false)
+    expect(asked([{ ...one, text: '' }]).success).toBe(false)
+    const twice = asked([one, { ...one, title: 'Again' }])
+    expect(twice.error?.issues.map((i) => i.path)).toEqual([[0, 'patches', 1, 'id']])
+  })
+  it('keeps the edit of words with the game’s words they were written over, sorted by id', () => {
+    const edits = applyPatchWordsChange(none, 'inn', 'lamp-lit', ' Dim the lamp ', 'Light the lamp')
+    expect(edits.images.inn).toEqual({
+      patches: { 'lamp-lit': { text: 'Dim the lamp', gameWas: 'Light the lamp' } },
+    })
+    const both = applyPatchWordsChange(edits, 'inn', 'bread-taken', 'No bread', 'Remove the bread')
+    expect(Object.keys(JSON.parse(formatImageEdits(both)).images.inn.patches)).toEqual([
+      'bread-taken',
+      'lamp-lit',
+    ])
+    expect(ImageEditsSchema.parse(JSON.parse(formatImageEdits(both)))).toEqual(both)
+  })
+  it('takes the words back when emptied or typed as the game’s, leaving the image’s own edit', () => {
+    const own: ImageEdits = { images: { inn: { text: 'cosy', gameWas: 'old' } } }
+    const mine = applyPatchWordsChange(own, 'inn', 'lamp-lit', 'Dim', 'Light the lamp')
+    expect(mine.images.inn!.text).toBe('cosy')
+    const back = applyPatchWordsChange(mine, 'inn', 'lamp-lit', 'Light the lamp', 'Light the lamp')
+    expect(back).toEqual(own)
+    expect(applyPatchWordsChange(mine, 'inn', 'lamp-lit', null, 'Light the lamp')).toEqual(own)
+    const only = applyPatchWordsChange(none, 'inn', 'lamp-lit', 'Dim', 'Light the lamp')
+    expect(applyPatchWordsChange(only, 'inn', 'lamp-lit', '', 'Light the lamp').images).toEqual({})
+  })
+  it('keeps the words of the other patches and the image’s words when one is taken back', () => {
+    let edits = applyPatchWordsChange(none, 'inn', 'lamp-lit', 'Dim', 'Light the lamp')
+    edits = applyPatchWordsChange(edits, 'inn', 'bread-taken', 'No bread', 'Remove the bread')
+    edits = applyPatchWordsChange(edits, 'inn', 'lamp-lit', null, 'Light the lamp')
+    expect(Object.keys(edits.images.inn!.patches!)).toEqual(['bread-taken'])
+  })
+  it('settles a changed patch: keep mine moves the baseline, the game’s drops mine', () => {
+    const mine = applyPatchWordsChange(none, 'inn', 'lamp-lit', 'Dim', 'old')
+    expect(resolvePatchCompare(mine, 'inn', 'lamp-lit', 'keep', 'new').images.inn).toEqual({
+      patches: { 'lamp-lit': { text: 'Dim', gameWas: 'new' } },
+    })
+    expect(resolvePatchCompare(mine, 'inn', 'lamp-lit', 'game', 'new').images).toEqual({})
+  })
+  it('reads a patch edit apart: one without gameWas drops only that edit', () => {
+    const read = readImageEditsValue(
+      {
+        images: {
+          inn: { patches: { 'lamp-lit': { text: 'Dim' } } },
+          bar: { text: 'a', gameWas: 'b' },
+        },
+      },
+      'edits.json',
+    )
+    expect(Object.keys(read.edits.images)).toEqual(['bar'])
+    expect(read.problems.length).toBe(1)
+  })
+
+  describe('in the rows', () => {
+    const rowOf = (over: Partial<ImagesInput> = {}, image = withPatches) =>
+      summarizeImages(
+        input({
+          lists: [
+            {
+              id: 'act1',
+              title: 'Act I',
+              file: 'tts/act1/images.json',
+              state: { status: 'ok', images: [image] },
+              canRefresh: true,
+            },
+          ],
+          ...over,
+        }),
+      ).images.acts[0]!.rows[0]!
+
+    it('lists them in the game’s order with the game’s words, none reworded', () => {
+      expect(rowOf().patches).toEqual([
+        { ...bread, words: bread.description, changed: false, gameChanged: false, gameWas: null },
+        { ...lamp, words: lamp.description, changed: false, gameChanged: false, gameWas: null },
+      ])
+      expect(rowOf({}, inn).patches).toEqual([])
+    })
+    it('uses the user’s words, and notes when the game’s changed under them', () => {
+      const edits = {
+        [inn.id]: {
+          patches: {
+            'lamp-lit': { text: 'Dim it', gameWas: 'Light the lamp' },
+            'bread-taken': { text: 'No bread', gameWas: 'Take the bread' },
+          },
+        },
+      }
+      const [b, l] = rowOf({ edits }).patches
+      expect(l).toMatchObject({ words: 'Dim it', changed: true, gameChanged: false })
+      expect(b).toMatchObject({
+        words: 'No bread',
+        changed: true,
+        gameChanged: true,
+        gameWas: 'Take the bread',
+      })
+    })
+    it('drops a patch the game stopped asking for from the rows, keeping the words in the edits', () => {
+      const edits = { [inn.id]: { patches: { gone: { text: 'x', gameWas: 'y' } } } }
+      expect(rowOf({ edits }, { ...inn, patches: [bread] }).patches.map((p) => p.id)).toEqual([
+        'bread-taken',
+      ])
+    })
+    it('does not make the image out of date, nor change what a take is made from', () => {
+      const plain = rowOf({}, inn)
+      const edits = { [inn.id]: { patches: { 'lamp-lit': { text: 'Dim', gameWas: 'Light' } } } }
+      const row = rowOf({ edits, chosen: { [inn.id]: plain.madeFrom } })
+      expect(row.status).toBe('chosen')
+      expect(row.madeFrom).toEqual(plain.madeFrom)
+      expect(row.prompt).toBe(plain.prompt)
+    })
+  })
+
+  describe('shared between acts', () => {
+    const lists = (...images: (typeof inn)[]): ImagesInput['lists'] =>
+      images.map((image, i) => ({
+        id: `act${i + 1}`,
+        title: `Act ${i + 1}`,
+        file: `tts/act${i + 1}/images.json`,
+        state: { status: 'ok' as const, images: [image] },
+        canRefresh: true,
+      }))
+    const run = (...images: (typeof inn)[]) =>
+      summarizeImages(
+        input({
+          parts: images.map((_, i) => ({ id: `act${i + 1}`, title: `Act ${i + 1}` })),
+          lists: lists(...images),
+        }),
+      )
+
+    it('is a disagreement when a patch is missing or its id, title or words differ', () => {
+      for (const other of [
+        [bread],
+        [bread, { ...lamp, id: 'lamp-out' }],
+        [bread, { ...lamp, title: 'Lamp' }],
+        [bread, { ...lamp, description: 'x' }],
+      ]) {
+        const { images } = run(withPatches, { ...inn, patches: other })
+        expect(images.acts[0]!.conflicts[0]!.differs).toEqual(['patches'])
+        expect(images.acts[0]!.rows).toEqual([])
+      }
+    })
+    it('joins patches to the other kinds, and the problem says other patches', () => {
+      const { images, problems } = run(withPatches, { ...inn, description: 'x', patches: [bread] })
+      expect(images.acts[0]!.conflicts[0]!.differs).toEqual(['words', 'patches'])
+      expect(problems[0]!.message).toBe(
+        `the image "${inn.id}" has other words and other patches in tts/act2/images.json`,
+      )
+    })
+    it('is not a disagreement in another order, and uses the first act’s order', () => {
+      const { images, problems } = run(withPatches, { ...inn, patches: [lamp, bread] })
+      expect(problems).toEqual([])
+      for (const act of images.acts) {
+        expect(act.rows[0]!.patches.map((p) => p.id)).toEqual(['bread-taken', 'lamp-lit'])
+      }
+    })
   })
 })

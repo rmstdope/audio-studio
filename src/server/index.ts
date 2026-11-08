@@ -67,8 +67,10 @@ import { gitChanges } from '../services/git'
 import { keepMyBrief, setTrackBrief } from '../services/briefs'
 import {
   resolveImageCompare,
+  resolveImagePatchCompare,
   setImageActStyle,
   setImageActStylePick,
+  setImagePatchWords,
   setImageWords,
   setStyleField,
   type ImageEditResult,
@@ -1633,6 +1635,28 @@ export function startServer({
           }
           return imageAnswer(
             await resolveImageCompare(projectFile, request.params.id, body.data.choice),
+          )
+        }),
+      },
+      '/api/images/:id/game-patches/:patch': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = WordsBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { words: string | null }' }, { status: 400 })
+          }
+          const { id, patch } = request.params
+          return imageAnswer(await setImagePatchWords(projectFile, id, patch, body.data.words))
+        }),
+      },
+      '/api/images/:id/game-patches/:patch/compare': {
+        POST: fromOwnPage(async (request) => {
+          const body = CompareBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: "expected { choice: 'keep' | 'game' }" }, { status: 400 })
+          }
+          const { id, patch } = request.params
+          return imageAnswer(
+            await resolveImagePatchCompare(projectFile, id, patch, body.data.choice),
           )
         }),
       },

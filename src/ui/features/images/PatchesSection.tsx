@@ -61,7 +61,7 @@ export function PatchesSection({ imageId }: { imageId: string }) {
 
   return (
     <section className="panel patches" aria-label="Patches">
-      <h2>Patches</h2>
+      <h2>Try a patch of your own</h2>
       <p className="muted">
         Drag over the chosen take to mark an area, then say what should change there. The whole take
         is edited and only the marked area is kept, with its colours matched to the take around it.

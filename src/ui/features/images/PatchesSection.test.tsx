@@ -117,6 +117,12 @@ async function settle() {
 const makeButton = (host: Element) => host.querySelector<HTMLButtonElement>('button.patch-make')!
 
 describe('PatchesSection', () => {
+  it('is headed as the navigator’s own try, not the game’s patches', async () => {
+    const { host } = await render(view())
+    expect(host.querySelector('h2')?.textContent).toBe('Try a patch of your own')
+    expect(host.textContent).toContain('An experiment: nothing here reaches the game.')
+  })
+
   it('asks for a patch of the dragged area with the instruction as written, trimmed', async () => {
     const { host, posts } = await render(view())
     await drag(stageOf(host), [100, 50], [300, 250])

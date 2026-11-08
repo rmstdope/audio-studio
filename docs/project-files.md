@@ -285,12 +285,21 @@ Between languages, lines are matched by `id`.
     "title": "The Silver Stag Inn",
     "text": "A low timber inn at dusk, lantern light in every window, a silver stag on the sign.",
     "width": 320,
-    "height": 200
+    "height": 200,
+    "patches": [
+      { "id": "bread-taken", "title": "Bread taken", "text": "Remove the bread from the table" }
+    ]
   }
 ]
 ```
 
 `width` and `height` are the picture the game shows, in pixels. `file` is optional, as for tracks.
+
+`patches` is optional (absent or `[]` means the image needs none): the small changes the game lays
+over the image when it needs them, in the game's order. Each has an `id` (a slug, used once in the
+image), a `title` and `text`, the words for the edit. The studio shows them on the image's page and
+lets the user reword them; making them is a later step. An image several parts list must list the
+same patches (id, title and words; the order may differ), or the lists disagree.
 
 **A sound effect** (`effects.from.shared`):
 
@@ -474,22 +483,29 @@ and `key` (`null` for none).
     "cellar-door": {
       "text": "A heavy iron-banded door at the foot of a worn stair.",
       "gameWas": "A heavy iron-banded door at the foot of a stair.",
-      "partStyle": "act2"
+      "partStyle": "act2",
+      "patches": {
+        "bread-taken": {
+          "text": "Take the loaf off the table, leave only crumbs",
+          "gameWas": "Remove the bread from the table"
+        }
+      }
     }
   }
 }
 ```
 
-| Field                         | What it is                                                                                                      | Default                      |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `style.look`                  | What every image looks like.                                                                                    | required                     |
-| `style.keepOut`               | What no image may hold.                                                                                         | `""`                         |
-| `style.palette`               | The only colours a picture may use, as `#rrggbb`.                                                               | `[]`: any                    |
-| `style.colourDepth`           | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                         | `full`                       |
-| `style.dithering`             | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.                    | `patterned`                  |
-| `style.parts`                 | A part's addition to the look, by part id.                                                                      | `{}`                         |
-| `images.<id>.text`, `gameWas` | A rewording.                                                                                                    | none                         |
-| `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`). | the first part that lists it |
+| Field                         | What it is                                                                                                        | Default                      |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `style.look`                  | What every image looks like.                                                                                      | required                     |
+| `style.keepOut`               | What no image may hold.                                                                                           | `""`                         |
+| `style.palette`               | The only colours a picture may use, as `#rrggbb`.                                                                 | `[]`: any                    |
+| `style.colourDepth`           | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                           | `full`                       |
+| `style.dithering`             | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.                      | `patterned`                  |
+| `style.parts`                 | A part's addition to the look, by part id.                                                                        | `{}`                         |
+| `images.<id>.text`, `gameWas` | A rewording.                                                                                                      | none                         |
+| `images.<id>.patches.<patch>` | A rewording of a patch the game asks for: `text` and `gameWas`, as for an image. Kept when the game stops asking. | none                         |
+| `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`).   | the first part that lists it |
 
 The studio reads the style and each image's edit apart. A bad `images.<id>` (say, `text` without
 `gameWas`) drops only that image's edit, and the image shows the game's words; a bad `style` is

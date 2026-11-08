@@ -33,6 +33,7 @@ const row: ImageRow = {
   changed: false,
   gameChanged: false,
   gameWas: null,
+  patches: [],
   prompt: 'a low inn',
   actStyle: null,
   sharedWith: [],
