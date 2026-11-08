@@ -502,20 +502,21 @@ and `key` (`null` for none).
 }
 ```
 
-| Field                         | What it is                                                                                                        | Default                      |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `style.look`                  | What every image looks like.                                                                                      | required                     |
-| `style.keepOut`               | What no image may hold.                                                                                           | `""`                         |
-| `style.palette`               | The only colours a picture may use, as `#rrggbb`.                                                                 | `[]`: any                    |
-| `style.colourDepth`           | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                           | `full`                       |
-| `style.dithering`             | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.                      | `patterned`                  |
-| `style.parts`                 | A part's addition to the look, by part id.                                                                        | `{}`                         |
-| `images.<id>.text`, `gameWas` | A rewording.                                                                                                      | none                         |
-| `images.<id>.patches.<patch>` | A rewording of a patch the game asks for: `text` and `gameWas`, as for an image. Kept when the game stops asking. | none                         |
-| `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`).   | the first part that lists it |
+| Field                         | What it is                                                                                                                                                                   | Default                      |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `style.look`                  | What every image looks like.                                                                                                                                                 | required                     |
+| `style.keepOut`               | What no image may hold.                                                                                                                                                      | `""`                         |
+| `style.palette`               | The only colours a picture may use, as `#rrggbb`.                                                                                                                            | `[]`: any                    |
+| `style.colourDepth`           | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                                                                                      | `full`                       |
+| `style.dithering`             | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.                                                                                 | `patterned`                  |
+| `style.parts`                 | A part's addition to the look, by part id.                                                                                                                                   | `{}`                         |
+| `images.<id>.text`, `gameWas` | A rewording.                                                                                                                                                                 | none                         |
+| `images.<id>.patches.<patch>` | A rewording of a patch the game asks for: `text` and `gameWas`, as for an image. Kept when the game stops asking.                                                            | none                         |
+| `images.<id>.areas.<area>`    | The box marked for a named area: `{ x, y, width, height }`, whole pixels of the image's own size (at least 4 each way, inside the picture). Kept when the game stops asking. | none                         |
+| `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`).                                                              | the first part that lists it |
 
 The studio reads the style and each image's edit apart. A bad `images.<id>` (say, `text` without
-`gameWas`, or a patch's edit without its `gameWas`) drops only that image's edit (all of it), and the image shows the game's words; a bad `style` is
+`gameWas`, a patch's edit without its `gameWas`, or a box that is not four whole numbers) drops only that image's edit (all of it), and the image shows the game's words; a bad `style` is
 taken as none, and the rewordings are kept. Each is shown as a problem at its path. While any part
 of the file cannot be read, the studio refuses every save to it, so nothing in it is lost.
 

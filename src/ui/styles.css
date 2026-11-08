@@ -5079,8 +5079,20 @@ button.cue-chip[aria-expanded='true'] {
 .named-areas-body {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 24px;
+  grid-template-areas:
+    'picture list'
+    'switches list';
+  gap: 8px 24px;
   align-items: start;
+}
+.named-areas-picture {
+  grid-area: picture;
+}
+.named-area-list {
+  grid-area: list;
+}
+.named-area-switches {
+  grid-area: switches;
 }
 .named-areas-picture {
   position: sticky;
@@ -5140,7 +5152,7 @@ button.cue-chip[aria-expanded='true'] {
   padding: 3px 6px;
   border-radius: 4px 4px 0 0;
   white-space: nowrap;
-  pointer-events: none;
+  cursor: pointer;
 }
 .named-area-box.low > span {
   transform: none;
@@ -5154,7 +5166,7 @@ button.cue-chip[aria-expanded='true'] {
 }
 .named-area-box.selected {
   border: 2px solid var(--accent);
-  background: rgb(255 107 44 / 14%);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   cursor: move;
 }
 .named-area-box.selected > span {
@@ -5245,7 +5257,7 @@ button.cue-chip[aria-expanded='true'] {
   border-top: 1px solid var(--line);
 }
 .named-area.selected {
-  background: rgb(255 107 44 / 9%);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .named-area-main {
@@ -5275,6 +5287,10 @@ button.cue-chip[aria-expanded='true'] {
 @media (max-width: 760px) {
   .named-areas-body {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'picture'
+      'switches'
+      'list';
   }
 }
 /* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */

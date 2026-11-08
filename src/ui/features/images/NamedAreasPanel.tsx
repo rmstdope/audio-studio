@@ -22,12 +22,17 @@ export interface ChosenPatch {
   src: string
 }
 
+/** How far, in screen pixels, a press may move and still be a click. */
+const CLICK_SLACK = 3
+
 /** What a drag on the picture is doing. */
 interface Gesture {
   mode: 'draw' | 'move' | 'resize'
   /** The area it changes. */
   area: string
   start: Point
+  /** Where it went down on the screen: a click is a press that stays within a few screen pixels. */
+  screen: Point
   /** The box a move or resize began from. */
   origin: AreaBox | null
   handle?: Handle
@@ -80,7 +85,7 @@ export function NamedAreasPanel({
   // Boxes asked for and not yet seen in the row, by area; null is a clear.
   const [pending, setPending] = useState<Record<string, AreaBox | null>>({})
   const [failure, setFailure] = useState<string | null>(null)
-  const [unreadable, setUnreadable] = useState(false)
+  const [unreadable, setUnreadable] = useState<number | null>(null)
   const [shown, setShown] = useState<Set<string>>(new Set())
   const stage = useRef<HTMLDivElement>(null)
   const rowButtons = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -108,26 +113,27 @@ export function NamedAreasPanel({
 
   if (row.areas.length === 0) return null
 
-  const areas: (AreaRow & { shownBox: AreaBox | null })[] = row.areas.map((area) => {
+  const areas: AreaRow[] = row.areas.map((area) => {
     const box = area.id in pending ? pending[area.id]! : area.box
-    return { ...area, placed: box !== null, box, shownBox: box }
+    return { ...area, placed: box !== null, box }
   })
   const placedCount = areas.filter((area) => area.placed).length
   const current = areas.find((area) => area.id === selected) ?? null
 
   const view = picture && !('ok' in picture) ? picture : null
-  const state = !view
+  const state = !picture
     ? 'loading'
-    : view.pictureGone || unreadable
+    : !view
       ? 'gone'
-      : view.take
-        ? 'ready'
-        : 'none'
+      : view.pictureGone || unreadable === view.take?.n
+        ? 'gone'
+        : view.take
+          ? 'ready'
+          : 'none'
   const ready = state === 'ready' && !!view?.take
 
   /** Sends a box (or a clear) to be saved, showing it at once and taking it back if it fails. */
   const commit = (area: AreaRow, box: AreaBox | null) => {
-    setFailure(null)
     setPending((now) => ({ ...now, [area.id]: box }))
     const undo = (reason: string) => {
       setPending((now) => {
@@ -141,7 +147,10 @@ export function NamedAreasPanel({
       { area: area.id, box },
       {
         onSuccess: (result) => {
-          if (result.ok) return
+          if (result.ok) {
+            setFailure(null)
+            return
+          }
           undo(result.problems[0]?.message ?? 'the studio could not save it')
         },
         onError: (error) => undo(error.message),
@@ -150,6 +159,8 @@ export function NamedAreasPanel({
   }
 
   const focusRow = (id: string) => requestAnimationFrame(() => rowButtons.current[id]?.focus())
+
+  const screenOf = (event: PointerEvent): Point => ({ x: event.clientX, y: event.clientY })
 
   const pointAt = (event: PointerEvent) =>
     pointOnPicture(
@@ -163,31 +174,30 @@ export function NamedAreasPanel({
     event.preventDefault()
     const at = pointAt(event)
     const handle = (event.target as HTMLElement).dataset?.handle as Handle | undefined
-    const boxes = areas.flatMap((a) => (a.shownBox ? [{ id: a.id, box: a.shownBox }] : []))
-    const clicked = smallestAt(boxes, at)
+    const boxes = areas.flatMap((a) => (a.box ? [{ id: a.id, box: a.box }] : []))
+    const tagged = (event.target as HTMLElement).closest?.('[data-tag-of]')
+    const clicked = tagged?.getAttribute('data-tag-of') ?? smallestAt(boxes, at)
     let next: Gesture | null = null
-    if (current && current.shownBox && handle) {
+    if (current && current.box && handle) {
       next = {
         mode: 'resize',
         area: current.id,
         start: at,
-        origin: current.shownBox,
+        screen: { x: event.clientX, y: event.clientY },
+        origin: current.box,
         handle,
-        preview: current.shownBox,
+        preview: current.box,
         moved: false,
         clicked: null,
       }
-    } else if (
-      current &&
-      current.shownBox &&
-      smallestAt([{ id: current.id, box: current.shownBox }], at)
-    ) {
+    } else if (current && current.box && smallestAt([{ id: current.id, box: current.box }], at)) {
       next = {
         mode: 'move',
         area: current.id,
         start: at,
-        origin: current.shownBox,
-        preview: current.shownBox,
+        screen: { x: event.clientX, y: event.clientY },
+        origin: current.box,
+        preview: current.box,
         moved: false,
         clicked,
       }
@@ -196,6 +206,7 @@ export function NamedAreasPanel({
         mode: 'draw',
         area: current.id,
         start: at,
+        screen: { x: event.clientX, y: event.clientY },
         origin: null,
         preview: null,
         moved: false,
@@ -210,8 +221,9 @@ export function NamedAreasPanel({
     setGesture(next)
   }
 
-  const preview = (g: Gesture, at: Point): Gesture => {
-    const moved = g.moved || at.x !== g.start.x || at.y !== g.start.y
+  const preview = (g: Gesture, at: Point, screen: Point): Gesture => {
+    const moved = g.moved || Math.hypot(screen.x - g.screen.x, screen.y - g.screen.y) >= CLICK_SLACK
+    if (!moved) return g
     if (g.mode === 'draw') return { ...g, moved, preview: boxFromDrag(g.start, at) }
     if (g.mode === 'move') {
       return { ...g, moved, preview: moveBox(g.origin!, at.x - g.start.x, at.y - g.start.y, size) }
@@ -220,12 +232,12 @@ export function NamedAreasPanel({
   }
 
   const move = (event: PointerEvent<HTMLDivElement>) => {
-    if (gesture) setGesture(preview(gesture, pointAt(event)))
+    if (gesture) setGesture(preview(gesture, pointAt(event), screenOf(event)))
   }
 
   const up = (event: PointerEvent<HTMLDivElement>) => {
     if (!gesture) return
-    const done = preview(gesture, pointAt(event))
+    const done = preview(gesture, pointAt(event), screenOf(event))
     setGesture(null)
     const area = areas.find((a) => a.id === done.area)
     if (!area) return
@@ -242,7 +254,8 @@ export function NamedAreasPanel({
 
   const keys = (event: KeyboardEvent<HTMLElement>, area: AreaRow) => {
     if (area.id !== selected || !area.box) return
-    if (event.key === 'Delete') {
+    if (event.target !== rowButtons.current[area.id]) return
+    if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
       commit(area, null)
       return
@@ -255,7 +268,7 @@ export function NamedAreasPanel({
 
   const boxes = areas.flatMap((area) => {
     const live = gesture?.area === area.id && gesture.mode !== 'draw' ? gesture.preview : null
-    const box = live ?? area.shownBox
+    const box = live ?? area.box
     return box ? [{ area, box }] : []
   })
   const drawing = gesture?.mode === 'draw' ? gesture.preview : null
@@ -296,7 +309,7 @@ export function NamedAreasPanel({
                   src={`/api/images/${encodeURIComponent(row.id)}/takes/${view.take.n}`}
                   alt="The chosen take"
                   draggable={false}
-                  onError={() => setUnreadable(true)}
+                  onError={() => setUnreadable(view.take?.n ?? null)}
                 />
                 {chosenPatches
                   .filter((patch) => shown.has(patch.id))
@@ -313,7 +326,7 @@ export function NamedAreasPanel({
                   const isSelected = area.id === selected
                   const edge = [
                     box.y / row.height < 0.08 ? ' low' : '',
-                    box.x / row.width > 0.65 ? ' right' : '',
+                    box.x / row.width > 0.5 ? ' right' : '',
                   ].join('')
                   return (
                     <div
@@ -322,7 +335,9 @@ export function NamedAreasPanel({
                       style={placedStyle(box, row)}
                       data-area={area.id}
                     >
-                      <span title={area.title}>{areaTagText(area.title)}</span>
+                      <span title={area.title} data-tag-of={area.id}>
+                        {areaTagText(area.title)}
+                      </span>
                       {isSelected &&
                         HANDLES.map((handle) => (
                           <i
@@ -339,28 +354,6 @@ export function NamedAreasPanel({
                 )}
               </div>
               <p className="muted named-area-line">{areaLineText(current)}</p>
-              {chosenPatches.length > 0 && (
-                <div className="named-area-switches">
-                  <span className="muted">Show on the picture:</span>
-                  {chosenPatches.map((patch) => (
-                    <label key={patch.id} className="named-area-switch">
-                      <input
-                        type="checkbox"
-                        checked={shown.has(patch.id)}
-                        onChange={(event) =>
-                          setShown((now) => {
-                            const next = new Set(now)
-                            if (event.target.checked) next.add(patch.id)
-                            else next.delete(patch.id)
-                            return next
-                          })
-                        }
-                      />
-                      {patch.title}
-                    </label>
-                  ))}
-                </div>
-              )}
             </>
           ) : (
             <div
@@ -419,6 +412,28 @@ export function NamedAreasPanel({
             )
           })}
         </ul>
+        {ready && chosenPatches.length > 0 && (
+          <div className="named-area-switches">
+            <span className="muted">Show on the picture:</span>
+            {chosenPatches.map((patch) => (
+              <label key={patch.id} className="named-area-switch">
+                <input
+                  type="checkbox"
+                  checked={shown.has(patch.id)}
+                  onChange={(event) =>
+                    setShown((now) => {
+                      const next = new Set(now)
+                      if (event.target.checked) next.add(patch.id)
+                      else next.delete(patch.id)
+                      return next
+                    })
+                  }
+                />
+                {patch.title}
+              </label>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )

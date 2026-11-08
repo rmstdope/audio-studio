@@ -227,6 +227,20 @@ describe('the named areas panel', () => {
       expect(selectedIds(host)).toEqual([])
     })
 
+    it('says so when the pictures cannot be asked for at all', async () => {
+      const { host } = await render([area('a')], {
+        answer: () =>
+          Promise.resolve(
+            Response.json({
+              ok: false,
+              file: 'f',
+              problems: [{ file: 'f', path: '', message: 'x' }],
+            }),
+          ),
+      })
+      expect(host.querySelector('.named-area-empty')!.textContent).toContain('missing or cannot')
+    })
+
     it('keeps the picture’s place empty while it loads, with the list as usual', async () => {
       const { host } = await render([area('a')], { answer: () => new Promise<Response>(() => {}) })
       expect(host.querySelector('.named-area-empty')!.textContent).toBe('')
@@ -390,6 +404,27 @@ describe('the named areas panel', () => {
       expect(puts[0]!.body.box).toEqual({ x: 156, y: 50, width: 4, height: 40 })
     })
 
+    it('counts a press that wobbles a screen pixel as a click, not a move', async () => {
+      const { host, stage, puts } = await render([
+        placedAt('a', start),
+        placedAt('b', { x: 110, y: 60, width: 10, height: 10 }),
+      ])
+      await act(async () => mainOf(host, 0).click())
+      await drag(stage!, [112, 62], [113, 62])
+      expect(puts).toEqual([])
+      expect(selectedIds(host)).toEqual([1])
+    })
+
+    it('counts a small wobble outside the box as a click on a box there', async () => {
+      const { host, stage, puts } = await render([
+        area('a'),
+        placedAt('b', { x: 200, y: 100, width: 80, height: 50 }),
+      ])
+      await drag(stage!, [210, 110], [212, 112])
+      expect(puts).toEqual([])
+      expect(selectedIds(host)).toEqual([1])
+    })
+
     it('saves nothing for a press on the box without moving', async () => {
       const { stage, puts } = await setup()
       await drag(stage!, [120, 60], [120, 60])
@@ -461,6 +496,32 @@ describe('the named areas panel', () => {
       expect(none.puts).toEqual([])
     })
 
+    it('clears with the Backspace key too, which is Mac’s delete key', async () => {
+      const { host, puts } = await setup()
+      await press(mainOf(host, 0), 'Backspace')
+      expect(puts[0]!.body).toEqual({ box: null })
+    })
+
+    it('ignores keys pressed on the Clear button', async () => {
+      const { host, puts } = await setup()
+      await press(host.querySelector('.named-area-clear')!, 'ArrowRight')
+      expect(puts).toEqual([])
+    })
+
+    it('reaches the rows, the Clear button, then the patch switches, by Tab', async () => {
+      const patches = [{ id: 'p1', title: 'Bread taken', src: '/p1.png' }]
+      const { host } = await render([placedAt('a', box)], { chosenPatches: patches })
+      await act(async () => mainOf(host, 0).click())
+      const order = [...host.querySelectorAll('button, input')].filter(
+        (e) => !(e as HTMLButtonElement).disabled,
+      )
+      expect(order.map((e) => e.className || e.tagName)).toEqual([
+        'named-area-main',
+        'btn named-area-clear',
+        'INPUT',
+      ])
+    })
+
     it('reaches the rows, then the Clear button of the selected row, by Tab', async () => {
       const { host } = await setup()
       const tabbable = [...host.querySelectorAll('button')].filter((b) => !b.disabled)
@@ -484,6 +545,16 @@ describe('the named areas panel', () => {
       expect(host.querySelector('.named-area-box')).toBeNull()
       expect(rows(host)[0]!.querySelector('.chip')!.textContent).toBe('To place')
       expect(host.querySelector('.named-areas-head')!.textContent).toContain('0 of 1 placed')
+    })
+
+    it('keeps the red line until a later change is saved', async () => {
+      const { host, stage } = await render([area('a'), area('b')], {
+        saved: { status: 500, body: {} },
+      })
+      await drag(stage!, [20, 30], [120, 90])
+      expect(host.querySelector('.adopt-error')).not.toBeNull()
+      await act(async () => mainOf(host, 1).click())
+      expect(host.querySelector('.adopt-error')).not.toBeNull()
     })
 
     it('puts a cleared box back when clearing fails, and drops the line at the next change', async () => {
@@ -518,6 +589,16 @@ describe('the named areas panel', () => {
       expect(tagOf(host, 'top').className).toContain('low')
       expect(tagOf(host, 'right').className).toContain('right')
       expect(tagOf(host, 'mid').className).not.toMatch(/low|right/)
+    })
+
+    it('selects a box by pressing its tag, which is all there is to press on a tiny box', async () => {
+      const { host, stage } = await render([
+        placedAt('tiny', { x: 100, y: 100, width: 4, height: 4 }),
+        placedAt('other', { x: 10, y: 10, width: 30, height: 30 }),
+      ])
+      await act(async () => mainOf(host, 1).click())
+      await drag(stage!, [100, 100], [100, 100], tagOf(host, 'tiny').querySelector('span')!)
+      expect(selectedIds(host)).toEqual([0])
     })
 
     it('follows the game’s new title for the same id, the box staying', async () => {
