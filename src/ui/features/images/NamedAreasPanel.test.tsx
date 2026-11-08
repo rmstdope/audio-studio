@@ -56,6 +56,14 @@ interface Options {
 
 /** Renders the panel for an image of 320 x 200 with these areas; gives what was saved. */
 async function render(areas: AreaRow[], options: Options = {}) {
+  // Chosen patches reach the panel as the page gives them: titles in the row, takes in the query.
+  const chosenViews = (options.chosenPatches ?? []).map((patch) => ({
+    id: patch.id,
+    takes: [{ n: 7, chosen: true }],
+    making: [],
+    failed: [],
+    oldLook: false,
+  })) as unknown as ImagePatchesView['patches']
   const puts: { path: string; body: { box: AreaBox | null } }[] = []
   const saved = options.saved ?? { status: 200, body: { ok: true } }
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -64,21 +72,24 @@ async function render(areas: AreaRow[], options: Options = {}) {
       return Response.json(saved.body, { status: saved.status })
     }
     if (typeof options.answer === 'function') return options.answer()
-    return Response.json(options.answer ?? view())
+    return Response.json(options.answer ?? view({ patches: chosenViews }))
   }) as typeof fetch
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const draw = async (now: AreaRow[], chosenTake: number | null) => {
-    const row = { id: 'inn', width: 320, height: 200, areas: now, chosenTake } as ImageRow
+    const row = {
+      id: 'inn',
+      width: 320,
+      height: 200,
+      areas: now,
+      chosenTake,
+      patches: (options.chosenPatches ?? []).map((p) => ({ id: p.id, title: p.title })),
+    } as ImageRow
     await act(async () => {
       root.render(
-        createElement(
-          QueryClientProvider,
-          { client },
-          createElement(NamedAreasPanel, { row, chosenPatches: options.chosenPatches }),
-        ),
+        createElement(QueryClientProvider, { client }, createElement(NamedAreasPanel, { row })),
       )
     })
   }
@@ -520,7 +531,9 @@ describe('the named areas panel', () => {
     })
 
     it('reaches the rows, the Clear button, then the patch switches, by Tab', async () => {
-      const patches = [{ id: 'p1', title: 'Bread taken', src: '/p1.png' }]
+      const patches = [
+        { id: 'p1', title: 'Bread taken', src: '/api/images/inn/patches/p1/takes/7' },
+      ]
       const { host } = await render([placedAt('a', box)], { chosenPatches: patches })
       await act(async () => mainOf(host, 0).click())
       const order = [...host.querySelectorAll('button, input')].filter(
@@ -621,8 +634,8 @@ describe('the named areas panel', () => {
 
   describe('the chosen patches', () => {
     const patches = [
-      { id: 'p1', title: 'Bread taken', src: '/p1.png' },
-      { id: 'p2', title: 'Lamp lit', src: '/p2.png' },
+      { id: 'p1', title: 'Bread taken', src: '/api/images/inn/patches/p1/takes/7' },
+      { id: 'p2', title: 'Lamp lit', src: '/api/images/inn/patches/p2/takes/7' },
     ]
 
     it('has no switches and no heading without chosen patches', async () => {
@@ -640,7 +653,9 @@ describe('the named areas panel', () => {
       expect(switches.map((s) => s.checked)).toEqual([false, false])
       expect(host.querySelector('img.named-area-patch')).toBeNull()
       await act(async () => switches[1]!.click())
-      expect(host.querySelector<HTMLImageElement>('img.named-area-patch')!.src).toContain('/p2.png')
+      expect(host.querySelector<HTMLImageElement>('img.named-area-patch')!.src).toContain(
+        '/api/images/inn/patches/p2/takes/7',
+      )
     })
 
     it('stays as left while moving between areas', async () => {
