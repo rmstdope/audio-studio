@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>After a failure, the menu stays on your pick (recommended)</title
+  ><style>
+    :root {
+      --bg: #06070c;
+      --panel: #10121a;
+      --line: #262a36;
+      --text: #eceef3;
+      --soft: #c7ccd6;
+      --muted: #a9b0bd;
+      --accent: #ff6b2c;
+      --grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+      --softbg: #2a1b12;
+      --softink: #ff9a6b;
+      --danger-bg: #2e1720;
+      --danger: #ff94a8;
+      --ok: #5be3ae;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font:
+        15px/1.5 -apple-system,
+        system-ui,
+        sans-serif;
+      padding: 28px 16px 60px;
+    }
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+    .lede {
+      color: var(--soft);
+      margin: 6px 0 0;
+    }
+    .cap {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--softink);
+      margin: 0 0 8px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .panel h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .panel p {
+      margin: 0;
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .mono {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 13px;
+    }
+    .stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1024/640;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .stage svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .mark {
+      position: absolute;
+      left: 34%;
+      top: 18%;
+      width: 32%;
+      height: 50%;
+      border: 2px dashed var(--accent);
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: #1b1e29;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font: inherit;
+      text-align: left;
+    }
+    .btn.on {
+      border-color: var(--accent);
+      background: var(--softbg);
+      color: var(--softink);
+    }
+    .primary {
+      background: var(--grad);
+      color: #1a0a02;
+      border: 0;
+      font-weight: 600;
+    }
+    .dis {
+      opacity: 0.45;
+    }
+    .label {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .box {
+      background: #0b0c13;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 11px;
+      color: var(--text);
+      min-height: 52px;
+    }
+    .ph {
+      color: var(--muted);
+    }
+    .select {
+      background: #0b0c13;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 12px;
+      display: inline-flex;
+      gap: 10px;
+    }
+    .menu {
+      background: #0b0c13;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      overflow: hidden;
+      max-width: 520px;
+    }
+    .menu div {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .menu div:last-child {
+      border-bottom: 0;
+    }
+    .menu .cur {
+      background: var(--softbg);
+    }
+    .warn {
+      color: var(--danger);
+    }
+    .err {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-radius: 8px;
+      padding: 9px 12px;
+    }
+    .tries {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .seg {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .seg span {
+      padding: 7px 16px;
+    }
+    .seg .on {
+      background: var(--softbg);
+      color: var(--softink);
+      font-weight: 600;
+    }
+    .setup-row {
+      display: grid;
+      grid-template-columns: 150px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .setup-row:last-child {
+      border-bottom: 0;
+    }
+    .ok {
+      color: var(--ok);
+    }
+    .cost {
+      border-left: 3px solid var(--accent);
+      padding: 4px 12px;
+      color: var(--soft);
+    }
+    @media (max-width: 560px) {
+      .setup-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <main>
+    <div>
+      <h1>After a failure, the menu stays on your pick (recommended)</h1>
+      <p class="lede">
+        You compare models here, so the studio never swaps one without being asked.
+      </p>
+    </div>
+    <section>
+      <p class="cap">After the stronger model failed</p>
+      <div class="panel">
+        <div class="row">
+          <span class="select">Qwen Image Edit — about 2 min a patch <span>▾</span></span
+          ><span class="warn">last patch failed</span
+          ><button class="btn primary">Make patch</button>
+        </div>
+        <p class="err">
+          Qwen Image Edit could not make the patch (mflux stopped with exit code 143); the details
+          are in the studio's log.
+        </p>
+      </div>
+    </section>
+    <p class="cost">Cost: you switch to the fast model yourself if you want to carry on.</p>
+  </main>
+</html>
