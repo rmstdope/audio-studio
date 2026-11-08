@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { isRefreshing, refreshDialog, refreshEffects, refreshShared } from './refresh'
@@ -454,6 +454,20 @@ describe('refreshing an act’s images', () => {
     const raw = readFileSync(join(root, MANIFEST), 'utf8')
     await refreshDialog(join(root, 'content-studio.json'), 'act1')
     expect(readFileSync(join(root, MANIFEST), 'utf8')).toBe(raw)
+  })
+
+  it('fails with the areas reason when the manifest cannot be written', async () => {
+    const root = imagesProject({}, `printf '%s' '${gameList}' > tts/{part}/images.json`)
+    const dir = join(root, 'web/images')
+    chmodSync(dir, 0o555)
+    const result = await refreshDialog(join(root, 'content-studio.json'), 'act1')
+    chmodSync(dir, 0o755)
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'areas',
+      detail:
+        'The images manifest could not be written (permission denied). Fix it, then Refresh from the game again.',
+    })
   })
 
   it('fails with the areas reason when the manifest cannot be read', async () => {

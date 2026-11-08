@@ -84,8 +84,8 @@ bundle breaks.
   game on the Stingers page or the Sound effects page; each writes what the game writes. The one
   shared command rewrites the stingers and the effects lists alike, but each page reports only its
   own list's changes.
-  After the part command, Refresh from the game on an act's Images page also brings the placed named
-  areas of the act's images up to date in the images manifest (`areas`, §8.7).
+  After the part command, whichever page it was run from, the studio also brings the placed named
+  areas of that act's images up to date in the images manifest (`areas`, §8.7).
   The studio runs nothing else of the consumer's. The Scenes page writes one file of an act, the
   mix (`scenes.mix`, §8.11), and never the declarations the game writes.
 - The project file itself is read, and changed in seven kinds of places only: the words that sound

@@ -44,7 +44,7 @@ function edit<T>(
   projectFile: string,
   find: (summary: Summary) => T | null,
   change: (edits: ImageEdits, found: T) => ImageEdits | Problem[] | null,
-  after?: (root: string, project: Project) => Promise<Problem[]>,
+  after?: (project: Project) => Promise<Problem[]>,
 ): Promise<ImageEditResult> {
   return serial.run(projectFile, async () => {
     const opened = await openProject(projectFile)
@@ -69,7 +69,7 @@ function edit<T>(
     } catch (error) {
       return { ok: false, problems: [{ file, path: '', message: writeFailure(error) }] }
     }
-    const failed = after ? await after(root, project) : []
+    const failed = after ? await after(project) : []
     if (failed.length) {
       try {
         if (was === null) await rm(resolveInRoot(root, file), { force: true })
@@ -140,8 +140,8 @@ export function setImageAreaBox(
         : applyAreaBox(edits, id, area, box)
     },
     // The game gets the box in the same save; a clear never fails for want of an entry.
-    async (root, project) => {
-      const sync = await syncImageAreas(root, project, [id], { requireEntry: box !== null })
+    async (project) => {
+      const sync = await syncImageAreas(projectFile, project, [id], { requireEntry: box !== null })
       return sync.ok
         ? []
         : [{ file: project.images!.manifest, path: `images.${id}`, message: sync.message }]

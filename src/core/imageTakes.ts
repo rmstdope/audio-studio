@@ -176,13 +176,6 @@ export const ImageManifestSchema = z.record(
     file: z.string(),
     width: z.number(),
     height: z.number(),
-    /** The placed named areas (as-qg4.3), by area id, as fractions of the picture. */
-    areas: z
-      .record(
-        z.string(),
-        z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
-      )
-      .optional(),
   }),
 )
 

@@ -344,9 +344,12 @@ export function createImageTakes({
       const next = entry(lock[id])
       if (!next) return { ok: true as const }
       const file = `${id}.png`
+      // The boxes read again in the turn: one placed since `found` was read is what the game gets.
+      const fresh = await resolve(found.projectFile, id)
+      const row = fresh && 'row' in fresh ? fresh.row : found.row
       manifest[id] = withAreas(
         { file, width: found.row.width, height: found.row.height },
-        areaFractions(found.row.areas, found.row),
+        areaFractions(row.areas, row),
       )
       lock[id] = next
       await writeAtomic(found.root, join(found.config.clips, file), png)

@@ -406,6 +406,7 @@ export function RefreshOutcome({
         </div>
         {close}
       </div>
+      {result && 'detail' in result && <p className="notice">{result.detail}</p>}
       {result && 'problems' in result && (
         <Problems title="The new dialog cannot be used" problems={result.problems} />
       )}

@@ -210,7 +210,7 @@ async function refresh(
     problems.push({ file: dialogPath, path: '', message: 'the command wrote no dialog file' })
   }
   if (read === 'missing' || read === 'invalid') return { ok: false, problems, output: run.output }
-  const areas = await passAreasToGame(root, project, part.id)
+  const areas = await passAreasToGame(projectFile, project, part.id)
   if (!areas.ok) return { ...areas, output: run.output }
   const diff = before === 'invalid' ? null : dialogDiff(before, read)
   const loopsAfter = loopsFile ? await readTracks(root, loopsFile, LoopListSchema) : 'invalid'
@@ -232,19 +232,19 @@ async function refresh(
  * Refresh panel shows.
  */
 async function passAreasToGame(
-  root: string,
+  projectFile: string,
   project: Project,
   partId: string,
 ): Promise<{ ok: true } | { ok: false; reason: 'areas'; message: string; detail: string }> {
   if (!project.images) return { ok: true }
-  const summary = await readImages(root, project, [])
+  const summary = await readImages(dirname(projectFile), project, [])
   const ids = summary?.acts.find((act) => act.id === partId)?.rows.map((row) => row.id) ?? []
-  const sync = await syncImageAreas(root, project, ids)
+  const sync = await syncImageAreas(projectFile, project, ids)
   if (sync.ok) return sync
   const what =
     sync.reason === 'read'
       ? 'The images manifest could not be read.'
-      : `The images manifest could not be written: ${sync.message}.`
+      : `The images manifest could not be written (${sync.message}).`
   return {
     ok: false,
     reason: 'areas',

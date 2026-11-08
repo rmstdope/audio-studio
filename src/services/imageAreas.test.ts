@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { chmodSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { choices } from './musicClips'
 import { syncImageAreas } from './imageAreas'
 import { openProject } from './workspace'
 
@@ -28,7 +29,9 @@ function repo(files: Record<string, unknown> = {}) {
   const run = async (ids: string[], requireEntry = false) => {
     const opened = await openProject(join(root, 'content-studio.json'))
     if (!opened.ok) throw new Error('project')
-    return syncImageAreas(root, opened.project, ids, { requireEntry })
+    return syncImageAreas(join(root, 'content-studio.json'), opened.project, ids, {
+      requireEntry,
+    })
   }
   return { root, read, run }
 }
@@ -92,6 +95,25 @@ describe('syncImageAreas', () => {
     const answer = await full.run(['inn'])
     chmodSync(join(full.root, 'web/public/images/generated'), 0o755)
     expect(answer).toMatchObject({ ok: false, reason: 'write', message: 'permission denied' })
+  })
+
+  it('waits for a take being chosen, which writes the same manifest', async () => {
+    const { run, read, root } = repo({
+      [MANIFEST]: { inn: entry },
+      [EDITS]: { images: { inn: { areas: { fountain: box } } } },
+    })
+    let release: () => void = () => {}
+    const held = choices().run(
+      `image-choice\0${join(root, 'content-studio.json')}`,
+      () => new Promise<void>((resolve) => (release = resolve)),
+    )
+    const sync = run(['inn'])
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(read().inn.areas).toBeUndefined()
+    release()
+    await held
+    expect(await sync).toEqual({ ok: true })
+    expect(read().inn.areas).toBeDefined()
   })
 
   it('touches only the images it is asked for, and none that lists disagree on', async () => {
