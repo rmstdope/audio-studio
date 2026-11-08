@@ -121,7 +121,10 @@ export const PATCH_BIG_DIFFERENCE = 30
 export const PATCH_EASE = 48
 
 /** How many positions each way along a side the median is taken over, so that one speck does not set the colour. */
-const MATCH_SMOOTH = 6
+const MATCH_SMOOTH = 24
+
+/** How far, out of 255, a place along a side may differ from the side as a whole before it is taken as something the edit painted there and not as drift. */
+const MATCH_OUTLIER = 14
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */
 interface MatchSide {
@@ -170,11 +173,17 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       return sum.map((v) => v / depths) as [number, number, number]
     })
     // A median, not a mean: it follows a step such as a horizon instead of smearing it.
+    const middle = (values: number[]) => values.sort((x, y) => x - y)[values.length >> 1]!
+    const overall = [0, 1, 2].map((c) => middle(raw.map((o) => o[c]!)))
     return raw.map((_, k) => {
       const window = raw.slice(Math.max(0, k - MATCH_SMOOTH), Math.min(count, k + MATCH_SMOOTH + 1))
-      const median = (c: number) =>
-        window.map((o) => o[c]!).sort((x, y) => x - y)[window.length >> 1]!
-      return [median(0), median(1), median(2)] as [number, number, number]
+      // An object the edit painted beside the area is wider than the median sees, but it is far
+      // from the side's own drift: such a place takes the side's overall drift, so it is never
+      // carried into the area as a streak.
+      return [0, 1, 2].map((c) => {
+        const here = middle(window.map((o) => o[c]!))
+        return Math.abs(here - overall[c]!) > MATCH_OUTLIER ? overall[c]! : here
+      }) as [number, number, number]
     })
   }
 

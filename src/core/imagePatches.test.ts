@@ -134,13 +134,28 @@ describe('matchToTake', () => {
     const horizon = (c: [number, number, number], d: [number, number, number]) =>
       painted(200, 200, (_x, y) => (y < 100 ? c : d))
     const horizonTake = horizon([100, 140, 200], [100, 140, 60])
-    const horizonEdited = horizon([110, 150, 210], [90, 130, 50])
+    const horizonEdited = horizon([110, 150, 210], [98, 138, 58])
     const matched = matchToTake(horizonEdited, horizonTake, area)
     expect(rgbAt(matched, 51, 60)).toEqual([100, 140, 200])
     expect(rgbAt(matched, 51, 140)).toEqual([100, 140, 60])
     // Right at the horizon each part is still matched to what lies next to it.
     expect(rgbAt(matched, 51, 99)).toEqual([100, 140, 200])
     expect(rgbAt(matched, 51, 100)).toEqual([100, 140, 60])
+  })
+
+  it('does not streak the area with something the edit painted just outside one side', () => {
+    const flat = plain(300, 300, [100, 140, 200])
+    const object = (x0: number, w: number, x: number, y: number): [number, number, number] =>
+      y >= 150 && y < 158 && x >= x0 && x < x0 + w ? [0, 20, 100] : [103, 143, 203]
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    // A narrow object and a wide one, painted in the strip below the area; the drift is +3.
+    for (const w of [24, 60]) {
+      const edited = painted(300, 300, (x, y) => object(130, w, x, y))
+      const matched = matchToTake(edited, flat, bounds)
+      for (const y of [149, 120, 80]) {
+        for (const x of [100, 140, 200]) expect(rgbAt(matched, x, y)).toEqual([100, 140, 200])
+      }
+    }
   })
 
   it('does not look past a side on the picture edge, and matches the other sides', () => {
