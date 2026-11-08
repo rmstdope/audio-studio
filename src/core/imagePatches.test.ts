@@ -180,6 +180,26 @@ describe('matchToTake', () => {
     }
   })
 
+  it('still meets the take at the sides when objects painted just outside cover most of a side (the sky is still the commonest tone)', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    // The edit is paler by 85 in blue everywhere; dark birds of varied tone cover 60% of the strip below.
+    const edited = painted(300, 300, (x, y) => {
+      const ring =
+        x >= 42 && x < 258 && y >= 42 && y < 158 && !(x >= 50 && x < 250 && y >= 50 && y < 150)
+      const bird = ring && (x >= 50 && x < 250 ? x : y) % 20 < 12
+      return bird ? [(x * 7) % 60, 20 + ((x * 3) % 40), 60 + ((x * 11) % 50)] : [103, 143, 235]
+    })
+    const matched = matchToTake(edited, flat, bounds)
+    for (const x of [60, 80, 100, 120, 140, 160, 180, 200]) {
+      for (const y of [149, 140, 100]) {
+        for (const [i, v] of rgbAt(matched, x, y).entries()) {
+          expect(Math.abs(v - [100, 140, 150][i]!)).toBeLessThanOrEqual(6)
+        }
+      }
+    }
+  })
+
   it('does not look past a side on the picture edge, and matches the other sides', () => {
     const edge = { x: 0, y: 50, width: 100, height: 100 }
     const edited = plain(200, 200, [110, 150, 70])

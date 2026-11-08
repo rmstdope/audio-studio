@@ -132,6 +132,30 @@ const MATCH_IGNORE = 8
 /** The median of the values, which it sorts in place. */
 const middle = (values: number[]) => values.sort((x, y) => x - y)[values.length >> 1]!
 
+/** Out of 255, how close two offsets must be on every channel to count as the same tone when looking for the commonest. */
+const MATCH_SAME = 8
+
+/** At most this many offsets are compared with each other when looking for the commonest tone. */
+const MATCH_SAMPLES = 400
+
+/**
+ * The commonest offset among the places: the one with the most others within `MATCH_SAME` of it on
+ * every channel, taken as the median of those. Unlike the median of all, it stays on the sky when
+ * objects of many different tones cover most of the strip around it.
+ */
+function commonest(offsets: [number, number, number][]): number[] {
+  const step = Math.max(1, Math.ceil(offsets.length / MATCH_SAMPLES))
+  const sample = offsets.filter((_, k) => k % step === 0)
+  const near = (a: number[], b: number[]) =>
+    [0, 1, 2].every((c) => Math.abs(a[c]! - b[c]!) <= MATCH_SAME)
+  let best: [number, number, number][] = []
+  for (const o of sample) {
+    const group = sample.filter((other) => near(o, other))
+    if (group.length > best.length) best = group
+  }
+  return [0, 1, 2].map((c) => middle(best.map((o) => o[c]!)))
+}
+
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */
 interface MatchSide {
   /** The distance in pixels from a point of the area to this side. */
@@ -161,14 +185,14 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       take.data[i + 2]! - edited.data[i + 2]!,
     ]
   }
-  /** The smoothed offsets along one side: for each position, the median of the strip's mean over the position and its neighbours. */
+  /** The offsets along one side: for each position, the mean over the strip's depth. */
   const along = (
     count: number,
     start: number,
     pixel: (position: number, depth: number) => [number, number, number],
     depths: number,
-  ): [number, number, number][] => {
-    const raw = Array.from({ length: count }, (_, k) => {
+  ): [number, number, number][] =>
+    Array.from({ length: count }, (_, k) => {
       const sum: [number, number, number] = [0, 0, 0]
       for (let d = 0; d < depths; d++) {
         const o = pixel(start + k, d)
@@ -178,60 +202,66 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       }
       return sum.map((v) => v / depths) as [number, number, number]
     })
-    // A median, not a mean: it follows a step such as a horizon instead of smearing it.
-    return raw.map((_, k) => {
-      const window = raw.slice(Math.max(0, k - MATCH_SMOOTH), Math.min(count, k + MATCH_SMOOTH + 1))
+  /** The offsets with each position replaced by the median over its neighbours: it follows a step such as a horizon instead of smearing it. */
+  const smooth = (raw: [number, number, number][]): [number, number, number][] =>
+    raw.map((_, k) => {
+      const window = raw.slice(
+        Math.max(0, k - MATCH_SMOOTH),
+        Math.min(raw.length, k + MATCH_SMOOTH + 1),
+      )
       return [0, 1, 2].map((c) => middle(window.map((o) => o[c]!))) as [number, number, number]
     })
-  }
 
-  const sides: MatchSide[] = []
-  const allOffsets: [number, number, number][][] = []
   const band = (room: number) => Math.min(PATCH_MATCH_BAND, room)
+  const strips: {
+    offsets: [number, number, number][]
+    distance: MatchSide['distance']
+    index: (x: number, y: number) => number
+  }[] = []
   if (area.x > 0) {
-    const depths = band(area.x)
-    const offsets = along(area.height, area.y, (y, d) => offsetAtPixel(area.x - 1 - d, y), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (x) => x - area.x + 0.5,
-      offsetAt: (_x, y) => offsets[y - area.y]!,
-    })
+    const offsets = along(
+      area.height,
+      area.y,
+      (y, d) => offsetAtPixel(area.x - 1 - d, y),
+      band(area.x),
+    )
+    strips.push({ offsets, distance: (x) => x - area.x + 0.5, index: (_x, y) => y - area.y })
   }
   if (right < width) {
-    const depths = band(width - right)
-    const offsets = along(area.height, area.y, (y, d) => offsetAtPixel(right + d, y), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (x) => right - x - 0.5,
-      offsetAt: (_x, y) => offsets[y - area.y]!,
-    })
+    const offsets = along(
+      area.height,
+      area.y,
+      (y, d) => offsetAtPixel(right + d, y),
+      band(width - right),
+    )
+    strips.push({ offsets, distance: (x) => right - x - 0.5, index: (_x, y) => y - area.y })
   }
   if (area.y > 0) {
-    const depths = band(area.y)
-    const offsets = along(area.width, area.x, (x, d) => offsetAtPixel(x, area.y - 1 - d), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (_x, y) => y - area.y + 0.5,
-      offsetAt: (x) => offsets[x - area.x]!,
-    })
+    const offsets = along(
+      area.width,
+      area.x,
+      (x, d) => offsetAtPixel(x, area.y - 1 - d),
+      band(area.y),
+    )
+    strips.push({ offsets, distance: (_x, y) => y - area.y + 0.5, index: (x) => x - area.x })
   }
   if (bottom < height) {
-    const depths = band(height - bottom)
-    const offsets = along(area.width, area.x, (x, d) => offsetAtPixel(x, bottom + d), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (_x, y) => bottom - y - 0.5,
-      offsetAt: (x) => offsets[x - area.x]!,
-    })
+    const offsets = along(
+      area.width,
+      area.x,
+      (x, d) => offsetAtPixel(x, bottom + d),
+      band(height - bottom),
+    )
+    strips.push({ offsets, distance: (_x, y) => bottom - y - 0.5, index: (x) => x - area.x })
   }
 
-  // Something the edit painted just outside the area (a bird, a cloud) is far from the drift of
-  // the sides as a whole, and carried inward it would streak the area: such a place takes that
-  // drift instead, gradually, so no hard step shows.
-  if (allOffsets.length > 0) {
-    const pooled = allOffsets.flat()
-    const reference = [0, 1, 2].map((c) => middle(pooled.map((o) => o[c]!)))
-    for (const offsets of allOffsets) {
+  // Something the edit painted just outside the area (a bird, a cloud) is far from the commonest
+  // tone around the area, and carried inward it would streak the area: such a place takes that
+  // tone instead, gradually, so no hard step shows. This is judged before smoothing, so that
+  // objects covering most of a side cannot outvote the sky.
+  if (strips.length > 0) {
+    const reference = commonest(strips.flatMap((strip) => strip.offsets))
+    for (const { offsets } of strips) {
       for (const o of offsets) {
         for (let c = 0; c < 3; c++) {
           const t = Math.max(
@@ -243,6 +273,10 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       }
     }
   }
+  const sides: MatchSide[] = strips.map((strip) => {
+    const offsets = smooth(strip.offsets)
+    return { distance: strip.distance, offsetAt: (x, y) => offsets[strip.index(x, y)]! }
+  })
 
   const data = new Uint8Array(edited.data)
   if (sides.length === 0) return { width, height, data }
