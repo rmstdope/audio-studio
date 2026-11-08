@@ -335,6 +335,17 @@ describe('Make takes for every image with no chosen take', () => {
     expect(page.container.querySelector('button')).toBeNull()
   })
 
+  it('names the images the lists disagree about instead of saying every image is chosen', () => {
+    for (const rows of [[], [image('a', 'A', 'chosen')]]) {
+      const page = render(actOf(rows, [conflict('x', "Smugglers' cave")]))
+      expect(page.text()).not.toContain('Every image has a chosen take.')
+      expect(page.text()).toContain(
+        "Smugglers' cave gets none: the game's lists disagree about it.",
+      )
+      expect(page.container.querySelector('button')).toBeNull()
+    }
+  })
+
   it('says images cannot be made yet, with a link to Setup, when neither model can run', () => {
     const none: ImageModelState = { download: 'absent', failed: false }
     const page = render(three, { states: { klein: none, 'z-image-turbo': none } })

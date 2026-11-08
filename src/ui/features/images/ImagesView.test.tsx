@@ -850,6 +850,13 @@ describe('lists that disagree about an image', () => {
       ['The Inninn', 'The Barnbarn'],
     )
   })
+  it('counts an image the lists disagree about in the line under the act heading', () => {
+    const page = render({ view: 'images', page: 'act', part: 'act2' }, summed())
+    expect(text(page.querySelector('.page-header .muted'))).toBe(
+      'The images the game asks for in Act II. 0 of 1 chosen.',
+    )
+  })
+
   it('shows only the reason on the page of such an image', () => {
     const page = render({ view: 'images', page: 'image', image: 'inn', from: 'act2' }, summed())
     expect(text(page.querySelector('.crumbs'))).toBe('Images › Act II')

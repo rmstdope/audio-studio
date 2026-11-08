@@ -66,7 +66,7 @@ export function ActPage({
           <span className="crumbs">Images</span>
           <h1 tabIndex={-1}>{name}</h1>
           {act.state === 'ok' && (
-            <span className="muted">{chosenLine(name, act.rows.length, act.chosen)}</span>
+            <span className="muted">{chosenLine(name, done.total, act.chosen)}</span>
           )}
         </div>
         {act.canRefresh && (
