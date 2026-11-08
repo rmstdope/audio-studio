@@ -48,3 +48,18 @@ describe('an image’s workbench', () => {
     expect(block).toMatch(/position:\s*static/)
   })
 })
+
+describe('a patch row the game asks for (as-9b8)', () => {
+  const rule = (selector: string) => {
+    const at = css.indexOf(`${selector} {`)
+    return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
+  }
+
+  it('holds the chevron on the first line, and wraps only the words beside it', () => {
+    expect(rule('.game-patch-row')).not.toMatch(/flex-wrap/)
+    expect(rule('.game-patch-chev')).toMatch(/flex:\s*none/)
+    expect(rule('.game-patch-words')).toMatch(/flex-wrap:\s*wrap/)
+    expect(rule('.game-patch-words')).toMatch(/flex:\s*1/)
+    expect(rule('.game-patch-words')).toMatch(/min-width:\s*0/)
+  })
+})

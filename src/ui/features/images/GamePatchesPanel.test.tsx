@@ -122,6 +122,19 @@ describe('GamePatchesPanel', () => {
     expect(rowButtons(host)[0]!.getAttribute('aria-expanded')).toBe('false')
   })
 
+  it('keeps the chevron apart from the words, so a long title wraps beside it (as-9b8)', async () => {
+    const { host } = await render([patch('bread-taken', { changed: true })])
+    const [chevron, words, ...others] = [...rowButtons(host)[0]!.children]
+    expect(chevron!.className).toBe('game-patch-chev')
+    expect(others.length).toBe(0)
+    expect(words!.className).toBe('game-patch-words')
+    expect([...words!.children].map((c) => text(c))).toEqual([
+      'Title of bread-taken',
+      'bread-taken',
+      'changed here',
+    ])
+  })
+
   it('saves rewording when the field is left, shows Saved, and the game’s words', async () => {
     const { host, sent } = await render([patch('bread-taken')])
     await act(async () => rowButtons(host)[0]!.click())

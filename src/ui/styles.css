@@ -5024,9 +5024,8 @@ button.cue-chip[aria-expanded='true'] {
 }
 .game-patch-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 10px;
+  gap: 10px;
   width: 100%;
   padding: 10px 2px;
   background: none;
@@ -5041,8 +5040,17 @@ button.cue-chip[aria-expanded='true'] {
   overflow-wrap: anywhere;
 }
 .game-patch-chev {
+  flex: none;
   width: 14px;
   color: var(--faint);
+}
+.game-patch-words {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
 }
 .game-patch-mark {
   margin-left: auto;

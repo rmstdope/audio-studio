@@ -131,13 +131,15 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                 <span className="game-patch-chev" aria-hidden="true">
                   {isOpen ? '▾' : '▸'}
                 </span>
-                <b>{patch.title}</b>
-                <span className="mono muted">{patch.id}</span>
-                {patch.changed && (
-                  <span className="game-patch-mark">
-                    {patch.gameChanged ? 'the game changed its words' : 'changed here'}
-                  </span>
-                )}
+                <span className="game-patch-words">
+                  <b>{patch.title}</b>
+                  <span className="mono muted">{patch.id}</span>
+                  {patch.changed && (
+                    <span className="game-patch-mark">
+                      {patch.gameChanged ? 'the game changed its words' : 'changed here'}
+                    </span>
+                  )}
+                </span>
               </button>
               {isOpen && (
                 <PatchBody
