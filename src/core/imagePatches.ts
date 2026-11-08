@@ -123,7 +123,7 @@ export const PATCH_EASE = 48
 /** How many positions each way along a side the median is taken over, so that one speck does not set the colour. */
 const MATCH_SMOOTH = 24
 
-/** Out of 255, how far a place along a side may differ from the drift of all the sides together and still be followed in full. */
+/** Out of 255, how far a place along a side may differ from the drift around the area and still be followed in full. */
 const MATCH_FOLLOW = 22
 
 /** Out of 255, how far beyond `MATCH_FOLLOW` a place may differ before it is not followed at all: it is something the edit painted there. */
@@ -131,6 +131,42 @@ const MATCH_IGNORE = 8
 
 /** The median of the values, which it sorts in place. */
 const middle = (values: number[]) => values.sort((x, y) => x - y)[values.length >> 1]!
+
+/** Out of 255, how close two offsets must be on every channel to count as the same tone when grouping the places. */
+const MATCH_SAME = 8
+
+/** At most this many offsets are compared with each other when grouping the places. */
+const MATCH_SAMPLES = 400
+
+/**
+ * The offset to take as the drift around the area: of the tones that many places agree on (within
+ * `MATCH_SAME` on every channel; any group at least a quarter as big as the biggest), the one
+ * nearest `anchor`, the median offset of the whole picture, as the median of that group, or the anchor itself when that group is more than `MATCH_FOLLOW` from it. The whole
+ * picture is mostly untouched by the edit, so its median is the drift even where objects cover most
+ * of the strip around the area, and among tones that are about equally common (a gradual drift) it
+ * keeps the middle one instead of an end.
+ */
+function driftAround(offsets: [number, number, number][], anchor: number[]): number[] {
+  const step = Math.max(1, Math.ceil(offsets.length / MATCH_SAMPLES))
+  const sample = offsets.filter((_, k) => k % step === 0)
+  const near = (a: number[], b: number[]) =>
+    [0, 1, 2].every((c) => Math.abs(a[c]! - b[c]!) <= MATCH_SAME)
+  const groups = sample.map((o) => sample.filter((other) => near(o, other)))
+  const biggest = Math.max(...groups.map((g) => g.length))
+  let best: number[] = anchor
+  let nearest = Infinity
+  for (const group of groups) {
+    if (group.length * 4 < biggest) continue
+    const centre = [0, 1, 2].map((c) => middle(group.map((o) => o[c]!)))
+    const gap = [0, 1, 2].reduce((sum, c) => sum + Math.abs(centre[c]! - anchor[c]!), 0)
+    if (gap < nearest) {
+      nearest = gap
+      best = centre
+    }
+  }
+  // A tone far from the picture's own median is objects, not drift.
+  return [0, 1, 2].every((c) => Math.abs(best[c]! - anchor[c]!) <= MATCH_FOLLOW) ? best : anchor
+}
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */
 interface MatchSide {
@@ -161,14 +197,14 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       take.data[i + 2]! - edited.data[i + 2]!,
     ]
   }
-  /** The smoothed offsets along one side: for each position, the median of the strip's mean over the position and its neighbours. */
+  /** The offsets along one side: for each position, the mean over the strip's depth. */
   const along = (
     count: number,
     start: number,
     pixel: (position: number, depth: number) => [number, number, number],
     depths: number,
-  ): [number, number, number][] => {
-    const raw = Array.from({ length: count }, (_, k) => {
+  ): [number, number, number][] =>
+    Array.from({ length: count }, (_, k) => {
       const sum: [number, number, number] = [0, 0, 0]
       for (let d = 0; d < depths; d++) {
         const o = pixel(start + k, d)
@@ -178,60 +214,80 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       }
       return sum.map((v) => v / depths) as [number, number, number]
     })
-    // A median, not a mean: it follows a step such as a horizon instead of smearing it.
-    return raw.map((_, k) => {
-      const window = raw.slice(Math.max(0, k - MATCH_SMOOTH), Math.min(count, k + MATCH_SMOOTH + 1))
+  /** The offsets with each position replaced by the median over its neighbours: it follows a step such as a horizon instead of smearing it. */
+  const smooth = (raw: [number, number, number][]): [number, number, number][] =>
+    raw.map((_, k) => {
+      const window = raw.slice(
+        Math.max(0, k - MATCH_SMOOTH),
+        Math.min(raw.length, k + MATCH_SMOOTH + 1),
+      )
       return [0, 1, 2].map((c) => middle(window.map((o) => o[c]!))) as [number, number, number]
     })
-  }
 
-  const sides: MatchSide[] = []
-  const allOffsets: [number, number, number][][] = []
   const band = (room: number) => Math.min(PATCH_MATCH_BAND, room)
+  const strips: {
+    offsets: [number, number, number][]
+    distance: MatchSide['distance']
+    index: (x: number, y: number) => number
+  }[] = []
   if (area.x > 0) {
-    const depths = band(area.x)
-    const offsets = along(area.height, area.y, (y, d) => offsetAtPixel(area.x - 1 - d, y), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (x) => x - area.x + 0.5,
-      offsetAt: (_x, y) => offsets[y - area.y]!,
-    })
+    const offsets = along(
+      area.height,
+      area.y,
+      (y, d) => offsetAtPixel(area.x - 1 - d, y),
+      band(area.x),
+    )
+    strips.push({ offsets, distance: (x) => x - area.x + 0.5, index: (_x, y) => y - area.y })
   }
   if (right < width) {
-    const depths = band(width - right)
-    const offsets = along(area.height, area.y, (y, d) => offsetAtPixel(right + d, y), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (x) => right - x - 0.5,
-      offsetAt: (_x, y) => offsets[y - area.y]!,
-    })
+    const offsets = along(
+      area.height,
+      area.y,
+      (y, d) => offsetAtPixel(right + d, y),
+      band(width - right),
+    )
+    strips.push({ offsets, distance: (x) => right - x - 0.5, index: (_x, y) => y - area.y })
   }
   if (area.y > 0) {
-    const depths = band(area.y)
-    const offsets = along(area.width, area.x, (x, d) => offsetAtPixel(x, area.y - 1 - d), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (_x, y) => y - area.y + 0.5,
-      offsetAt: (x) => offsets[x - area.x]!,
-    })
+    const offsets = along(
+      area.width,
+      area.x,
+      (x, d) => offsetAtPixel(x, area.y - 1 - d),
+      band(area.y),
+    )
+    strips.push({ offsets, distance: (_x, y) => y - area.y + 0.5, index: (x) => x - area.x })
   }
   if (bottom < height) {
-    const depths = band(height - bottom)
-    const offsets = along(area.width, area.x, (x, d) => offsetAtPixel(x, bottom + d), depths)
-    allOffsets.push(offsets)
-    sides.push({
-      distance: (_x, y) => bottom - y - 0.5,
-      offsetAt: (x) => offsets[x - area.x]!,
-    })
+    const offsets = along(
+      area.width,
+      area.x,
+      (x, d) => offsetAtPixel(x, bottom + d),
+      band(height - bottom),
+    )
+    strips.push({ offsets, distance: (_x, y) => bottom - y - 0.5, index: (x) => x - area.x })
   }
 
-  // Something the edit painted just outside the area (a bird, a cloud) is far from the drift of
-  // the sides as a whole, and carried inward it would streak the area: such a place takes that
-  // drift instead, gradually, so no hard step shows.
-  if (allOffsets.length > 0) {
-    const pooled = allOffsets.flat()
-    const reference = [0, 1, 2].map((c) => middle(pooled.map((o) => o[c]!)))
-    for (const offsets of allOffsets) {
+  // Something the edit painted just outside the area (a bird, a cloud) is far from the drift
+  // around the area, and carried inward it would streak the area: such a place takes that
+  // tone instead, gradually, so no hard step shows. This is judged before smoothing, so that
+  // objects covering most of a side cannot outvote the sky.
+  if (strips.length > 0) {
+    // The median offset of the whole picture outside the area, from a sparse grid of places.
+    const grid: [number, number, number][] = []
+    const stride = Math.max(1, Math.floor(Math.sqrt((width * height) / MATCH_SAMPLES)))
+    for (let y = 0; y < height; y += stride) {
+      for (let x = 0; x < width; x += stride) {
+        if (x >= area.x && x < right && y >= area.y && y < bottom) continue
+        grid.push(offsetAtPixel(x, y))
+      }
+    }
+    const basis = grid.length > 0 ? grid : strips.flatMap((strip) => strip.offsets)
+    const anchor = [0, 1, 2].map((c) => middle(basis.map((o) => o[c]!)))
+    const reference = driftAround(
+      strips.flatMap((strip) => strip.offsets),
+      anchor,
+    )
+    for (const { offsets } of strips) {
       for (const o of offsets) {
         for (let c = 0; c < 3; c++) {
           const t = Math.max(
@@ -243,6 +299,10 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       }
     }
   }
+  const sides: MatchSide[] = strips.map((strip) => {
+    const offsets = smooth(strip.offsets)
+    return { distance: strip.distance, offsetAt: (x, y) => offsets[strip.index(x, y)]! }
+  })
 
   const data = new Uint8Array(edited.data)
   if (sides.length === 0) return { width, height, data }

@@ -180,6 +180,88 @@ describe('matchToTake', () => {
     }
   })
 
+  it('still meets the take at the sides when objects painted just outside cover most of a side (the sky is still the drift)', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    // The edit is paler by 85 in blue everywhere; dark birds of varied tone cover 60% of the strip around the area.
+    const edited = painted(300, 300, (x, y) => {
+      const ring =
+        x >= 42 && x < 258 && y >= 42 && y < 158 && !(x >= 50 && x < 250 && y >= 50 && y < 150)
+      const bird = ring && (x >= 50 && x < 250 ? x : y) % 20 < 12
+      return bird ? [(x * 7) % 60, 20 + ((x * 3) % 40), 60 + ((x * 11) % 50)] : [103, 143, 235]
+    })
+    const matched = matchToTake(edited, flat, bounds)
+    for (const x of [60, 80, 100, 120, 140, 160, 180, 200]) {
+      for (const y of [149, 140, 100]) {
+        for (const [i, v] of rgbAt(matched, x, y).entries()) {
+          expect(Math.abs(v - [100, 140, 150][i]!)).toBeLessThanOrEqual(6)
+        }
+      }
+    }
+  })
+
+  it('meets the take at the sides when objects of one dark tone cover more than half of the strip around the area', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    const edited = painted(300, 300, (x, y) => {
+      const ring =
+        x >= 42 && x < 258 && y >= 42 && y < 158 && !(x >= 50 && x < 250 && y >= 50 && y < 150)
+      return ring && (x >= 50 && x < 250 ? x : y) % 20 < 12 ? [10, 10, 15] : [103, 143, 235]
+    })
+    const matched = matchToTake(edited, flat, bounds)
+    for (const [x, y] of [
+      [60, 149],
+      [100, 100],
+      [140, 149],
+      [51, 100],
+      [248, 60],
+      [200, 51],
+    ] as const) {
+      for (const [i, v] of rgbAt(matched, x, y).entries()) {
+        expect(Math.abs(v - [100, 140, 150][i]!)).toBeLessThanOrEqual(6)
+      }
+    }
+  })
+
+  it('meets the take at the sides when objects of one dark tone cover most (85%) of the strip around the area', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    const edited = painted(300, 300, (x, y) => {
+      const ring =
+        x >= 42 && x < 258 && y >= 42 && y < 158 && !(x >= 50 && x < 250 && y >= 50 && y < 150)
+      return ring && (x >= 50 && x < 250 ? x : y) % 20 < 17 ? [10, 10, 15] : [103, 143, 235]
+    })
+    const matched = matchToTake(edited, flat, bounds)
+    for (const [x, y] of [
+      [60, 149],
+      [100, 100],
+      [140, 149],
+      [51, 100],
+      [248, 60],
+      [200, 51],
+    ] as const) {
+      for (const [i, v] of rgbAt(matched, x, y).entries()) {
+        expect(Math.abs(v - [100, 140, 150][i]!)).toBeLessThanOrEqual(6)
+      }
+    }
+  })
+
+  it('meets the take at every side when the drift changes gradually across the area', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    const edited = painted(300, 300, (x) => [100, 140, 150 + Math.round(x / 5)])
+    const matched = matchToTake(edited, flat, bounds)
+    for (const [x, y] of [
+      [51, 100],
+      [248, 100],
+      [240, 149],
+      [60, 51],
+      [150, 100],
+    ] as const) {
+      expect(Math.abs(rgbAt(matched, x, y)[2]! - 150)).toBeLessThanOrEqual(6)
+    }
+  })
+
   it('does not look past a side on the picture edge, and matches the other sides', () => {
     const edge = { x: 0, y: 50, width: 100, height: 100 }
     const edited = plain(200, 200, [110, 150, 70])
