@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Two chosen patches overlap</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/8%);
+        --line-strong: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --warn-line: #5a4a1e;
+        --danger-ink: #ff94a8;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --info: #7aa7ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .intro {
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .intro p {
+        margin: 0;
+      }
+      .state {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 22px 0 -6px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .panel h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .panel p {
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--line);
+      }
+      .rows > li {
+        border-bottom: 1px solid var(--line);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 2px;
+        flex-wrap: wrap;
+      }
+      .chev {
+        color: var(--faint);
+        width: 14px;
+      }
+      .row b {
+        font-weight: 600;
+      }
+      .right {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 13px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: rgb(255 255 255/6%);
+        color: var(--muted);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .notice {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--warn-line);
+        background: var(--warn-bg);
+      }
+      .notice strong {
+        color: var(--warn);
+      }
+      .notice p {
+        margin: 0;
+      }
+      .notice .t {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .notice ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        padding: 6px 11px;
+        border-radius: 9px;
+        font: inherit;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .line-warn {
+        color: var(--warn);
+        font-size: 13px;
+      }
+      .body {
+        padding: 0 2px 16px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .note {
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .pic {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #2b3350 0, #39304a 55%, #5a3f33 55%, #3e2b24 100%);
+        aspect-ratio: 16/10;
+      }
+      .pic .a {
+        position: absolute;
+        border: 2px solid var(--info);
+        background: rgb(122 167 255/16%);
+      }
+      .pic .b {
+        position: absolute;
+        border: 2px solid var(--accent);
+        background: rgb(255 107 44/16%);
+      }
+      .pic .o {
+        position: absolute;
+        background: repeating-linear-gradient(45deg, var(--warn) 0 4px, transparent 4px 8px);
+        opacity: 0.85;
+      }
+      .tag {
+        position: absolute;
+        font-size: 11px;
+        padding: 1px 6px;
+        border-radius: 5px;
+        background: rgb(0 0 0/60%);
+        color: #fff;
+        white-space: nowrap;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .case {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .side {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        color: var(--faint);
+        font-size: 12px;
+        text-align: left;
+        font-weight: 500;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .chg {
+        color: var(--warn);
+        font-size: 12px;
+        margin-top: 3px;
+      }
+      .collapsed {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .link {
+        color: var(--info);
+        text-decoration: underline;
+      }
+      @media (max-width: 640px) {
+        body {
+          padding: 16px;
+        }
+        .two,
+        .side {
+          grid-template-columns: 1fr;
+        }
+      }
+      .wb {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+        gap: 16px;
+      }
+      .wb .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .btns {
+        display: flex;
+        gap: 6px;
+      }
+      .ta {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 8px 10px;
+        color: var(--text);
+        min-height: 58px;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .a-link {
+        color: var(--warn);
+        text-decoration: underline;
+      }
+      @media (max-width: 640px) {
+        .wb {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>Two chosen patches overlap</h1>
+        <p>
+          The agreed drawing: the warning an image’s page and its act’s page give when the marked
+          areas of two chosen takes share part of the picture. It stops nothing.
+        </p>
+      </div>
+      <div class="state">One overlap, patches closed</div>
+      <div class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <div class="notice">
+          <div class="t">
+            <strong>Two chosen patches overlap: Bread taken and Door ajar.</strong>
+            <p class="muted">
+              If the game shows both at once, one is drawn over the other where they meet.
+            </p>
+          </div>
+        </div>
+        <ul class="rows">
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="state">Several overlaps: one line per pair, in the game’s order</div>
+      <div class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <div class="notice">
+          <div class="t">
+            <strong>Some chosen patches overlap.</strong>
+            <ul>
+              <li>Bread taken and Door ajar</li>
+              <li>Bread taken and Fire out</li>
+              <li>Door ajar and Fire out</li>
+            </ul>
+            <p class="muted">
+              If the game shows both at once, one is drawn over the other where they meet.
+            </p>
+          </div>
+        </div>
+        <ul class="rows">
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="state">An open patch that overlaps one other</div>
+      <div class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <div class="notice">
+          <div class="t">
+            <strong>Two chosen patches overlap: Bread taken and Door ajar.</strong>
+            <p class="muted">
+              If the game shows both at once, one is drawn over the other where they meet.
+            </p>
+          </div>
+        </div>
+        <ul class="rows">
+          <li>
+            <div class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+            <div class="body">
+              <div class="wb">
+                <div class="col">
+                  <div class="head">
+                    <span class="small muted"
+                      >Looking at Take 1 <span class="chip ok">Chosen</span></span
+                    ><span class="btns"
+                      ><span class="btn">Show the patch</span
+                      ><span class="btn">Un-choose</span></span
+                    >
+                  </div>
+                  <div class="pic">
+                    <div class="a" style="left: 18%; top: 30%; width: 42%; height: 48%"></div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="line-warn">The chosen take overlaps Door ajar.</div>
+                  <div class="label">What should change</div>
+                  <div class="ta">Remove the bread from the table</div>
+                  <div class="note">Takes and how to make more, as they are today.</div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="state">An open patch that overlaps several</div>
+      <div class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <div class="notice">
+          <div class="t">
+            <strong>Some chosen patches overlap.</strong>
+            <ul>
+              <li>Bread taken and Door ajar</li>
+              <li>Bread taken and Fire out</li>
+              <li>Door ajar and Fire out</li>
+            </ul>
+            <p class="muted">
+              If the game shows both at once, one is drawn over the other where they meet.
+            </p>
+          </div>
+        </div>
+        <ul class="rows">
+          <li>
+            <div class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+            <div class="body">
+              <div class="wb">
+                <div class="col">
+                  <div class="head">
+                    <span class="small muted"
+                      >Looking at Take 1 <span class="chip ok">Chosen</span></span
+                    ><span class="btns"
+                      ><span class="btn">Show the patch</span
+                      ><span class="btn">Un-choose</span></span
+                    >
+                  </div>
+                  <div class="pic">
+                    <div class="a" style="left: 18%; top: 30%; width: 42%; height: 48%"></div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="line-warn">The chosen take overlaps Door ajar and Fire out.</div>
+                  <div class="label">What should change</div>
+                  <div class="ta">Remove the bread from the table</div>
+                  <div class="note">Takes and how to make more, as they are today.</div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="state">A patch waiting to be made again does not count: no warning</div>
+      <div class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right"
+                >1 take, none chosen <span class="chip warn">Make again</span></span
+              >
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right">no takes yet</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="state">No overlap: nothing extra on the page</div>
+      <div class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+          <li>
+            <div class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right">3 takes <span class="chip ok">Take 1 chosen</span></span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="state">The act’s Images page: one overlap</div>
+      <div class="panel">
+        <h2>Act 1: Images</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Image</th>
+              <th>Prompt</th>
+              <th>Size</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Elior’s cottage</b><br /><span class="mono muted">elior-cottage</span></td>
+              <td>
+                A small stone cottage room, a table by the fire
+                <div class="chg">patches overlap: Bread taken and Door ajar</div>
+              </td>
+              <td>640 × 400</td>
+              <td><span class="chip ok">Chosen</span></td>
+            </tr>
+            <tr>
+              <td><b>The sluice</b><br /><span class="mono muted">sluice</span></td>
+              <td>The old sluice gate at dusk</td>
+              <td>640 × 400</td>
+              <td><span class="chip ok">Chosen</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="state">
+        The act’s Images page: several overlaps, the line wraps within its row
+      </div>
+      <div class="panel">
+        <h2>Act 1: Images</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Image</th>
+              <th>Prompt</th>
+              <th>Size</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Elior’s cottage</b><br /><span class="mono muted">elior-cottage</span></td>
+              <td>
+                A small stone cottage room, a table by the fire
+                <div class="chg">
+                  patches overlap: Bread taken and Door ajar; Bread taken and Fire out; Door ajar
+                  and Fire out
+                </div>
+              </td>
+              <td>640 × 400</td>
+              <td><span class="chip ok">Chosen</span></td>
+            </tr>
+            <tr>
+              <td><b>The sluice</b><br /><span class="mono muted">sluice</span></td>
+              <td>The old sluice gate at dusk</td>
+              <td>640 × 400</td>
+              <td><span class="chip ok">Chosen</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>
