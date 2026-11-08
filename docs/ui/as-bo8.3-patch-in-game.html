@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>A chosen patch in the game</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/8%);
+        --line-strong: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --ok: #3ddc97;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .intro {
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .intro p {
+        margin: 0;
+      }
+      .state {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 22px 0 -6px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .panel h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .panel p {
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--line);
+      }
+      .rows > li {
+        border-bottom: 1px solid var(--line);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 2px;
+        width: 100%;
+        background: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        flex-wrap: wrap;
+      }
+      .chev {
+        color: var(--faint);
+        width: 14px;
+      }
+      .row b {
+        font-weight: 600;
+      }
+      .row .right {
+        margin-left: auto;
+      }
+      .tag {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .tag.ch {
+        color: var(--warn);
+      }
+      .body {
+        padding: 0 2px 16px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .fh {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      textarea,
+      select {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        color: var(--text);
+        font: inherit;
+        padding: 7px 10px;
+      }
+      textarea {
+        width: 100%;
+        resize: vertical;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 6px 12px;
+        font: inherit;
+      }
+      .btn.p {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border: 0;
+        font-weight: 600;
+      }
+      .btn.g {
+        background: none;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+      }
+      .bench {
+        display: grid;
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+      }
+      .pic svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+      .pic {
+        position: relative;
+      }
+      .tr {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .lbl {
+        font-size: 12px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .chip {
+        font-size: 11px;
+        border-radius: 99px;
+        padding: 1px 8px;
+      }
+      .chip.ok {
+        background: rgb(61 220 151/15%);
+        color: var(--ok);
+      }
+      .chip.new {
+        background: rgb(255 107 44/18%);
+        color: var(--accent);
+      }
+      .thumbs {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        gap: 8px;
+      }
+      .thumb {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 5px;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .thumb.on {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .thumb svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 5px;
+      }
+      .thumb .tl {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .making {
+        height: 44px;
+        border-radius: 5px;
+        background: var(--inset);
+      }
+      .bar {
+        height: 4px;
+        background: var(--inset);
+        border-radius: 9px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+        border-radius: 9px;
+      }
+      .err {
+        background: var(--danger-bg);
+        border: 1px solid rgb(255 148 168/30%);
+        border-radius: 11px;
+        padding: 10px 12px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .err strong {
+        color: var(--danger-ink);
+      }
+      .empty {
+        border: 1px dashed var(--line-strong);
+        border-radius: 9px;
+        padding: 14px;
+        color: var(--muted);
+      }
+      .crumbs {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      h1.t {
+        margin: 2px 0;
+        font-size: 24px;
+      }
+      .ph {
+        background: repeating-linear-gradient(
+          45deg,
+          #191c24,
+          #191c24 10px,
+          #14161d 10px,
+          #14161d 20px
+        );
+        border-radius: 9px;
+        min-height: 64px;
+        display: grid;
+        place-items: center;
+        color: var(--faint);
+      }
+      .dim {
+        opacity: 0.55;
+      }
+      kbd {
+        font:
+          11px ui-monospace,
+          Menlo,
+          monospace;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        padding: 0 4px;
+      }
+      .switch {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .noteband {
+        background: var(--raised);
+        border-radius: 9px;
+        padding: 8px 10px;
+        color: var(--soft);
+      }
+      @media (max-width: 700px) {
+        .bench,
+        .two {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+      canvas.px {
+        image-rendering: pixelated;
+      }
+      .thumb canvas {
+        border-radius: 5px;
+      }
+      .box {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .note {
+        background: var(--warn-bg);
+        border-radius: 11px;
+        padding: 10px 12px;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .note strong {
+        color: var(--warn);
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .side {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      @media (max-width: 700px) {
+        .side {
+          grid-template-columns: 1fr;
+        }
+      }
+      .cap {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+      }
+      .frame {
+        aspect-ratio: 8/5;
+        background: var(--inset);
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+        padding: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>A chosen patch in the game</h1>
+        <p>
+          The agreed drawing: what a patch shows now that its chosen take reaches the game, and what
+          the game receives.
+        </p>
+      </div>
+      <div class="state">
+        Opened: “What the game gets” is ticked, so the picture and close-ups are the game’s version
+      </div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span> <b>Take 1</b>
+                    <span class="chip ok">Chosen</span>
+                  </div>
+                  <div class="pic"><canvas data-p="game-patched"></canvas></div>
+                  <span class="faint small">640 × 400</span>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="tr">
+                    <span class="label" style="font-weight: 600">Takes · 3</span
+                    ><span class="grow"></span
+                    ><label class="box"><input type="checkbox" checked /> What the game gets</label>
+                  </div>
+                  <div class="thumbs">
+                    <button class="thumb on">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 1 <span class="chip ok">Chosen</span></span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 2 </span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 3 </span>
+                    </button>
+                  </div>
+                  <span class="faint small"
+                    >Press a take, or use ← →, to lay it over the picture.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <div class="state">Unticked: what the model made</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span> <b>Take 1</b>
+                    <span class="chip ok">Chosen</span>
+                  </div>
+                  <div class="pic"><canvas data-p="model-patched"></canvas></div>
+                  <span class="faint small">1024 × 640</span>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="tr">
+                    <span class="label" style="font-weight: 600">Takes · 3</span
+                    ><span class="grow"></span
+                    ><label class="box"><input type="checkbox" /> What the game gets</label>
+                  </div>
+                  <div class="thumbs">
+                    <button class="thumb on">
+                      <canvas data-p="model-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 1 <span class="chip ok">Chosen</span></span></button
+                    ><button class="thumb">
+                      <canvas data-p="model-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 2 </span></button
+                    ><button class="thumb">
+                      <canvas data-p="model-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 3 </span>
+                    </button>
+                  </div>
+                  <span class="faint small"
+                    >Press a take, or use ← →, to lay it over the picture.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        No takes yet: the box is there, and the area can be marked on either version
+      </div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">The chosen take of the image</span></div>
+                  <div class="pic"><canvas data-p="game-take" data-mark="1"></canvas></div>
+                  <span class="faint small">640 × 400</span>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 takes</button>
+                  </div>
+                  <div class="tr">
+                    <span class="label" style="font-weight: 600">Takes</span
+                    ><span class="grow"></span
+                    ><label class="box"><input type="checkbox" checked /> What the game gets</label>
+                  </div>
+                  <div class="empty">
+                    No takes yet. Each take is a new try at this change, painted with the whole
+                    picture in view.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">The chosen take of the image</span></div>
+                  <div class="pic"><canvas data-p="model-take" data-mark="1"></canvas></div>
+                  <span class="faint small">1024 × 640</span>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 takes</button>
+                  </div>
+                  <div class="tr">
+                    <span class="label" style="font-weight: 600">Takes</span
+                    ><span class="grow"></span
+                    ><label class="box"><input type="checkbox" /> What the game gets</label>
+                  </div>
+                  <div class="empty">
+                    No takes yet. Each take is a new try at this change, painted with the whole
+                    picture in view.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <div class="state">A new take is still being brought to the game’s look: Choose waits</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">Looking at</span> <b>Take 1</b></div>
+                  <div class="pic"><div class="frame">Bringing to the game’s look…</div></div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Drop</button
+                    ><button class="btn p" disabled>Choose</button>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="tr">
+                    <span class="label" style="font-weight: 600">Takes · 3</span
+                    ><span class="grow"></span
+                    ><label class="box"><input type="checkbox" checked /> What the game gets</label>
+                  </div>
+                  <div class="thumbs">
+                    <button class="thumb on">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 1 <span class="chip ok">Chosen</span></span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 2 </span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 3 </span>
+                    </button>
+                  </div>
+                  <span class="faint small"
+                    >Press a take, or use ← →, to lay it over the picture.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        Choose could not be saved: the choice goes back, the reason under the buttons
+      </div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">Looking at</span> <b>Take 1</b></div>
+                  <div class="pic"><canvas data-p="game-patched"></canvas></div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Drop</button
+                    ><button class="btn p">Choose</button>
+                  </div>
+                  <span class="small" style="color: var(--danger-ink)"
+                    >web/public/images/generated/manifest.json cannot be used</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="tr">
+                    <span class="label" style="font-weight: 600">Takes · 3</span
+                    ><span class="grow"></span
+                    ><label class="box"><input type="checkbox" checked /> What the game gets</label>
+                  </div>
+                  <div class="thumbs">
+                    <button class="thumb on">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 1 <span class="chip ok">Chosen</span></span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 2 </span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 3 </span>
+                    </button>
+                  </div>
+                  <span class="faint small"
+                    >Press a take, or use ← →, to lay it over the picture.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <div class="state">The game’s look changed: patches go along with their image</div>
+      <div class="note">
+        <span
+          ><strong>The game’s look changed</strong> (its palette). 3 images and their takes still
+          have the old look. Nothing needs making again.</span
+        ><button class="btn p">Bring all</button>
+      </div>
+      <div class="state">A patch could not be brought</div>
+      <div class="note">
+        <span
+          ><strong>Brought 2 of 3 images to the new look.</strong> 1 couldn’t be: the model’s
+          picture of its patch “Bread taken” is missing. Its old look stays until you make new
+          takes.</span
+        ><button class="btn p">Try again</button>
+      </div>
+      <div class="state">That patch afterwards, closed and open</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right"
+                ><span class="tag">3 takes</span> <span class="chip ok">Take 1 chosen</span>
+                <span class="chip warn">Old look</span></span
+              >
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right"><span class="tag">2 takes, none chosen</span></span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right"><span class="tag">no takes yet</span></span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span> <b>Take 1</b>
+                    <span class="chip ok">Chosen</span> <span class="chip warn">Old look</span>
+                  </div>
+                  <div class="pic"><canvas data-p="game-patched"></canvas></div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="tr">
+                    <span class="label" style="font-weight: 600">Takes · 3</span
+                    ><span class="grow"></span
+                    ><label class="box"><input type="checkbox" checked /> What the game gets</label>
+                  </div>
+                  <div class="thumbs">
+                    <button class="thumb on">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 1 <span class="chip ok">Chosen</span></span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 2 </span></button
+                    ><button class="thumb">
+                      <canvas data-p="game-patched" data-crop="area"></canvas
+                      ><span class="tl">Take 3 </span>
+                    </button>
+                  </div>
+                  <span class="faint small"
+                    >Press a take, or use ← →, to lay it over the picture.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+      <div class="state">The patch’s soft edge in a limited palette, laid over the image</div>
+      <section class="panel">
+        <div class="side">
+          <div class="col">
+            <span class="lbl">The whole picture</span><canvas data-p="edge-a"></canvas>
+          </div>
+          <div class="col">
+            <span class="lbl">The patch’s left edge, close up</span
+            ><canvas data-p="edge-a" data-crop="edge"></canvas>
+            <p class="cap">
+              Every dot is a palette colour, and the change fades out in the dither pattern the rest
+              of the picture uses. Nothing is half see-through.
+            </p>
+          </div>
+        </div>
+      </section>
+      <div class="state">The game’s pictures folder</div>
+      <section class="panel">
+        <pre
+          class="mono"
+          style="
+            margin: 0;
+            background: var(--inset);
+            border-radius: 9px;
+            padding: 12px;
+            white-space: pre-wrap;
+          "
+        >
+cottage.png
+cottage.bread-taken.png
+cottage.door-ajar.png
+market.png</pre>
+      </section>
+      <div class="state">The list the game reads</div>
+      <section class="panel">
+        <pre
+          class="mono"
+          style="
+            margin: 0;
+            background: var(--inset);
+            border-radius: 9px;
+            padding: 12px;
+            white-space: pre-wrap;
+          "
+        >
+{
+  "cottage": {
+    "file": "cottage.png", "width": 640, "height": 400,
+    "patches": {
+      "bread-taken": { "file": "cottage.bread-taken.png", "width": 640, "height": 400 },
+      "door-ajar": { "file": "cottage.door-ajar.png", "width": 640, "height": 400 }
+    }
+  },
+  "market": { "file": "market.png", "width": 640, "height": 400 }
+}</pre>
+        <p class="cap">An image with no chosen patches looks exactly as it does today.</p>
+      </section>
+    </div>
+    <script>
+      const W = 640,
+        H = 400,
+        AREA = { x: 216, y: 180, w: 168, h: 82 },
+        F = 24
+      const PAL = [
+        '#1a1420',
+        '#2f2419',
+        '#4a3527',
+        '#5e3f25',
+        '#7a5230',
+        '#a36f3f',
+        '#c98f4a',
+        '#e6c07a',
+        '#8f5e2a',
+        '#262019',
+        '#3a2a1e',
+        '#8fb3c9',
+        '#5f7f96',
+        '#b9c4cc',
+        '#ff9a3c',
+        '#f3e3c3',
+      ].map((h) => [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16)))
+      const B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+      function draw(bread) {
+        const c = document.createElement('canvas')
+        c.width = W
+        c.height = H
+        const x = c.getContext('2d', { willReadFrequently: true })
+        const r = (col, a, b, w, h) => {
+          x.fillStyle = col
+          x.fillRect(a, b, w, h)
+        }
+        let g = x.createLinearGradient(0, 0, 640, 0)
+        g.addColorStop(0, '#55402f')
+        g.addColorStop(1, '#3f2c20')
+        x.fillStyle = g
+        x.fillRect(0, 0, 640, 290)
+        r('#2f2419', 0, 270, 640, 130)
+        r('#8fb3c9', 60, 60, 120, 100)
+        r('#3a2a1e', 117, 60, 6, 100)
+        r('#3a2a1e', 60, 107, 120, 6)
+        r('#262019', 470, 130, 130, 150)
+        x.fillStyle = '#ff9a3c'
+        x.beginPath()
+        x.moveTo(510, 278)
+        x.quadraticCurveTo(520, 228, 538, 204)
+        x.quadraticCurveTo(558, 234, 564, 278)
+        x.fill()
+        r('#7a5230', 200, 236, 240, 14)
+        r('#5e3f25', 216, 250, 12, 74)
+        r('#5e3f25', 412, 250, 12, 74)
+        r('#b9c4cc', 376, 212, 22, 24)
+        if (bread) {
+          x.fillStyle = '#c98f4a'
+          x.beginPath()
+          x.ellipse(300, 222, 44, 15, 0, 0, 7)
+          x.fill()
+          x.strokeStyle = '#8f5e2a'
+          x.lineWidth = 3
+          x.beginPath()
+          for (const [a, b] of [
+            [276, 216],
+            [296, 214],
+            [316, 216],
+          ]) {
+            x.moveTo(a, b)
+            x.lineTo(a + 10, b + 10)
+          }
+          x.stroke()
+        }
+        return x.getImageData(0, 0, W, H)
+      }
+      const take = draw(true)
+      const edit = (() => {
+        const d = draw(false)
+        for (let i = 0; i < d.data.length; i += 4) {
+          d.data[i] = Math.min(255, d.data[i] + 14)
+          d.data[i + 1] = Math.min(255, d.data[i + 1] + 9)
+          d.data[i + 2] = Math.max(0, d.data[i + 2] - 4)
+        }
+        return d
+      })()
+      function mask(px, py) {
+        const dx = Math.min(px - AREA.x, AREA.x + AREA.w - px),
+          dy = Math.min(py - AREA.y, AREA.y + AREA.h - py),
+          d = Math.min(dx, dy)
+        return d <= 0 ? 0 : Math.min(1, d / F)
+      }
+      function comp() {
+        const o = new ImageData(W, H)
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            const m = mask(x, y),
+              i = (y * W + x) * 4
+            for (let k = 0; k < 3; k++)
+              o.data[i + k] = take.data[i + k] * (1 - m) + edit.data[i + k] * m
+            o.data[i + 3] = 255
+          }
+        return o
+      }
+      const SCALE = 4,
+        GW = W / SCALE,
+        GH = H / SCALE
+      function bring(d) {
+        const o = new ImageData(GW, GH)
+        for (let y = 0; y < GH; y++)
+          for (let x = 0; x < GW; x++) {
+            const s = [0, 0, 0]
+            for (let v = 0; v < SCALE; v++)
+              for (let u = 0; u < SCALE; u++) {
+                const i = ((y * SCALE + v) * W + x * SCALE + u) * 4
+                for (let k = 0; k < 3; k++) s[k] += d.data[i + k]
+              }
+            const t = (B[(y % 4) * 4 + (x % 4)] / 16 - 0.5) * 34,
+              c = s.map((v) => v / 16 + t)
+            let best = PAL[0],
+              bd = 1e9
+            for (const p of PAL) {
+              const e = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2
+              if (e < bd) {
+                bd = e
+                best = p
+              }
+            }
+            const i = (y * GW + x) * 4
+            o.data[i] = best[0]
+            o.data[i + 1] = best[1]
+            o.data[i + 2] = best[2]
+            o.data[i + 3] = 255
+          }
+        return o
+      }
+      const composite = comp(),
+        gTake = bring(take),
+        gEdit = bring(edit)
+      const gm = (x, y) => mask(x * SCALE + SCALE / 2, y * SCALE + SCALE / 2)
+      function mix(fn) {
+        const o = new ImageData(GW, GH)
+        for (let y = 0; y < GH; y++)
+          for (let x = 0; x < GW; x++) {
+            const i = (y * GW + x) * 4,
+              m = gm(x, y)
+            for (let k = 0; k < 3; k++) o.data[i + k] = fn(gTake.data[i + k], gEdit.data[i + k], m)
+            o.data[i + 3] = 255
+          }
+        return o
+      }
+      const P = {
+        'model-take': take,
+        'model-patched': composite,
+        'game-take': gTake,
+        'game-patched': bring(composite),
+        'edge-a': bring(composite),
+        'edge-b': mix((t, e, m) => (m >= 0.5 ? e : t)),
+        'edge-c': mix((t, e, m) => Math.round(t * (1 - m) + e * m)),
+      }
+      function put(cv, d, crop) {
+        const t = document.createElement('canvas')
+        t.width = d.width
+        t.height = d.height
+        t.getContext('2d').putImageData(d, 0, 0)
+        const [sx, sy, sw, sh] = crop || [0, 0, d.width, d.height]
+        cv.width = sw
+        cv.height = sh
+        const c = cv.getContext('2d')
+        c.imageSmoothingEnabled = false
+        c.drawImage(t, sx, sy, sw, sh, 0, 0, sw, sh)
+      }
+      for (const cv of document.querySelectorAll('canvas[data-p]')) {
+        const k = cv.dataset.p,
+          d = P[k],
+          game = d.width === GW
+        let crop = null
+        if (cv.dataset.crop === 'area') {
+          const m = game ? 1 / SCALE : 1
+          crop = [(AREA.x - 30) * m, (AREA.y - 20) * m, (AREA.w + 60) * m, (AREA.h + 40) * m]
+        }
+        if (cv.dataset.crop === 'edge') {
+          crop = [Math.floor((AREA.x - 12) / SCALE), Math.floor((AREA.y + 8) / SCALE), 18, 11]
+        }
+        put(cv, d, crop)
+        if (game) cv.classList.add('px')
+        if (cv.dataset.mark) {
+          const c = cv.getContext('2d'),
+            s = cv.width / W
+          c.strokeStyle = '#ff6b2c'
+          c.lineWidth = Math.max(1, 2.2 * s)
+          c.setLineDash([7 * s, 5 * s])
+          c.strokeRect(AREA.x * s, AREA.y * s, AREA.w * s, AREA.h * s)
+        }
+      }
+    </script>
+  </body>
+</html>
