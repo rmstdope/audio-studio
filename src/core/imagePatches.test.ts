@@ -9,8 +9,11 @@ import {
   matchToTake,
   PATCH_FEATHER,
   PatchBoardSchema,
+  makeAgainOf,
   patchSummary,
+  setAsideQuestion,
 } from './imagePatches'
+import type { PatchRow } from './images'
 import type { Pixels } from './imagePixels'
 
 /** A picture of one opaque colour. */
@@ -514,5 +517,85 @@ describe('gamePatch', () => {
     const edge = keepArea(plain(256, 128, [255, 255, 255]), { x: 0, y: 0, width: 32, height: 128 })
     const out = gamePatch(wide, edge, look, size)
     expect([...out.data].filter((_, i) => i % 4 === 3 && out.data[i] !== 0)).toEqual([])
+  })
+})
+
+describe('patches set aside', () => {
+  const patch = (title: string, chosenOn: number[], chosenOnGone = false): PatchRow => ({
+    id: title.toLowerCase().replace(/ /g, '-'),
+    title,
+    description: '',
+    words: '',
+    changed: false,
+    gameChanged: false,
+    gameWas: null,
+    chosenOn,
+    chosenOnGone,
+  })
+  const bread = patch('Bread taken', [2])
+  const door = patch('Door open', [1, 2])
+  const lamp = patch('Lamp lit', [1])
+  const well = patch('Well covered', [])
+  const row = (chosenTake: number | null, ...patches: PatchRow[]) => ({ chosenTake, patches })
+
+  describe('makeAgainOf', () => {
+    it('is the patches chosen on another take only, in the game’s order', () => {
+      expect(makeAgainOf(row(4, bread, well, lamp)).map((p) => p.title)).toEqual([
+        'Bread taken',
+        'Lamp lit',
+      ])
+    })
+    it('leaves out a patch chosen on the take in the game too', () => {
+      expect(makeAgainOf(row(2, bread, door, lamp)).map((p) => p.title)).toEqual(['Lamp lit'])
+    })
+    it('keeps a patch whose only choice is on a dropped take, and with no take chosen', () => {
+      const gone = patch('Gone', [], true)
+      expect(makeAgainOf(row(4, gone, well)).map((p) => p.title)).toEqual(['Gone'])
+      expect(makeAgainOf(row(null, bread)).map((p) => p.title)).toEqual(['Bread taken'])
+    })
+  })
+
+  describe('setAsideQuestion', () => {
+    it('asks nothing when the take in the game has no chosen patches', () => {
+      expect(setAsideQuestion(row(4, bread, well), { kind: 'choose', n: 2 })).toBeNull()
+      expect(setAsideQuestion(row(null, bread), { kind: 'choose', n: 2 })).toBeNull()
+      expect(setAsideQuestion(row(4, well), { kind: 'unchoose' })).toBeNull()
+    })
+    it('names the patches that leave, in the game’s order', () => {
+      expect(setAsideQuestion(row(2, bread, well, door), { kind: 'choose', n: 4 })).toEqual({
+        from: 2,
+        leaving: ['Bread taken', 'Door open'],
+        to: 4,
+        returning: [],
+      })
+    })
+    it('names what comes back on the take chosen', () => {
+      expect(setAsideQuestion(row(2, bread, door, lamp), { kind: 'choose', n: 1 })).toEqual({
+        from: 2,
+        leaving: ['Bread taken'],
+        to: 1,
+        returning: ['Door open', 'Lamp lit'],
+      })
+    })
+    it('asks nothing when what leaves comes back on the new take', () => {
+      expect(setAsideQuestion(row(2, door), { kind: 'choose', n: 1 })).toBeNull()
+    })
+    it('asks the same on Un-choose, with nothing coming back', () => {
+      expect(setAsideQuestion(row(2, bread, door, lamp), { kind: 'unchoose' })).toEqual({
+        from: 2,
+        leaving: ['Bread taken', 'Door open'],
+        to: null,
+        returning: [],
+      })
+    })
+    it('asks on Drop about the patches set aside on that take only', () => {
+      expect(setAsideQuestion(row(4, bread, door, lamp), { kind: 'drop', n: 2 })).toEqual({
+        from: 2,
+        leaving: ['Bread taken', 'Door open'],
+        to: null,
+        returning: [],
+      })
+      expect(setAsideQuestion(row(4, bread, well), { kind: 'drop', n: 3 })).toBeNull()
+    })
   })
 })

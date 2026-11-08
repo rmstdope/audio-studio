@@ -17,6 +17,12 @@ import {
   paletteText,
   takeCountText,
   unchooseNote,
+  makeAgainActLine,
+  makeAgainOpenLine,
+  setAsideDim,
+  setAsideDropSentence,
+  setAsideSentence,
+  setAsideTitle,
 } from './imagesText'
 import { parseRoute, routeHref } from './route'
 import { openWorkspace } from './sidebarActs'
@@ -191,5 +197,72 @@ describe('the words of an image several acts list', () => {
       page: 'image',
       image: 'inn',
     })
+  })
+})
+
+describe('the questions about patches set aside', () => {
+  it('counts the patches and says what the game does', () => {
+    expect(setAsideSentence(2, 3)).toBe(
+      '3 chosen patches were made on take 2. The game will stop showing them until you make new ones.',
+    )
+    expect(setAsideSentence(2, 1)).toBe(
+      '1 chosen patch was made on take 2. The game will stop showing it until you make a new one.',
+    )
+  })
+  it('says how to bring them back, and what comes back with the take chosen', () => {
+    const q = (leaving: string[], to: number | null, returning: string[]) => ({
+      from: 2,
+      leaving,
+      to,
+      returning,
+    })
+    expect(setAsideDim(q(['A', 'B', 'C'], 4, []))).toBe(
+      'Choosing take 2 again brings them all back.',
+    )
+    expect(setAsideDim(q(['A'], null, []))).toBe('Choosing take 2 again brings it back.')
+    expect(setAsideDim(q(['Bread taken'], 1, ['Door open', 'Lamp lit']))).toBe(
+      '2 patches made on take 1 come back: Door open, Lamp lit. Choosing take 2 again brings Bread taken back.',
+    )
+    expect(setAsideDim(q(['Bread taken', 'Well'], 1, ['Door open']))).toBe(
+      '1 patch made on take 1 comes back: Door open. Choosing take 2 again brings Bread taken and Well back.',
+    )
+  })
+  it('titles the questions', () => {
+    expect(setAsideTitle({ kind: 'choose', n: 4 }, 2)).toBe('Choose take 4?')
+    expect(setAsideTitle({ kind: 'drop', n: 2 }, 2)).toBe('Drop take 2?')
+    expect(setAsideTitle({ kind: 'unchoose' }, 2)).toBe('Un-choose take 2?')
+  })
+  it('says a drop cannot be taken back', () => {
+    expect(setAsideDropSentence(2, 3)).toBe(
+      '3 chosen patches were made on take 2. After this they cannot be brought back; only new ones can be made.',
+    )
+    expect(setAsideDropSentence(2, 1)).toBe(
+      '1 chosen patch was made on take 2. After this it cannot be brought back; only a new one can be made.',
+    )
+  })
+})
+
+describe('the marks of a patch to make again', () => {
+  it('names them on the act’s row', () => {
+    expect(makeAgainActLine(['Bread taken', 'Door open'])).toBe(
+      'make again: Bread taken, Door open',
+    )
+  })
+  it('says where the patch was chosen and how to get it back', () => {
+    expect(makeAgainOpenLine([2], 4)).toBe(
+      'Chosen on take 2 of the image, so the game does not show it now. Make a new one here, or choose take 2 again to bring it back.',
+    )
+    expect(makeAgainOpenLine([1, 2], 4)).toBe(
+      'Chosen on takes 1 and 2 of the image, so the game does not show it now. Make a new one here, or choose one of those takes again to bring it back.',
+    )
+    expect(makeAgainOpenLine([2], null)).toBe(
+      'Chosen on take 2 of the image, so the game does not show it now. Choose take 2 again to bring it back.',
+    )
+    expect(makeAgainOpenLine([1, 2], null)).toBe(
+      'Chosen on takes 1 and 2 of the image, so the game does not show it now. Choose one of those takes again to bring it back.',
+    )
+    expect(makeAgainOpenLine([], 4)).toBe(
+      'Chosen on an earlier take of the image, so the game does not show it now. Make a new one here.',
+    )
   })
 })

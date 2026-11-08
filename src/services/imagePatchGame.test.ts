@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import type { ImagePatchesView } from '../core/imagePatches'
+import { makeAgainOf, type ImagePatchesView } from '../core/imagePatches'
 import { readImages } from './imageLists'
 import { createImagePatches } from './imagePatches'
 import { createImageTakes } from './imageTakes'
@@ -141,6 +141,33 @@ describe('a chosen patch across the image’s own choices', () => {
     expect(s.read('web/images/inn.door.png')).not.toEqual(forOne)
     expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
     expect(s.read('web/images/inn.door.png')).toEqual(forOne)
+  })
+})
+
+describe('patches set aside, as the rows say', () => {
+  const rowOf = async (s: Awaited<ReturnType<typeof chosenPatch>>) => {
+    const opened = await openProject(s.file)
+    if (!opened.ok) throw new Error('project did not open')
+    const images = await readImages(s.root, opened.project, [])
+    return images!.acts[0]!.rows[0]!
+  }
+  it('notes the takes a patch is chosen on, so a patch left behind needs making again', async () => {
+    const s = await chosenPatch()
+    expect((await rowOf(s)).patches[0]).toMatchObject({ chosenOn: [2], chosenOnGone: false })
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+    const row = await rowOf(s)
+    expect(row.chosenTake).toBe(1)
+    expect(makeAgainOf(row).map((p) => p.id)).toEqual(['door'])
+    expect(await s.takes.choose(s.file, 'inn', 2)).toEqual({ ok: true })
+    expect(makeAgainOf(await rowOf(s))).toEqual([])
+  })
+  it('keeps the patch marked after the take it was chosen on is dropped, without touching the game', async () => {
+    const s = await chosenPatch()
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+    const before = s.read(MANIFEST)
+    expect(await s.takes.drop(s.file, 'inn', 2)).toEqual({ ok: true })
+    expect(s.read(MANIFEST)).toEqual(before)
+    expect((await rowOf(s)).patches[0]).toMatchObject({ chosenOn: [], chosenOnGone: true })
   })
 })
 

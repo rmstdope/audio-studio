@@ -772,6 +772,10 @@ export interface PatchRow {
   gameWas: string | null
   /** The id of the named area the game ties it to, if any. */
   area?: string | undefined
+  /** The image's takes (still on its board) this patch has a chosen take on, ascending. */
+  chosenOn: number[]
+  /** The patch has a chosen take on a take of the image that has since been dropped. */
+  chosenOnGone: boolean
 }
 
 /** One named area of an image as its page shows it. */
@@ -913,6 +917,10 @@ export interface ImagesInput {
   lookError?: string
   /** What each image's takes (whose model picture is there) were brought to, by image id; null for never. */
   takeLooks?: Record<string, (string | null)[]>
+  /** The takes of each image each of its patches has a chosen take on, by image id then patch id. */
+  patchChoices?: Record<string, Record<string, number[]>>
+  /** The takes on each image's board, by image id; absent means none. */
+  imageTakes?: Record<string, number[]>
 }
 
 /** The Images pages from what was read, and the problems found in it. */
@@ -1023,12 +1031,16 @@ export function summarizeImages(input: ImagesInput): {
       gameWas: own?.gameWas ?? null,
       patches: image.patches.map((patch) => {
         const mine = own?.patches?.[patch.id]
+        const bases = input.patchChoices?.[image.id]?.[patch.id] ?? []
+        const there = new Set(input.imageTakes?.[image.id] ?? [])
         return {
           ...patch,
           words: mine?.text ?? patch.description,
           changed: mine !== undefined,
           gameChanged: mine !== undefined && mine.gameWas !== patch.description,
           gameWas: mine?.gameWas ?? null,
+          chosenOn: bases.filter((base) => there.has(base)).sort((a, b) => a - b),
+          chosenOnGone: bases.some((base) => !there.has(base)),
         }
       }),
       areas: image.areas.map((area) => {

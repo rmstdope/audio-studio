@@ -89,6 +89,35 @@ async function readTakeLooks(
 }
 
 /**
+ * For each image whose patches have a board: the takes of the image each patch has a chosen take
+ * on (`chosen`, whether or not the picture is still on the board), and the takes on the image's
+ * own board. Boards that cannot be read count as holding nothing.
+ */
+export async function readPatchChoices(
+  root: string,
+  images: { id: string; patches: { id: string }[] }[],
+): Promise<{
+  patchChoices: Record<string, Record<string, number[]>>
+  imageTakes: Record<string, number[]>
+}> {
+  const patchChoices: Record<string, Record<string, number[]>> = {}
+  const imageTakes: Record<string, number[]> = {}
+  for (const { id, patches } of images) {
+    if (patches.length === 0) continue
+    for (const patch of patches) {
+      const folder = `${CACHE_DIR}/image-patches/${id}/${patch.id}`
+      const board = await readResource(root, `${folder}/board.json`, PatchBoardSchema, [])
+      if (board === 'missing' || board === 'invalid') continue
+      const bases = Object.keys(board.chosen).map(Number)
+      if (bases.length) (patchChoices[id] ??= {})[patch.id] = bases
+    }
+    const board = await readResource(root, `${IMAGE_BOARD_DIR}/${id}.json`, ImageBoardSchema, [])
+    if (board !== 'missing' && board !== 'invalid') imageTakes[id] = board.takes.map((t) => t.n)
+  }
+  return { patchChoices, imageTakes }
+}
+
+/**
  * The images edits (the style and the studio's changes), empty when there are none. A file that
  * cannot be read holds nothing usable; otherwise the style and each image are read apart
  * (`readImageEditsValue`), and the problems say what was left out.
@@ -148,6 +177,7 @@ export async function readImages(
   const styleLook = styleLookOf(edits)
   const listed = lists.flatMap((list) => (list.state.status === 'ok' ? list.state.images : []))
   const summary = summarizeImages({
+    ...(await readPatchChoices(root, listed)),
     gameFiles,
     look: styleLook.look,
     lookError: styleLook.error,

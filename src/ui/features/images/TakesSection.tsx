@@ -7,6 +7,7 @@ import {
   type ImageTakeView,
   type ImageTakesView,
 } from '../../../core/imageTakes'
+import { setAsideQuestion, type SetAsideAsk } from '../../../core/imagePatches'
 import type { ImageRow } from '../../../core/images'
 import {
   IMAGE_MODEL_IDS,
@@ -34,6 +35,10 @@ import {
   makeTakesText,
   refusal,
   pictureRendering,
+  setAsideDim,
+  setAsideDropSentence,
+  setAsideSentence,
+  setAsideTitle,
   takeCountText,
   unchooseNote,
 } from '../../imagesText'
@@ -125,7 +130,9 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   const [count, setCount] = useState(2)
   const [picked, setPicked] = useState<ImageModelId | null>(null)
   const [modelOpen, setModelOpen] = useState(false)
-  const [asking, setAsking] = useState(false)
+  // The question open: choosing, un-choosing or dropping a take with chosen patches asks first.
+  const [asking, setAsking] = useState<SetAsideAsk | null>(null)
+  const open = asking !== null
   const [saved, setSaved] = useState(0)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
   const [showing, setShowing] = useState<Showing>('game')
@@ -136,6 +143,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   const focusQuietly = useRef(false)
   const chooseButton = useRef<HTMLButtonElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
+  const dropButton = useRef<HTMLButtonElement>(null)
   const leftHeading = useRef<HTMLSpanElement>(null)
   const rightHeading = useRef<HTMLSpanElement>(null)
   const thumbs = useRef(new Map<number, HTMLButtonElement>())
@@ -153,8 +161,10 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   // A choice or drop asked for by a key and not yet settled: a second press waits for it, since the
   // handler it would reach still sees the take as it was.
   const changing = useRef(false)
-  const refocusUnchoose = useFocusWhenClosed(asking, unchooseButton)
-  const focusLeft = useFocusWhenClosed(asking, leftHeading)
+  const refocusUnchoose = useFocusWhenClosed(open, unchooseButton)
+  const refocusChoose = useFocusWhenClosed(open, chooseButton)
+  const refocusDrop = useFocusWhenClosed(open, dropButton)
+  const focusLeft = useFocusWhenClosed(open, leftHeading)
 
   const ready = view && 'takes' in view ? view : null
   const others = ready ? ready.takes.filter((t) => !t.chosen) : []
@@ -260,44 +270,85 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
     lookError === null &&
     t.look !== 'bringing'
   const canDrop = !lockUnread && !drop.isPending && !choose.isPending
-  const onChoose = (n: number) => {
+  /** Chooses take `n`; `confirmed` is after the question, which waits for the save before it closes. */
+  const onChoose = (n: number, confirmed = false) => {
     const before = chosen?.n ?? null
     beforeChange()
     // The page shows the choice at once; a refusal puts it back when the takes are read again.
-    set((v) => ({
-      ...v,
-      takes: v.takes.map((t) => ({ ...t, chosen: t.n === n, isNew: t.n === n ? false : t.isNew })),
-    }))
-    setWasChosen(before)
-    setRight(before ?? rightAfterDrop(strip, n))
+    const show = () => {
+      set((v) => ({
+        ...v,
+        takes: v.takes.map((t) => ({
+          ...t,
+          chosen: t.n === n,
+          isNew: t.n === n ? false : t.isNew,
+        })),
+      }))
+      setWasChosen(before)
+      setRight(before ?? rightAfterDrop(strip, n))
+    }
+    if (!confirmed) show()
     // Focus is asked for once the save has settled: asked earlier, it would be given to the button
     // just before the button is switched off, and the browser drops it from a disabled button.
     const focus = before !== null || strip.length > 1 ? 'choose' : 'right'
     changing.current = true
     choose.mutate(n, {
-      onSuccess: () => setSaved((count) => count + 1),
-      onSettled: () => {
+      onSuccess: (answer) => {
+        setSaved((count) => count + 1)
+        if (confirmed && answer.ok) {
+          show()
+          setAsking(null)
+        }
+      },
+      onSettled: (answer) => {
         changing.current = false
-        setPendingFocus(focus)
+        if (!confirmed || answer?.ok) setPendingFocus(focus)
       },
     })
   }
-  const onDrop = (n: number) => {
+  const onDrop = (n: number, confirmed = false) => {
     const next = rightAfterDrop(strip, n)
     beforeChange()
-    set((v) => ({ ...v, takes: v.takes.filter((t) => t.n !== n) }))
-    setRight(next)
+    const show = () => {
+      set((v) => ({ ...v, takes: v.takes.filter((t) => t.n !== n) }))
+      setRight(next)
+    }
+    if (!confirmed) show()
     changing.current = true
     drop.mutate(n, {
-      onSettled: () => {
+      onSuccess: (answer) => {
+        if (confirmed && answer.ok) {
+          show()
+          setAsking(null)
+        }
+      },
+      onSettled: (answer) => {
         changing.current = false
-        setPendingFocus(next ?? 'right')
+        if (!confirmed || answer?.ok) setPendingFocus(next ?? 'right')
       },
     })
+  }
+  /** Asks first when chosen patches would be set aside or lost, else does it at once. */
+  const request = (ask: SetAsideAsk) => {
+    if (!setAsideQuestion(row, ask)) {
+      if (ask.kind === 'choose') onChoose(ask.n)
+      else if (ask.kind === 'drop') onDrop(ask.n)
+      return
+    }
+    beforeChange()
+    setAsking(ask)
+  }
+  /** Closes the question without acting, and returns focus to the button that opened it. */
+  const cancelAsking = () => {
+    if (asking?.kind === 'choose') refocusChoose()
+    else if (asking?.kind === 'drop') refocusDrop()
+    else refocusUnchoose()
+    for (const mutation of [choose, drop, unchoose]) mutation.reset()
+    setAsking(null)
   }
   onKey = (event: KeyboardEvent) => {
     const target = event.target
-    if (event.defaultPrevented || asking) return
+    if (event.defaultPrevented || open) return
     if (event.metaKey || event.ctrlKey || event.altKey) return
     if (target instanceof HTMLElement && target.isContentEditable) return
     // Keys typed into a field or menu are its own; a box or button leaves them to the page, but
@@ -321,11 +372,11 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
     const key = event.key.toLowerCase()
     if (key === 'c' && canChoose(rightTake)) {
       event.preventDefault()
-      onChoose(rightTake.n)
+      request({ kind: 'choose', n: rightTake.n })
     }
     if (key === 'd' && canDrop) {
       event.preventDefault()
-      onDrop(rightTake.n)
+      request({ kind: 'drop', n: rightTake.n })
     }
   }
 
@@ -386,6 +437,10 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   const problem =
     refusal(make.data) ?? refusal(choose.data) ?? refusal(drop.data) ?? refusal(unchoose.data)
   const error = make.error ?? choose.error ?? drop.error ?? unchoose.error ?? stop.error
+  // The red line under an open question's buttons: the studio's own message for the last try.
+  const question = asking === null ? null : setAsideQuestion(row, asking)
+  const answering = asking?.kind === 'choose' ? choose : asking?.kind === 'drop' ? drop : unchoose
+  const askError = refusal(answering.data) ?? answering.error?.message ?? null
 
   return (
     <>
@@ -531,38 +586,64 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
         >
           <div className="image-stage" data-stacked={stacked} ref={setStage}>
             <div className="image-side" data-side="left">
-              {asking && chosen ? (
+              {asking && asking.kind !== 'drop' && (chosen || asking.kind === 'choose') ? (
                 <Confirm
-                  title={`Un-choose take ${chosen.n}?`}
+                  title={setAsideTitle(asking, chosen?.n ?? 0)}
+                  lead={
+                    question && (
+                      <>
+                        {asking.kind === 'unchoose' && (
+                          <span className="muted">{unchooseNote(question.from)}</span>
+                        )}
+                        <p>{setAsideSentence(question.from, question.leaving.length)}</p>
+                        <ul className="confirm-effects">
+                          {question.leaving.map((title) => (
+                            <li key={title}>{title}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )
+                  }
                   effects={[]}
-                  note={unchooseNote(chosen.n)}
+                  note={
+                    question
+                      ? setAsideDim(question)
+                      : asking.kind === 'unchoose'
+                        ? unchooseNote(chosen!.n)
+                        : undefined
+                  }
+                  error={askError}
                   back="Cancel"
-                  backDisabled={unchoose.isPending}
-                  onBack={() => {
-                    refocusUnchoose()
-                    setAsking(false)
-                  }}
+                  backDisabled={answering.isPending}
+                  onBack={cancelAsking}
                 >
                   <button
                     className="btn btn-primary"
                     type="button"
                     autoFocus
-                    disabled={unchoose.isPending}
-                    onClick={() =>
+                    disabled={answering.isPending}
+                    onClick={() => {
+                      if (asking.kind === 'choose') {
+                        onChoose(asking.n, true)
+                        return
+                      }
+                      unchoose.reset()
                       unchoose.mutate(undefined, {
                         onSuccess: (answer) => {
-                          setAsking(false)
-                          if (answer.ok) focusLeft()
-                          else refocusUnchoose()
-                        },
-                        onError: () => {
-                          setAsking(false)
-                          refocusUnchoose()
+                          if (!answer.ok) return
+                          setAsking(null)
+                          focusLeft()
                         },
                       })
-                    }
+                    }}
                   >
-                    {unchoose.isPending ? 'Un-choosing…' : 'Un-choose'}
+                    {asking.kind === 'choose'
+                      ? choose.isPending
+                        ? 'Choosing…'
+                        : `Choose take ${asking.n}`
+                      : unchoose.isPending
+                        ? 'Un-choosing…'
+                        : 'Un-choose'}
                   </button>
                 </Confirm>
               ) : (
@@ -577,7 +658,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                   saved={saved}
                   onUnchoose={() => {
                     unchoose.reset()
-                    setAsking(true)
+                    setAsking({ kind: 'unchoose' })
                   }}
                   size={size}
                   id={id}
@@ -604,20 +685,52 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
               </div>
               {rightTake ? (
                 <>
-                  <TakePicture
-                    id={id}
-                    take={rightTake}
-                    row={row}
-                    lookError={lookError}
-                    showing={showing}
-                    zoom={zoom}
-                  />
+                  {asking?.kind === 'drop' && question ? (
+                    <Confirm
+                      title={setAsideTitle(asking, asking.n)}
+                      lead={
+                        <>
+                          <p>{setAsideDropSentence(question.from, question.leaving.length)}</p>
+                          <ul className="confirm-effects">
+                            {question.leaving.map((title) => (
+                              <li key={title}>{title}</li>
+                            ))}
+                          </ul>
+                        </>
+                      }
+                      effects={[]}
+                      error={askError}
+                      back="Cancel"
+                      backDisabled={drop.isPending}
+                      onBack={cancelAsking}
+                    >
+                      <button
+                        className="btn btn-primary"
+                        type="button"
+                        autoFocus
+                        disabled={drop.isPending}
+                        onClick={() => onDrop(asking.n, true)}
+                      >
+                        {drop.isPending ? 'Dropping…' : `Drop take ${asking.n}`}
+                      </button>
+                    </Confirm>
+                  ) : (
+                    <TakePicture
+                      id={id}
+                      take={rightTake}
+                      row={row}
+                      lookError={lookError}
+                      showing={showing}
+                      zoom={zoom}
+                    />
+                  )}
                   <div className="image-take-actions">
                     <button
                       type="button"
+                      ref={dropButton}
                       className="btn btn-ghost btn-small"
-                      disabled={!canDrop}
-                      onClick={() => onDrop(rightTake.n)}
+                      disabled={!canDrop || open}
+                      onClick={() => request({ kind: 'drop', n: rightTake.n })}
                     >
                       Drop
                     </button>
@@ -625,8 +738,8 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                       type="button"
                       ref={chooseButton}
                       className="btn btn-primary btn-small"
-                      disabled={!canChoose(rightTake)}
-                      onClick={() => onChoose(rightTake.n)}
+                      disabled={!canChoose(rightTake) || open}
+                      onClick={() => request({ kind: 'choose', n: rightTake.n })}
                     >
                       Choose
                     </button>
@@ -650,8 +763,8 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
               )}
             </div>
           </div>
-          {problem && <span className="adopt-error">{problem}</span>}
-          {error && <span className="adopt-error">{error.message}</span>}
+          {!open && problem && <span className="adopt-error">{problem}</span>}
+          {!open && error && <span className="adopt-error">{error.message}</span>}
         </section>
       </div>
     </>

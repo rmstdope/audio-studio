@@ -78,6 +78,10 @@ interface Options {
   actTwoImages?: (typeof inn)[]
   /** What the chosen pictures were brought to; the look now when absent. */
   lookWas?: string
+  /** The inn's chosen take, and the takes its patches are chosen on (by patch id) and its board has. */
+  gameTake?: number
+  choices?: Record<string, number[]>
+  imageTakes?: number[]
 }
 
 function summary(options: Options = {}): ProjectSummary {
@@ -118,11 +122,14 @@ function summary(options: Options = {}): ProjectSummary {
         id,
         {
           ...made,
+          ...(id === 'inn' && options.gameTake !== undefined ? { take: options.gameTake } : {}),
           look: options.lookWas ?? lookKey(lookOf(style), id === 'inn' ? inn : barn),
         },
       ]),
     ),
     look: lookOf(style),
+    ...(options.choices ? { patchChoices: { inn: options.choices } } : {}),
+    ...(options.imageTakes ? { imageTakes: { inn: options.imageTakes } } : {}),
   })
   return { images } as unknown as ProjectSummary
 }
@@ -969,6 +976,66 @@ describe('the patches the game asks for', () => {
     )
     expect(settled.querySelector('.chg')).toBeNull()
     expect(text(settled.querySelector('tbody tr'))).not.toContain('patch')
+  })
+
+  describe('patches to make again', () => {
+    const actRoute = { view: 'images', page: 'act', part: 'act1' } as const
+    const image = { view: 'images', page: 'image', image: 'inn', from: 'act1' } as const
+    const settled = (over: Options = {}) =>
+      summary({
+        patches: [lamp, door],
+        chosen: { inn: summary().images!.acts[0]!.rows[0]!.madeFrom },
+        gameTake: 4,
+        imageTakes: [1, 2, 4],
+        ...over,
+      })
+
+    it('names them on the act’s row, in the game’s order, and changes no other figure', () => {
+      const before = render(actRoute, settled({ choices: { 'lamp-lit': [4] } }))
+      expect(before.querySelector('.images-prompt .chg')).toBeNull()
+      const page = render(actRoute, settled({ choices: { 'lamp-lit': [2], 'door-ajar': [1] } }))
+      const row = page.querySelector('tbody tr')!
+      expect(text(row.querySelector('.images-prompt .chg'))).toBe('make again: Lamp lit, Door ajar')
+      expect([...row.querySelectorAll('.images-status .chip')].map((c) => c.textContent)).toEqual([
+        'chosen',
+      ])
+      expect(text(page.querySelector('.page-header .muted'))).toContain('1 of 2 chosen')
+    })
+
+    it('puts it after the line about the game’s changed words', () => {
+      const edits = { inn: { patches: { 'lamp-lit': { text: 'Dim it', gameWas: 'Old' } } } }
+      const page = render(actRoute, settled({ edits, choices: { 'door-ajar': [2] } }))
+      expect(
+        [...page.querySelectorAll('tbody tr')[0]!.querySelectorAll('.images-prompt .chg')].map(
+          (c) => text(c),
+        ),
+      ).toEqual(["the game changed a patch's words", 'make again: Door ajar'])
+    })
+
+    it('marks the row of the patch on the image’s page with a chip, after the changed-here mark', () => {
+      const edits = {
+        inn: { patches: { 'lamp-lit': { text: 'Dim it', gameWas: 'Light the lamp' } } },
+      }
+      const page = render(image, settled({ edits, choices: { 'lamp-lit': [2] } }))
+      const [first, second] = [...page.querySelectorAll('.game-patch-row')]
+      expect(text(first!.querySelector('.game-patch-end'))).toBe('changed hereMake again')
+      expect(first!.querySelector('.chip-warn')?.textContent).toBe('Make again')
+      expect(second!.querySelector('.chip-warn')).toBeNull()
+    })
+
+    it('says, in a line above the words when opened, where it was chosen and how to get it back', () => {
+      const page = render(image, settled({ choices: { 'lamp-lit': [1, 2] } }))
+      act(() => page.querySelector<HTMLButtonElement>('.game-patch-row')!.click())
+      const line = page.querySelector('.game-patch-body .make-again-line')
+      expect(text(line)).toBe(
+        'Chosen on takes 1 and 2 of the image, so the game does not show it now. Make a new one here, or choose one of those takes again to bring it back.',
+      )
+    })
+
+    it('has no chip or line once the patch has a chosen take on the take in the game', () => {
+      const page = render(image, settled({ choices: { 'lamp-lit': [2, 4] } }))
+      expect(page.querySelector('.game-patch-row .chip-warn')).toBeNull()
+    })
   })
 
   it('says patches among the things the lists disagree on', () => {

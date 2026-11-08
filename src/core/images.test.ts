@@ -932,8 +932,24 @@ describe('the patches the game asks for', () => {
 
     it('lists them in the game’s order with the game’s words, none reworded', () => {
       expect(rowOf().patches).toEqual([
-        { ...bread, words: bread.description, changed: false, gameChanged: false, gameWas: null },
-        { ...lamp, words: lamp.description, changed: false, gameChanged: false, gameWas: null },
+        {
+          ...bread,
+          words: bread.description,
+          changed: false,
+          gameChanged: false,
+          gameWas: null,
+          chosenOn: [],
+          chosenOnGone: false,
+        },
+        {
+          ...lamp,
+          words: lamp.description,
+          changed: false,
+          gameChanged: false,
+          gameWas: null,
+          chosenOn: [],
+          chosenOnGone: false,
+        },
       ])
       expect(rowOf({}, inn).patches).toEqual([])
     })
@@ -960,6 +976,20 @@ describe('the patches the game asks for', () => {
       expect(rowOf({ edits }, { ...inn, patches: [bread] }).patches.map((p) => p.id)).toEqual([
         'bread-taken',
       ])
+    })
+    it('notes the image takes each patch has a chosen take on, and any since dropped', () => {
+      const row = rowOf({
+        patchChoices: { [inn.id]: { 'bread-taken': [4, 2, 7], 'lamp-lit': [] } },
+        imageTakes: { [inn.id]: [1, 2, 4] },
+      })
+      expect(row.patches.map((p) => [p.chosenOn, p.chosenOnGone])).toEqual([
+        [[2, 4], true],
+        [[], false],
+      ])
+    })
+    it('counts every chosen take as on a dropped one when the image has no takes', () => {
+      const row = rowOf({ patchChoices: { [inn.id]: { 'bread-taken': [3] } } })
+      expect(row.patches[0]).toMatchObject({ chosenOn: [], chosenOnGone: true })
     })
     it('does not make the image out of date, nor change what a take is made from', () => {
       const plain = rowOf({}, inn)

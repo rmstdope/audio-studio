@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
+import { makeAgainOf } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
 import { Problems } from '../../components/Problems'
+import { makeAgainOpenLine } from '../../imagesText'
 import {
   patchSummary,
   type ImagePatchesView,
@@ -30,9 +32,12 @@ function PatchBody({
   onGame,
   onSaved,
   onEdit,
+  makeAgainLine,
 }: {
   imageId: string
   patch: PatchRow
+  /** Where the patch was chosen and how to get it back, when it needs making again. */
+  makeAgainLine: string | null
   /** The image's patches with their takes, once they have been loaded. */
   view: ImagePatchesView | null
   work: PatchWorkView | null
@@ -106,6 +111,7 @@ function PatchBody({
   )
   const words = (
     <>
+      {makeAgainLine && <div className="make-again-line">{makeAgainLine}</div>}
       <WordsField
         label="What should change"
         words={patch.words}
@@ -162,6 +168,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   // The box "What the game gets" of each patch lives here too; every box is ticked when the page opens.
   const [games, setGames] = useState<Record<string, boolean>>({})
   const view = query.data && 'patches' in query.data ? query.data : null
+  const again = new Set(makeAgainOf(row).map((patch) => patch.id))
   const [open, setOpen] = useState(
     () => new Set(row.patches.filter((patch) => patch.gameChanged).map((patch) => patch.id)),
   )
@@ -212,6 +219,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                     )}
                     {summary && <span className="game-patch-summary">{summary.text}</span>}
                     {summary?.chip && <span className="chip chip-ok">{summary.chip}</span>}
+                    {again.has(patch.id) && <span className="chip chip-warn">Make again</span>}
                     {work?.oldLook && <span className="chip chip-warn">Old look</span>}
                   </span>
                 </span>
@@ -231,6 +239,9 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
+                  makeAgainLine={
+                    again.has(patch.id) ? makeAgainOpenLine(patch.chosenOn, row.chosenTake) : null
+                  }
                 />
               )}
             </li>
