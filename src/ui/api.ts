@@ -19,7 +19,7 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
-import type { ImagePatchesView } from '../core/imagePatches'
+import type { ImagePatchesView, PatchArea } from '../core/imagePatches'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
 import type { ImagePatchAnswer, PatchMakeRequest } from '../services/imagePatches'
 import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
@@ -1649,17 +1649,26 @@ function useImageTakesChange<Input>(
   })
 }
 
+/** The images whose patches this page load has read. */
+const loadedPatches = new Set<string>()
+
 /** The patches the game asks for on an image, with their takes on its chosen take; polled while any is being made. */
 export function useImagePatches(imageId: string) {
   return useQuery({
     queryKey: ['image-patches', imageId],
-    queryFn: () =>
-      getJson<ImagePatchesView | ProjectFailure>(
-        `/api/images/${encodeURIComponent(imageId)}/patches`,
-      ),
+    queryFn: () => {
+      // The first read after the page loads says so, so a finished press's summary is not shown again.
+      const fresh = !loadedPatches.has(imageId)
+      loadedPatches.add(imageId)
+      return getJson<ImagePatchesView | ProjectFailure>(
+        `/api/images/${encodeURIComponent(imageId)}/patches${fresh ? '?fresh=1' : ''}`,
+      )
+    },
     refetchInterval: (query) => {
       const view = query.state.data
-      return view && 'patches' in view && view.patches.some((p) => p.making.length > 0)
+      return view &&
+        'patches' in view &&
+        (view.patches.some((p) => p.making.length > 0) || view.remake.press?.running)
         ? 1000
         : false
     },
@@ -1711,6 +1720,53 @@ export function useMakePatchTakes(imageId: string, patchId: string) {
     method: 'POST',
     body,
   }))
+}
+
+/**
+ * Asks for takes of every patch of the image that needs making again and has none on the take in
+ * the game. Answers what the server said (a refusal is an answer); reloads the image's patches.
+ */
+export function useRemakePatches(imageId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { count: number; marks: Record<string, PatchArea> }) => {
+      const response = await fetch(`/api/images/${encodeURIComponent(imageId)}/patches/remake`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`remaking the patches answered ${response.status}`)
+      }
+      return (await response.json()) as { ok: boolean }
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+  })
+}
+
+/** Stops the takes of the latest press that wait or are being made. */
+export function useStopRemake(imageId: string) {
+  return useRemakeChange(imageId, 'stop')
+}
+
+/** Forgets the latest press's summary. */
+export function useCloseRemake(imageId: string) {
+  return useRemakeChange(imageId, 'close')
+}
+
+/** A POST to the remake route of an image that answers nothing the page needs, then reloads its patches. */
+function useRemakeChange(imageId: string, what: 'stop' | 'close') {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(
+        `/api/images/${encodeURIComponent(imageId)}/patches/remake/${what}`,
+        { method: 'POST' },
+      )
+      if (!response.ok) throw new Error(`${what} answered ${response.status}`)
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+  })
 }
 
 /** Chooses a take of a patch. */

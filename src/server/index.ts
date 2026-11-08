@@ -13,8 +13,12 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
-import { ChoosePatchTakeBody, MakePatchTakesBody } from '../core/imagePatches'
-import { createImagePatches, type ImagePatchAnswer } from '../services/imagePatches'
+import { ChoosePatchTakeBody, MakePatchTakesBody, RemakePatchesBody } from '../core/imagePatches'
+import {
+  createImagePatches,
+  type ImagePatchAnswer,
+  type RemakeAnswer,
+} from '../services/imagePatches'
 import { ChooseImageTakeBody, MakeImageTakesBody } from '../core/imageTakes'
 import { BriefChangeBody } from '../core/music'
 import {
@@ -325,7 +329,7 @@ const AreaBoxBody = z.object({
 
 /** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
 function imageAnswer(
-  result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAnswer | ImagePatchAnswer,
+  result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAnswer | ImagePatchAnswer | RemakeAnswer,
 ): Response {
   if (!result) return Response.json({ error: 'not found' }, { status: 404 })
   return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -1713,9 +1717,33 @@ export function startServer({
       },
       '/api/images/:id/patches': {
         GET: guard(async (request) => {
-          const view = await imagePatches.view(projectFile, request.params.id)
+          const view = await imagePatches.view(
+            projectFile,
+            request.params.id,
+            new URL(request.url).searchParams.has('fresh'),
+          )
           return view ? Response.json(view) : notFound()
         }),
+      },
+      '/api/images/:id/patches/remake': {
+        POST: fromOwnPage(async (request) => {
+          const body = RemakePatchesBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { count, marks }' }, { status: 400 })
+          }
+          return imageAnswer(await imagePatches.remake(projectFile, request.params.id, body.data))
+        }),
+      },
+      '/api/images/:id/patches/remake/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await imagePatches.stopRemake(projectFile, request.params.id)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/images/:id/patches/remake/close': {
+        POST: fromOwnPage(async (request) =>
+          Response.json(await imagePatches.closeRemake(projectFile, request.params.id)),
+        ),
       },
       '/api/images/:id/patches/:patch/takes': {
         POST: fromOwnPage(async (request) => {

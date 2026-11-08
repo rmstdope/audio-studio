@@ -42,13 +42,14 @@ async function render(
   const sent: { method: string; path: string; body: unknown }[] = []
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
     // The takes of the patches are PatchWorkbench.test's; here there is nothing to patch on.
-    if (path === '/api/images/inn/patches') {
+    if (path.split('?')[0] === '/api/images/inn/patches') {
       // null: the patches never finish loading
       if (view === null) return new Promise<Response>(() => {})
       return Response.json({
         ok: true,
         take: null,
         pictureGone: false,
+        remake: { earlier: {}, press: null },
         maker: { ok: true },
         patches: [],
         ...view,

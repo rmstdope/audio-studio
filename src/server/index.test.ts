@@ -5368,9 +5368,22 @@ describe('the image takes routes', () => {
       ['POST', '/api/images/inn/patches/door/choose', { n: 1 }],
       ['POST', '/api/images/inn/patches/door/unchoose', undefined],
       ['POST', '/api/images/inn/patches/door/stop', undefined],
+      ['POST', '/api/images/inn/patches/remake', { count: 1, marks: {} }],
+      ['POST', '/api/images/inn/patches/remake/stop', undefined],
+      ['POST', '/api/images/inn/patches/remake/close', undefined],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
+  })
+
+  it('answers 400 to a remake body that is not { count, marks }, and 409 when nothing needs remaking', async () => {
+    expect(
+      (await send('POST', '/api/images/inn/patches/remake', { count: 9, marks: {} })).status,
+    ).toBe(400)
+    expect(
+      (await send('POST', '/api/images/inn/patches/remake', { count: 1, marks: {} })).status,
+    ).toBe(409)
+    expect((await send('POST', '/api/images/inn/patches/remake/close')).status).toBe(200)
   })
 
   it('makes takes, serves their pictures, chooses one and shows it as the current image', async () => {

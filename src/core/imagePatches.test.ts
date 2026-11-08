@@ -13,6 +13,8 @@ import {
   overlappingPatches,
   patchBoxesOverlap,
   patchSummary,
+  planRemake,
+  remakeCovered,
   setAsideQuestion,
 } from './imagePatches'
 import type { PatchRow } from './images'
@@ -645,5 +647,90 @@ describe('overlapping chosen patches', () => {
   })
   it('ignores a patch with no chosen area on the take in the game', () => {
     expect(overlappingPatches([patch('A', box(0, 0)), patch('B', null)])).toEqual([])
+  })
+})
+
+describe('remakeCovered', () => {
+  const row = (chosenTake: number | null, patches: Partial<PatchRow>[]) => ({
+    chosenTake,
+    patches: patches.map((p) => ({ chosenOn: [], chosenOnGone: false, ...p }) as PatchRow),
+  })
+  const idle = (id: string) => ({ id, takes: [], making: [], failed: [] })
+
+  it('covers a "Make again" patch with no takes on the take in the game', () => {
+    const r = row(2, [{ id: 'a', chosenOn: [1] }, { id: 'b' }])
+    expect(remakeCovered(r, [idle('a'), idle('b')]).map((p) => p.id)).toEqual(['a'])
+  })
+
+  it('leaves out a patch that has takes, takes being made, or a failed take', () => {
+    const r = row(2, [
+      { id: 'a', chosenOn: [1] },
+      { id: 'b', chosenOn: [1] },
+      { id: 'c', chosenOn: [1] },
+      { id: 'd', chosenOn: [1] },
+    ])
+    const work = [
+      { id: 'a', takes: [{}], making: [], failed: [] },
+      { id: 'b', takes: [], making: [{}], failed: [] },
+      { id: 'c', takes: [], making: [], failed: [{}] },
+      idle('d'),
+    ] as never
+    expect(remakeCovered(r, work).map((p) => p.id)).toEqual(['d'])
+  })
+
+  it('covers nothing when no take of the image is chosen', () => {
+    expect(remakeCovered(row(null, [{ id: 'a', chosenOn: [1] }]), [idle('a')])).toEqual([])
+  })
+})
+
+describe('planRemake', () => {
+  const image = { width: 640, height: 400 }
+  const take = { width: 1024, height: 640 }
+  const mark = { x: 10, y: 10, width: 100, height: 100 }
+  const earlier = { x: 200, y: 200, width: 80, height: 80 }
+  const base = { title: 'Bread taken', mark: null, tie: null, earlier: null }
+
+  it('uses the mark the person drew first', () => {
+    const tie = { title: 'Loaf', box: { x: 0, y: 0, width: 50, height: 50 } }
+    const plan = planRemake([{ ...base, id: 'a', mark, tie, earlier }], image, take)
+    expect(plan.make).toEqual([{ id: 'a', title: 'Bread taken', area: mark }])
+  })
+
+  it('then the place its named area has now', () => {
+    const box = { x: 100, y: 100, width: 100, height: 100 }
+    const plan = planRemake(
+      [{ ...base, id: 'a', tie: { title: 'Loaf', box }, earlier }],
+      image,
+      take,
+    )
+    expect(plan.make[0]!.area).toEqual(markFromArea(box, image, take)!)
+  })
+
+  it('then the area the patch was chosen with, also for an area with no place', () => {
+    const plan = planRemake(
+      [{ ...base, id: 'a', tie: { title: 'Loaf', box: null }, earlier }],
+      image,
+      take,
+    )
+    expect(plan.make[0]!.area).toEqual(earlier)
+  })
+
+  it('names a patch with nothing to go on and makes the others', () => {
+    const plan = planRemake(
+      [
+        { ...base, id: 'a' },
+        { ...base, id: 'b', title: 'Lamp lit', earlier },
+      ],
+      image,
+      take,
+    )
+    expect(plan.leftOut).toEqual([{ id: 'a', title: 'Bread taken' }])
+    expect(plan.make.map((m) => m.id)).toEqual(['b'])
+  })
+
+  it('ignores a mark that does not fit the picture', () => {
+    const bad = { x: 1000, y: 0, width: 100, height: 100 }
+    const plan = planRemake([{ ...base, id: 'a', mark: bad, earlier }], image, take)
+    expect(plan.make[0]!.area).toEqual(earlier)
   })
 })

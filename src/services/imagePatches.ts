@@ -8,7 +8,11 @@ import {
   checkPatchArea,
   keepArea,
   matchToTake,
+  planRemake,
+  remakeCovered,
+  tieOf,
   type ImagePatchesView,
+  type RemakePressView,
   type PatchArea,
   type PatchBoard,
   type PatchTake,
@@ -46,10 +50,21 @@ export type ImagePatchAnswer = { ok: true } | { ok: false; message: string } | P
 /** What to make: this many new takes of an area, or the failed take with this number again. */
 export type PatchMakeRequest = { count: number; area: PatchArea } | { retry: number }
 
+/** What a press of "Remake patches on this take" answered: the patches and takes queued, or why not. */
+export type RemakeAnswer =
+  | { ok: true; patches: string[]; takes: number }
+  | { ok: false; message: string }
+  | ProjectFailure
+  | null
+
 /** The takes of the patches the game asks for on an image. */
 export interface ImagePatches {
   /** The image's patches with their takes on the chosen take, a project failure, or null for an image not listed. */
-  view(projectFile: string, id: string): Promise<ImagePatchesView | ProjectFailure | null>
+  view(
+    projectFile: string,
+    id: string,
+    fresh?: boolean,
+  ): Promise<ImagePatchesView | ProjectFailure | null>
   /** Queues takes of a patch on the GPU queue and returns at once; null for an image or patch not listed. */
   make(
     projectFile: string,
@@ -63,6 +78,22 @@ export interface ImagePatches {
     id: string,
     patch: string,
   ): Promise<{ ok: true; stopped: number } | ProjectFailure | null>
+  /**
+   * Queues takes (1 to 4 each) for every patch that needs making again and has none on the take in
+   * the game, each from the person's mark, its named area's place or the area it was chosen with.
+   */
+  remake(
+    projectFile: string,
+    id: string,
+    request: { count: number; marks: Record<string, PatchArea> },
+  ): Promise<RemakeAnswer>
+  /** Stops the takes of the latest press that are waiting or being made; those made stay. */
+  stopRemake(
+    projectFile: string,
+    id: string,
+  ): Promise<{ ok: true; stopped: number } | ProjectFailure | null>
+  /** Forgets the latest press's summary once it has ended (Close). */
+  closeRemake(projectFile: string, id: string): Promise<{ ok: true }>
   /** Chooses a take of the patch on the take it was made on, in place of another chosen one. */
   choose(projectFile: string, id: string, patch: string, n: number): Promise<ImagePatchAnswer>
   /** Takes back the patch's chosen take on the image's chosen take; the take stays. */
@@ -121,6 +152,12 @@ export function createImagePatches({
   const bringing = ((
     globalThis as { contentStudioPatchBringing?: Set<string> }
   ).contentStudioPatchBringing ??= new Set())
+  // The latest press of each image (`<project file>\0<image>`): the takes it queued, by patch.
+  const presses = ((
+    globalThis as {
+      contentStudioPatchRemakes?: Map<string, { base: number; takes: Map<string, number[]> }>
+    }
+  ).contentStudioPatchRemakes ??= new Map())
   /** Patches whose new takes are being checked and queued, so a second press at once is refused. */
   const starting = new Set<string>()
 
@@ -376,61 +413,127 @@ export function createImagePatches({
     return { ok: true }
   }
 
-  return {
-    async view(projectFile, id) {
-      const image = await resolve(projectFile, id)
-      if (!image || 'ok' in image) return image
-      const picture = image.chosen === null ? null : await takePicture(image, image.chosen)
-      const patches: PatchWorkView[] = []
-      for (const patch of image.row.patches) {
-        const found = patchOf(image, patch)
-        // Before the board: a take that lands in between then shows as made, never as neither.
-        const entries = entriesOf(found.key).filter((e) => e.base === image.chosen)
-        const board = await readBoard(found)
-        if ('ok' in board) return board
-        const chosen = image.chosen === null ? undefined : board.chosen[String(image.chosen)]
-        const key = image.row.look.key
-        const takes: PatchWorkView['takes'] = []
-        for (const t of board.takes.filter((t) => t.base === image.chosen)) {
-          takes.push({
-            n: t.n,
-            area: t.area,
-            earlier: t.words !== patch.words,
-            chosen: t.n === chosen,
-            isNew: !t.seen,
-            look: bringing.has(`${found.key}\0${t.n}`)
-              ? 'bringing'
-              : !(await Bun.file(
-                    resolveInRoot(image.root, patchGameOf(image.id, patch.id, t.n)),
-                  ).exists())
-                ? 'missing'
-                : t.look === key
-                  ? 'ready'
-                  : 'old',
-          })
-        }
-        const inGame = image.chosen === null ? undefined : board.inGame[String(image.chosen)]
-        patches.push({
-          id: patch.id,
-          takes,
-          oldLook:
-            key !== null &&
-            inGame !== undefined &&
-            board.takes.find((t) => t.n === inGame)?.look !== key,
-          making: entries
-            .filter((e) => e.state !== 'failed')
-            .map((e) => ({
-              n: e.n,
-              state: e.state as 'waiting' | 'making',
-              elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
-              expected: imageModel(EDIT_MODEL).seconds,
-              area: e.area,
-            })),
-          failed: entries
-            .filter((e) => e.state === 'failed')
-            .map((e) => ({ n: e.n, message: e.message, area: e.area })),
+  /** Each patch's takes on the chosen take, and the area of its earlier choice; a failure when a board cannot be read. */
+  async function workOf(image: Image) {
+    const patches: PatchWorkView[] = []
+    const earlier: Record<string, PatchArea> = {}
+    for (const patch of image.row.patches) {
+      const found = patchOf(image, patch)
+      // Before the board: a take that lands in between then shows as made, never as neither.
+      const entries = entriesOf(found.key).filter((e) => e.base === image.chosen)
+      const board = await readBoard(found)
+      if ('ok' in board) return board
+      // The take chosen on the newest other take of the image that is still on the board.
+      const was = Object.keys(board.chosen)
+        .map(Number)
+        .filter((base) => base !== image.chosen)
+        .sort((a, b) => b - a)
+        .map((base) => board.takes.find((t) => t.n === board.chosen[String(base)]))
+        .find((t) => t !== undefined)
+      if (was) earlier[patch.id] = was.area
+      const chosen = image.chosen === null ? undefined : board.chosen[String(image.chosen)]
+      const key = image.row.look.key
+      const takes: PatchWorkView['takes'] = []
+      for (const t of board.takes.filter((t) => t.base === image.chosen)) {
+        takes.push({
+          n: t.n,
+          area: t.area,
+          earlier: t.words !== patch.words,
+          chosen: t.n === chosen,
+          isNew: !t.seen,
+          look: bringing.has(`${found.key}\0${t.n}`)
+            ? 'bringing'
+            : !(await Bun.file(
+                  resolveInRoot(image.root, patchGameOf(image.id, patch.id, t.n)),
+                ).exists())
+              ? 'missing'
+              : t.look === key
+                ? 'ready'
+                : 'old',
         })
       }
+      const inGame = image.chosen === null ? undefined : board.inGame[String(image.chosen)]
+      patches.push({
+        id: patch.id,
+        takes,
+        oldLook:
+          key !== null &&
+          inGame !== undefined &&
+          board.takes.find((t) => t.n === inGame)?.look !== key,
+        making: entries
+          .filter((e) => e.state !== 'failed')
+          .map((e) => ({
+            n: e.n,
+            state: e.state as 'waiting' | 'making',
+            elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
+            expected: imageModel(EDIT_MODEL).seconds,
+            area: e.area,
+          })),
+        failed: entries
+          .filter((e) => e.state === 'failed')
+          .map((e) => ({ n: e.n, message: e.message, area: e.area })),
+      })
+    }
+    return { work: patches, earlier }
+  }
+
+  /** The latest press of the image as the page shows it; null when there is none. */
+  async function pressOf(
+    image: Pick<Image, 'projectFile' | 'id' | 'root'>,
+  ): Promise<RemakePressView | ProjectFailure | null> {
+    const press = presses.get(`${image.projectFile}\0${image.id}`)
+    if (!press) return null
+    let total = 0
+    let made = 0
+    let running = 0
+    let left = 0
+    let failedTakes = 0
+    const failed: string[] = []
+    for (const [patch, ns] of press.takes) {
+      const entries = active.get(patchBoardKey(image.projectFile, image.id, patch))
+      const board = await readPatchBoard(image.root, image.id, patch)
+      if ('ok' in board) return board
+      total += ns.length
+      for (const n of ns) {
+        const entry = entries?.get(n)
+        if (entry?.state === 'failed') {
+          failedTakes++
+          if (!failed.includes(patch)) failed.push(patch)
+        } else if (entry) {
+          running++
+          const seconds = imageModel(EDIT_MODEL).seconds
+          left +=
+            entry.state === 'making'
+              ? Math.max(0, seconds - (now() - entry.startedAt) / 1000)
+              : seconds
+        } else if (board.takes.some((t) => t.n === n && t.base === press.base)) made++
+      }
+    }
+    return {
+      total,
+      ids: [...press.takes.keys()],
+      failedTakes,
+      made,
+      stopped: total - made - running - failedTakes,
+      failed,
+      running: running > 0,
+      left: Math.round(left),
+    }
+  }
+
+  return {
+    async view(projectFile, id, fresh = false) {
+      const image = await resolve(projectFile, id)
+      if (!image || 'ok' in image) return image
+      // A page that has just loaded does not get a finished summary back (only Close keeps it until then).
+      if (fresh && !(await pressOf(image).then((p) => !!p && 'running' in p && p.running))) {
+        presses.delete(`${projectFile}\0${id}`)
+      }
+      const picture = image.chosen === null ? null : await takePicture(image, image.chosen)
+      const got = await workOf(image)
+      if ('ok' in got) return got
+      const press = await pressOf(image)
+      if (press && 'ok' in press) return press
       const problem = await makerProblem()
       const lock = await readResource(image.root, IMAGES_LOCK_FILE, ImageLockSchema, [])
       return {
@@ -447,8 +550,119 @@ export function createImagePatches({
         lockUnread: lock === 'invalid',
         pictureGone: image.chosen !== null && picture === null,
         maker: problem === null ? { ok: true } : { ok: false, message: problem },
-        patches,
+        patches: got.work,
+        remake: { earlier: got.earlier, press },
       }
+    },
+
+    async remake(projectFile, id, request) {
+      const image = await resolve(projectFile, id)
+      if (!image || 'ok' in image) return image
+      const got = await workOf(image)
+      if ('ok' in got) return got
+      const covered = remakeCovered(image.row, got.work)
+      if (covered.length === 0) {
+        return { ok: false, message: 'No patch needs making again on this take.' }
+      }
+      const picture = image.chosen === null ? null : await takePicture(image, image.chosen)
+      if (!picture) {
+        return {
+          ok: false,
+          message:
+            "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
+        }
+      }
+      const plan = planRemake(
+        covered.map((patch) => ({
+          id: patch.id,
+          title: patch.title,
+          mark: request.marks[patch.id] ?? null,
+          tie: tieOf(image.row, patch),
+          earlier: got.earlier[patch.id] ?? null,
+        })),
+        image.row,
+        picture,
+      )
+      if (plan.make.length === 0) {
+        return { ok: false, message: 'None of the patches has an area to make it from.' }
+      }
+      const base = image.chosen!
+      const takes = new Map<string, number[]>()
+      const undo = () => {
+        for (const [patch, ns] of takes) {
+          const entries = active.get(patchOf(image, { id: patch } as PatchRow).key)
+          for (const n of ns) {
+            entries?.get(n)?.stop?.abort()
+            entries?.delete(n)
+          }
+        }
+      }
+      for (const { id: patch, area } of plan.make) {
+        const found = patchOf(
+          image,
+          image.row.patches.find((p) => p.id === patch)!,
+        )
+        const entries = active.get(found.key) ?? new Map<number, Entry>()
+        active.set(found.key, entries)
+        if (starting.has(found.key)) {
+          undo()
+          return {
+            ok: false,
+            message: 'Takes of this patch are being made. Wait for them, or stop them.',
+          }
+        }
+        starting.add(found.key)
+        const before = new Set(entries.keys())
+        try {
+          const answer = await start(found, entries, { count: request.count, area })
+          if (!answer || !answer.ok) {
+            undo()
+            return answer
+          }
+        } catch (error) {
+          // A board that cannot be written leaves nothing of this press queued.
+          undo()
+          throw error
+        } finally {
+          starting.delete(found.key)
+        }
+        takes.set(
+          patch,
+          [...entries.keys()].filter((n) => !before.has(n)),
+        )
+      }
+      presses.set(`${projectFile}\0${id}`, { base, takes })
+      return {
+        ok: true,
+        patches: plan.make.map((m) => m.id),
+        takes: plan.make.length * request.count,
+      }
+    },
+
+    async stopRemake(projectFile, id) {
+      const image = await resolve(projectFile, id)
+      if (!image || 'ok' in image) return image
+      const press = presses.get(`${projectFile}\0${id}`)
+      let stopped = 0
+      for (const [patch, ns] of press?.takes ?? []) {
+        const entries = active.get(patchBoardKey(projectFile, id, patch))
+        for (const n of ns) {
+          const entry = entries?.get(n)
+          if (!entry || entry.state === 'failed') continue
+          entry.stop?.abort()
+          entries!.delete(n)
+          stopped++
+        }
+      }
+      return { ok: true, stopped }
+    },
+
+    async closeRemake(projectFile, id) {
+      const key = `${projectFile}\0${id}`
+      const press = presses.get(key)
+      const now = press ? await pressOf({ projectFile, id, root: dirname(projectFile) }) : null
+      if (press && !(now && !('ok' in now) && now.running)) presses.delete(key)
+      return { ok: true }
     },
 
     async make(projectFile, id, patch, request) {

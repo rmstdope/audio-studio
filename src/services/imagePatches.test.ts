@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { matchToTake, type ImagePatchesView, type PatchWorkView } from '../core/imagePatches'
@@ -731,5 +731,266 @@ describe('a chosen take of a patch reaches the game', () => {
     )
     expect((await work()).takes[0]!.chosen).toBe(true)
     expect(manifestOf(root)).toEqual(gameManifest)
+  })
+})
+
+const IMAGE_BOARD = 'content-studio/cache/images/inn.json'
+const earlierArea = { x: 32, y: 32, width: 96, height: 96 }
+
+/** Makes `patches` chosen on an earlier take 2 of the image, with the area they were chosen with. */
+function chosenEarlier(root: string, patches: string[] = ['door', 'sign'], at = earlierArea) {
+  writeTake(root, 'content-studio/cache/image-takes/inn/2.png')
+  mkdirSync(dirname(join(root, IMAGE_BOARD)), { recursive: true })
+  writeFileSync(
+    join(root, IMAGE_BOARD),
+    JSON.stringify({
+      next: 4,
+      takes: [2, 3].map((n) => ({
+        n,
+        seed: n,
+        model: 'flux2-klein-4b',
+        width: 256,
+        height: 256,
+        madeFrom: { words: 'a low inn', style: '', width: 320, height: 200 },
+        seen: true,
+      })),
+    }),
+  )
+  for (const patch of patches) {
+    const folder = `content-studio/cache/image-patches/inn/${patch}`
+    mkdirSync(join(root, folder), { recursive: true })
+    writeFileSync(
+      join(root, `${folder}/board.json`),
+      JSON.stringify({
+        next: 2,
+        takes: [{ n: 1, base: 2, seed: 1, words: 'old', area: at, seen: true }],
+        chosen: { '2': 1 },
+        inGame: { '2': 1 },
+      }),
+    )
+  }
+}
+
+describe('remaking patches on a new take', () => {
+  it('makes the chosen number of takes for each covered patch, in the game order, from the area they were chosen with and their words now', async () => {
+    const { root, file, patches, requests, settled } = setup()
+    chosenEarlier(root)
+    const view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.remake.earlier).toEqual({ door: earlierArea, sign: earlierArea })
+    expect(await patches.remake(file, 'inn', { count: 2, marks: {} })).toEqual({
+      ok: true,
+      patches: ['door', 'sign'],
+      takes: 4,
+    })
+    await settled('door')
+    const after = await settled('sign')
+    expect(after.patches.map((p) => p.takes.length)).toEqual([2, 2])
+    expect(requests.map((r) => r.prompt)).toEqual([
+      'the door is gone',
+      'the door is gone',
+      'the sign is new',
+      'the sign is new',
+    ])
+    const board = JSON.parse(readFileSync(join(root, BOARD), 'utf8'))
+    expect(
+      board.takes
+        .filter((t: { base: number }) => t.base === 3)
+        .map((t: { area: unknown }) => t.area),
+    ).toEqual([earlierArea, earlierArea])
+    expect(board.chosen).toEqual({ '2': 1 })
+  })
+
+  it('uses the mark the person drew in place of the area it was chosen with', async () => {
+    const { root, file, patches, requests, settled } = setup()
+    chosenEarlier(root, ['door'])
+    const marked = { x: 8, y: 8, width: 64, height: 64 }
+    expect(await patches.remake(file, 'inn', { count: 1, marks: { door: marked } })).toEqual({
+      ok: true,
+      patches: ['door'],
+      takes: 1,
+    })
+    await settled('door')
+    expect(requests).toHaveLength(1)
+    const board = JSON.parse(readFileSync(join(root, BOARD), 'utf8'))
+    expect(board.takes.find((t: { base: number }) => t.base === 3).area).toEqual(marked)
+  })
+
+  it('does not cover a patch that already has takes on the take in the game', async () => {
+    const { root, file, patches, settled } = setup()
+    chosenEarlier(root)
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await settled('door')
+    expect(await patches.remake(file, 'inn', { count: 1, marks: {} })).toMatchObject({
+      patches: ['sign'],
+    })
+  })
+
+  it('refuses when nothing is covered', async () => {
+    const { file, patches } = setup()
+    expect(await patches.remake(file, 'inn', { count: 1, marks: {} })).toEqual({
+      ok: false,
+      message: 'No patch needs making again on this take.',
+    })
+  })
+
+  it('refuses for a model that is missing, with the reason a patch gives', async () => {
+    const { root, file, patches } = setup({ installed: false })
+    chosenEarlier(root)
+    expect(await patches.remake(file, 'inn', { count: 1, marks: {} })).toEqual({
+      ok: false,
+      message: 'FLUX.2 klein 4B is not on this computer, and patches are made with it.',
+    })
+  })
+
+  it('shows progress while it runs and a summary after, until Close', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { root, file, patches, settled } = setup({ queue })
+    chosenEarlier(root)
+    await patches.remake(file, 'inn', { count: 2, marks: {} })
+    let view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.remake.press).toMatchObject({
+      total: 4,
+      ids: ['door', 'sign'],
+      made: 0,
+      stopped: 0,
+      failed: [],
+      running: true,
+    })
+    expect(view.remake.press!.left).toBeGreaterThan(0)
+    release()
+    await settled('door')
+    view = await settled('sign')
+    expect(view.remake.press).toMatchObject({ total: 4, made: 4, running: false, failed: [] })
+    expect(await patches.closeRemake(file, 'inn')).toEqual({ ok: true })
+    view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.remake.press).toBeNull()
+  })
+
+  it('keeps the takes already made when the press is stopped', async () => {
+    const { root, file, patches, settled } = setup()
+    chosenEarlier(root, ['door'])
+    await patches.remake(file, 'inn', { count: 1, marks: {} })
+    await settled('door')
+    expect(await patches.stopRemake(file, 'inn')).toEqual({ ok: true, stopped: 0 })
+    const view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.patches[0]!.takes).toHaveLength(1)
+    expect(view.remake.press).toMatchObject({ total: 1, made: 1, stopped: 0 })
+  })
+
+  it('stops what waits and keeps what was made, and not the takes a patch’s own Make queued', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { root, file, patches, settled } = setup({ queue })
+    chosenEarlier(root, ['door'])
+    await patches.remake(file, 'inn', { count: 2, marks: {} })
+    // The sign is not covered; its own Make is queued behind the press's takes.
+    await patches.make(file, 'inn', 'sign', { count: 1, area })
+    expect(await patches.stopRemake(file, 'inn')).toEqual({ ok: true, stopped: 2 })
+    release()
+    const view = await settled('sign')
+    expect(view.patches.map((p) => p.takes.length)).toEqual([0, 1])
+    expect(view.remake.press).toMatchObject({ total: 2, made: 0, stopped: 2, running: false })
+  })
+
+  it('does not show a finished press again to a page that has just loaded, until Close otherwise', async () => {
+    const { root, file, patches, settled } = setup()
+    chosenEarlier(root, ['door'])
+    await patches.remake(file, 'inn', { count: 1, marks: {} })
+    await settled('door')
+    expect(((await patches.view(file, 'inn')) as ImagePatchesView).remake.press).toMatchObject({
+      made: 1,
+    })
+    expect(((await patches.view(file, 'inn', true)) as ImagePatchesView).remake.press).toBeNull()
+  })
+
+  it('keeps a running press for a page that has just loaded', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { root, file, patches, settled } = setup({ queue })
+    chosenEarlier(root, ['door'])
+    await patches.remake(file, 'inn', { count: 1, marks: {} })
+    expect(
+      ((await patches.view(file, 'inn', true)) as ImagePatchesView).remake.press,
+    ).toMatchObject({ running: true })
+    release()
+    await settled('door')
+  })
+
+  it('makes from the words as they stand now, and counts takes made on their own take of the image', async () => {
+    const { root, file, patches, requests, settled } = setup()
+    chosenEarlier(root, ['door'])
+    writeFileSync(
+      join(root, 'content-studio/images/edits.json'),
+      JSON.stringify({
+        images: { inn: { patches: { door: { text: 'a new door', gameWas: 'the door is gone' } } } },
+      }),
+    )
+    await patches.remake(file, 'inn', { count: 1, marks: {} })
+    await settled('door')
+    expect(requests.map((r) => r.prompt)).toEqual(['a new door'])
+    // Another take of the image is chosen: the press's take still counts as made on its own take.
+    writeTake(root, 'content-studio/cache/image-takes/inn/4.png')
+    writeFileSync(join(root, LOCK), JSON.stringify({ inn: { ...lock.inn, take: 4 } }))
+    expect(((await patches.view(file, 'inn')) as ImagePatchesView).remake.press).toMatchObject({
+      made: 1,
+    })
+  })
+
+  it('falls back to an older earlier take when the newest one is gone from the board', async () => {
+    const { root, file, patches } = setup()
+    chosenEarlier(root, ['door'])
+    const board = join(root, BOARD)
+    const was = JSON.parse(readFileSync(board, 'utf8'))
+    was.takes.push({ n: 2, base: 1, seed: 1, words: 'x', area: earlierArea, seen: true })
+    was.chosen = { '1': 2, '2': 9 }
+    writeFileSync(board, JSON.stringify(was))
+    const view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.remake.earlier).toEqual({ door: earlierArea })
+  })
+
+  it('names a patch whose take failed in the summary', async () => {
+    const { root, file, patches, settled } = setup({
+      makes: (r) => {
+        if (r.prompt === 'the sign is new') throw new Error('boom')
+        return fakePng(r.width, r.height, 1)
+      },
+    })
+    chosenEarlier(root)
+    await patches.remake(file, 'inn', { count: 1, marks: {} })
+    await settled('door')
+    const view = await settled('sign')
+    expect(view.remake.press).toMatchObject({
+      total: 2,
+      made: 1,
+      failed: ['sign'],
+      failedTakes: 1,
+      running: false,
+    })
+  })
+
+  it('starts nothing, and stops the takes already queued, when a later patch cannot be started', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { root, file, patches, requests } = setup({ queue })
+    chosenEarlier(root)
+    // The sign's board can be read but not written, so reserving its takes fails after the door's are queued.
+    const folder = join(root, 'content-studio/cache/image-patches/inn/sign')
+    chmodSync(folder, 0o500)
+    const answer = await patches
+      .remake(file, 'inn', { count: 1, marks: {} })
+      .catch(() => 'threw' as const)
+      .finally(() => chmodSync(folder, 0o700))
+    expect(answer === 'threw' || (answer && 'ok' in answer && answer.ok === false)).toBe(true)
+    const view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.remake.press).toBeNull()
+    expect(view.patches.map((p) => p.making.length)).toEqual([0, 0])
+    release()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(requests).toHaveLength(0)
   })
 })
