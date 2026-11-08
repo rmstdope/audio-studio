@@ -143,6 +143,43 @@ describe('matchToTake', () => {
     expect(rgbAt(matched, 51, 100)).toEqual([100, 140, 60])
   })
 
+  it('does not streak the area with something the edit painted just outside one side', () => {
+    const flat = plain(300, 300, [100, 140, 200])
+    const object = (x0: number, w: number, x: number, y: number): [number, number, number] =>
+      y >= 150 && y < 158 && x >= x0 && x < x0 + w ? [0, 20, 100] : [103, 143, 203]
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    // A narrow object and a wide one, painted in the strip below the area; the drift is +3.
+    for (const w of [24, 60]) {
+      const edited = painted(300, 300, (x, y) => object(130, w, x, y))
+      const matched = matchToTake(edited, flat, bounds)
+      for (const y of [149, 120, 80]) {
+        for (const x of [100, 140, 200]) expect(rgbAt(matched, x, y)).toEqual([100, 140, 200])
+      }
+    }
+  })
+
+  it('does not streak the area with a wide or a soft-edged thing painted just outside (a gentle tail up to the drift limit is taken as drift)', () => {
+    const flat = plain(300, 300, [100, 140, 200])
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    const wide = painted(300, 300, (x, y) =>
+      y >= 150 && y < 158 && x >= 60 && x < 180 ? [0, 20, 100] : [103, 143, 203],
+    )
+    const soft = painted(300, 300, (x, y) => {
+      const dim = y >= 150 && y < 158 ? Math.max(0, 1 - Math.abs(x - 150) / 60) : 0
+      return [103 - 103 * dim, 143 - 120 * dim, 203 - 100 * dim]
+    })
+    for (const edited of [wide, soft]) {
+      const matched = matchToTake(edited, flat, bounds)
+      for (const y of [149, 120, 80]) {
+        for (const x of [60, 100, 130, 154, 200, 240]) {
+          for (const [i, v] of rgbAt(matched, x, y).entries()) {
+            expect(Math.abs(v - [100, 140, 200][i]!)).toBeLessThanOrEqual(22)
+          }
+        }
+      }
+    }
+  })
+
   it('does not look past a side on the picture edge, and matches the other sides', () => {
     const edge = { x: 0, y: 50, width: 100, height: 100 }
     const edited = plain(200, 200, [110, 150, 70])
