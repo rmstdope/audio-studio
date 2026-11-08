@@ -134,7 +134,7 @@ describe('matchToTake', () => {
     const horizon = (c: [number, number, number], d: [number, number, number]) =>
       painted(200, 200, (_x, y) => (y < 100 ? c : d))
     const horizonTake = horizon([100, 140, 200], [100, 140, 60])
-    const horizonEdited = horizon([110, 150, 210], [98, 138, 58])
+    const horizonEdited = horizon([110, 150, 210], [90, 130, 50])
     const matched = matchToTake(horizonEdited, horizonTake, area)
     expect(rgbAt(matched, 51, 60)).toEqual([100, 140, 200])
     expect(rgbAt(matched, 51, 140)).toEqual([100, 140, 60])
@@ -154,6 +154,28 @@ describe('matchToTake', () => {
       const matched = matchToTake(edited, flat, bounds)
       for (const y of [149, 120, 80]) {
         for (const x of [100, 140, 200]) expect(rgbAt(matched, x, y)).toEqual([100, 140, 200])
+      }
+    }
+  })
+
+  it('does not streak the area with a wide or a soft-edged thing painted just outside (a gentle tail up to the drift limit is taken as drift)', () => {
+    const flat = plain(300, 300, [100, 140, 200])
+    const bounds = { x: 50, y: 50, width: 200, height: 100 }
+    const wide = painted(300, 300, (x, y) =>
+      y >= 150 && y < 158 && x >= 60 && x < 180 ? [0, 20, 100] : [103, 143, 203],
+    )
+    const soft = painted(300, 300, (x, y) => {
+      const dim = y >= 150 && y < 158 ? Math.max(0, 1 - Math.abs(x - 150) / 60) : 0
+      return [103 - 103 * dim, 143 - 120 * dim, 203 - 100 * dim]
+    })
+    for (const edited of [wide, soft]) {
+      const matched = matchToTake(edited, flat, bounds)
+      for (const y of [149, 120, 80]) {
+        for (const x of [60, 100, 130, 154, 200, 240]) {
+          for (const [i, v] of rgbAt(matched, x, y).entries()) {
+            expect(Math.abs(v - [100, 140, 200][i]!)).toBeLessThanOrEqual(22)
+          }
+        }
       }
     }
   })

@@ -123,8 +123,14 @@ export const PATCH_EASE = 48
 /** How many positions each way along a side the median is taken over, so that one speck does not set the colour. */
 const MATCH_SMOOTH = 24
 
-/** How far, out of 255, a place along a side may differ from the side as a whole before it is taken as something the edit painted there and not as drift. */
-const MATCH_OUTLIER = 14
+/** Out of 255, how far a place along a side may differ from the drift of all the sides together and still be followed in full. */
+const MATCH_FOLLOW = 22
+
+/** Out of 255, how far beyond `MATCH_FOLLOW` a place may differ before it is not followed at all: it is something the edit painted there. */
+const MATCH_IGNORE = 8
+
+/** The median of the values, which it sorts in place. */
+const middle = (values: number[]) => values.sort((x, y) => x - y)[values.length >> 1]!
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */
 interface MatchSide {
@@ -155,7 +161,7 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       take.data[i + 2]! - edited.data[i + 2]!,
     ]
   }
-  /** The smoothed offsets along one side: for each position, the mean over the strip and its neighbours. */
+  /** The smoothed offsets along one side: for each position, the median of the strip's mean over the position and its neighbours. */
   const along = (
     count: number,
     start: number,
@@ -173,25 +179,19 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       return sum.map((v) => v / depths) as [number, number, number]
     })
     // A median, not a mean: it follows a step such as a horizon instead of smearing it.
-    const middle = (values: number[]) => values.sort((x, y) => x - y)[values.length >> 1]!
-    const overall = [0, 1, 2].map((c) => middle(raw.map((o) => o[c]!)))
     return raw.map((_, k) => {
       const window = raw.slice(Math.max(0, k - MATCH_SMOOTH), Math.min(count, k + MATCH_SMOOTH + 1))
-      // An object the edit painted beside the area is wider than the median sees, but it is far
-      // from the side's own drift: such a place takes the side's overall drift, so it is never
-      // carried into the area as a streak.
-      return [0, 1, 2].map((c) => {
-        const here = middle(window.map((o) => o[c]!))
-        return Math.abs(here - overall[c]!) > MATCH_OUTLIER ? overall[c]! : here
-      }) as [number, number, number]
+      return [0, 1, 2].map((c) => middle(window.map((o) => o[c]!))) as [number, number, number]
     })
   }
 
   const sides: MatchSide[] = []
+  const allOffsets: [number, number, number][][] = []
   const band = (room: number) => Math.min(PATCH_MATCH_BAND, room)
   if (area.x > 0) {
     const depths = band(area.x)
     const offsets = along(area.height, area.y, (y, d) => offsetAtPixel(area.x - 1 - d, y), depths)
+    allOffsets.push(offsets)
     sides.push({
       distance: (x) => x - area.x + 0.5,
       offsetAt: (_x, y) => offsets[y - area.y]!,
@@ -200,6 +200,7 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
   if (right < width) {
     const depths = band(width - right)
     const offsets = along(area.height, area.y, (y, d) => offsetAtPixel(right + d, y), depths)
+    allOffsets.push(offsets)
     sides.push({
       distance: (x) => right - x - 0.5,
       offsetAt: (_x, y) => offsets[y - area.y]!,
@@ -208,6 +209,7 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
   if (area.y > 0) {
     const depths = band(area.y)
     const offsets = along(area.width, area.x, (x, d) => offsetAtPixel(x, area.y - 1 - d), depths)
+    allOffsets.push(offsets)
     sides.push({
       distance: (_x, y) => y - area.y + 0.5,
       offsetAt: (x) => offsets[x - area.x]!,
@@ -216,10 +218,30 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
   if (bottom < height) {
     const depths = band(height - bottom)
     const offsets = along(area.width, area.x, (x, d) => offsetAtPixel(x, bottom + d), depths)
+    allOffsets.push(offsets)
     sides.push({
       distance: (_x, y) => bottom - y - 0.5,
       offsetAt: (x) => offsets[x - area.x]!,
     })
+  }
+
+  // Something the edit painted just outside the area (a bird, a cloud) is far from the drift of
+  // the sides as a whole, and carried inward it would streak the area: such a place takes that
+  // drift instead, gradually, so no hard step shows.
+  if (allOffsets.length > 0) {
+    const pooled = allOffsets.flat()
+    const reference = [0, 1, 2].map((c) => middle(pooled.map((o) => o[c]!)))
+    for (const offsets of allOffsets) {
+      for (const o of offsets) {
+        for (let c = 0; c < 3; c++) {
+          const t = Math.max(
+            0,
+            Math.min(1, (Math.abs(o[c]! - reference[c]!) - MATCH_FOLLOW) / MATCH_IGNORE),
+          )
+          o[c] = o[c]! + (reference[c]! - o[c]!) * t * t * (3 - 2 * t)
+        }
+      }
+    }
   }
 
   const data = new Uint8Array(edited.data)
