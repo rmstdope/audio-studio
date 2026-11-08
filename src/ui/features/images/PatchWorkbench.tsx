@@ -47,11 +47,15 @@ const MAX_AT_ONCE = 4
 
 /** Where an area lies on a picture of this size, in the percentages the page draws with. */
 function placed(area: PatchArea, take: { width: number; height: number }): CSSProperties {
+  // A mark can reach past the part the game's version shows; it is drawn up to that picture's edge.
+  const within = (at: number, size: number) => Math.min(Math.max(at, 0), size) / size
+  const left = within(area.x, take.width)
+  const top = within(area.y, take.height)
   return {
-    left: `${(area.x / take.width) * 100}%`,
-    top: `${(area.y / take.height) * 100}%`,
-    width: `${(area.width / take.width) * 100}%`,
-    height: `${(area.height / take.height) * 100}%`,
+    left: `${left * 100}%`,
+    top: `${top * 100}%`,
+    width: `${(within(area.x + area.width, take.width) - left) * 100}%`,
+    height: `${(within(area.y + area.height, take.height) - top) * 100}%`,
   }
 }
 
