@@ -1111,6 +1111,31 @@ describe('the named areas the game declares', () => {
       'Old noticeold-noticeTo place',
     ])
   })
+  it('keeps one panel when the page is drawn again with new data (siblings need their own keys)', () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, enabled: false } },
+    })
+    client.setQueryData(['image-making'], {})
+    client.setQueryData(['look-run'], null)
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act_(() => root.unmount()))
+    const draw = (shown: ProjectSummary) =>
+      act_(() =>
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client },
+            createElement(ImagesView, { summary: shown, route: image }),
+          ),
+        ),
+      )
+    draw(summary({ areas: [fountain, notice], patches: [lamp] }))
+    draw(summary({ areas: [fountain, notice], patches: [lamp] }))
+    expect(container.querySelectorAll('.named-areas').length).toBe(1)
+    expect(container.querySelectorAll('.game-patches').length).toBe(1)
+  })
   it('leaves the page as it is when the game names none', () => {
     const page = render(image)
     expect(page.querySelector('.named-areas')).toBeNull()
