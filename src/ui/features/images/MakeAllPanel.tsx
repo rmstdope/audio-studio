@@ -15,6 +15,7 @@ import {
   disagreeLine,
   makeAllHeading,
   makeAllLine,
+  nothingToMakeDisagreeLine,
   readyLine,
   runningLine,
   summaryFailed,
@@ -169,7 +170,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
     action = (
       <span className="muted">
         {act.conflicts.length > 0
-          ? disagreeLine(act.conflicts.map((c) => c.title))
+          ? nothingToMakeDisagreeLine(act.conflicts.map((c) => c.title))
           : 'Every image has a chosen take.'}
       </span>
     )

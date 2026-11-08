@@ -64,6 +64,11 @@ export function disagreeLine(names: readonly string[]): string {
   return `${joined([...names])} ${one ? 'gets' : 'get'} none: the game's lists disagree about ${one ? 'it' : 'them'}.`
 }
 
+/** The panel's line when the only images left to make are those the game's lists disagree about. */
+export function nothingToMakeDisagreeLine(names: readonly string[]): string {
+  return `No takes can be made for ${joined([...names])}: the game's lists disagree about ${names.length === 1 ? 'it' : 'them'}.`
+}
+
 /** The running line: what is being made in the act, and about how long is left. */
 export function runningLine({
   takes,

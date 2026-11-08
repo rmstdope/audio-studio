@@ -340,7 +340,7 @@ describe('Make takes for every image with no chosen take', () => {
       const page = render(actOf(rows, [conflict('x', "Smugglers' cave")]))
       expect(page.text()).not.toContain('Every image has a chosen take.')
       expect(page.text()).toContain(
-        "Smugglers' cave gets none: the game's lists disagree about it.",
+        "No takes can be made for Smugglers' cave: the game's lists disagree about it.",
       )
       expect(page.container.querySelector('button')).toBeNull()
     }
