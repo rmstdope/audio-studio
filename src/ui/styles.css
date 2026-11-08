@@ -3113,8 +3113,7 @@ button.cue-chip[aria-expanded='true'] {
   text-decoration: underline;
 }
 
-/* A track's Brief panel */
-
+/* An image's patches */
 .patches {
   display: flex;
   flex-direction: column;
@@ -3161,6 +3160,8 @@ button.cue-chip[aria-expanded='true'] {
   padding: 0;
   list-style: none;
 }
+/* A track's Brief panel */
+
 .brief-panel {
   display: flex;
   flex-direction: column;

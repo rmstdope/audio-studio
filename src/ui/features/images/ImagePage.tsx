@@ -208,7 +208,7 @@ export function ImagePage({
           </section>
         }
       />
-      {row.chosenTake !== null && <PatchesSection key={row.chosenTake} imageId={row.id} />}
+      <PatchesSection key={row.chosenTake} imageId={row.id} />
     </>
   )
 }

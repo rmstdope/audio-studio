@@ -74,6 +74,15 @@ function encode(pixels: Pixels, samples: 3 | 4): Uint8Array {
   return out
 }
 
+/** The size of a PNG from its first 33 bytes, without reading the rest; throws for anything else. */
+export function pngSize(bytes: Uint8Array): { width: number; height: number } {
+  if (bytes.length < 33 || SIGNATURE.some((b, i) => bytes[i] !== b)) {
+    throw new Error('The picture is not a PNG.')
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  return { width: view.getUint32(16), height: view.getUint32(20) }
+}
+
 /** The samples per pixel of each PNG colour type. */
 const CHANNELS: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }
 

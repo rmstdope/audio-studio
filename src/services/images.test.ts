@@ -72,6 +72,17 @@ describe('mfluxArguments of an edit', () => {
   })
 })
 
+describe('canEdit', () => {
+  it('asks whether the installed mflux has the edit command', async () => {
+    const has = createMfluxGenerator({ machine: mac })
+    const lacks = createMfluxGenerator({
+      machine: { ...mac, which: (c) => c !== 'mflux-generate-flux2-edit' },
+    })
+    expect(await has.canEdit?.()).toBe(true)
+    expect(await lacks.canEdit?.()).toBe(false)
+  })
+})
+
 describe('mfluxCommandLine', () => {
   it("starts with the model's own command", () => {
     const line = mfluxCommandLine(

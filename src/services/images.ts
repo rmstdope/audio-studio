@@ -56,6 +56,8 @@ export interface ImageGenerator {
   installed(model: ImageModelId): boolean | Promise<boolean>
   /** How much of this model's download is here; a generator without it is whole or absent by `installed`. */
   download?(model: ImageModelId): ImageDownload | Promise<ImageDownload>
+  /** Whether a picture can be edited here; a generator without it can. */
+  canEdit?(): boolean | Promise<boolean>
   /** One take; the model loads for it and leaves memory when it is made. Aborting ends it, and it rejects. */
   generate(request: ImageRequest, signal?: AbortSignal): Promise<GeneratedImage>
 }
@@ -236,6 +238,7 @@ export function createMfluxGenerator({
   return {
     ready: () => mfluxReady(machine),
     installed: (model) => imageModelInstalled(hubDir, model),
+    canEdit: () => machine.which(IMAGE_EDIT_COMMAND),
     download: (model) => imageModelDownload(hubDir, model),
     async generate(request, signal) {
       const problem = checkImageRequest(request)

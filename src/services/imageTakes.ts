@@ -175,7 +175,7 @@ const notHere = (model: ImageModelId): { ok: false; message: string } => ({
 const gameOf = (id: string, n: number) => `${IMAGE_TAKES_DIR}/${id}/${n}.game.png`
 
 /** The reason a generator gave, as a sentence. */
-function describeFailure(error: unknown): string {
+export function describeFailure(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
   return /[.!?]$/.test(text) ? text : `${text}.`
 }

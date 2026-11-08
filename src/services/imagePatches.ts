@@ -15,7 +15,8 @@ import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_TAKES_DIR, readImages } from './imageLists'
 import { makeImageTake, type ImageGenerator } from './images'
 import { boardQueue, isSafeId } from './musicTakes'
-import { decodePng, encodeTransparentPng } from './png'
+import { describeFailure } from './imageTakes'
+import { decodePng, encodeTransparentPng, pngSize } from './png'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
@@ -44,14 +45,8 @@ export interface ImagePatches {
 
 /** What is going on with an image's patch, kept in memory for the page to poll. */
 type Activity =
-  | { state: 'making'; instruction: string; area: PatchArea }
-  | { state: 'failed'; instruction: string; message: string }
-
-/** A failure as one sentence for the page. */
-function sentence(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error)
-  return /[.!?]$/.test(text) ? text : `${text}.`
-}
+  | { state: 'making'; take: number; instruction: string; area: PatchArea }
+  | { state: 'failed'; take: number; instruction: string; message: string }
 
 /**
  * In-context patches of an image's chosen take: the whole take is edited from an instruction and
@@ -104,13 +99,16 @@ export function createImagePatches({
     return board
   }
 
-  /** The chosen take's picture and size, or null when it is not on this computer. */
+  /** The chosen take's picture and size, or null when it is not there or is no picture. */
   async function takePicture(found: Found, n: number) {
     const path = resolveInRoot(found.root, `${IMAGE_TAKES_DIR}/${found.id}/${n}.png`)
     const file = Bun.file(path)
     if (!(await file.exists())) return null
-    const { width, height } = decodePng(new Uint8Array(await file.arrayBuffer()))
-    return { path, width, height }
+    try {
+      return { path, ...pngSize(new Uint8Array(await file.slice(0, 33).arrayBuffer())) }
+    } catch {
+      return null
+    }
   }
 
   /** Edits the whole take and saves the marked area as the next patch. */
@@ -160,8 +158,9 @@ export function createImagePatches({
     } catch (error) {
       activity.set(found.key, {
         state: 'failed',
+        take: take.n,
         instruction: request.instruction,
-        message: sentence(error),
+        message: describeFailure(error),
       })
     }
   }
@@ -171,12 +170,14 @@ export function createImagePatches({
       const found = await resolve(projectFile, id)
       if (!found || 'ok' in found) return found
       // Before the board: a patch that lands in between then shows as made, never as neither.
-      const now = activity.get(found.key)
+      const latest = activity.get(found.key)
+      const now = latest?.take === found.chosen ? latest : undefined
       const board = await readBoard(found)
       if ('ok' in board) return board
       const picture = found.chosen === null ? null : await takePicture(found, found.chosen)
       return {
         take: picture && { n: found.chosen!, width: picture.width, height: picture.height },
+        pictureGone: found.chosen !== null && picture === null,
         patches: board.patches.filter((p) => p.take === found.chosen),
         making: now?.state === 'making' ? { instruction: now.instruction, area: now.area } : null,
         failed:
@@ -188,7 +189,8 @@ export function createImagePatches({
     async make(projectFile, id, request) {
       const found = await resolve(projectFile, id)
       if (!found || 'ok' in found) return found
-      if (activity.get(found.key)?.state === 'making') {
+      const before = activity.get(found.key)
+      if (before?.state === 'making') {
         return {
           ok: false,
           message: 'A patch of this image is being made. Wait for it, then try again.',
@@ -197,26 +199,35 @@ export function createImagePatches({
       if (found.chosen === null) {
         return { ok: false, message: 'Choose a take first: a patch is made from the chosen take.' }
       }
-      const ready = await generator.ready()
-      if (!ready.ok) return { ok: false, message: ready.message }
-      if (!(await generator.installed(EDIT_MODEL))) {
-        return {
-          ok: false,
-          message: `${imageModel(EDIT_MODEL).name} is not on this computer, and patches are made with it.`,
-        }
+      const n = found.chosen
+      // Taken before the first wait, so that of two requests at once only one goes on.
+      activity.set(found.key, { state: 'making', take: n, ...request })
+      const refuse = (message: string) => {
+        if (before) activity.set(found.key, before)
+        else activity.delete(found.key)
+        return { ok: false as const, message }
       }
-      const picture = await takePicture(found, found.chosen)
+      const ready = await generator.ready()
+      if (!ready.ok) return refuse(ready.message)
+      if (!(await generator.installed(EDIT_MODEL))) {
+        return refuse(
+          `${imageModel(EDIT_MODEL).name} is not on this computer, and patches are made with it.`,
+        )
+      }
+      if (generator.canEdit && !(await generator.canEdit())) {
+        return refuse(
+          'This mflux cannot edit pictures. Update it with uv tool install --upgrade mflux, then start the studio again.',
+        )
+      }
+      const picture = await takePicture(found, n)
       if (!picture) {
-        return { ok: false, message: "The chosen take's picture is gone, so it cannot be edited." }
+        return refuse(
+          "The chosen take's picture is missing or cannot be read, so it cannot be edited.",
+        )
       }
       const problem = checkPatchArea(request.area, picture)
-      if (problem) return { ok: false, message: problem }
-      activity.set(found.key, {
-        state: 'making',
-        instruction: request.instruction,
-        area: request.area,
-      })
-      void run(found, { n: found.chosen, ...picture }, request)
+      if (problem) return refuse(problem)
+      void run(found, { n, ...picture }, request)
       return { ok: true }
     },
 

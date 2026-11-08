@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { inflateSync } from 'node:zlib'
-import { decodePng, encodePng, encodeTransparentPng } from './png'
+import { decodePng, encodePng, encodeTransparentPng, pngSize } from './png'
 import type { Pixels } from '../core/imagePixels'
 
 const gradient = (w: number, h: number): Pixels => {
@@ -17,6 +17,12 @@ describe('png', () => {
     const back = decodePng(encodePng(picture))
     expect([back.width, back.height]).toEqual([37, 19])
     expect(back.data).toEqual(picture.data)
+  })
+  it('reads the size from the start of the file', () => {
+    expect(pngSize(encodePng(gradient(37, 19)).subarray(0, 33))).toEqual({ width: 37, height: 19 })
+  })
+  it('says a file is not a PNG when asked its size', () => {
+    expect(() => pngSize(new TextEncoder().encode('not a picture'))).toThrow('not a PNG')
   })
   it('keeps the transparency of a picture written with it', () => {
     const picture = gradient(9, 5)

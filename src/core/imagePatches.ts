@@ -48,8 +48,10 @@ export type PatchBoard = z.infer<typeof PatchBoardSchema>
 
 /** The patches of an image's chosen take as the page shows them. */
 export interface ImagePatchesView {
-  /** The chosen take the patches lie over and its size, or null when no take of the studio's is chosen. */
+  /** The chosen take the patches lie over and its size, or null when there is no picture of one to patch. */
   take: { n: number; width: number; height: number } | null
+  /** Whether a take is chosen but its picture is missing or cannot be read. */
+  pictureGone: boolean
   /** The patches made from the chosen take, oldest first. */
   patches: Patch[]
   /** The patch being made or waiting for its turn. */

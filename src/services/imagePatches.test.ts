@@ -35,12 +35,13 @@ function writeTake(root: string, path: string) {
   writeFileSync(join(root, path), fakePng(256, 256, 9))
 }
 
-/** A studio project whose image `inn` has take 3 chosen, unless `files` says otherwise. */
+/** A studio project whose image `inn` has take 3 chosen and its picture there, unless told otherwise. */
 function setup({
   chosen = true,
   picture = true,
   ready = { ok: true },
   installed = true,
+  canEdit,
   makes = (request: ImageRequest) => fakePng(request.width, request.height, 1),
   queue = createSerial(),
 }: {
@@ -48,6 +49,7 @@ function setup({
   picture?: boolean
   ready?: ImageReady
   installed?: boolean
+  canEdit?: boolean
   makes?: (request: ImageRequest) => Uint8Array
   queue?: Serial
 } = {}) {
@@ -62,6 +64,7 @@ function setup({
   const generator: ImageGenerator = {
     ready: () => ready,
     installed: () => installed,
+    ...(canEdit === undefined ? {} : { canEdit: () => canEdit }),
     async generate(request) {
       requests.push(request)
       return { png: makes(request), seed: request.seed }
@@ -108,6 +111,7 @@ describe('image patches', () => {
     await patches.make(file, 'inn', { area, instruction: 'the door is gone' })
     expect(await settled()).toEqual({
       take: { n: 3, width: 256, height: 256 },
+      pictureGone: false,
       patches: [{ n: 1, take: 3, seed: 11, instruction: 'the door is gone', area }],
       making: null,
       failed: null,
@@ -215,15 +219,79 @@ describe('image patches', () => {
       ok: false,
       message: 'Choose a take first: a patch is made from the chosen take.',
     })
-    expect(await patches.view(file, 'inn')).toMatchObject({ take: null, patches: [] })
+    expect(await patches.view(file, 'inn')).toMatchObject({
+      take: null,
+      pictureGone: false,
+      patches: [],
+    })
   })
 
-  it("refuses when the chosen take's picture is gone", async () => {
+  it("refuses, and says so, when the chosen take's picture is gone", async () => {
     const { file, patches } = setup({ picture: false })
+    expect(await patches.view(file, 'inn')).toMatchObject({ take: null, pictureGone: true })
     expect(await patches.make(file, 'inn', { area, instruction: 'x' })).toEqual({
       ok: false,
-      message: "The chosen take's picture is gone, so it cannot be edited.",
+      message: "The chosen take's picture is missing or cannot be read, so it cannot be edited.",
     })
+  })
+
+  it("treats a chosen take's picture that cannot be read as gone", async () => {
+    const { root, file, patches } = setup()
+    writeFileSync(join(root, TAKE), 'not a picture')
+    expect(await patches.view(file, 'inn')).toMatchObject({ take: null, pictureGone: true })
+  })
+
+  it('reports a patch board that cannot be read, and fails the patch rather than writing over it', async () => {
+    const { root, file, patches } = setup()
+    mkdirSync(dirname(join(root, BOARD)), { recursive: true })
+    writeFileSync(join(root, BOARD), '{"next":"x"}')
+    expect(await patches.view(file, 'inn')).toMatchObject({ ok: false, file: BOARD })
+    await patches.make(file, 'inn', { area, instruction: 'x' })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(readFileSync(join(root, BOARD), 'utf8')).toBe('{"next":"x"}')
+    writeFileSync(join(root, BOARD), JSON.stringify({ next: 1, patches: [] }))
+    expect(await patches.view(file, 'inn')).toMatchObject({
+      failed: { message: `${BOARD} cannot be used.` },
+    })
+  })
+
+  it('takes only one of two requests that arrive together', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { file, patches, settled, requests } = setup({ queue })
+    const answers = await Promise.all([
+      patches.make(file, 'inn', { area, instruction: 'first' }),
+      patches.make(file, 'inn', { area, instruction: 'second' }),
+    ])
+    expect(answers.filter((a) => a?.ok)).toHaveLength(1)
+    release()
+    await settled()
+    expect(requests).toHaveLength(1)
+  })
+
+  it('keeps the last failure when a request is refused', async () => {
+    const { file, patches, settled } = setup({
+      makes: () => {
+        throw new Error('Out of memory')
+      },
+    })
+    await patches.make(file, 'inn', { area, instruction: 'x' })
+    await settled()
+    await patches.make(file, 'inn', { area: { ...area, x: 200 }, instruction: 'x' })
+    expect(await patches.view(file, 'inn')).toMatchObject({ failed: { message: 'Out of memory.' } })
+  })
+
+  it('does not show a patch being made, or failed, from another take under the one chosen now', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { root, file, patches } = setup({ queue })
+    await patches.make(file, 'inn', { area, instruction: 'first' })
+    writeFileSync(join(root, LOCK), JSON.stringify({ inn: { ...lock.inn, take: 4 } }))
+    writeTake(root, 'content-studio/cache/image-takes/inn/4.png')
+    expect(await patches.view(file, 'inn')).toMatchObject({ take: { n: 4 }, making: null })
+    release()
   })
 
   it('refuses an area outside the picture', async () => {
@@ -242,6 +310,12 @@ describe('image patches', () => {
     expect(await none.patches.make(none.file, 'inn', { area, instruction: 'x' })).toEqual({
       ok: false,
       message,
+    })
+    const old = setup({ canEdit: false })
+    expect(await old.patches.make(old.file, 'inn', { area, instruction: 'x' })).toEqual({
+      ok: false,
+      message:
+        'This mflux cannot edit pictures. Update it with uv tool install --upgrade mflux, then start the studio again.',
     })
     const absent = setup({ installed: false })
     expect(await absent.patches.make(absent.file, 'inn', { area, instruction: 'x' })).toEqual({

@@ -33,7 +33,16 @@ export function PatchesSection({ imageId }: { imageId: string }) {
     return <Problems title={`${view.file} cannot be used`} problems={view.problems} />
   }
   const { take } = view
-  if (!take) return null
+  if (!take) {
+    if (!view.pictureGone) return null
+    return (
+      <section className="panel patches" aria-label="Patches">
+        <p className="muted">
+          The chosen take&apos;s picture is missing or cannot be read, so it cannot be patched.
+        </p>
+      </section>
+    )
+  }
   const shown = view.patches.find((p) => p.n === picked) ?? view.patches.at(-1) ?? null
   const overlaid = showing ? shown : null
   const making = view.making !== null || make.isPending
@@ -62,6 +71,7 @@ export function PatchesSection({ imageId }: { imageId: string }) {
         className="patch-stage"
         style={{ aspectRatio: `${take.width} / ${take.height}` }}
         onPointerDown={(event) => {
+          if (event.button !== 0 || event.ctrlKey) return
           event.preventDefault()
           event.currentTarget.setPointerCapture(event.pointerId)
           start.current = { x: event.clientX, y: event.clientY }
@@ -70,6 +80,9 @@ export function PatchesSection({ imageId }: { imageId: string }) {
         onPointerMove={dragTo}
         onPointerUp={(event) => {
           dragTo(event)
+          start.current = null
+        }}
+        onPointerCancel={() => {
           start.current = null
         }}
       >
