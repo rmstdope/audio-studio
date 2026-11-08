@@ -187,6 +187,10 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const pairs = view && !view.pictureGone && !view.lockUnread ? overlappingPatches(row.patches) : []
   const overlapsOf = (id: string) =>
     pairs.flatMap(([a, b]) => (a.id === id ? [b.title] : b.id === id ? [a.title] : []))
+  const overlapLineOf = (id: string) => {
+    const titles = overlapsOf(id)
+    return titles.length > 0 ? overlapOpenLine(titles) : null
+  }
   const toggle = (id: string) =>
     setOpen((now) => {
       const next = new Set(now)
@@ -268,9 +272,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
-                  overlapLine={
-                    overlapsOf(patch.id).length > 0 ? overlapOpenLine(overlapsOf(patch.id)) : null
-                  }
+                  overlapLine={overlapLineOf(patch.id)}
                   makeAgainLine={
                     again.has(patch.id) ? makeAgainOpenLine(patch.chosenOn, row.chosenTake) : null
                   }

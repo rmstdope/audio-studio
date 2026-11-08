@@ -418,6 +418,15 @@ describe('an open patch with takes', () => {
     expect(client.getQueryState(['project'])?.isInvalidated).toBe(true)
   })
 
+  it('leaves the project alone when a take is only marked as seen', async () => {
+    const { host, client } = await render([patchRow('a')], made())
+    client.setQueryData(['project'], {})
+    await open(host)
+    await act(async () => thumbs(host)[0]!.click())
+    await settle()
+    expect(client.getQueryState(['project'])?.isInvalidated).toBe(false)
+  })
+
   it('asks before un-choosing, in the picture’s place, and Cancel gives focus back', async () => {
     const { host, sent } = await render([patchRow('a')], made())
     await open(host)

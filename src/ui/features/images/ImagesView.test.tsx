@@ -1057,7 +1057,7 @@ describe('the patches the game asks for', () => {
         patchAreas,
       })
 
-    it('names the pair on the act’s row, after the other lines, and changes no figure', () => {
+    it('names the pair on the act’s row, and changes no figure', () => {
       const page = render(
         actRoute,
         settled({ 'lamp-lit': { 4: at(0) }, 'door-ajar': { 4: at(5) } }),

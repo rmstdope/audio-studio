@@ -37,12 +37,14 @@ const patch = (id: string, over: Partial<PatchRow> = {}): PatchRow => ({
 async function render(
   patches: PatchRow[],
   answer: { status: number; body: unknown } = { status: 200, body: { ok: true } },
-  view: Record<string, unknown> = {},
+  view: Record<string, unknown> | null = {},
 ) {
   const sent: { method: string; path: string; body: unknown }[] = []
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
     // The takes of the patches are PatchWorkbench.test's; here there is nothing to patch on.
     if (path === '/api/images/inn/patches') {
+      // null: the patches never finish loading
+      if (view === null) return new Promise<Response>(() => {})
       return Response.json({
         ok: true,
         take: null,
@@ -296,10 +298,12 @@ describe('GamePatchesPanel', () => {
         'Door ajar and Fire out',
       ])
     })
-    it('says nothing when no pair overlaps, or the chosen picture is gone', async () => {
+    it('says nothing when no pair overlaps, or the patches are not loaded, the chosen picture is gone or the lock cannot be read', async () => {
       const apart = [patch('a', { chosenArea: at(0) }), patch('b', { chosenArea: at(10) })]
       expect(warning((await render(apart)).host)).toBeNull()
       expect(warning((await render(three(), undefined, { pictureGone: true })).host)).toBeNull()
+      expect(warning((await render(three(), undefined, { lockUnread: true })).host)).toBeNull()
+      expect(warning((await render(three(), undefined, null)).host)).toBeNull()
     })
     it('puts one amber line at the top of an open patch, naming each patch it overlaps', async () => {
       const { host } = await render(three())
