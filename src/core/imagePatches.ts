@@ -123,7 +123,7 @@ export const PATCH_EASE = 48
 /** How many positions each way along a side the median is taken over, so that one speck does not set the colour. */
 const MATCH_SMOOTH = 24
 
-/** Out of 255, how far a place along a side may differ from the commonest tone around the area and still be followed in full. */
+/** Out of 255, how far a place along a side may differ from the drift around the area and still be followed in full. */
 const MATCH_FOLLOW = 22
 
 /** Out of 255, how far beyond `MATCH_FOLLOW` a place may differ before it is not followed at all: it is something the edit painted there. */
@@ -132,21 +132,21 @@ const MATCH_IGNORE = 8
 /** The median of the values, which it sorts in place. */
 const middle = (values: number[]) => values.sort((x, y) => x - y)[values.length >> 1]!
 
-/** Out of 255, how close two offsets must be on every channel to count as the same tone when looking for the commonest. */
+/** Out of 255, how close two offsets must be on every channel to count as the same tone when grouping the places. */
 const MATCH_SAME = 8
 
-/** At most this many offsets are compared with each other when looking for the commonest tone. */
+/** At most this many offsets are compared with each other when grouping the places. */
 const MATCH_SAMPLES = 400
 
 /**
  * The offset to take as the drift around the area: of the tones that many places agree on (within
  * `MATCH_SAME` on every channel; any group at least a quarter as big as the biggest), the one
- * nearest `anchor`, the median offset of the whole picture, as the median of that group. The whole
+ * nearest `anchor`, the median offset of the whole picture, as the median of that group, or the anchor itself when that group is more than `MATCH_FOLLOW` from it. The whole
  * picture is mostly untouched by the edit, so its median is the drift even where objects cover most
  * of the strip around the area, and among tones that are about equally common (a gradual drift) it
  * keeps the middle one instead of an end.
  */
-function commonest(offsets: [number, number, number][], anchor: number[]): number[] {
+function driftAround(offsets: [number, number, number][], anchor: number[]): number[] {
   const step = Math.max(1, Math.ceil(offsets.length / MATCH_SAMPLES))
   const sample = offsets.filter((_, k) => k % step === 0)
   const near = (a: number[], b: number[]) =>
@@ -164,7 +164,8 @@ function commonest(offsets: [number, number, number][], anchor: number[]): numbe
       best = centre
     }
   }
-  return best
+  // A tone far from the picture's own median is objects, not drift.
+  return [0, 1, 2].every((c) => Math.abs(best[c]! - anchor[c]!) <= MATCH_FOLLOW) ? best : anchor
 }
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */
@@ -266,8 +267,8 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
     strips.push({ offsets, distance: (_x, y) => bottom - y - 0.5, index: (x) => x - area.x })
   }
 
-  // Something the edit painted just outside the area (a bird, a cloud) is far from the commonest
-  // tone around the area, and carried inward it would streak the area: such a place takes that
+  // Something the edit painted just outside the area (a bird, a cloud) is far from the drift
+  // around the area, and carried inward it would streak the area: such a place takes that
   // tone instead, gradually, so no hard step shows. This is judged before smoothing, so that
   // objects covering most of a side cannot outvote the sky.
   if (strips.length > 0) {
@@ -282,7 +283,7 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
     }
     const basis = grid.length > 0 ? grid : strips.flatMap((strip) => strip.offsets)
     const anchor = [0, 1, 2].map((c) => middle(basis.map((o) => o[c]!)))
-    const reference = commonest(
+    const reference = driftAround(
       strips.flatMap((strip) => strip.offsets),
       anchor,
     )
