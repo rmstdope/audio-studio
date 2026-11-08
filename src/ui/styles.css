@@ -5481,6 +5481,7 @@ button.cue-chip[aria-expanded='true'] {
   width: 90px;
   height: 4px;
   vertical-align: middle;
+}
 
 .confirm-heading {
   margin: 0;

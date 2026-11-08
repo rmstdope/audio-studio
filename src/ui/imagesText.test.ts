@@ -302,6 +302,9 @@ describe('overlapping patches', () => {
     expect(overlapActLine(pairs.slice(0, 1))).toBe('patches overlap: Bread taken and Door ajar')
     expect(overlapActLine(pairs)).toBe(
       'patches overlap: Bread taken and Door ajar; Bread taken and Fire out; Door ajar and Fire out',
+    )
+  })
+})
 
 describe('the questions about named areas set aside', () => {
   const q = (over: Partial<SetAsideQuestion> = {}): SetAsideQuestion => ({

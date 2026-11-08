@@ -744,6 +744,8 @@ describe('planRemake', () => {
     const bad = { x: 1000, y: 0, width: 100, height: 100 }
     const plan = planRemake([{ ...base, id: 'a', mark: bad, earlier }], image, take)
     expect(plan.make[0]!.area).toEqual(earlier)
+  })
+})
 
 describe('named areas set aside', () => {
   const box = { x: 1, y: 1, width: 10, height: 10 }
@@ -820,6 +822,7 @@ describe('named areas set aside', () => {
       gameWas: null,
       chosenOn: [2],
       chosenOnGone: false,
+      chosenArea: null,
     }
     expect(setAsideQuestion(row(2, [well], [bread]), { kind: 'choose', n: 4 })).toEqual({
       from: 2,

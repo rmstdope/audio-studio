@@ -614,6 +614,7 @@ describe('named areas set aside', () => {
     gameWas: null,
     chosenOn,
     chosenOnGone: false,
+    chosenArea: null,
   })
   const five = ['Bucket', 'Well', 'Cottage door', 'Old oak', 'Path north'].map((t) => area(t, 2))
   const inGame = (
