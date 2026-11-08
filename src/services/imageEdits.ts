@@ -2,6 +2,9 @@ import { dirname } from 'node:path'
 import {
   applyActStyleChange,
   applyActStylePick,
+  applyAreaBox,
+  checkAreaBox,
+  type AreaBox,
   applyPatchWordsChange,
   applyStyleChange,
   applyWordsChange,
@@ -87,6 +90,32 @@ export function setImagePatchWords(
 ): Promise<ImageEditResult> {
   return edit(projectFile, patchWordsOf(id, patch), (edits, game) =>
     applyPatchWordsChange(edits, id, patch, text, game),
+  )
+}
+
+/**
+ * Saves the box of a named area of an image (null takes it away). Null for an image or an area the
+ * game does not list; a box outside the picture, or too small, is answered as a problem.
+ */
+export function setImageAreaBox(
+  projectFile: string,
+  id: string,
+  area: string,
+  box: AreaBox | null,
+): Promise<ImageEditResult> {
+  const file = IMAGES_EDITS_FILE
+  return edit(
+    projectFile,
+    (summary) => {
+      const row = summary.acts.flatMap((act) => act.rows).find((r) => r.id === id)
+      return row?.areas.some((a) => a.id === area) ? { width: row.width, height: row.height } : null
+    },
+    (edits, size) => {
+      const why = box && checkAreaBox(box, size)
+      return why
+        ? [{ file, path: `images.${id}.areas.${area}`, message: why }]
+        : applyAreaBox(edits, id, area, box)
+    },
   )
 }
 

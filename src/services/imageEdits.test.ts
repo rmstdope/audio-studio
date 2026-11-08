@@ -10,6 +10,7 @@ import {
   resolveImagePatchCompare,
   setImageActStyle,
   setImageActStylePick,
+  setImageAreaBox,
   setImagePatchWords,
   setImageWords,
   setStyleField,
@@ -353,5 +354,48 @@ describe('the words of a patch the game asks for', () => {
     })
     expect(await resolveImagePatchCompare(file, 'inn', 'lamp-lit', 'game')).toEqual({ ok: true })
     expect(JSON.parse(read(EDITS)).images).toEqual({})
+  })
+})
+
+describe('the box of a named area', () => {
+  const box = { x: 10, y: 20, width: 50, height: 40 }
+  const withArea = () =>
+    repo({ 'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }] })
+
+  it('is kept in the image’s edit and touches no game file', async () => {
+    const { file, read } = withArea()
+    const before = read('tts/act1/images.json')
+    expect(await setImageAreaBox(file, 'inn', 'fountain', box)).toEqual({ ok: true })
+    expect(JSON.parse(read(EDITS))).toEqual({
+      style,
+      images: { inn: { areas: { fountain: box } } },
+    })
+    expect(read('tts/act1/images.json')).toEqual(before)
+  })
+
+  it('is taken away with null', async () => {
+    const { file, read } = withArea()
+    await setImageAreaBox(file, 'inn', 'fountain', box)
+    await setImageAreaBox(file, 'inn', 'fountain', null)
+    expect(JSON.parse(read(EDITS)).images).toEqual({})
+  })
+
+  it('answers a problem for a box outside the picture, and null for an unlisted image or area', async () => {
+    const { file, read } = withArea()
+    const before = read(EDITS)
+    const result = await setImageAreaBox(file, 'inn', 'fountain', { ...box, width: 400 })
+    expect(result).toMatchObject({ ok: false })
+    expect(read(EDITS)).toBe(before)
+    expect(await setImageAreaBox(file, 'ghost', 'fountain', box)).toBeNull()
+    expect(await setImageAreaBox(file, 'inn', 'ghost', box)).toBeNull()
+  })
+
+  it('writes nothing over edits that cannot be read', async () => {
+    const broken = repo({
+      'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }],
+      [EDITS]: '{nope',
+    })
+    expect(await setImageAreaBox(broken.file, 'inn', 'fountain', box)).toMatchObject({ ok: false })
+    expect(broken.read(EDITS)).toBe('{nope')
   })
 })

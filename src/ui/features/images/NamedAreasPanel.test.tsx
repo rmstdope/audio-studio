@@ -18,6 +18,7 @@ const area = (id: string, over: Partial<AreaRow> = {}): AreaRow => ({
   id,
   title: `Title of ${id}`,
   placed: false,
+  box: null,
   ...over,
 })
 
