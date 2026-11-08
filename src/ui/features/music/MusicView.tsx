@@ -339,17 +339,21 @@ export function FailedPanel({
     (result && 'message' in result
       ? result.message
       : 'The command ran, but what it wrote cannot be used.')
+  const areas = result && 'reason' in result && result.reason === 'areas' ? result : null
   return (
     <section className="panel refresh-outcome" aria-label="Refresh from the game">
       <div className="refresh-head">
         <div>
-          <span className="label">Refresh from the game failed</span>
+          <span className="label">
+            {areas ? 'Refresh from the game' : 'Refresh from the game failed'}
+          </span>
           <strong>{message}</strong>
         </div>
         <button className="btn" type="button" onClick={onClose}>
           Close
         </button>
       </div>
+      {areas && <p className="notice">{areas.detail}</p>}
       {result && 'problems' in result && (
         <Problems title="What the command wrote cannot be used" problems={result.problems} />
       )}

@@ -1505,7 +1505,17 @@ image's own size (at least 4 each way, inside the picture), kept in the image's 
 `areas.<area id>` (`applyAreaBox`, `checkAreaBox`; sorted by id), so one set serves a shared image
 and a box survives the game dropping the area and asking for it again. `AreaRow.box` and `placed`
 come from it. The pure geometry is `ui/imageAreaBox.ts`. Chosen patches (`chosenPatches`, none yet)
-can be laid over the picture by switches, for looking only. Nothing reaches the game yet.
+can be laid over the picture by switches, for looking only. **Reaching the game** (as-qg4.3,
+`services/imageAreas.ts` `syncImageAreas`): a placed box is written for the game in the same save as the
+box, as `areas.<area id>: { x, y, width, height }` in the image's images-manifest entry, fractions of
+the picture (six decimals; no title; `areaFractions`, `withAreas`). Only the areas the game asks for
+are passed, and the key is gone when none is placed. If the manifest cannot be read or written, or the
+image has no entry, the whole save fails and the edits are put back byte for byte (a clear never fails
+for want of an entry). Choosing a take, bringing to a look and Bring all keep the areas (`publish`),
+un-choosing takes the entry with them. Refresh from the game on an act (`passAreasToGame`) brings every
+image of the act up to date, which is also how boxes marked earlier arrive; the manifest is written
+only when something changed, and a failure is the result `reason: 'areas'`. The manifest is one more
+file of the Changes page's Images section. Screens: `docs/ui/as-qg4.3-placed-areas-reach-the-game.html`.
 The act's list adds "4 of 5 areas to place" under an image's
 status while some are left; it changes neither "n of m chosen" nor the needs-attention view. Areas
 are no part of what a picture is made from, so changing them never makes an image out of date, and
@@ -2675,7 +2685,8 @@ Small, independently useful increments:
         on the image's chosen take, compared and chosen; reaching the game is the next step of as-bo8.
     13. **The game's named areas listed** (as-qg4.1, done: §8.7): the image list carries named areas, an image's
         page and the act's list show which are left to place; placing them is the next step of as-qg4.
-    14. **Named areas marked** (as-qg4.2, done: §8.7): a box per area on the chosen take, kept in the image's edits; reaching the game is the next step of as-qg4.
+    14. **Named areas marked** (as-qg4.2, done: §8.7): a box per area on the chosen take, kept in the image's edits.
+    15. **Placed areas reach the game** (as-qg4.3, done: §8.7): each placed box goes into the image's images-manifest entry as fractions, in the same save, and on Refresh from the game.
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.

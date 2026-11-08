@@ -603,8 +603,26 @@ them, and writes nothing else there. The game reads the manifests, keyed by item
 | --------- | ------------------------------------------------------------------------------ |
 | Narration | `{ file, speaker, duration, words: [{ word, start, end }] }`, times in seconds |
 | Music     | `{ file, duration }`                                                           |
-| Images    | `{ file, width, height }`                                                      |
+| Images    | `{ file, width, height, areas? }`, see below                                   |
 | Effects   | `{ file, duration }`                                                           |
+
+**An image's named areas.** When the game's list asks for named areas on an image (`areas`) and some
+are placed in the studio, the image's manifest entry gains `areas`, keyed by the area's id, each the box's
+`x`, `y`, `width` and `height` as fractions of the picture (0 to 1, six decimals), so they survive a change of
+size. Only position is passed, no title, and only for areas the list currently asks for; an image with
+none placed has no `areas` key. The studio writes it when a box is placed, moved, resized or cleared, and on
+Refresh from the game for the act. A game that does not read `areas` is unaffected.
+
+```json
+{
+  "inn": {
+    "file": "inn.png",
+    "width": 320,
+    "height": 200,
+    "areas": { "fountain": { "x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5 } }
+  }
+}
+```
 
 **A part's mix** (`scenes.mix`) says what plays in each of a part's scenes, by scene id:
 

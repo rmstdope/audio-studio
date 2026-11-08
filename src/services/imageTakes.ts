@@ -29,6 +29,8 @@ import {
 import {
   ImageLockSchema,
   acceptableReasons,
+  areaFractions,
+  withAreas,
   formatImageLock,
   outOfDateReasons,
   type ChosenEntry,
@@ -342,7 +344,10 @@ export function createImageTakes({
       const next = entry(lock[id])
       if (!next) return { ok: true as const }
       const file = `${id}.png`
-      manifest[id] = { file, width: found.row.width, height: found.row.height }
+      manifest[id] = withAreas(
+        { file, width: found.row.width, height: found.row.height },
+        areaFractions(found.row.areas, found.row),
+      )
       lock[id] = next
       await writeAtomic(found.root, join(found.config.clips, file), png)
       await writeAtomic(

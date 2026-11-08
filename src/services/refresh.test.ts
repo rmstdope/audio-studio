@@ -398,3 +398,74 @@ describe('the one shared command', () => {
     expect(readFileSync(join(root, 'runs.txt'), 'utf8')).toBe('start\nend\nstart\nend\n')
   })
 })
+
+describe('refreshing an act’s images', () => {
+  const MANIFEST = 'web/images/manifest.json'
+  const imagesSection = {
+    from: { part: 'tts/{part}/images.json' },
+    clips: 'web/images',
+    manifest: MANIFEST,
+  }
+  const inn = { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 }
+  const entry = { file: 'inn.png', width: 320, height: 200 }
+  const edits = {
+    style: { look: 'pixel', keepOut: 'x', palette: ['#000000'] },
+    images: { inn: { areas: { fountain: { x: 80, y: 50, width: 160, height: 100 } } } },
+  }
+  const gameList = JSON.stringify([{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }])
+
+  function imagesProject(extra: Record<string, unknown> = {}, command = 'true') {
+    return tempRepo({
+      ...project(command),
+      'content-studio.json': projectJson({
+        images: imagesSection,
+        refresh: { part: forPart(command) },
+      }),
+      'tts/act1/images.json': [inn],
+      'content-studio/images/edits.json': edits,
+      [MANIFEST]: { inn: entry },
+      ...extra,
+    })
+  }
+  const manifestOf = (root: string) => JSON.parse(readFileSync(join(root, MANIFEST), 'utf8'))
+
+  it('hands the placed boxes to the game for every image of the act, boxes marked before included', async () => {
+    const root = imagesProject({}, `printf '%s' '${gameList}' > tts/{part}/images.json`)
+    const result = await refreshDialog(join(root, 'content-studio.json'), 'act1')
+    expect(result).toMatchObject({ ok: true })
+    expect(manifestOf(root).inn.areas).toEqual({
+      fountain: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+    })
+  })
+
+  it('takes an area the game stopped asking for out, leaving the box in the edits', async () => {
+    const root = imagesProject({
+      [MANIFEST]: { inn: { ...entry, areas: { fountain: { x: 0, y: 0, width: 1, height: 1 } } } },
+    })
+    await refreshDialog(join(root, 'content-studio.json'), 'act1')
+    expect(manifestOf(root)).toEqual({ inn: entry })
+    expect(readFileSync(join(root, 'content-studio/images/edits.json'), 'utf8')).toContain(
+      'fountain',
+    )
+  })
+
+  it('leaves the manifest untouched when there is nothing to change', async () => {
+    const root = imagesProject({ 'content-studio/images/edits.json': { images: {} } })
+    const raw = readFileSync(join(root, MANIFEST), 'utf8')
+    await refreshDialog(join(root, 'content-studio.json'), 'act1')
+    expect(readFileSync(join(root, MANIFEST), 'utf8')).toBe(raw)
+  })
+
+  it('fails with the areas reason when the manifest cannot be read', async () => {
+    const root = imagesProject(
+      { [MANIFEST]: '{ nope' },
+      `printf '%s' '${gameList}' > tts/{part}/images.json`,
+    )
+    expect(await refreshDialog(join(root, 'content-studio.json'), 'act1')).toMatchObject({
+      ok: false,
+      reason: 'areas',
+      message: 'The command ran, but the named areas could not be passed to the game',
+      detail: 'The images manifest could not be read. Fix it, then Refresh from the game again.',
+    })
+  })
+})

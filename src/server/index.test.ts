@@ -5246,10 +5246,28 @@ describe('the images routes', () => {
     const path = '/api/images/inn/areas/sign'
     const box = { x: 10, y: 20, width: 50, height: 40 }
     const placed = async () => (await summary()).acts[0].rows[0].areas[0]
+    const manifestFile = join(imagesRoot, 'web/public/images/generated/manifest.json')
+    // No take is chosen yet: the game has no entry for the image, so nothing is saved.
+    const refused = await send('PUT', path, { box })
+    expect(refused.status).toBe(409)
+    expect(JSON.stringify(await refused.json())).toContain('no entry in the images manifest')
+    expect(await placed()).toMatchObject({ placed: false })
+    mkdirSync(dirname(manifestFile), { recursive: true })
+    writeFileSync(
+      manifestFile,
+      JSON.stringify({ inn: { file: 'inn.png', width: 320, height: 200 } }),
+    )
     expect(await (await send('PUT', path, { box })).json()).toEqual({ ok: true })
     expect(await placed()).toMatchObject({ placed: true, box })
+    expect(JSON.parse(readFileSync(manifestFile, 'utf8')).inn.areas.sign).toEqual({
+      x: 0.03125,
+      y: 0.1,
+      width: 0.15625,
+      height: 0.2,
+    })
     expect(await (await send('PUT', path, { box: null })).json()).toEqual({ ok: true })
     expect(await placed()).toMatchObject({ placed: false, box: null })
+    expect(JSON.parse(readFileSync(manifestFile, 'utf8')).inn.areas).toBeUndefined()
     expect((await send('PUT', path, { box: { ...box, x: 300 } })).status).toBe(409)
     expect((await send('PUT', path, { box: 3 })).status).toBe(400)
     expect((await send('PUT', path, {})).status).toBe(400)

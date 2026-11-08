@@ -550,6 +550,51 @@ export function applyStyleChange(
   return { ...edits, style: { ...edits.style, [field]: words } }
 }
 
+/** A placed area as the game receives it: the box as fractions of the picture's width and height. */
+export interface AreaFractions {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** A fraction of a side, to six decimals so the file stays small and its diffs stable. */
+function fraction(part: number, whole: number): number {
+  return Math.round((part / whole) * 1e6) / 1e6
+}
+
+/**
+ * The placed areas of an image as the game receives them, by area id, in the game's order; none
+ * (undefined) when nothing is placed. `areas` are the ones the game currently asks for.
+ */
+export function areaFractions(
+  areas: readonly AreaRow[],
+  size: { width: number; height: number },
+): Record<string, AreaFractions> | undefined {
+  const placed = areas.flatMap((a) => (a.box ? [[a.id, a.box] as const] : []))
+  if (!placed.length) return undefined
+  return Object.fromEntries(
+    placed.map(([id, b]) => [
+      id,
+      {
+        x: fraction(b.x, size.width),
+        y: fraction(b.y, size.height),
+        width: fraction(b.width, size.width),
+        height: fraction(b.height, size.height),
+      },
+    ]),
+  )
+}
+
+/** A manifest entry with its `areas` set, or taken away when there are none; its other fields stay in place. */
+export function withAreas<T extends object>(
+  entry: T,
+  areas: Record<string, AreaFractions> | undefined,
+): T & { areas?: Record<string, AreaFractions> } {
+  const { areas: _old, ...rest } = entry as T & { areas?: unknown }
+  return (areas ? { ...rest, areas } : rest) as T & { areas?: Record<string, AreaFractions> }
+}
+
 /** The edits with the box of one named area of an image set, replaced or (null) taken away. */
 export function applyAreaBox(
   edits: ImageEdits,
