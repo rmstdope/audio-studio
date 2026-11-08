@@ -1,0 +1,2765 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Making a patch's takes</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/8%);
+        --line-strong: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --ok: #3ddc97;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .intro {
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .intro p {
+        margin: 0;
+      }
+      .state {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 22px 0 -6px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .panel h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .panel p {
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--line);
+      }
+      .rows > li {
+        border-bottom: 1px solid var(--line);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 2px;
+        width: 100%;
+        background: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        flex-wrap: wrap;
+      }
+      .chev {
+        color: var(--faint);
+        width: 14px;
+      }
+      .row b {
+        font-weight: 600;
+      }
+      .row .right {
+        margin-left: auto;
+      }
+      .tag {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .tag.ch {
+        color: var(--warn);
+      }
+      .body {
+        padding: 0 2px 16px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .fh {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      textarea,
+      select {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        color: var(--text);
+        font: inherit;
+        padding: 7px 10px;
+      }
+      textarea {
+        width: 100%;
+        resize: vertical;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 6px 12px;
+        font: inherit;
+      }
+      .btn.p {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border: 0;
+        font-weight: 600;
+      }
+      .btn.g {
+        background: none;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+      }
+      .bench {
+        display: grid;
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+      }
+      .pic svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+      .pic {
+        position: relative;
+      }
+      .tr {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .lbl {
+        font-size: 12px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .chip {
+        font-size: 11px;
+        border-radius: 99px;
+        padding: 1px 8px;
+      }
+      .chip.ok {
+        background: rgb(61 220 151/15%);
+        color: var(--ok);
+      }
+      .chip.new {
+        background: rgb(255 107 44/18%);
+        color: var(--accent);
+      }
+      .thumbs {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        gap: 8px;
+      }
+      .thumb {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 5px;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .thumb.on {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .thumb svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 5px;
+      }
+      .thumb .tl {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .making {
+        height: 44px;
+        border-radius: 5px;
+        background: var(--inset);
+      }
+      .bar {
+        height: 4px;
+        background: var(--inset);
+        border-radius: 9px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+        border-radius: 9px;
+      }
+      .err {
+        background: var(--danger-bg);
+        border: 1px solid rgb(255 148 168/30%);
+        border-radius: 11px;
+        padding: 10px 12px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .err strong {
+        color: var(--danger-ink);
+      }
+      .empty {
+        border: 1px dashed var(--line-strong);
+        border-radius: 9px;
+        padding: 14px;
+        color: var(--muted);
+      }
+      .crumbs {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      h1.t {
+        margin: 2px 0;
+        font-size: 24px;
+      }
+      .ph {
+        background: repeating-linear-gradient(
+          45deg,
+          #191c24,
+          #191c24 10px,
+          #14161d 10px,
+          #14161d 20px
+        );
+        border-radius: 9px;
+        min-height: 64px;
+        display: grid;
+        place-items: center;
+        color: var(--faint);
+      }
+      .dim {
+        opacity: 0.55;
+      }
+      kbd {
+        font:
+          11px ui-monospace,
+          Menlo,
+          monospace;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        padding: 0 4px;
+      }
+      .switch {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .noteband {
+        background: var(--raised);
+        border-radius: 9px;
+        padding: 8px 10px;
+        color: var(--soft);
+      }
+      @media (max-width: 700px) {
+        .bench,
+        .two {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>Making a patch's takes</h1>
+        <p>
+          The agreed drawing: a patch opens in place, its takes compared by flipping them over one
+          picture.
+        </p>
+      </div>
+      <div class="state">Closed rows: how far each patch has come; the trial panel is gone</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="right"
+                ><span class="tag">3 takes</span> <span class="chip ok">Take 1 chosen</span></span
+              >
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span
+              ><span class="right"><span class="tag">2 takes, none chosen</span></span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span
+              ><span class="right"><span class="tag">no takes yet</span></span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Stool moved</b
+              ><span class="mono muted">stool-moved</span
+              ><span class="right"
+                ><span class="tag ch">changed here</span> <span class="tag">1 take</span>
+                <span class="chip ok">Take 1 chosen</span></span
+              >
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">Opened: nothing marked yet, no takes</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">The chosen take of the image</span></div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p" disabled>Make 2 takes</button>
+                  </div>
+                  <span class="muted small">Drag over the picture to mark what should change.</span>
+                  <div class="empty">
+                    No takes yet. Each take is a new try at this change, painted with the whole
+                    picture in view.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">An area marked, no takes yet</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">The chosen take of the image</span></div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <rect
+                        x="240"
+                        y="192"
+                        width="130"
+                        height="46"
+                        fill="none"
+                        stroke="#ff6b2c"
+                        stroke-width="2.5"
+                        stroke-dasharray="7 5"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 takes</button>
+                  </div>
+                  <div class="empty">
+                    No takes yet. Each take is a new try at this change, painted with the whole
+                    picture in view.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">Takes made: take 3 laid over the picture, its own area (no dashes)</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">Looking at</span><b>Take 3</b></div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <clipPath id="c0"><rect x="214" y="172" width="200" height="78" /></clipPath>
+                      <g clip-path="url(#c0)">
+                        <rect width="640" height="290" fill="#4a3527" />
+                        <rect y="270" width="640" height="130" fill="#2f2419" />
+                        <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                        <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                        <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                        <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                        <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                        <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn g">Drop</button
+                    ><button class="btn p">Choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c1">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c1)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c2">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c2)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 2</span></span></button
+                      ><button class="thumb on">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c3">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c3)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 3</span></span>
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        The switch off: the image as it is, the dashes show where the patch goes
+      </div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">Looking at</span><b>Take 3</b></div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <rect
+                        x="214"
+                        y="172"
+                        width="200"
+                        height="78"
+                        fill="none"
+                        stroke="#ff6b2c"
+                        stroke-width="2.5"
+                        stroke-dasharray="7 5"
+                      />
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" /> Show the patch</label
+                    ><span class="grow"></span><button class="btn g">Drop</button
+                    ><button class="btn p">Choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c4">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c4)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c5">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c5)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 2</span></span></button
+                      ><button class="thumb on">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c6">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c6)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 3</span></span>
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        A new area drawn while a take is laid over: only the next takes use it
+      </div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span><b>Take 1</b
+                    ><span
+                      class="chip"
+                      style="background: rgb(61, 220, 151, 0.15); color: var(--ok)"
+                      >Chosen</span
+                    >
+                  </div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <clipPath id="c7"><rect x="240" y="192" width="130" height="46" /></clipPath>
+                      <g clip-path="url(#c7)">
+                        <rect width="640" height="290" fill="#4a3527" />
+                        <rect y="270" width="640" height="130" fill="#2f2419" />
+                        <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                        <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                        <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                        <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                        <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                        <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                        <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                        <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                        <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                      </g>
+                      <rect
+                        x="214"
+                        y="172"
+                        width="200"
+                        height="78"
+                        fill="none"
+                        stroke="#ff6b2c"
+                        stroke-width="2.5"
+                        stroke-dasharray="7 5"
+                      />
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb on">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c8">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c8)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c9">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c9)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 2</span></span></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c10">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c10)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 3</span></span>
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">A take chosen: Un-choose takes the place of Choose and Drop</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span><b>Take 1</b
+                    ><span
+                      class="chip"
+                      style="background: rgb(61, 220, 151, 0.15); color: var(--ok)"
+                      >Chosen</span
+                    >
+                  </div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <clipPath id="c11"><rect x="240" y="192" width="130" height="46" /></clipPath>
+                      <g clip-path="url(#c11)">
+                        <rect width="640" height="290" fill="#4a3527" />
+                        <rect y="270" width="640" height="130" fill="#2f2419" />
+                        <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                        <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                        <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                        <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                        <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                        <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                        <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                        <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                        <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb on">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c12">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c12)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c13">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c13)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 2</span></span></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c14">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c14)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 3</span></span>
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">After pressing Un-choose</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="panel" style="background: var(--raised)">
+                    <b>Un-choose take 1?</b
+                    ><span class="muted"
+                      >The game shows the image without this patch until you choose another. Take 1
+                      stays among the takes.</span
+                    >
+                    <div class="tr">
+                      <button class="btn g">Cancel</button><button class="btn p">Un-choose</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb on">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c15">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c15)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c16">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c16)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 2</span></span></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c17">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c17)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 3</span></span>
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">Takes being made</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span><b>Take 1</b
+                    ><span
+                      class="chip"
+                      style="background: rgb(61, 220, 151, 0.15); color: var(--ok)"
+                      >Chosen</span
+                    >
+                  </div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <clipPath id="c18"><rect x="240" y="192" width="130" height="46" /></clipPath>
+                      <g clip-path="url(#c18)">
+                        <rect width="640" height="290" fill="#4a3527" />
+                        <rect y="270" width="640" height="130" fill="#2f2419" />
+                        <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                        <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                        <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                        <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                        <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                        <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                        <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                        <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                        <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p" disabled>Make 2 more takes</button
+                    ><button class="btn g">Stop</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb on">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c19">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c19)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c20">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c20)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 2</span></span></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c21">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c21)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 3</span></span>
+                      </button>
+                      <div class="thumb">
+                        <div class="making"></div>
+                        <span class="tl">Take 4</span
+                        ><span class="faint small">About 20 s left</span>
+                        <div class="bar"><i style="width: 40%"></i></div>
+                      </div>
+                      <div class="thumb">
+                        <div class="making"></div>
+                        <span class="tl">Take 5</span><span class="faint small">Waiting</span>
+                        <div class="bar"><i style="width: 0%"></i></div>
+                      </div>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">A new take arrived while you looked at another: the picture stays</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span><b>Take 1</b
+                    ><span
+                      class="chip"
+                      style="background: rgb(61, 220, 151, 0.15); color: var(--ok)"
+                      >Chosen</span
+                    >
+                  </div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <clipPath id="c22"><rect x="240" y="192" width="130" height="46" /></clipPath>
+                      <g clip-path="url(#c22)">
+                        <rect width="640" height="290" fill="#4a3527" />
+                        <rect y="270" width="640" height="130" fill="#2f2419" />
+                        <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                        <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                        <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                        <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                        <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                        <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                        <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                        <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                        <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb on">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c23">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c23)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c24">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c24)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 2</span><span class="chip new">new</span></span
+                        >
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">A take could not be made</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr">
+                    <span class="lbl">Looking at</span><b>Take 1</b
+                    ><span
+                      class="chip"
+                      style="background: rgb(61, 220, 151, 0.15); color: var(--ok)"
+                      >Chosen</span
+                    >
+                  </div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <clipPath id="c25"><rect x="240" y="192" width="130" height="46" /></clipPath>
+                      <g clip-path="url(#c25)">
+                        <rect width="640" height="290" fill="#4a3527" />
+                        <rect y="270" width="640" height="130" fill="#2f2419" />
+                        <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                        <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                        <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                        <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                        <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                        <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                        <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                        <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                        <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                        <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn">Un-choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="err">
+                    <span
+                      ><strong>Take 4 could not be made.</strong><br /><span class="muted small"
+                        >FLUX.2 klein 4B could not make the image; the details are in the studio's
+                        log. Your other takes are kept.</span
+                      ></span
+                    ><button class="btn">Try again</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb on">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c26">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c26)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c27">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c27)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 2</span></span></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c28">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c28)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"><span class="grow">Take 3</span></span>
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">The words changed after a take was made</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">Looking at</span><b>Take 2</b></div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <clipPath id="c29"><rect x="240" y="192" width="130" height="46" /></clipPath>
+                      <g clip-path="url(#c29)">
+                        <rect width="640" height="290" fill="#4a3527" />
+                        <rect y="270" width="640" height="130" fill="#2f2419" />
+                        <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                        <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                        <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                        <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                        <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                        <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                        <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                        <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div class="tr">
+                    <label class="switch"><input type="checkbox" checked /> Show the patch</label
+                    ><span class="grow"></span><button class="btn g">Drop</button
+                    ><button class="btn p">Choose</button>
+                  </div>
+                  <span class="faint small"
+                    >or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the
+                    patch off and on</span
+                  >
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p">Make 2 more takes</button>
+                  </div>
+                  <div class="col" style="gap: 6px">
+                    <b>Takes · 3</b>
+                    <div class="thumbs">
+                      <button class="thumb">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c30">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c30)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <circle cx="272" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="290" cy="232" r="2.5" fill="#c98f4a" />
+                            <circle cx="311" cy="234" r="2.5" fill="#c98f4a" />
+                            <circle cx="330" cy="233" r="2.5" fill="#c98f4a" />
+                            <circle cx="300" cy="231" r="2.5" fill="#c98f4a" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 1</span><span class="chip ok">Chosen</span></span
+                        ></button
+                      ><button class="thumb on">
+                        <svg
+                          viewBox="214 166 182 98"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c31">
+                            <rect x="240" y="192" width="130" height="46" />
+                          </clipPath>
+                          <g clip-path="url(#c31)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                            <path d="M252 236q48-14 96 0z" fill="#9c3d3d" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 2</span
+                          ><span class="faint small">earlier words</span></span
+                        ></button
+                      ><button class="thumb">
+                        <svg
+                          viewBox="188 146 252 130"
+                          role="img"
+                          aria-label="An illustration of the room"
+                        >
+                          <rect width="640" height="290" fill="#4a3527" />
+                          <rect y="270" width="640" height="130" fill="#2f2419" />
+                          <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                          <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                          <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                          <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                          <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                          <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                          <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                          <path
+                            d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                            stroke="#8f5e2a"
+                            stroke-width="3"
+                          />
+                          <clipPath id="c32">
+                            <rect x="214" y="172" width="200" height="78" />
+                          </clipPath>
+                          <g clip-path="url(#c32)">
+                            <rect width="640" height="290" fill="#4a3527" />
+                            <rect y="270" width="640" height="130" fill="#2f2419" />
+                            <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                            <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                            <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                            <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                            <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                            <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                            <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                          </g></svg
+                        ><span class="tl"
+                          ><span class="grow">Take 3</span
+                          ><span class="faint small">earlier words</span></span
+                        >
+                      </button>
+                    </div>
+                    <span class="faint small"
+                      >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to lay it over the
+                      picture.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">The image has no chosen take</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="col" style="gap: 4px">
+                <div class="fh">
+                  <span class="label">What should change</span
+                  ><span class="tag">from the game</span>
+                </div>
+                <textarea rows="2">Remove the bread from the table</textarea>
+              </div>
+              <span class="muted"
+                >Choose a take of the image first. Patches are painted onto the take the game
+                shows.</span
+              >
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">The chosen take's picture is missing</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="col" style="gap: 4px">
+                <div class="fh">
+                  <span class="label">What should change</span
+                  ><span class="tag">from the game</span>
+                </div>
+                <textarea rows="2">Remove the bread from the table</textarea>
+              </div>
+              <span class="muted"
+                >The chosen take's picture is missing or cannot be read, so it cannot be
+                patched.</span
+              >
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        Another take of the image was chosen: this patch has no takes on that one
+      </div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">The chosen take of the image</span></div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p" disabled>Make 2 takes</button>
+                  </div>
+                  <span class="muted small">Drag over the picture to mark what should change.</span>
+                  <div class="empty">
+                    No takes yet. Each take is a new try at this change, painted with the whole
+                    picture in view.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">The editing model is not on this computer</div>
+      <section class="panel">
+        <h2>Patches the game asks for</h2>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="bench">
+                <div class="col">
+                  <div class="tr"><span class="lbl">The chosen take of the image</span></div>
+                  <div class="pic">
+                    <svg viewBox="0 0 640 400" role="img" aria-label="An illustration of the room">
+                      <rect width="640" height="290" fill="#4a3527" />
+                      <rect y="270" width="640" height="130" fill="#2f2419" />
+                      <rect x="60" y="60" width="120" height="100" fill="#8fb3c9" />
+                      <path d="M120 60v100M60 110h120" stroke="#3a2a1e" stroke-width="5" />
+                      <rect x="470" y="130" width="130" height="150" fill="#262019" />
+                      <path d="M510 278q10-50 28-74q20 30 26 74z" fill="#ff9a3c" />
+                      <rect x="200" y="236" width="240" height="14" fill="#7a5230" />
+                      <rect x="216" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="412" y="250" width="12" height="74" fill="#5e3f25" />
+                      <rect x="376" y="212" width="22" height="24" rx="3" fill="#b9c4cc" />
+                      <ellipse cx="300" cy="222" rx="44" ry="15" fill="#c98f4a" />
+                      <path
+                        d="M276 216l10 10M296 214l10 11M316 216l9 9"
+                        stroke="#8f5e2a"
+                        stroke-width="3"
+                      />
+                      <rect
+                        x="240"
+                        y="192"
+                        width="130"
+                        height="46"
+                        fill="none"
+                        stroke="#ff6b2c"
+                        stroke-width="2.5"
+                        stroke-dasharray="7 5"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="col" style="gap: 4px">
+                    <div class="fh">
+                      <span class="label">What should change</span
+                      ><span class="tag">from the game</span>
+                    </div>
+                    <textarea rows="2">Remove the bread from the table</textarea>
+                  </div>
+                  <div class="tr">
+                    <select aria-label="Number of new takes">
+                      <option>2 takes</option></select
+                    ><button class="btn p" disabled>Make 2 takes</button>
+                  </div>
+                  <span class="adopt muted"
+                    >FLUX.2 klein 4B is not on this computer, and patches are made with it.</span
+                  >
+                  <div class="empty">
+                    No takes yet. Each take is a new try at this change, painted with the whole
+                    picture in view.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </body>
+</html>
