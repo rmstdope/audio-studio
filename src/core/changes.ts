@@ -33,8 +33,8 @@ export interface MusicChanges {
   clips: Record<ChangeKind, number>
 }
 
-/** What an images file is for: the game's list of images, the studio's edits (the style and words), or the lock. */
-export type ImagesFileRole = 'images' | 'edits' | 'lock'
+/** What an images file is for: the game's list of images, the studio's edits (the style and words), the lock, or the manifest the game reads. */
+export type ImagesFileRole = 'images' | 'edits' | 'lock' | 'manifest'
 
 /** The images files' changes. */
 export interface ImagesChanges {
@@ -106,6 +106,7 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
           ]),
           [IMAGES_EDITS_FILE, 'edits'],
           [IMAGES_LOCK_FILE, 'lock'],
+          [normal(images.manifest), 'manifest'],
         ])
       : null,
     music: music

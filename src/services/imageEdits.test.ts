@@ -359,8 +359,13 @@ describe('the words of a patch the game asks for', () => {
 
 describe('the box of a named area', () => {
   const box = { x: 10, y: 20, width: 50, height: 40 }
+  const MANIFEST = 'web/public/images/generated/manifest.json'
+  const entry = { file: 'inn.png', width: 320, height: 200 }
   const withArea = () =>
-    repo({ 'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }] })
+    repo({
+      'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }],
+      [MANIFEST]: { inn: entry },
+    })
 
   it('is kept in the image’s edit and touches no game file', async () => {
     const { file, read } = withArea()
@@ -388,6 +393,55 @@ describe('the box of a named area', () => {
     expect(read(EDITS)).toBe(before)
     expect(await setImageAreaBox(file, 'ghost', 'fountain', box)).toBeNull()
     expect(await setImageAreaBox(file, 'inn', 'ghost', box)).toBeNull()
+  })
+
+  it('reaches the game in the same save, and leaves with a clear', async () => {
+    const { file, read } = withArea()
+    await setImageAreaBox(file, 'inn', 'fountain', box)
+    expect(JSON.parse(read(MANIFEST)).inn.areas).toEqual({
+      fountain: { x: 0.03125, y: 0.1, width: 0.15625, height: 0.2 },
+    })
+    await setImageAreaBox(file, 'inn', 'fountain', null)
+    expect(JSON.parse(read(MANIFEST))).toEqual({ inn: entry })
+  })
+
+  it('goes back when the manifest cannot be read, saving nothing', async () => {
+    const r = repo({
+      'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }],
+      [MANIFEST]: '{nope',
+    })
+    const before = r.read(EDITS)
+    const result = await setImageAreaBox(r.file, 'inn', 'fountain', box)
+    expect(result).toMatchObject({
+      ok: false,
+      problems: [{ message: 'the images manifest could not be read' }],
+    })
+    expect(r.read(EDITS)).toBe(before)
+  })
+
+  it('goes back when the image has no entry, but a clear still works', async () => {
+    const r = repo({
+      'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }],
+      [MANIFEST]: {},
+    })
+    const before = r.read(EDITS)
+    expect(await setImageAreaBox(r.file, 'inn', 'fountain', box)).toMatchObject({
+      ok: false,
+      problems: [{ message: 'the image has no entry in the images manifest' }],
+    })
+    expect(r.read(EDITS)).toBe(before)
+    expect(await setImageAreaBox(r.file, 'inn', 'fountain', null)).toEqual({ ok: true })
+  })
+
+  it('goes back when the manifest cannot be written', async () => {
+    const r = withArea()
+    const before = r.read(EDITS)
+    const dir = join(r.root, 'web/public/images/generated')
+    chmodSync(dir, 0o555)
+    const result = await setImageAreaBox(r.file, 'inn', 'fountain', box)
+    chmodSync(dir, 0o755)
+    expect(result).toMatchObject({ ok: false, problems: [{ message: 'permission denied' }] })
+    expect(r.read(EDITS)).toBe(before)
   })
 
   it('writes nothing over edits that cannot be read', async () => {

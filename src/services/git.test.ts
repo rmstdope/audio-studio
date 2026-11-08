@@ -97,11 +97,14 @@ describe('gitChanges', () => {
     mkdirSync(join(root, 'content-studio/images'), { recursive: true })
     writeFileSync(join(root, 'content-studio/images/edits.json'), '{}')
     writeFileSync(join(root, 'tts/act1/images.json'), '[]')
+    mkdirSync(join(root, 'web/public/images/generated'), { recursive: true })
+    writeFileSync(join(root, 'web/public/images/generated/manifest.json'), '{}')
     const result = await gitChanges(join(root, 'content-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.images?.files.map((f) => [f.path, f.role]).sort()).toEqual([
       ['content-studio/images/edits.json', 'edits'],
       ['tts/act1/images.json', 'images'],
+      ['web/public/images/generated/manifest.json', 'manifest'],
     ])
   })
 

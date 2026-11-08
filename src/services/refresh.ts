@@ -8,7 +8,9 @@ import {
   type Track,
   type TrackRef,
 } from '../core/music'
-import { partPathFor, type Problem } from '../core/project'
+import { partPathFor, type Problem, type Project } from '../core/project'
+import { syncImageAreas } from './imageAreas'
+import { readImages } from './imageLists'
 import { DialogSchema, type Line } from '../core/resources'
 import { readResource } from './files'
 import { readEffectsList } from './effectsLists'
@@ -33,6 +35,14 @@ export type RefreshResult =
     }
   | { ok: false; reason: 'none' | 'busy'; message: string }
   | { ok: false; reason: 'failed'; message: string; output: string }
+  | {
+      /** The command ran, but the images manifest could not take the placed named areas (as-qg4.3). */
+      ok: false
+      reason: 'areas'
+      message: string
+      detail: string
+      output: string
+    }
   | { ok: false; problems: Problem[]; output: string }
   | ProjectFailure
   | null
@@ -200,6 +210,8 @@ async function refresh(
     problems.push({ file: dialogPath, path: '', message: 'the command wrote no dialog file' })
   }
   if (read === 'missing' || read === 'invalid') return { ok: false, problems, output: run.output }
+  const areas = await passAreasToGame(projectFile, project, part.id)
+  if (!areas.ok) return { ...areas, output: run.output }
   const diff = before === 'invalid' ? null : dialogDiff(before, read)
   const loopsAfter = loopsFile ? await readTracks(root, loopsFile, LoopListSchema) : 'invalid'
   // What the loops were is unknown when the old list was broken, and there is none to compare when
@@ -212,6 +224,33 @@ async function refresh(
           total: loopsAfter.tracks.length,
         }
   return { ok: true, lines: read.length, diff, loops, output: run.output }
+}
+
+/**
+ * After an act's refresh: brings the placed named areas of the act's images up to date in the
+ * images manifest (boxes marked before the game received them included), failing in words the
+ * Refresh panel shows.
+ */
+async function passAreasToGame(
+  projectFile: string,
+  project: Project,
+  partId: string,
+): Promise<{ ok: true } | { ok: false; reason: 'areas'; message: string; detail: string }> {
+  if (!project.images) return { ok: true }
+  const summary = await readImages(dirname(projectFile), project, [])
+  const ids = summary?.acts.find((act) => act.id === partId)?.rows.map((row) => row.id) ?? []
+  const sync = await syncImageAreas(projectFile, project, ids)
+  if (sync.ok) return sync
+  const what =
+    sync.reason === 'read'
+      ? 'The images manifest could not be read.'
+      : `The images manifest could not be written (${sync.message}).`
+  return {
+    ok: false,
+    reason: 'areas',
+    message: 'The command ran, but the named areas could not be passed to the game',
+    detail: `${what} Fix it, then Refresh from the game again.`,
+  }
 }
 
 async function refreshStingers(

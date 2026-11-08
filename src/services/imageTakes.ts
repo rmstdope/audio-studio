@@ -29,6 +29,8 @@ import {
 import {
   ImageLockSchema,
   acceptableReasons,
+  areaFractions,
+  withAreas,
   formatImageLock,
   outOfDateReasons,
   type ChosenEntry,
@@ -342,7 +344,13 @@ export function createImageTakes({
       const next = entry(lock[id])
       if (!next) return { ok: true as const }
       const file = `${id}.png`
-      manifest[id] = { file, width: found.row.width, height: found.row.height }
+      // The boxes read again in the turn: one placed since `found` was read is what the game gets.
+      const fresh = await resolve(found.projectFile, id)
+      const row = fresh && 'row' in fresh ? fresh.row : found.row
+      manifest[id] = withAreas(
+        { file, width: found.row.width, height: found.row.height },
+        areaFractions(row.areas, row),
+      )
       lock[id] = next
       await writeAtomic(found.root, join(found.config.clips, file), png)
       await writeAtomic(

@@ -169,10 +169,14 @@ export function rightAfterDrop(strip: number[], n: number): number | null {
   return rest[Math.min(Math.max(at, 0), rest.length - 1)]!
 }
 
-/** `manifest.json` of the images clips folder, which the game reads: `{ image: { file, width, height } }`. */
+/** `manifest.json` of the images clips folder, which the game reads: `{ image: { file, width, height, areas? } }`. */
 export const ImageManifestSchema = z.record(
   z.string(),
-  z.looseObject({ file: z.string(), width: z.number(), height: z.number() }),
+  z.looseObject({
+    file: z.string(),
+    width: z.number(),
+    height: z.number(),
+  }),
 )
 
 /** The images manifest. */

@@ -1,4 +1,6 @@
+import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { resolveInRoot } from '../core/paths'
 import {
   applyActStyleChange,
   applyActStylePick,
@@ -14,8 +16,9 @@ import {
   type ImageEdits,
   type StyleField,
 } from '../core/images'
-import { IMAGES_EDITS_FILE, type Problem } from '../core/project'
+import { IMAGES_EDITS_FILE, type Problem, type Project } from '../core/project'
 import { writeAtomic, writeFailure } from './files'
+import { syncImageAreas } from './imageAreas'
 import { readImageEdits, readImages } from './imageLists'
 import { createSerial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
@@ -34,12 +37,14 @@ type Summary = NonNullable<Awaited<ReturnType<typeof readImages>>>
  * Runs `change` over the images edits and writes them back (the game's files are never written).
  * `find` gives what the change is about from the pages (an image's game words, the style); null
  * from it, or from `change` (it is gone since), answers null. `change` may answer problems
- * instead of edits, and nothing is written.
+ * instead of edits, and nothing is written. `after` runs once the edits are written and may
+ * answer problems: the edits are then written back as they were.
  */
 function edit<T>(
   projectFile: string,
   find: (summary: Summary) => T | null,
   change: (edits: ImageEdits, found: T) => ImageEdits | Problem[] | null,
+  after?: (project: Project) => Promise<Problem[]>,
 ): Promise<ImageEditResult> {
   return serial.run(projectFile, async () => {
     const opened = await openProject(projectFile)
@@ -54,6 +59,8 @@ function edit<T>(
     const read = await readImageEdits(root)
     // Saving over a part that cannot be read would lose it: nothing is written until it is fixed.
     if (read.problems.length) return { ok: false, problems: read.problems }
+    // The file as it is, to put back exactly if `after` fails; null when there is none.
+    const was = after ? await readText(root, file) : null
     const changed = change(read.edits, found)
     if (changed === null) return null
     if (Array.isArray(changed)) return { ok: false, problems: changed }
@@ -62,8 +69,24 @@ function edit<T>(
     } catch (error) {
       return { ok: false, problems: [{ file, path: '', message: writeFailure(error) }] }
     }
+    const failed = after ? await after(project) : []
+    if (failed.length) {
+      try {
+        if (was === null) await rm(resolveInRoot(root, file), { force: true })
+        else await writeAtomic(root, file, was)
+      } catch {
+        // The edits could not be put back either: the problems already say what went wrong.
+      }
+      return { ok: false, problems: failed }
+    }
     return { ok: true }
   })
+}
+
+/** A file's text, null when there is none. */
+async function readText(root: string, path: string): Promise<string | null> {
+  const file = Bun.file(resolveInRoot(root, path))
+  return (await file.exists()) ? file.text() : null
 }
 
 /** The game's description of an image, from the pages; null when it is not listed. */
@@ -115,6 +138,13 @@ export function setImageAreaBox(
       return why
         ? [{ file, path: `images.${id}.areas.${area}`, message: why }]
         : applyAreaBox(edits, id, area, box)
+    },
+    // The game gets the box in the same save; a clear never fails for want of an entry.
+    async (project) => {
+      const sync = await syncImageAreas(projectFile, project, [id], { requireEntry: box !== null })
+      return sync.ok
+        ? []
+        : [{ file: project.images!.manifest, path: `images.${id}`, message: sync.message }]
     },
   )
 }

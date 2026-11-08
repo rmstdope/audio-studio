@@ -8,6 +8,8 @@ import {
   applyActStyleChange,
   applyActStylePick,
   applyAreaBox,
+  areaFractions,
+  withAreas,
   checkAreaBox,
   applyStyleChange,
   applyPatchWordsChange,
@@ -1192,5 +1194,45 @@ describe('the boxes marked for named areas', () => {
       placed: true,
       box,
     })
+  })
+})
+
+describe('areas for the game', () => {
+  const row = (
+    id: string,
+    box: { x: number; y: number; width: number; height: number } | null,
+  ) => ({
+    id,
+    title: id,
+    placed: box !== null,
+    box,
+  })
+  const size = { width: 320, height: 200 }
+
+  it('gives each placed area as fractions of the picture, and none when nothing is placed', () => {
+    expect(
+      areaFractions(
+        [row('fountain', { x: 80, y: 50, width: 160, height: 100 }), row('gate', null)],
+        size,
+      ),
+    ).toEqual({ fountain: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } })
+    expect(areaFractions([row('gate', null)], size)).toBeUndefined()
+  })
+
+  it('rounds to six decimals', () => {
+    const got = areaFractions([row('a', { x: 1, y: 1, width: 4, height: 4 })], {
+      width: 3,
+      height: 3,
+    })
+    expect(got?.a).toEqual({ x: 0.333333, y: 0.333333, width: 1.333333, height: 1.333333 })
+  })
+
+  it('sets or removes the areas of an entry, keeping its other fields in order', () => {
+    const entry = { file: 'a.png', width: 320, height: 200, extra: 1 }
+    const areas = { f: { x: 0, y: 0, width: 1, height: 1 } }
+    const with_ = withAreas(entry, areas)
+    expect(Object.keys(with_)).toEqual(['file', 'width', 'height', 'extra', 'areas'])
+    expect(withAreas(with_, undefined)).toEqual(entry)
+    expect('areas' in withAreas(with_, undefined)).toBe(false)
   })
 })

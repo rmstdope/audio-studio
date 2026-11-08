@@ -342,6 +342,28 @@ describe('choosing', () => {
     expect(await takes.currentFile(file, 'inn')).toBeNull()
   })
 
+  it('keeps the placed areas on the manifest entry: choosing writes them, un-choosing takes them with it', async () => {
+    const box = { x: 80, y: 50, width: 160, height: 100 }
+    const { takes, file, read } = await made({
+      'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }],
+      [EDITS]: { style: STYLE, images: { inn: { areas: { fountain: box } } } },
+    })
+    const areas = { fountain: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } }
+    await takes.choose(file, 'inn', 1)
+    expect(JSON.parse(read('web/images/manifest.json')).inn).toEqual({
+      file: 'inn.png',
+      width: 320,
+      height: 200,
+      areas,
+    })
+    await takes.choose(file, 'inn', 2)
+    expect(JSON.parse(read('web/images/manifest.json')).inn.areas).toEqual(areas)
+    await takes.unchoose(file, 'inn')
+    expect(JSON.parse(read('web/images/manifest.json'))).toEqual({})
+    await takes.choose(file, 'inn', 1)
+    expect(JSON.parse(read('web/images/manifest.json')).inn.areas).toEqual(areas)
+  })
+
   it('accepts changed words and style: the chosen take counts as made from them, up to date again', async () => {
     const { takes, file, root, read, row } = await made()
     await takes.choose(file, 'inn', 1)
