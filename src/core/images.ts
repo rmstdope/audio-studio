@@ -1086,6 +1086,8 @@ export function summarizeImages(input: ImagesInput): {
     for (const then of stale) lookPairs.push([then, key!])
     if (stale.length) oldIds.add(image.id)
     const wasText = made ? styleParts(withoutPalette(made.style))?.[2] : null
+    const boardTakes = input.imageTakes?.[image.id]
+    const onBoard = boardTakes ? new Set(boardTakes) : null
     const row: ImageRow = {
       id: image.id,
       title: image.title,
@@ -1118,8 +1120,6 @@ export function summarizeImages(input: ImagesInput): {
         }
       }),
       areas: image.areas.map((area): AreaRow => {
-        const there = input.imageTakes?.[image.id]
-        const onBoard = there ? new Set(there) : null
         const boxes: Record<number, AreaBox> = {}
         let gone = false
         for (const [key, byArea] of Object.entries(own?.takeAreas ?? {})) {

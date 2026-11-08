@@ -952,36 +952,39 @@ export function createImageTakes({
     async unchoose(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return found
-      return boards.run(turn(found), () =>
-        choices().run(`image-choice\0${projectFile}`, async (): Promise<ImageTakesAnswer> => {
-          const problems: Problem[] = []
-          const manifest = await manifestNow(found, problems)
-          const lock = await lockNow(found, problems)
-          if (!manifest) return { ok: false, message: 'The images manifest could not be read.' }
-          if (!lock) return { ok: false, message: 'The images lock could not be read.' }
-          if (!lock[id]) return { ok: false, message: 'No take is chosen for this image.' }
-          const adopted = await adoptImageAreas(
-            projectFile,
-            id,
-            lock[id].take ?? found.row.chosenTake ?? 0,
-          )
+      return boards.run(turn(found), async () => {
+        // Before the image-choice turn, as in choose: saving a box holds the edits and then waits for it.
+        // A lock entry with no take number leaves the boxes of no take yet where they are.
+        if (found.row.chosenTake !== null) {
+          const adopted = await adoptImageAreas(projectFile, id, found.row.chosenTake)
           if (adopted && !adopted.ok) return notAdopted(adopted)
-          if (id in manifest) {
-            delete manifest[id]
-            await writeAtomic(
-              found.root,
-              found.config.manifest,
-              `${JSON.stringify(sorted(manifest), null, 2)}\n`,
-            )
-          }
-          await rm(resolveInRoot(found.root, join(found.config.clips, `${id}.png`)), {
-            force: true,
-          })
-          delete lock[id]
-          await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
-          return { ok: true }
-        }),
-      )
+        }
+        return choices().run(
+          `image-choice\0${projectFile}`,
+          async (): Promise<ImageTakesAnswer> => {
+            const problems: Problem[] = []
+            const manifest = await manifestNow(found, problems)
+            const lock = await lockNow(found, problems)
+            if (!manifest) return { ok: false, message: 'The images manifest could not be read.' }
+            if (!lock) return { ok: false, message: 'The images lock could not be read.' }
+            if (!lock[id]) return { ok: false, message: 'No take is chosen for this image.' }
+            if (id in manifest) {
+              delete manifest[id]
+              await writeAtomic(
+                found.root,
+                found.config.manifest,
+                `${JSON.stringify(sorted(manifest), null, 2)}\n`,
+              )
+            }
+            await rm(resolveInRoot(found.root, join(found.config.clips, `${id}.png`)), {
+              force: true,
+            })
+            delete lock[id]
+            await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
+            return { ok: true }
+          },
+        )
+      })
     },
 
     async drop(projectFile, id, n) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setImageAreaBox, setImageWords } from './imageEdits'
 import { readImages } from './imageLists'
@@ -408,7 +408,46 @@ describe('choosing', () => {
       expect(JSON.parse(read(EDITS)).images.inn).toEqual({ takeAreas: { '2': { fountain: box } } })
     })
 
-    it('adopts them when the take is un-chosen, and keeps a dropped take’s boxes in the edits', async () => {
+    it('moves the boxes of no take yet onto the take in the game when it is un-chosen', async () => {
+      const { takes, file, read } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      // Boxes of no take yet, written by hand (or placed before takes kept their own).
+      const edits = JSON.parse(read(EDITS))
+      edits.images.inn = { areas: { fountain: box } }
+      writeFileSync(join(dirname(file), EDITS), JSON.stringify(edits))
+      expect(await takes.unchoose(file, 'inn')).toEqual({ ok: true })
+      expect(JSON.parse(read(EDITS)).images.inn).toEqual({ takeAreas: { '1': { fountain: box } } })
+    })
+
+    it('does not wait forever when a box is saved while the take is un-chosen', async () => {
+      const { takes, file } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      const both = Promise.all([
+        takes.unchoose(file, 'inn'),
+        setImageAreaBox(file, 'inn', 'fountain', other),
+      ])
+      const timeout = new Promise((resolve) => setTimeout(() => resolve('stuck'), 3000))
+      expect(await Promise.race([both, timeout])).not.toBe('stuck')
+    })
+
+    it('refuses Choose and Un-choose, changing nothing, when the edits cannot be read', async () => {
+      const { takes, file, read } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      writeFileSync(
+        join(dirname(file), EDITS),
+        JSON.stringify({ style: STYLE, images: { inn: { areas: { fountain: { x: 'a' } } } } }),
+      )
+      for (const answer of [
+        await takes.choose(file, 'inn', 2),
+        await takes.unchoose(file, 'inn'),
+      ]) {
+        expect(answer).toMatchObject({ ok: false })
+        expect(JSON.stringify(answer)).toContain('The named areas could not be kept')
+      }
+      expect(JSON.parse(read(LOCK)).inn.take).toBe(1)
+    })
+
+    it('keeps a dropped take’s boxes in the edits, its rows reading Place again with no take to name', async () => {
       const { takes, file, read, row } = await withBox()
       await takes.choose(file, 'inn', 1)
       await takes.choose(file, 'inn', 2)
