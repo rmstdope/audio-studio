@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { matchToTake } from '../core/imagePatches'
 import { createImagePatches } from './imagePatches'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
@@ -122,6 +123,42 @@ describe('image patches', () => {
     const png = new Uint8Array(readFileSync(join(root, PATCH)))
     expect(png[25]).toBe(6)
     expect([decodePng(png).width, decodePng(png).height]).toEqual([256, 256])
+  })
+
+  it('matches the colours of the kept area to the take around it before saving', async () => {
+    const { root, file, patches, settled } = setup({
+      makes: (request) => fakePng(request.width, request.height, 5),
+    })
+    await patches.make(file, 'inn', { area, instruction: 'the door is gone' })
+    await settled()
+    const take = decodePng(new Uint8Array(readFileSync(join(root, TAKE))))
+    const edited = decodePng(fakePng(256, 256, 5))
+    const saved = decodePng(new Uint8Array(readFileSync(join(root, PATCH))))
+    const colourAt = (p: { width: number; data: Uint8Array }, x: number, y: number) => [
+      ...p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3),
+    ]
+    const [x, y] = [area.x + 2, area.y + 64] as const
+    const gap = (a: number[], b: number[]) => a.reduce((sum, v, c) => sum + Math.abs(v - b[c]!), 0)
+    // Next to the side the kept colours are closer to the take than the edit's own are.
+    expect(gap(colourAt(saved, x, y), colourAt(take, x, y))).toBeLessThan(
+      gap(colourAt(edited, x, y), colourAt(take, x, y)),
+    )
+    expect(colourAt(saved, x, y)).toEqual(colourAt(matchToTake(edited, take, area), x, y))
+  })
+
+  it('fails like any other patch when the take cannot be read back, saving nothing', async () => {
+    const { root, file, patches, settled } = setup({
+      makes: (request) => {
+        writeFileSync(join(root, TAKE), new Uint8Array(40))
+        return fakePng(request.width, request.height, 1)
+      },
+    })
+    await patches.make(file, 'inn', { area, instruction: 'the door is gone' })
+    expect(await settled()).toMatchObject({
+      patches: [],
+      failed: { instruction: 'the door is gone' },
+    })
+    expect(existsSync(join(root, PATCH))).toBe(false)
   })
 
   it('never says nothing is being made before the finished patch shows', async () => {

@@ -64,8 +64,8 @@ export function PatchesSection({ imageId }: { imageId: string }) {
       <h2>Patches</h2>
       <p className="muted">
         Drag over the chosen take to mark an area, then say what should change there. The whole take
-        is edited and only the marked area is kept, with a soft edge. An experiment: nothing here
-        reaches the game.
+        is edited and only the marked area is kept, with its colours matched to the take around it.
+        An experiment: nothing here reaches the game.
       </p>
       <div
         className="patch-stage"

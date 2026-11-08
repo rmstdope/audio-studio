@@ -243,6 +243,13 @@ describe('PatchesSection', () => {
     expect(host.textContent).toContain('Drag over the picture')
   })
 
+  it('says the marked area is kept with its colours matched to the take around it', async () => {
+    const { host } = await render(view())
+    expect(host.querySelector('.patches > p')?.textContent?.replace(/\s+/g, ' ')).toBe(
+      'Drag over the chosen take to mark an area, then say what should change there. The whole take is edited and only the marked area is kept, with its colours matched to the take around it. An experiment: nothing here reaches the game.',
+    )
+  })
+
   it('lays the newest patch over the take, and lists every try', async () => {
     const { host } = await render(view({ patches: [patch(1, 'first'), patch(2, 'second')] }))
     expect(overlay(host)?.getAttribute('src')).toBe('/api/images/inn/patches/2')
