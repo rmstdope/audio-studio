@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { describeLook, lookChanges, lookKey, lookOf, type Look } from './imageLook'
+import type { PatchArea } from './imagePatches'
 import { problemsFrom, type Problem } from './project'
 
 /** The path of the picture the game shows for an image now: inside the project root, and a picture. */
@@ -776,6 +777,8 @@ export interface PatchRow {
   chosenOn: number[]
   /** The patch has a chosen take on a take of the image that has since been dropped. */
   chosenOnGone: boolean
+  /** The area the patch's chosen take on the image's take in the game was made with; null when it has none there. */
+  chosenArea: PatchArea | null
 }
 
 /** One named area of an image as its page shows it. */
@@ -919,6 +922,8 @@ export interface ImagesInput {
   takeLooks?: Record<string, (string | null)[]>
   /** The takes of each image each of its patches has a chosen take on, by image id then patch id. */
   patchChoices?: Record<string, Record<string, number[]>>
+  /** The area each patch's chosen take on each take of an image was made with, by image id, patch id, then take of the image. */
+  patchAreas?: Record<string, Record<string, Record<number, PatchArea>>>
   /** The takes on each image's board, by image id; an image absent here has a board that was not read. */
   imageTakes?: Record<string, number[]>
 }
@@ -1043,6 +1048,10 @@ export function summarizeImages(input: ImagesInput): {
           gameWas: mine?.gameWas ?? null,
           chosenOn: bases.filter((base) => there.has(base)).sort((a, b) => a - b),
           chosenOnGone: bases.some((base) => !there.has(base)),
+          chosenArea:
+            made?.take == null
+              ? null
+              : (input.patchAreas?.[image.id]?.[patch.id]?.[made.take] ?? null),
         }
       }),
       areas: image.areas.map((area) => {

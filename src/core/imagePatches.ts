@@ -543,6 +543,29 @@ export function makeAgainOf(row: Pick<ImageRow, 'chosenTake' | 'patches'>): Patc
   )
 }
 
+/** Whether two marked areas of one take share at least one dot; areas that only share a border do not. */
+export function patchBoxesOverlap(a: PatchArea, b: PatchArea): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+}
+
+/**
+ * The pairs of patches whose chosen takes (on the take of the image in the game) were made with
+ * areas that overlap, each pair once with the earlier patch first, ordered by the first then the
+ * second, in the game's order.
+ */
+export function overlappingPatches(patches: readonly PatchRow[]): [PatchRow, PatchRow][] {
+  const pairs: [PatchRow, PatchRow][] = []
+  patches.forEach((first, i) => {
+    if (!first.chosenArea) return
+    for (const second of patches.slice(i + 1)) {
+      if (second.chosenArea && patchBoxesOverlap(first.chosenArea, second.chosenArea)) {
+        pairs.push([first, second])
+      }
+    }
+  })
+  return pairs
+}
+
 /**
  * What to ask before the ask changes the image's takes, or null when nothing needs asking: the
  * chosen patches of the take in the game leave on Choose and Un-choose (unless they come back on

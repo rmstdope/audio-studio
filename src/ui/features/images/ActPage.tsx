@@ -1,8 +1,14 @@
-import { makeAgainOf } from '../../../core/imagePatches'
+import { makeAgainOf, overlappingPatches } from '../../../core/imagePatches'
 import { imagesDone, type ImagesAct, type ImageRow, type ImagesSummary } from '../../../core/images'
 import { useImageMaking, useRefreshDialog } from '../../api'
 import { shortTitle } from '../../format'
-import { areasToPlaceText, chosenLine, disagreeText, makeAgainActLine } from '../../imagesText'
+import {
+  areasToPlaceText,
+  chosenLine,
+  disagreeText,
+  makeAgainActLine,
+  overlapActLine,
+} from '../../imagesText'
 import { ActLinks } from './ActLinks'
 import { makingStatusText } from '../../musicTakesText'
 import { routeHref } from '../../route'
@@ -163,6 +169,7 @@ export function ActPage({
                 }
                 const row = act.rows.find((r) => r.id === id)
                 const again = row ? makeAgainOf(row) : []
+                const overlaps = row ? overlappingPatches(row.patches) : []
                 return (
                   row && (
                     <tr key={id}>
@@ -200,6 +207,11 @@ export function ActPage({
                         {again.length > 0 && (
                           <div className="chg">
                             {makeAgainActLine(again.map((patch) => patch.title))}
+                          </div>
+                        )}
+                        {overlaps.length > 0 && (
+                          <div className="chg">
+                            {overlapActLine(overlaps.map(([a, b]) => [a.title, b.title]))}
                           </div>
                         )}
                         {row.actStyle?.on === false && act.addition !== null && (

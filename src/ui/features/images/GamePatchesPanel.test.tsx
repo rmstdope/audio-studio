@@ -29,6 +29,7 @@ const patch = (id: string, over: Partial<PatchRow> = {}): PatchRow => ({
   gameWas: null,
   chosenOn: [],
   chosenOnGone: false,
+  chosenArea: null,
   ...over,
 })
 
@@ -36,17 +37,21 @@ const patch = (id: string, over: Partial<PatchRow> = {}): PatchRow => ({
 async function render(
   patches: PatchRow[],
   answer: { status: number; body: unknown } = { status: 200, body: { ok: true } },
+  view: Record<string, unknown> | null = {},
 ) {
   const sent: { method: string; path: string; body: unknown }[] = []
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
     // The takes of the patches are PatchWorkbench.test's; here there is nothing to patch on.
     if (path === '/api/images/inn/patches') {
+      // null: the patches never finish loading
+      if (view === null) return new Promise<Response>(() => {})
       return Response.json({
         ok: true,
         take: null,
         pictureGone: false,
         maker: { ok: true },
         patches: [],
+        ...view,
       })
     }
     sent.push({
@@ -69,6 +74,8 @@ async function render(
       ),
     )
   })
+  // The patches' view is loaded after the first render.
+  for (let i = 0; i < 3; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
   cleanups.push(() => {
     act(() => root.unmount())
     host.remove()
@@ -255,5 +262,67 @@ describe('GamePatchesPanel', () => {
     await reword(host.querySelector('textarea')!, 'x')
     expect(text(host.querySelector('.game-patch-body'))).toContain('cannot be written')
     expect(host.querySelector('.saved')).toBeNull()
+  })
+
+  describe('overlapping chosen patches', () => {
+    const at = (x: number) => ({ x, y: 0, width: 10, height: 10 })
+    const three = () => [
+      patch('bread-taken', { title: 'Bread taken', chosenArea: at(0) }),
+      patch('door-ajar', { title: 'Door ajar', chosenArea: at(5) }),
+      patch('fire-out', { title: 'Fire out', chosenArea: at(8) }),
+    ]
+    const warning = (host: Element) =>
+      host.querySelector('section[aria-label="Overlapping patches"]')
+
+    it('warns above the list, between the explanation and the patches, naming the one pair', async () => {
+      const { host } = await render(three().slice(0, 2))
+      const notice = warning(host)!
+      expect(notice.className).toContain('notice-warn')
+      expect(text(notice.querySelector('strong'))).toBe(
+        'Two chosen patches overlap: Bread taken and Door ajar.',
+      )
+      expect(text(notice.querySelector('.muted'))).toBe(
+        'If the game shows both at once, one is drawn over the other where they meet.',
+      )
+      expect(notice.previousElementSibling?.className).toContain('game-patches-intro')
+      expect(notice.nextElementSibling?.className).toContain('game-patch-list')
+      expect(notice.querySelectorAll('button, a, [tabindex]').length).toBe(0)
+    })
+    it('lists every pair under a shorter heading, in the game’s order', async () => {
+      const { host } = await render(three())
+      const notice = warning(host)!
+      expect(text(notice.querySelector('strong'))).toBe('Some chosen patches overlap.')
+      expect([...notice.querySelectorAll('li')].map((li) => text(li))).toEqual([
+        'Bread taken and Door ajar',
+        'Bread taken and Fire out',
+        'Door ajar and Fire out',
+      ])
+    })
+    it('says nothing when no pair overlaps, or the patches are not loaded, the chosen picture is gone or the lock cannot be read', async () => {
+      const apart = [patch('a', { chosenArea: at(0) }), patch('b', { chosenArea: at(10) })]
+      expect(warning((await render(apart)).host)).toBeNull()
+      expect(warning((await render(three(), undefined, { pictureGone: true })).host)).toBeNull()
+      expect(warning((await render(three(), undefined, { lockUnread: true })).host)).toBeNull()
+      expect(warning((await render(three(), undefined, null)).host)).toBeNull()
+    })
+    it('puts one amber line at the top of an open patch, naming each patch it overlaps', async () => {
+      const { host } = await render(three())
+      await act(async () => rowButtons(host)[0]!.click())
+      await act(async () => rowButtons(host)[1]!.click())
+      const lines = [...host.querySelectorAll('.game-patch-body .line-warn')]
+      expect(lines.map((l) => text(l))).toEqual([
+        'The chosen take overlaps Door ajar and Fire out.',
+        'The chosen take overlaps Bread taken and Fire out.',
+      ])
+      const body = host.querySelector('.game-patch-body')!
+      expect(
+        body.querySelector('.line-warn')!.nextElementSibling?.querySelector('textarea'),
+      ).not.toBeNull()
+    })
+    it('puts no line in an open patch that overlaps nothing', async () => {
+      const { host } = await render([...three().slice(0, 2), patch('far', { chosenArea: at(500) })])
+      await act(async () => rowButtons(host)[2]!.click())
+      expect(host.querySelector('.line-warn')).toBeNull()
+    })
   })
 })

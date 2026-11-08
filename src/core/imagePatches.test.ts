@@ -10,6 +10,8 @@ import {
   PATCH_FEATHER,
   PatchBoardSchema,
   makeAgainOf,
+  overlappingPatches,
+  patchBoxesOverlap,
   patchSummary,
   setAsideQuestion,
 } from './imagePatches'
@@ -531,6 +533,7 @@ describe('patches set aside', () => {
     gameWas: null,
     chosenOn,
     chosenOnGone,
+    chosenArea: null,
   })
   const bread = patch('Bread taken', [2])
   const door = patch('Door open', [1, 2])
@@ -602,5 +605,45 @@ describe('patches set aside', () => {
       })
       expect(setAsideQuestion(row(4, bread, well), { kind: 'drop', n: 3 })).toBeNull()
     })
+  })
+})
+
+describe('overlapping chosen patches', () => {
+  const box = (x: number, y: number, width = 10, height = 10) => ({ x, y, width, height })
+  const patch = (title: string, chosenArea: PatchRow['chosenArea']): PatchRow => ({
+    id: title.toLowerCase().replace(/ /g, '-'),
+    title,
+    description: '',
+    words: '',
+    changed: false,
+    gameChanged: false,
+    gameWas: null,
+    chosenOn: [],
+    chosenOnGone: false,
+    chosenArea,
+  })
+
+  it('counts areas that share a dot, even only at a corner', () => {
+    expect(patchBoxesOverlap(box(0, 0), box(9, 9))).toBe(true)
+    expect(patchBoxesOverlap(box(0, 0, 100, 100), box(40, 40))).toBe(true)
+  })
+  it('does not count areas that only share a border, or lie apart', () => {
+    expect(patchBoxesOverlap(box(0, 0), box(10, 0))).toBe(false)
+    expect(patchBoxesOverlap(box(0, 0), box(10, 10))).toBe(false)
+    expect(patchBoxesOverlap(box(0, 0), box(50, 50))).toBe(false)
+  })
+  it('lists each pair once in the game’s order, earlier patch first', () => {
+    const a = patch('A', box(0, 0))
+    const b = patch('B', box(5, 5))
+    const c = patch('C', box(8, 8))
+    const d = patch('D', box(80, 80))
+    expect(overlappingPatches([a, b, d, c]).map((pair) => pair.map((p) => p.title))).toEqual([
+      ['A', 'B'],
+      ['A', 'C'],
+      ['B', 'C'],
+    ])
+  })
+  it('ignores a patch with no chosen area on the take in the game', () => {
+    expect(overlappingPatches([patch('A', box(0, 0)), patch('B', null)])).toEqual([])
   })
 })

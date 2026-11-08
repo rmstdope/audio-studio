@@ -82,6 +82,11 @@ interface Options {
   gameTake?: number
   choices?: Record<string, number[]>
   imageTakes?: number[]
+  /** The area each patch's chosen take was made with, by patch id then take of the image. */
+  patchAreas?: Record<
+    string,
+    Record<number, { x: number; y: number; width: number; height: number }>
+  >
 }
 
 function summary(options: Options = {}): ProjectSummary {
@@ -129,6 +134,7 @@ function summary(options: Options = {}): ProjectSummary {
     ),
     look: lookOf(style),
     ...(options.choices ? { patchChoices: { inn: options.choices } } : {}),
+    ...(options.patchAreas ? { patchAreas: { inn: options.patchAreas } } : {}),
     ...(options.imageTakes ? { imageTakes: { inn: options.imageTakes } } : {}),
   })
   return { images } as unknown as ProjectSummary
@@ -1035,6 +1041,42 @@ describe('the patches the game asks for', () => {
     it('has no chip or line once the patch has a chosen take on the take in the game', () => {
       const page = render(image, settled({ choices: { 'lamp-lit': [2, 4] } }))
       expect(page.querySelector('.game-patch-row .chip-warn')).toBeNull()
+    })
+  })
+
+  describe('chosen patches that overlap', () => {
+    const actRoute = { view: 'images', page: 'act', part: 'act1' } as const
+    const at = (x: number) => ({ x, y: 0, width: 10, height: 10 })
+    const settled = (patchAreas: NonNullable<Options['patchAreas']>) =>
+      summary({
+        patches: [lamp, door],
+        chosen: { inn: summary().images!.acts[0]!.rows[0]!.madeFrom },
+        gameTake: 4,
+        imageTakes: [4],
+        choices: { 'lamp-lit': [4], 'door-ajar': [4] },
+        patchAreas,
+      })
+
+    it('names the pair on the act’s row, and changes no figure', () => {
+      const page = render(
+        actRoute,
+        settled({ 'lamp-lit': { 4: at(0) }, 'door-ajar': { 4: at(5) } }),
+      )
+      const row = page.querySelector('tbody tr')!
+      expect(text(row.querySelector('.images-prompt .chg'))).toBe(
+        'patches overlap: Lamp lit and Door ajar',
+      )
+      expect([...row.querySelectorAll('.images-status .chip')].map((c) => c.textContent)).toEqual([
+        'chosen',
+      ])
+      expect(text(page.querySelector('.page-header .muted'))).toContain('1 of 2 chosen')
+    })
+    it('has no line when the areas only share a border', () => {
+      const page = render(
+        actRoute,
+        settled({ 'lamp-lit': { 4: at(0) }, 'door-ajar': { 4: at(10) } }),
+      )
+      expect(page.querySelector('.images-prompt .chg')).toBeNull()
     })
   })
 

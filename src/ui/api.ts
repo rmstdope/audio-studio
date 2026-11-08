@@ -1674,6 +1674,8 @@ function usePatchTakesChange<Input>(
   imageId: string,
   patchId: string,
   request: (input: Input) => { path: string; method: string; body?: unknown },
+  /** Whether the change alters which takes are chosen, so the images rows reload too. */
+  choice = false,
 ) {
   const client = useQueryClient()
   return useMutation({
@@ -1693,7 +1695,12 @@ function usePatchTakesChange<Input>(
       }
       return (await response.json()) as NonNullable<ImagePatchAnswer>
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+    // The rows of the images pages say which patch takes are chosen (and overlap), so they reload too.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+        ...(choice ? [client.invalidateQueries({ queryKey: ['project'] })] : []),
+      ]),
   })
 }
 
@@ -1708,27 +1715,42 @@ export function useMakePatchTakes(imageId: string, patchId: string) {
 
 /** Chooses a take of a patch. */
 export function useChoosePatchTake(imageId: string, patchId: string) {
-  return usePatchTakesChange<number>(imageId, patchId, (n) => ({
-    path: '/choose',
-    method: 'POST',
-    body: { n },
-  }))
+  return usePatchTakesChange<number>(
+    imageId,
+    patchId,
+    (n) => ({
+      path: '/choose',
+      method: 'POST',
+      body: { n },
+    }),
+    true,
+  )
 }
 
 /** Takes back a patch's chosen take. */
 export function useUnchoosePatchTake(imageId: string, patchId: string) {
-  return usePatchTakesChange<void>(imageId, patchId, () => ({
-    path: '/unchoose',
-    method: 'POST',
-  }))
+  return usePatchTakesChange<void>(
+    imageId,
+    patchId,
+    () => ({
+      path: '/unchoose',
+      method: 'POST',
+    }),
+    true,
+  )
 }
 
 /** Takes a take off a patch's board. */
 export function useDropPatchTake(imageId: string, patchId: string) {
-  return usePatchTakesChange<number>(imageId, patchId, (n) => ({
-    path: `/takes/${n}`,
-    method: 'DELETE',
-  }))
+  return usePatchTakesChange<number>(
+    imageId,
+    patchId,
+    (n) => ({
+      path: `/takes/${n}`,
+      method: 'DELETE',
+    }),
+    true,
+  )
 }
 
 /** Stops the patch's takes (the one being made and those waiting). */

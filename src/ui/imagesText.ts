@@ -272,3 +272,29 @@ export function refusal(answer: unknown): string | null {
     ? answer.message
     : 'That could not be done.'
 }
+
+/** The heading of the warning on an image's page: the pair when there is one, else a shorter line above the list. */
+export function overlapHeading(pairs: readonly [string, string][]): string {
+  return pairs.length === 1
+    ? `Two chosen patches overlap: ${overlapPairLine(pairs[0]!)}.`
+    : 'Some chosen patches overlap.'
+}
+
+/** One overlapping pair, earlier patch first. */
+export function overlapPairLine(pair: readonly [string, string]): string {
+  return `${pair[0]} and ${pair[1]}`
+}
+
+/** What the warning on an image's page says under its heading. */
+export const OVERLAP_EXPLANATION =
+  'If the game shows both at once, one is drawn over the other where they meet.'
+
+/** The line at the top of an open patch whose chosen take overlaps these patches. */
+export function overlapOpenLine(titles: string[]): string {
+  return `The chosen take overlaps ${joined(titles)}.`
+}
+
+/** The line in an image's Prompt cell on an act's page naming every overlapping pair. */
+export function overlapActLine(pairs: readonly [string, string][]): string {
+  return `patches overlap: ${pairs.map(overlapPairLine).join('; ')}`
+}
