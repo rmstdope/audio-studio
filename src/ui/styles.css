@@ -5094,6 +5094,15 @@ button.cue-chip[aria-expanded='true'] {
 .named-area-switches {
   grid-area: switches;
 }
+.named-areas-body.has-place-again {
+  grid-template-areas:
+    'picture again'
+    'picture list'
+    'switches list';
+}
+.place-again-line {
+  grid-area: again;
+}
 .named-areas-picture {
   position: sticky;
   top: 12px;
@@ -5290,6 +5299,13 @@ button.cue-chip[aria-expanded='true'] {
     grid-template-areas:
       'picture'
       'switches'
+      'list';
+  }
+  .named-areas-body.has-place-again {
+    grid-template-areas:
+      'picture'
+      'switches'
+      'again'
       'list';
   }
 }

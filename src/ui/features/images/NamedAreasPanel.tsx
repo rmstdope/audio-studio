@@ -308,7 +308,7 @@ export function NamedAreasPanel({
           {failure}
         </p>
       )}
-      <div className="named-areas-body">
+      <div className={`named-areas-body${again.length > 0 ? ' has-place-again' : ''}`}>
         <div className="named-areas-picture">
           {ready && view?.take ? (
             <>
