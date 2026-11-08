@@ -673,11 +673,18 @@ describe('areas to place again', () => {
     expect(line.nextElementSibling?.classList.contains('named-area-list')).toBe(true)
     // The picture is clean: only the box of the take in the game shows.
     expect(boxes(host)).toHaveLength(1)
+    // The body's class gives the line its own grid cell above the list, in the right column.
+    expect(host.querySelector('.named-areas-body')?.classList.contains('has-place-again')).toBe(
+      true,
+    )
   })
 
   it('has no line while nothing reads Place again', async () => {
     const { host } = await render([placedAt('a', box), area('b')], { chosenTake: 4 })
     expect(note(host)).toBeUndefined()
+    expect(host.querySelector('.named-areas-body')?.classList.contains('has-place-again')).toBe(
+      false,
+    )
   })
 
   it('says the singular words for one, and names every earlier take', async () => {
