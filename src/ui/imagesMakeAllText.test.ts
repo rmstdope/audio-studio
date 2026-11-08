@@ -3,6 +3,7 @@ import {
   busyLine,
   chosenLine,
   disagreeLine,
+  nothingToMakeDisagreeLine,
   makeAllHeading,
   makeAllLine,
   readyLine,
@@ -53,6 +54,12 @@ describe('the words of make-all on the Images page', () => {
       "Smugglers' cave gets none: the game's lists disagree about it.",
     )
     expect(disagreeLine(['A', 'B'])).toBe("A and B get none: the game's lists disagree about them.")
+    expect(nothingToMakeDisagreeLine(['A'])).toBe(
+      "No takes can be made for A: the game's lists disagree about it.",
+    )
+    expect(nothingToMakeDisagreeLine(['A', 'B'])).toBe(
+      "No takes can be made for A and B: the game's lists disagree about them.",
+    )
   })
 
   it('says what is being made and how it ended', () => {

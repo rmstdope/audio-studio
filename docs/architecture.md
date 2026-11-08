@@ -1622,7 +1622,10 @@ are made. The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.h
 button, "Make 4 takes each", beside the count. `planImagesMakeAll` (`src/core/imagesMakeAll.ts`)
 decides: every image with no chosen take (an out-of-date chosen image counts as chosen) that is not
 already making takes gets four, on Setup's model, or on the other one when Setup's is not whole or
-failed its last take (`defaultTakeModel`, as an image's own page does). The press always asks first,
+failed its last take (`defaultTakeModel`, as an image's own page does). With nothing to make, the
+panel says "Every image has a chosen take.", or, when the game's lists disagree about some of the
+act's images, names those instead, since they have no chosen take (as-3u3); the line under the act's
+heading counts them too. The press always asks first,
 inside the panel, and writes nothing until Make. `POST /api/image-acts/:id/make-all` plans again on
 the server and queues the takes through `make` per image (one refusal stops those already queued), answering the images and takes it queued;
 `POST /api/image-acts/:id/stop` stops every take of the act's images and answers how many;

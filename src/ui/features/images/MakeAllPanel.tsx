@@ -15,6 +15,7 @@ import {
   disagreeLine,
   makeAllHeading,
   makeAllLine,
+  nothingToMakeDisagreeLine,
   readyLine,
   runningLine,
   summaryFailed,
@@ -166,7 +167,13 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
       </div>
     )
   } else if (plan?.kind === 'all-chosen') {
-    action = <span className="muted">Every image has a chosen take.</span>
+    action = (
+      <span className="muted">
+        {act.conflicts.length > 0
+          ? nothingToMakeDisagreeLine(act.conflicts.map((c) => c.title))
+          : 'Every image has a chosen take.'}
+      </span>
+    )
   } else if (plan?.kind === 'not-ready') {
     action = (
       <div className="make-all-line">
