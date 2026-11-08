@@ -141,7 +141,7 @@ const MATCH_SAMPLES = 400
 /**
  * The offset to take as the drift around the area: of the tones that many places agree on (within
  * `MATCH_SAME` on every channel; any group at least a quarter as big as the biggest), the one
- * nearest `anchor`, the median offset of the whole picture, as the median of that group, or the anchor itself when that group is more than `MATCH_FOLLOW` from it. The whole
+ * nearest `anchor`, the median offset of the whole picture, as the median of that group, or the anchor itself when that group is more than `MATCH_FOLLOW` from it and some place in the strip is within `MATCH_FOLLOW` of the anchor. The whole
  * picture is mostly untouched by the edit, so its median is the drift even where objects cover most
  * of the strip around the area, and among tones that are about equally common (a gradual drift) it
  * keeps the middle one instead of an end.
@@ -164,8 +164,14 @@ function driftAround(offsets: [number, number, number][], anchor: number[]): num
       best = centre
     }
   }
-  // A tone far from the picture's own median is objects, not drift.
-  return [0, 1, 2].every((c) => Math.abs(best[c]! - anchor[c]!) <= MATCH_FOLLOW) ? best : anchor
+  if ([0, 1, 2].every((c) => Math.abs(best[c]! - anchor[c]!) <= MATCH_FOLLOW)) return best
+  // A tone far from the picture's own median is objects, not drift, when places in the strip do
+  // agree with that median. When none does, the edit changed all of what lies around the area (a
+  // sky shifted while the rest of the picture stayed) and the strip's own tone is the drift.
+  const supported = sample.some((o) =>
+    [0, 1, 2].every((c) => Math.abs(o[c]! - anchor[c]!) <= MATCH_FOLLOW),
+  )
+  return supported ? anchor : best
 }
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */

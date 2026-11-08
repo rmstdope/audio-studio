@@ -246,6 +246,33 @@ describe('matchToTake', () => {
     }
   })
 
+  it('meets the take at the sides when the edit shifted the sky far while the rest of the picture stayed the same', () => {
+    const flat = plain(300, 300, [100, 140, 150])
+    const bounds = { x: 50, y: 20, width: 150, height: 60 }
+    // Sky above y=100 is paler by (22, 48, 60) in the edit; the house below is unchanged; dark birds cover a share of the strip.
+    for (const share of [0, 3, 6]) {
+      const edited = painted(300, 300, (x, y) => {
+        if (y >= 100) return [100, 140, 150]
+        const ring =
+          x >= 42 && x < 208 && y >= 12 && y < 88 && !(x >= 50 && x < 200 && y >= 20 && y < 80)
+        return ring && (x >= 50 && x < 200 ? x : y) % 10 < share ? [10, 10, 15] : [122, 188, 210]
+      })
+      const matched = matchToTake(edited, flat, bounds)
+      for (const [x, y] of [
+        [60, 79],
+        [100, 50],
+        [140, 79],
+        [51, 50],
+        [198, 40],
+        [120, 21],
+      ] as const) {
+        for (const [i, v] of rgbAt(matched, x, y).entries()) {
+          expect(Math.abs(v - [100, 140, 150][i]!)).toBeLessThanOrEqual(6)
+        }
+      }
+    }
+  })
+
   it('meets the take at every side when the drift changes gradually across the area', () => {
     const flat = plain(300, 300, [100, 140, 150])
     const bounds = { x: 50, y: 50, width: 200, height: 100 }
