@@ -21,7 +21,7 @@ import { useImagePatchCompare, useImagePatches, useSetImagePatchWords } from '..
 import { patchRowId, RemakeLine } from './RemakeLine'
 import { rowFailed, rowMaking } from '../../remakeText'
 import { PatchWorkbench } from './PatchWorkbench'
-import { WordsField } from './WordsField'
+import { WordsField, type SaveWordsNow } from './WordsField'
 
 /**
  * One open patch: the notice when the game changed its words under the user's, then the field of
@@ -68,14 +68,7 @@ function PatchBody({
   const save = useSetImagePatchWords(imageId, patch.id)
   const compare = useImagePatchCompare(imageId, patch.id)
   const field = useRef<HTMLTextAreaElement>(null)
-  // The save under way, set the moment the field is left: a press of Make comes before any render.
-  const saving = useRef<Promise<boolean> | null>(null)
-  const trackSaving = (saved: Promise<boolean>) => {
-    saving.current = saved
-    void saved.then(() => {
-      if (saving.current === saved) saving.current = null
-    })
-  }
+  const saveNow = useRef<SaveWordsNow>(null)
   const settle = (choice: 'keep' | 'game') =>
     compare.mutate(choice, {
       onSuccess: (result) => {
@@ -140,7 +133,7 @@ function PatchBody({
         save={save}
         onSaved={onSaved}
         onEdit={onEdit}
-        onSaving={trackSaving}
+        saveNow={saveNow}
         inputRef={field}
       />
       {patch.changed && <span className="muted">The game&apos;s words: {patch.description}</span>}
@@ -156,7 +149,7 @@ function PatchBody({
           view={view}
           work={work}
           words={words}
-          wordsSaving={() => saving.current}
+          saveWords={() => saveNow.current?.() ?? null}
           mark={mark}
           onMark={onMark}
           onBackToArea={onBackToArea}

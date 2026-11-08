@@ -164,7 +164,7 @@ export function PatchWorkbench({
   view,
   work,
   words,
-  wordsSaving,
+  saveWords,
   mark,
   onMark,
   onBackToArea,
@@ -179,8 +179,8 @@ export function PatchWorkbench({
   work: PatchWorkView
   /** The patch's field of words. */
   words: ReactNode
-  /** The save of the field of words under way, which says whether it was saved; null with none. */
-  wordsSaving: () => Promise<boolean> | null
+  /** Sees the field of words saved: whether it was, or null with nothing to save. */
+  saveWords: () => Promise<boolean> | null
   /** The mark the person made their own; none starts the patch from its named area, if it has one. */
   mark: PatchArea | null
   onMark: (area: PatchArea) => void
@@ -588,9 +588,9 @@ export function PatchWorkbench({
               // goes to the take looked at in the grid, so ← and → keep stepping it.
               focusQuietly.current = true
               setPendingFocus(lookingAt ?? 'heading')
-              const saving = wordsSaving()
+              const saving = saveWords()
               if (saving === null) return make.mutate({ count, area: marked })
-              // Pressing Make left the words field, and the takes must be made from what it saved.
+              // The takes are made from the saved words, so they must be the words in the field.
               setWaitingForWords(true)
               void saving.then((saved) => {
                 setWaitingForWords(false)

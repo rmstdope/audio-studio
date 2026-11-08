@@ -1104,6 +1104,30 @@ describe('Make pressed straight after typing the words (as-d3b)', () => {
     expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
   })
 
+  it('tries the words again on the next press, and makes takes only once they are saved', async () => {
+    const answers = [false, false, true]
+    const { host, sent, release } = await typedAndLeft(() => {
+      const ok = answers.shift()!
+      return Response.json(
+        ok
+          ? { ok }
+          : { ok, problems: [{ file: 'edits.json', path: 'words', message: 'Too long' }] },
+      )
+    })
+    await act(async () => release())
+    await settle()
+    expect(sent.map((s) => s.method)).toEqual(['PATCH'])
+    // Focus has moved off the field, so this press leaves nothing and only Make can save the words.
+    await act(async () => button(host, 'Make 2 takes')!.click())
+    await settle()
+    expect(sent.map((s) => s.method)).toEqual(['PATCH', 'PATCH'])
+    expect(text(host)).toContain('Too long')
+    await act(async () => button(host, 'Make 2 takes')!.click())
+    await settle()
+    expect(sent.map((s) => s.method)).toEqual(['PATCH', 'PATCH', 'PATCH', 'POST'])
+    expect(sent[2]!.body).toEqual({ words: 'snowy winter night' })
+  })
+
   it('makes nothing when the save itself failed', async () => {
     const { host, sent, release } = await typedAndLeft(() => new Response('', { status: 500 }))
     await act(async () => release())

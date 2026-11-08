@@ -1,10 +1,16 @@
 import type { UseMutationResult } from '@tanstack/react-query'
-import { useId, useState, type Ref } from 'react'
+import { useId, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import type { ImageEditResult } from '../../../services/imageEdits'
 import { Problems } from '../../components/Problems'
 
 /** The save of a field of the user's own words: `useSetImageWords`, `useSetStyleField` or `useSetEffectDescription`. */
 export type WordsSave = UseMutationResult<NonNullable<ImageEditResult>, Error, string | null>
+
+/**
+ * Sees the field's words saved before something that reads them: answers whether they were, once
+ * the save under way or begun now is over, or null when there is nothing to save.
+ */
+export type SaveWordsNow = () => Promise<boolean> | null
 
 /**
  * A field of the user's own words over the game's: labelled "from the game", or "changed here ·
@@ -19,7 +25,7 @@ export function WordsField({
   save,
   onSaved,
   onEdit,
-  onSaving,
+  saveNow,
   inputRef,
   failTitle = 'Could not be saved',
 }: {
@@ -32,8 +38,8 @@ export function WordsField({
   onSaved: () => void
   /** The person began changing the field. */
   onEdit: () => void
-  /** A save began: what it hands over says, once it is over, whether the words were saved. */
-  onSaving?: (saved: Promise<boolean>) => void
+  /** Filled with the way to see the words saved. */
+  saveNow?: Ref<SaveWordsNow>
   inputRef?: Ref<HTMLTextAreaElement>
   /** The heading over the problems a failed save reports. */
   failTitle?: string
@@ -41,6 +47,8 @@ export function WordsField({
   const id = useId()
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? words
+  // Set the moment the field is left: a press that left it comes before any render.
+  const saving = useRef<Promise<boolean> | null>(null)
   const send = (value: string | null) => {
     const saved = save
       .mutateAsync(value, {
@@ -54,13 +62,21 @@ export function WordsField({
         (result) => result.ok,
         () => false,
       )
-    onSaving?.(saved)
+    saving.current = saved
+    void saved.then(() => {
+      if (saving.current === saved) saving.current = null
+    })
+    return saved
   }
   const leave = () => {
-    if (draft === null) return
-    if (draft.trim() === words) return setDraft(null)
-    send(draft.trim() === '' ? null : draft)
+    if (draft === null) return null
+    if (draft.trim() === words) {
+      setDraft(null)
+      return null
+    }
+    return send(draft.trim() === '' ? null : draft)
   }
+  useImperativeHandle(saveNow, () => () => saving.current ?? leave())
   return (
     <div className="brief-field">
       <div className="brief-field-head">
