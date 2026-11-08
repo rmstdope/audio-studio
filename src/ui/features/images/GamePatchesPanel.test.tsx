@@ -184,6 +184,38 @@ describe('GamePatchesPanel', () => {
     })
   })
 
+  it('settles with either button, keeps the patch open and moves focus to its field', async () => {
+    const changed = patch('door-ajar', {
+      changed: true,
+      gameChanged: true,
+      words: 'My door',
+      gameWas: 'Old',
+    })
+    const { host, sent } = await render([changed])
+    await act(async () => host.querySelector<HTMLButtonElement>('.btn:not(.btn-primary)')!.click())
+    for (let i = 0; i < 3; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
+    expect(sent[0]).toEqual({
+      method: 'POST',
+      path: '/api/images/inn/game-patches/door-ajar/compare',
+      body: { choice: 'game' },
+    })
+    expect(rowButtons(host)[0]!.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(host.querySelector('textarea'))
+  })
+
+  it('reports a compare that could not be saved', async () => {
+    const { host } = await render(
+      [patch('door-ajar', { changed: true, gameChanged: true, words: 'Mine', gameWas: 'Old' })],
+      {
+        status: 409,
+        body: { ok: false, problems: [{ file: 'edits.json', path: '', message: 'nope' }] },
+      },
+    )
+    await act(async () => host.querySelector<HTMLButtonElement>('.btn-primary')!.click())
+    for (let i = 0; i < 3; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
+    expect(text(host.querySelector('.notice'))).toContain('nope')
+  })
+
   it('reports a failed save under that patch’s field', async () => {
     const { host } = await render([patch('bread-taken')], {
       status: 409,

@@ -5036,6 +5036,10 @@ button.cue-chip[aria-expanded='true'] {
   text-align: left;
   cursor: pointer;
 }
+.game-patch-row b,
+.game-patch-row .mono {
+  overflow-wrap: anywhere;
+}
 .game-patch-chev {
   width: 14px;
   color: var(--faint);

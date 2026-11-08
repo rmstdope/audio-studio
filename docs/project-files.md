@@ -508,7 +508,7 @@ and `key` (`null` for none).
 | `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`).   | the first part that lists it |
 
 The studio reads the style and each image's edit apart. A bad `images.<id>` (say, `text` without
-`gameWas`) drops only that image's edit, and the image shows the game's words; a bad `style` is
+`gameWas`, or a patch's edit without its `gameWas`) drops only that image's edit (all of it), and the image shows the game's words; a bad `style` is
 taken as none, and the rewordings are kept. Each is shown as a problem at its path. While any part
 of the file cannot be read, the studio refuses every save to it, so nothing in it is lost.
 

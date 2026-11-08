@@ -893,7 +893,7 @@ describe('the patches the game asks for', () => {
     })
     expect(resolvePatchCompare(mine, 'inn', 'lamp-lit', 'game', 'new').images).toEqual({})
   })
-  it('reads a patch edit apart: one without gameWas drops only that edit', () => {
+  it('a patch edit without gameWas drops that image’s edit, and no other image’s', () => {
     const read = readImageEditsValue(
       {
         images: {

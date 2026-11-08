@@ -1423,14 +1423,14 @@ start on. It is saved from the Images row of Setup's Models panel (`PUT /api/ima
 `manifest` what the game reads there. Both are required.
 
 **The game's lists** (read only, `core/images.ts`). `from.part` holds an act's images in the game's
-order: `{ id, title, text, width, height, file? }`; `text` is what the studio calls the image's
+order: `{ id, title, text, width, height, file?, patches? }`; `text` is what the studio calls the image's
 **description**, in its pages, its API and its code. `file` is the picture the game shows for it now
 when the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or
 `.webp`; read only, never moved or written, shown as "The game's own image" until a take is chosen);
 the id a slug. `patches` (as-bo8.1) is the optional list of small changes the game lays over the
 image: `[{ id, title, text }]` in the game's order, `text` read as `description` as for the image.
 A patch with no id (a slug), title or words, or an id used twice in the image, makes the whole act's
-list unreadable, with the file and place named. An id used twice in one list is a problem with both places, and neither image is
+list unreadable, with the file and place named. An image id used twice in one list is a problem with both places, and neither image is
 shown. An id several acts list (as-94e) is one image, below. A list that is not there yet is not a
 problem (the game has not written it).
 
@@ -1487,7 +1487,7 @@ the first listing act's order). A rewording changes no prompt or take: it never 
 of date. Refresh's panel says nothing of patches. Screens: `docs/ui/as-bo8.1-image-patches.html`.
 
 **The studio's own words** are the edits' `images`, committed like the music edits and joining the
-Changes panel: `{ <id>: { text, gameWas, partStyle } }`. `gameWas` is the game's text when the words
+Changes panel: `{ <id>: { text, gameWas, partStyle, patches } }`. `gameWas` is the game's text when the words
 were written; a game description that differs from it raises the compare notice (**Keep mine** moves
 `gameWas`, **Use the game's** removes the words). Emptied words, or the game's own typed back, remove
 them; an edit left with nothing is removed. The edits are written with the style first (its keys in
