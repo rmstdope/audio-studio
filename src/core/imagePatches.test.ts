@@ -381,7 +381,10 @@ describe('patchSummary', () => {
         { n: 3, chosen: false },
       ]),
     ).toEqual({ text: '3 takes', chip: 'Take 1 chosen' })
-    expect(patchSummary([{ n: 4, chosen: true }])).toEqual({ text: '1 take', chip: 'Take 4 chosen' })
+    expect(patchSummary([{ n: 4, chosen: true }])).toEqual({
+      text: '1 take',
+      chip: 'Take 4 chosen',
+    })
   })
 })
 

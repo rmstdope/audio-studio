@@ -19,9 +19,9 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
-import type { ImagePatchesView, PatchArea } from '../core/imagePatches'
+import type { ImagePatchesView } from '../core/imagePatches'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
-import type { ImagePatchAnswer } from '../services/imagePatches'
+import type { ImagePatchAnswer, PatchMakeRequest } from '../services/imagePatches'
 import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
 import type {
@@ -1647,7 +1647,7 @@ function useImageTakesChange<Input>(
   })
 }
 
-/** The patches of an image's chosen take; polled while one is being made. */
+/** The patches the game asks for on an image, with their takes on its chosen take; polled while any is being made. */
 export function useImagePatches(imageId: string) {
   return useQuery({
     queryKey: ['image-patches', imageId],
@@ -1657,28 +1657,89 @@ export function useImagePatches(imageId: string) {
       ),
     refetchInterval: (query) => {
       const view = query.state.data
-      return view && 'making' in view && view.making ? 1000 : false
+      return view && 'patches' in view && view.patches.some((p) => p.making.length > 0)
+        ? 1000
+        : false
     },
   })
 }
 
-/** Asks for a patch of an image's chosen take: the marked area and what should change there. */
-export function useMakeImagePatch(imageId: string) {
+/**
+ * A change to a patch's takes: sends `request` to the patch's route, answers what the server said
+ * (a refusal is an answer, not an error), then reloads the image's patches.
+ */
+function usePatchTakesChange<Input>(
+  imageId: string,
+  patchId: string,
+  request: (input: Input) => { path: string; method: string; body?: unknown },
+) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (body: { area: PatchArea; instruction: string }) => {
-      const response = await fetch(`/api/images/${encodeURIComponent(imageId)}/patches`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+    mutationFn: async (input: Input) => {
+      const { path, method, body } = request(input)
+      const response = await fetch(
+        `/api/images/${encodeURIComponent(imageId)}/patches/${encodeURIComponent(patchId)}${path}`,
+        {
+          method,
+          ...(body === undefined
+            ? {}
+            : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+        },
+      )
       if (!response.ok && response.status !== 409) {
-        throw new Error(`making the patch answered ${response.status}`)
+        throw new Error(`changing the patch's takes answered ${response.status}`)
       }
       return (await response.json()) as NonNullable<ImagePatchAnswer>
     },
     onSettled: () => client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
   })
+}
+
+/** Asks for takes of a patch: new ones of a marked area, or a failed one again. */
+export function useMakePatchTakes(imageId: string, patchId: string) {
+  return usePatchTakesChange<PatchMakeRequest>(imageId, patchId, (body) => ({
+    path: '/takes',
+    method: 'POST',
+    body,
+  }))
+}
+
+/** Chooses a take of a patch. */
+export function useChoosePatchTake(imageId: string, patchId: string) {
+  return usePatchTakesChange<number>(imageId, patchId, (n) => ({
+    path: '/choose',
+    method: 'POST',
+    body: { n },
+  }))
+}
+
+/** Takes back a patch's chosen take. */
+export function useUnchoosePatchTake(imageId: string, patchId: string) {
+  return usePatchTakesChange<void>(imageId, patchId, () => ({
+    path: '/unchoose',
+    method: 'POST',
+  }))
+}
+
+/** Takes a take off a patch's board. */
+export function useDropPatchTake(imageId: string, patchId: string) {
+  return usePatchTakesChange<number>(imageId, patchId, (n) => ({
+    path: `/takes/${n}`,
+    method: 'DELETE',
+  }))
+}
+
+/** Stops the patch's takes (the one being made and those waiting). */
+export function useStopPatchTakes(imageId: string, patchId: string) {
+  return usePatchTakesChange<void>(imageId, patchId, () => ({ path: '/stop', method: 'POST' }))
+}
+
+/** Records that a take of a patch has been laid over the picture once. */
+export function useMarkPatchTakeSeen(imageId: string, patchId: string) {
+  return usePatchTakesChange<number>(imageId, patchId, (n) => ({
+    path: `/takes/${n}/seen`,
+    method: 'POST',
+  }))
 }
 
 /** Asks for takes of an image (new ones, or a failed one again). */

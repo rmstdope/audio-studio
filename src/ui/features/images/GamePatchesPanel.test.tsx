@@ -37,6 +37,16 @@ async function render(
 ) {
   const sent: { method: string; path: string; body: unknown }[] = []
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
+    // The takes of the patches are PatchWorkbench.test's; here there is nothing to patch on.
+    if (path === '/api/images/inn/patches') {
+      return Response.json({
+        ok: true,
+        take: null,
+        pictureGone: false,
+        maker: { ok: true },
+        patches: [],
+      })
+    }
     sent.push({
       method: init?.method ?? 'GET',
       path,
