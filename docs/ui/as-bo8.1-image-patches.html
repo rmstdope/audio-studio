@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>The game's patches on an image's page</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/8%);
+        --line-strong: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --ok: #3ddc97;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .intro {
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .state {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 22px 0 -6px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .panel h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .panel p {
+        margin: 0;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .saved {
+        color: var(--ok);
+        font-size: 12px;
+      }
+      .rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--line);
+      }
+      .rows > li {
+        border-bottom: 1px solid var(--line);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 2px;
+        width: 100%;
+        background: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+      }
+      .chev {
+        color: var(--faint);
+        width: 14px;
+      }
+      .row b {
+        font-weight: 600;
+      }
+      .row .tag {
+        margin-left: auto;
+      }
+      .tag {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .tag.ch {
+        color: var(--warn);
+      }
+      .tag a {
+        color: var(--warn);
+      }
+      .body {
+        padding: 0 2px 14px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .cards {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .fh {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      textarea {
+        width: 100%;
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        color: var(--text);
+        font: inherit;
+        padding: 9px 11px;
+        resize: vertical;
+      }
+      .notice {
+        border-radius: 11px;
+        padding: 12px;
+        display: flex;
+        gap: 14px;
+        justify-content: space-between;
+        background: var(--warn-bg);
+        border: 1px solid rgb(255 194 75/30%);
+      }
+      .notice strong {
+        color: var(--warn);
+      }
+      .notice.err {
+        background: var(--danger-bg);
+        border-color: rgb(255 148 168/30%);
+      }
+      .notice.err strong {
+        color: var(--danger-ink);
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        flex: none;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 6px 12px;
+        font: inherit;
+      }
+      .btn.p {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border: 0;
+        font-weight: 600;
+      }
+      .cmp {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .ro {
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 9px 11px;
+        color: var(--soft);
+      }
+      .crumbs {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      h1.t {
+        margin: 2px 0;
+        font-size: 24px;
+      }
+      .bench {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .ph {
+        background: repeating-linear-gradient(
+          45deg,
+          #191c24,
+          #191c24 10px,
+          #14161d 10px,
+          #14161d 20px
+        );
+        border-radius: 9px;
+        min-height: 120px;
+        display: grid;
+        place-items: center;
+        color: var(--faint);
+      }
+      .dim {
+        opacity: 0.55;
+      }
+      .new {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+      .chip {
+        font-size: 11px;
+        border-radius: 99px;
+        padding: 1px 8px;
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      @media (max-width: 700px) {
+        .cmp,
+        .bench {
+          grid-template-columns: 1fr;
+        }
+        .notice {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>The game's patches on an image's page</h1>
+        <p>The agreed drawing: a list of titles that open, in its own panel below the takes.</p>
+      </div>
+      <div class="state">
+        The image's page: the panel sits below the takes, the trial below it, renamed
+      </div>
+      <div>
+        <span class="crumbs">Images › Act 1</span>
+        <h1 class="t">Elior's cottage</h1>
+        <span class="mono muted">elior-cottage</span>
+      </div>
+      <div class="bench">
+        <section class="panel">
+          <h2>Prompt</h2>
+          <div class="ph">the words of the image</div>
+        </section>
+        <section class="panel">
+          <h2>Takes</h2>
+          <div class="ph">the takes</div>
+        </section>
+      </div>
+      <section class="panel">
+        <div class="head"><h2>Patches the game asks for</h2></div>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <section class="panel dim">
+        <h2>Try a patch of your own</h2>
+        <p class="muted">
+          Drag over the chosen take to mark an area, then say what should change there. An
+          experiment: nothing here reaches the game.
+        </p>
+        <div class="ph">the chosen take, the marked area, Make patch</div>
+      </section>
+      <div class="state">One opened, reworded and saved</div>
+      <section class="panel">
+        <div class="head">
+          <h2>Patches the game asks for</h2>
+          <span class="saved">Saved</span>
+        </div>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+            <div class="body">
+              <div class="fh">
+                <span class="label">What should change</span><span class="tag">from the game</span>
+              </div>
+              <textarea rows="2">Remove the bread from the table</textarea>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        A patch you have reworded (closed once you leave it, the row keeps its mark)
+      </div>
+      <section class="panel">
+        <div class="head"><h2>Patches the game asks for</h2></div>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span><span class="tag ch">changed here</span>
+            </button>
+            <div class="body">
+              <div class="fh">
+                <span class="label">What should change</span
+                ><span class="tag ch">changed here · <a href="#">use the game's</a></span>
+              </div>
+              <textarea rows="2">Take the loaf off the table, leave only crumbs</textarea
+              ><span class="muted">The game's words: Remove the bread from the table</span>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        The game changed the words of a patch you reworded: it opens by itself
+      </div>
+      <section class="panel">
+        <div class="head"><h2>Patches the game asks for</h2></div>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▾</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span
+              ><span class="tag ch">the game changed its words</span>
+            </button>
+            <div class="body">
+              <div class="notice">
+                <div>
+                  <strong>The game changed this patch's words since you wrote your own.</strong>
+                  <div class="cmp">
+                    <div>
+                      <span class="label">Your words (used now)</span>
+                      <div class="ro">Take the loaf off the table, leave only crumbs</div>
+                    </div>
+                    <div>
+                      <span class="label">The game's new words</span>
+                      <div class="ro">Remove the bread and the knife from the table</div>
+                      <span class="muted">Before: Remove the bread from the table</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="acts">
+                  <button class="btn">Use the game's</button
+                  ><button class="btn p">Keep mine</button>
+                </div>
+              </div>
+              <div class="fh">
+                <span class="label">What should change</span
+                ><span class="tag ch">changed here · <a href="#">use the game's</a></span>
+              </div>
+              <textarea rows="2">Take the loaf off the table, leave only crumbs</textarea>
+            </div>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">
+        A very long title and id wrap; a narrow window stacks the two sets of words in the notice
+      </div>
+      <section class="panel">
+        <div class="head"><h2>Patches the game asks for</h2></div>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▸</span
+              ><b
+                >The bread and the two cups taken away by the steward after the second visit to the
+                cottage</b
+              ><span class="mono muted">bread-and-cups-taken-after-second-visit</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">No take chosen yet: the list is the same, the trial is not there</div>
+      <section class="panel">
+        <div class="head"><h2>Patches the game asks for</h2></div>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Bread taken</b
+              ><span class="mono muted">bread-taken</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">The game listed no patches</div>
+      <section class="panel dim">
+        <p class="muted">
+          An image the game lists with no patches: this panel is not on the page at all, and the
+          page looks exactly as it does today.
+        </p>
+      </section>
+      <div class="state">
+        The game stopped asking for a patch: it leaves the list, your words come back if the game
+        asks again
+      </div>
+      <section class="panel">
+        <div class="head"><h2>Patches the game asks for</h2></div>
+        <p class="muted">Small changes the game lays over this image when it needs them.</p>
+        <ul class="rows">
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Door ajar</b><span class="mono muted">door-ajar</span>
+            </button>
+          </li>
+          <li>
+            <button class="row">
+              <span class="chev">▸</span><b>Fire out</b><span class="mono muted">fire-out</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+      <div class="state">An image shared between acts whose patches differ: only this page</div>
+      <div>
+        <span class="crumbs">Images › Act 1</span>
+        <h1 class="t">Elior's cottage</h1>
+        <span class="mono muted">elior-cottage</span>
+      </div>
+      <div class="notice err">
+        <div>
+          <strong
+            >The game's lists disagree about this image: Act 1 and Act 2 give it different patches.
+            Fix them in the game, then Refresh from the game.</strong
+          >
+        </div>
+      </div>
+      <div class="state">The act's list, when the game changed a patch's words</div>
+      <section class="panel">
+        <h2>Act 1</h2>
+        <table style="width: 100%; border-collapse: collapse">
+          <tr class="muted">
+            <td>Image</td>
+            <td>Prompt</td>
+            <td>Status</td>
+          </tr>
+          <tr>
+            <td>
+              <b>Elior's cottage</b>
+              <div class="mono muted">elior-cottage</div>
+            </td>
+            <td>
+              A low stone cottage, bread on the table
+              <div class="tag ch">the game changed a patch's words</div>
+            </td>
+            <td><span class="chip">out of date</span></td>
+          </tr>
+        </table>
+      </section>
+    </div>
+  </body>
+</html>
