@@ -47,23 +47,41 @@ const view = (over: Partial<ImagePatchesView> = {}): ImagePatchesView => ({
   ...over,
 })
 
+/** A patch of the image as the row titles it and the patches query lists its takes. */
+interface ListedPatch {
+  id: string
+  title: string
+  takes: { n: number; chosen: boolean }[]
+}
+
+/** A patch's view, its takes with every field the page reads. */
+const patchView = (patch: ListedPatch): ImagePatchesView['patches'][number] => ({
+  id: patch.id,
+  takes: patch.takes.map(({ n, chosen }) => ({
+    n,
+    chosen,
+    area: { x: 0, y: 0, width: 10, height: 10 },
+    earlier: false,
+    isNew: false,
+    look: 'ready' as const,
+  })),
+  making: [],
+  failed: [],
+  oldLook: false,
+})
+
 interface Options {
   answer?: ImagePatchesView | (() => Promise<Response>)
   saved?: { status: number; body: unknown }
-  chosenPatches?: { id: string; title: string; src: string }[]
+  /** Patches the game lists on the image, with their takes on its chosen take. */
+  patches?: ListedPatch[]
   chosenTake?: number | null
 }
 
 /** Renders the panel for an image of 320 x 200 with these areas; gives what was saved. */
 async function render(areas: AreaRow[], options: Options = {}) {
   // Chosen patches reach the panel as the page gives them: titles in the row, takes in the query.
-  const chosenViews = (options.chosenPatches ?? []).map((patch) => ({
-    id: patch.id,
-    takes: [{ n: 7, chosen: true }],
-    making: [],
-    failed: [],
-    oldLook: false,
-  })) as unknown as ImagePatchesView['patches']
+  const chosenViews = (options.patches ?? []).map(patchView)
   const puts: { path: string; body: { box: AreaBox | null } }[] = []
   const saved = options.saved ?? { status: 200, body: { ok: true } }
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -85,7 +103,7 @@ async function render(areas: AreaRow[], options: Options = {}) {
       height: 200,
       areas: now,
       chosenTake,
-      patches: (options.chosenPatches ?? []).map((p) => ({ id: p.id, title: p.title })),
+      patches: (options.patches ?? []).map((p) => ({ id: p.id, title: p.title })),
     } as ImageRow
     await act(async () => {
       root.render(
@@ -531,10 +549,8 @@ describe('the named areas panel', () => {
     })
 
     it('reaches the rows, the Clear button, then the patch switches, by Tab', async () => {
-      const patches = [
-        { id: 'p1', title: 'Bread taken', src: '/api/images/inn/patches/p1/takes/7' },
-      ]
-      const { host } = await render([placedAt('a', box)], { chosenPatches: patches })
+      const patches = [{ id: 'p1', title: 'Bread taken', takes: [{ n: 7, chosen: true }] }]
+      const { host } = await render([placedAt('a', box)], { patches })
       await act(async () => mainOf(host, 0).click())
       const order = [...host.querySelectorAll('button, input')].filter(
         (e) => !(e as HTMLButtonElement).disabled,
@@ -634,8 +650,8 @@ describe('the named areas panel', () => {
 
   describe('the chosen patches', () => {
     const patches = [
-      { id: 'p1', title: 'Bread taken', src: '/api/images/inn/patches/p1/takes/7' },
-      { id: 'p2', title: 'Lamp lit', src: '/api/images/inn/patches/p2/takes/7' },
+      { id: 'p1', title: 'Bread taken', takes: [{ n: 7, chosen: true }] },
+      { id: 'p2', title: 'Lamp lit', takes: [{ n: 7, chosen: true }] },
     ]
 
     it('has no switches and no heading without chosen patches', async () => {
@@ -644,8 +660,39 @@ describe('the named areas panel', () => {
       expect(host.querySelector('input[type=checkbox]')).toBeNull()
     })
 
+    it('has a switch only for a patch with a chosen take, laying that take over', async () => {
+      const { host } = await render([area('a')], {
+        patches: [
+          {
+            id: 'p1',
+            title: 'Bread taken',
+            takes: [
+              { n: 1, chosen: false },
+              { n: 3, chosen: true },
+            ],
+          },
+          { id: 'p2', title: 'Lamp lit', takes: [{ n: 2, chosen: false }] },
+          { id: 'p3', title: 'No takes', takes: [] },
+        ],
+      })
+      const labels = [...host.querySelectorAll('.named-area-switch')].map((l) => l.textContent)
+      expect(labels).toEqual(['Bread taken'])
+      await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
+      expect(host.querySelector<HTMLImageElement>('img.named-area-patch')!.src).toContain(
+        '/api/images/inn/patches/p1/takes/3',
+      )
+    })
+
+    it('has no switch for a patch the query does not list', async () => {
+      const { host } = await render([area('a')], {
+        answer: view({ patches: [] }),
+        patches: [{ id: 'p1', title: 'Bread taken', takes: [{ n: 7, chosen: true }] }],
+      })
+      expect(host.querySelector('input[type=checkbox]')).toBeNull()
+    })
+
     it('has a switch per patch, all off, that lays the patch over the picture', async () => {
-      const { host } = await render([area('a'), area('b')], { chosenPatches: patches })
+      const { host } = await render([area('a'), area('b')], { patches })
       expect(host.querySelector('.named-area-switches')!.textContent).toContain(
         'Show on the picture:',
       )
@@ -659,7 +706,7 @@ describe('the named areas panel', () => {
     })
 
     it('stays as left while moving between areas', async () => {
-      const { host } = await render([area('a'), area('b')], { chosenPatches: patches })
+      const { host } = await render([area('a'), area('b')], { patches })
       await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
       await act(async () => mainOf(host, 1).click())
       expect(host.querySelectorAll('img.named-area-patch').length).toBe(1)

@@ -20,8 +20,8 @@ import {
   placeAgainLine,
 } from '../../imagesText'
 
-/** A patch the game has chosen for an image, which can be laid over the picture for looking. */
-export interface ChosenPatch {
+/** A patch with a chosen take on the image's take, which can be laid over the picture for looking. */
+interface ChosenPatch {
   id: string
   title: string
   /** Where the patch's picture is. */
@@ -87,7 +87,8 @@ function placedStyle(box: AreaBox, row: { width: number; height: number }) {
  * the list of areas. One area is selected at a time; dragging on the picture draws its box, a drag
  * inside it moves it, on a handle resizes it, and the arrow keys nudge it. Every change is saved as
  * it is made, shown at once and taken back if saving fails. Nothing here reaches the game. Nothing
- * on the page when the game names none. The patches chosen on the image's take can be laid over the picture for looking.
+ * on the page when the game names none. The patches chosen on the image's take can be laid over
+ * the picture for looking.
  */
 export function NamedAreasPanel({ row }: { row: ImageRow }) {
   const picture = useImagePatches(row.id).data

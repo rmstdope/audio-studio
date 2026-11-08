@@ -1507,8 +1507,8 @@ and taken back with a red line if saving fails. A box is `{ x, y, width, height 
 image's own size (at least 4 each way, inside the picture), kept in the image's edit as
 `areas.<area id>` (`applyAreaBox`, `checkAreaBox`; sorted by id), so one set serves a shared image
 and a box survives the game dropping the area and asking for it again. `AreaRow.box` and `placed`
-come from it. The pure geometry is `ui/imageAreaBox.ts`. The patches with a chosen take on the image (read by the panel from the patches query) can be laid
-over the picture by switches, for looking only. **Reaching the game** (as-qg4.3,
+come from it. The pure geometry is `ui/imageAreaBox.ts`. The patches with a chosen take on the image (read by the panel from the patches query) can be
+laid over the picture by switches, for looking only. **Reaching the game** (as-qg4.3,
 `services/imageAreas.ts` `syncImageAreas`): a placed box is written for the game in the same save as the
 box, as `areas.<area id>: { x, y, width, height }` in the image's images-manifest entry, fractions of
 the picture (six decimals; no title; `areaFractions`, `withAreas`). Only the areas the game asks for
