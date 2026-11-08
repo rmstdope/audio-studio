@@ -33,21 +33,32 @@ export function isCropped(from: LookSize, to: LookSize): boolean {
   return from.width * to.height !== from.height * to.width
 }
 
+/** The part of a picture of size `src` that bringing it to `size` keeps: the target's shape, whole pixels, the middle. */
+export function cropWindow(
+  src: LookSize,
+  size: LookSize,
+): { x: number; y: number; width: number; height: number } {
+  let width = src.width
+  let height = src.height
+  if (src.width * size.height > src.height * size.width) {
+    width = Math.max(1, Math.floor((src.height * size.width) / size.height))
+  } else {
+    height = Math.max(1, Math.floor((src.width * size.height) / size.width))
+  }
+  return {
+    x: Math.floor((src.width - width) / 2),
+    y: Math.floor((src.height - height) / 2),
+    width,
+    height,
+  }
+}
+
 /**
  * The picture cropped to the target's shape (the middle kept) and scaled to exactly `size`: each
  * new pixel is the average of the source area it covers, so the result never depends on the machine.
  */
 export function fitToSize(src: Pixels, size: LookSize): Pixels {
-  // The source window with the target's shape: whole pixels, the middle kept.
-  let cw = src.width
-  let ch = src.height
-  if (src.width * size.height > src.height * size.width) {
-    cw = Math.max(1, Math.floor((src.height * size.width) / size.height))
-  } else {
-    ch = Math.max(1, Math.floor((src.width * size.height) / size.width))
-  }
-  const x0 = Math.floor((src.width - cw) / 2)
-  const y0 = Math.floor((src.height - ch) / 2)
+  const { x: x0, y: y0, width: cw, height: ch } = cropWindow(src, size)
   const out = new Uint8Array(size.width * size.height * 4)
   for (let y = 0; y < size.height; y++) {
     const sy0 = y0 + (y * ch) / size.height

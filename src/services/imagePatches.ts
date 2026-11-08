@@ -1,11 +1,13 @@
 import { rm } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { imageModel } from '../core/imageModels'
+import { isCropped } from '../core/imagePixels'
+import { ImageLockSchema } from '../core/images'
+import { ImageManifestSchema, type ImageManifest } from '../core/imageTakes'
 import {
   checkPatchArea,
   keepArea,
   matchToTake,
-  PatchBoardSchema,
   type ImagePatchesView,
   type PatchArea,
   type PatchBoard,
@@ -14,19 +16,26 @@ import {
 } from '../core/imagePatches'
 import type { PatchRow } from '../core/images'
 import { resolveInRoot } from '../core/paths'
-import { CACHE_DIR, type Problem } from '../core/project'
+import { IMAGES_LOCK_FILE } from '../core/project'
 import { readResource, writeAtomic } from './files'
 import { freeGpu, gpuQueue } from './gpu'
-import { IMAGE_TAKES_DIR, readImages } from './imageLists'
+import { IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
+import {
+  changePatchBoard,
+  patchBoardKey,
+  patchClipName,
+  patchFolder,
+  patchGameOf,
+  readPatchBoard,
+  renderPatchGame,
+} from './imagePatchGame'
 import { makeImageTake, type ImageGenerator } from './images'
 import { describeFailure } from './imageTakes'
-import { boardQueue, isSafeId } from './musicTakes'
+import { choices, sorted } from './musicClips'
+import { isSafeId } from './musicTakes'
 import { decodePng, encodeTransparentPng, pngSize } from './png'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
-
-/** The folder of a patch's takes: the studio's cache, never committed and never read by the game. */
-const patchFolder = (image: string, patch: string) => `${CACHE_DIR}/image-patches/${image}/${patch}`
 
 /** The model patches are made with, the one mflux can edit a picture with. */
 const EDIT_MODEL = 'klein'
@@ -64,6 +73,8 @@ export interface ImagePatches {
   markSeen(projectFile: string, id: string, patch: string, n: number): Promise<ImagePatchAnswer>
   /** The path of a take's picture, or null for a patch not listed or a name that is not a take's number. */
   takeFile(projectFile: string, id: string, patch: string, name: string): Promise<string | null>
+  /** The path of a take's game version, or null for a patch not listed, a bad number or a take not brought. */
+  gameFile(projectFile: string, id: string, patch: string, name: string): Promise<string | null>
 }
 
 /** A take waiting, being made, or failed, until it is made. */
@@ -106,7 +117,10 @@ export function createImagePatches({
   const shared = globalThis as { contentStudioPatchTakes?: Map<string, Map<number, Entry>> }
   // Kept across `--dev` reloads, as the takes being made are.
   const active = (shared.contentStudioPatchTakes ??= new Map())
-  const boards = boardQueue()
+  // Takes being brought to the look right now (`<patch key>\0<n>`), kept across `--dev` reloads.
+  const bringing = ((
+    globalThis as { contentStudioPatchBringing?: Set<string> }
+  ).contentStudioPatchBringing ??= new Set())
   /** Patches whose new takes are being checked and queued, so a second press at once is refused. */
   const starting = new Set<string>()
 
@@ -118,7 +132,17 @@ export function createImagePatches({
     const root = dirname(projectFile)
     const summary = await readImages(root, opened.project, [])
     const row = summary?.acts.flatMap((act) => act.rows).find((r) => r.id === id)
-    return row ? { projectFile, root, id, row, chosen: row.chosenTake } : null
+    if (!row) return null
+    const style = await readStyleLook(root)
+    return {
+      projectFile,
+      root,
+      id,
+      row,
+      chosen: row.chosenTake,
+      look: style.look,
+      config: opened.project.images,
+    }
   }
   type Image = Exclude<Awaited<ReturnType<typeof resolve>>, ProjectFailure | null>
 
@@ -126,9 +150,10 @@ export function createImagePatches({
   const patchOf = (image: Image, patch: PatchRow) => ({
     ...image,
     patch,
-    key: `${image.projectFile}\0${image.id}\0${patch.id}`,
+    key: patchBoardKey(image.projectFile, image.id, patch.id),
     folder: patchFolder(image.id, patch.id),
     board: `${patchFolder(image.id, patch.id)}/board.json`,
+    patchId: patch.id,
   })
 
   /** The image and one of the patches the game lists on it, or null / a failure. */
@@ -140,31 +165,26 @@ export function createImagePatches({
   }
   type Found = Exclude<Awaited<ReturnType<typeof resolvePatch>>, ProjectFailure | null>
 
-  async function readBoard(
-    found: Pick<Found, 'root' | 'board'>,
-  ): Promise<PatchBoard | ProjectFailure> {
-    const problems: Problem[] = []
-    const board = await readResource(found.root, found.board, PatchBoardSchema, problems)
-    if (board === 'missing') return { next: 1, takes: [], chosen: {} }
-    if (board === 'invalid') return { ok: false, file: found.board, problems }
-    return board
+  const readBoard = (found: Pick<Found, 'root' | 'id' | 'patchId'>) =>
+    readPatchBoard(found.root, found.id, found.patchId)
+
+  const changeBoard = <T>(
+    found: Pick<Found, 'projectFile' | 'root' | 'id' | 'patchId'>,
+    change: (board: PatchBoard) => T | Promise<T>,
+  ) =>
+    changePatchBoard(
+      { projectFile: found.projectFile, root: found.root, image: found.id, patch: found.patchId },
+      change,
+    )
+
+  /** The images manifest as it is: empty if there is none; null if it cannot be read. */
+  async function manifestNow(found: Pick<Found, 'root' | 'config'>): Promise<ImageManifest | null> {
+    const read = await readResource(found.root, found.config.manifest, ImageManifestSchema, [])
+    return read === 'invalid' ? null : read === 'missing' ? {} : read
   }
 
-  /** Reads the board in its turn, lets `change` alter it and writes it back if it differs. */
-  function changeBoard<T>(
-    found: Pick<Found, 'root' | 'board' | 'key'>,
-    change: (board: PatchBoard) => T | Promise<T>,
-  ): Promise<T | ProjectFailure> {
-    return boards.run(`patch\0${found.key}`, async () => {
-      const board = await readBoard(found)
-      if ('ok' in board) return board
-      const before = JSON.stringify(board, null, 2)
-      const answer = await change(board)
-      const after = JSON.stringify(board, null, 2)
-      if (after !== before) await writeAtomic(found.root, found.board, `${after}\n`)
-      return answer
-    })
-  }
+  const writeManifest = (found: Pick<Found, 'root' | 'config'>, manifest: ImageManifest) =>
+    writeAtomic(found.root, found.config.manifest, `${JSON.stringify(sorted(manifest), null, 2)}\n`)
 
   /** The image take's picture and size, or null when it is not there or is no picture. */
   async function takePicture(image: Image, n: number) {
@@ -193,6 +213,27 @@ export function createImagePatches({
 
   const entriesOf = (key: string) =>
     [...(active.get(key)?.values() ?? [])].sort((a, b) => a.n - b.n)
+
+  /** Brings a take just made to the look and notes it on the board; a take that cannot be stays as the model made it. */
+  async function bringTake(found: Found, n: number, base: number): Promise<void> {
+    const mark = `${found.key}\0${n}`
+    try {
+      const key = found.row.look.key
+      if (!key || !found.look) return
+      const made = await renderPatchGame(
+        { root: found.root, image: found.id, patch: found.patchId, base, n },
+        found.look,
+        found.row,
+      )
+      if ('error' in made) return
+      await changeBoard(found, (board) => {
+        const take = board.takes.find((t) => t.n === n)
+        if (take) take.look = key
+      })
+    } finally {
+      bringing.delete(mark)
+    }
+  }
 
   /** Edits the whole image take and saves the marked area as take `entry.n`. */
   async function run(
@@ -242,6 +283,8 @@ export function createImagePatches({
       }
       // The picture first: a take is on the board only once its file is there.
       await writeAtomic(found.root, `${found.folder}/${entry.n}.png`, png)
+      // Marked before it is on the board, so the page never sees it between made and brought.
+      bringing.add(`${found.key}\0${entry.n}`)
       const failure = await changeBoard(found, (board) => {
         if (stop.signal.aborted) return
         board.takes = [...board.takes.filter((t) => t.n !== saved.n), saved].sort(
@@ -249,11 +292,13 @@ export function createImagePatches({
         )
       })
       if (stop.signal.aborted || (failure && 'ok' in failure)) {
+        bringing.delete(`${found.key}\0${entry.n}`)
         await rm(resolveInRoot(found.root, `${found.folder}/${entry.n}.png`), { force: true })
         if (failure && 'ok' in failure) throw new Error(`${failure.file} cannot be used`)
         return
       }
       entries.delete(entry.n)
+      await bringTake(found, entry.n, entry.base)
     } catch (error) {
       if (stop.signal.aborted) return
       entry.state = 'failed'
@@ -344,17 +389,34 @@ export function createImagePatches({
         const board = await readBoard(found)
         if ('ok' in board) return board
         const chosen = image.chosen === null ? undefined : board.chosen[String(image.chosen)]
+        const key = image.row.look.key
+        const takes: PatchWorkView['takes'] = []
+        for (const t of board.takes.filter((t) => t.base === image.chosen)) {
+          takes.push({
+            n: t.n,
+            area: t.area,
+            earlier: t.words !== patch.words,
+            chosen: t.n === chosen,
+            isNew: !t.seen,
+            look: bringing.has(`${found.key}\0${t.n}`)
+              ? 'bringing'
+              : !(await Bun.file(
+                    resolveInRoot(image.root, patchGameOf(image.id, patch.id, t.n)),
+                  ).exists())
+                ? 'missing'
+                : t.look === key
+                  ? 'ready'
+                  : 'old',
+          })
+        }
+        const inGame = image.chosen === null ? undefined : board.inGame[String(image.chosen)]
         patches.push({
           id: patch.id,
-          takes: board.takes
-            .filter((t) => t.base === image.chosen)
-            .map((t) => ({
-              n: t.n,
-              area: t.area,
-              earlier: t.words !== patch.words,
-              chosen: t.n === chosen,
-              isNew: !t.seen,
-            })),
+          takes,
+          oldLook:
+            key !== null &&
+            inGame !== undefined &&
+            board.takes.find((t) => t.n === inGame)?.look !== key,
           making: entries
             .filter((e) => e.state !== 'failed')
             .map((e) => ({
@@ -370,9 +432,19 @@ export function createImagePatches({
         })
       }
       const problem = await makerProblem()
+      const lock = await readResource(image.root, IMAGES_LOCK_FILE, ImageLockSchema, [])
       return {
         ok: true,
-        take: picture && { n: image.chosen!, width: picture.width, height: picture.height },
+        take: picture && {
+          n: image.chosen!,
+          width: picture.width,
+          height: picture.height,
+          cropped: isCropped(picture, image.row),
+        },
+        game: { width: image.row.width, height: image.row.height },
+        lookError: image.row.look.error,
+        lookKey: image.row.look.key,
+        lockUnread: lock === 'invalid',
         pictureGone: image.chosen !== null && picture === null,
         maker: problem === null ? { ok: true } : { ok: false, message: problem },
         patches,
@@ -420,14 +492,72 @@ export function createImagePatches({
     async choose(projectFile, id, patch, n) {
       const found = await resolvePatch(projectFile, id, patch)
       if (!found || 'ok' in found) return found
-      const outcome = await changeBoard(found, (board): ImagePatchAnswer => {
+      return changeBoard(found, async (board): Promise<ImagePatchAnswer> => {
         const take = board.takes.find((t) => t.n === n)
         if (!take) return { ok: false, message: 'That take is not on the board.' }
+        if (take.base !== found.chosen) {
+          return { ok: false, message: 'That take was made on another take of the image.' }
+        }
+        const key = found.row.look.key
+        if (!key || !found.look) {
+          return { ok: false, message: found.row.look.error ?? "The game's look cannot be used." }
+        }
+        // The game gets the take brought to the look: the stored version, or made now when its look is old.
+        const stored =
+          take.look === key
+            ? await Bun.file(resolveInRoot(found.root, patchGameOf(id, patch, n)))
+                .bytes()
+                .catch(() => null)
+            : null
+        const png =
+          stored ??
+          (await renderPatchGame(
+            { root: found.root, image: id, patch, base: take.base, n },
+            found.look,
+            found.row,
+          ))
+        if ('error' in png) {
+          return {
+            ok: false,
+            message:
+              png.error === 'missing'
+                ? 'That take’s picture is gone, so it cannot be chosen.'
+                : `Take ${n} could not be brought to the game's look: ${png.error}`,
+          }
+        }
+        const answer = await choices().run(
+          `image-choice\0${projectFile}`,
+          async (): Promise<ImagePatchAnswer> => {
+            const manifest = await manifestNow(found)
+            if (!manifest) {
+              return {
+                ok: false,
+                message: `The game's picture for ${id} could not be changed: the images manifest could not be read. Nothing was changed.`,
+              }
+            }
+            const entry = manifest[id]
+            if (!entry) {
+              return {
+                ok: false,
+                message: `The game has no picture for ${id} yet. Choose a take of the image first.`,
+              }
+            }
+            const file = patchClipName(id, patch)
+            await writeAtomic(found.root, join(found.config.clips, file), png)
+            const listed = { ...(entry.patches as Record<string, unknown> | undefined) }
+            listed[patch] = { file, width: found.row.width, height: found.row.height }
+            manifest[id] = { ...entry, patches: sorted(listed) }
+            await writeManifest(found, manifest)
+            return { ok: true }
+          },
+        )
+        if (!answer || !answer.ok) return answer
         board.chosen[String(take.base)] = n
+        board.inGame[String(take.base)] = n
         take.seen = true
+        take.look = key
         return { ok: true }
       })
-      return outcome
     },
 
     async unchoose(projectFile, id, patch) {
@@ -435,10 +565,34 @@ export function createImagePatches({
       if (!found || 'ok' in found) return found
       if (found.chosen === null) return { ok: false, message: 'No take of the image is chosen.' }
       const base = String(found.chosen)
-      return changeBoard(found, (board): ImagePatchAnswer => {
+      return changeBoard(found, async (board): Promise<ImagePatchAnswer> => {
         if (!(base in board.chosen))
           return { ok: false, message: 'No take of this patch is chosen.' }
+        // The game first, the board last: pressing again finishes what stopped halfway.
+        const answer = await choices().run(
+          `image-choice\0${projectFile}`,
+          async (): Promise<ImagePatchAnswer> => {
+            const manifest = await manifestNow(found)
+            if (!manifest) return { ok: false, message: 'The images manifest could not be read.' }
+            const entry = manifest[id]
+            if (entry?.patches && patch in (entry.patches as Record<string, unknown>)) {
+              const { [patch]: _gone, ...rest } = entry.patches as Record<string, unknown>
+              const { patches: _all, ...others } = entry
+              manifest[id] = Object.keys(rest).length ? { ...others, patches: rest } : others
+              await writeManifest(found, manifest)
+            }
+            await rm(
+              resolveInRoot(found.root, join(found.config.clips, patchClipName(id, patch))),
+              {
+                force: true,
+              },
+            )
+            return { ok: true }
+          },
+        )
+        if (!answer || !answer.ok) return answer
         delete board.chosen[base]
+        delete board.inGame[base]
         return { ok: true }
       })
     },
@@ -457,6 +611,7 @@ export function createImagePatches({
       })
       if (!outcome || !('dropped' in outcome)) return outcome
       await rm(resolveInRoot(found.root, `${found.folder}/${n}.png`), { force: true })
+      await rm(resolveInRoot(found.root, patchGameOf(id, patch, n)), { force: true })
       return { ok: true }
     },
 
@@ -476,6 +631,14 @@ export function createImagePatches({
       const found = await resolvePatch(projectFile, id, patch)
       if (!found || 'ok' in found) return null
       const file = resolveInRoot(found.root, `${found.folder}/${name}.png`)
+      return (await Bun.file(file).exists()) ? file : null
+    },
+
+    async gameFile(projectFile, id, patch, name) {
+      if (!/^[1-9]\d*$/.test(name)) return null
+      const found = await resolvePatch(projectFile, id, patch)
+      if (!found || 'ok' in found) return null
+      const file = resolveInRoot(found.root, patchGameOf(id, patch, Number(name)))
       return (await Bun.file(file).exists()) ? file : null
     },
   }

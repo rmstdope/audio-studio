@@ -16,13 +16,16 @@ interface Box {
 
 /**
  * The marked area of a drag over a picture, in the pixels of the take it shows, stopping at the
- * picture's edges; null for a click, or for a drag too small to patch.
+ * picture's edges; null for a click, or for a drag too small to patch. A picture that is not
+ * the model's own (the game's version) gives its `unplace` to turn the area back into the model's pixels.
  */
 export function areaFromDrag(
   start: Point,
   end: Point,
   box: Box,
   take: { width: number; height: number },
+  unplace: (area: PatchArea) => PatchArea = (area) => area,
+  model: { width: number; height: number } = take,
 ): PatchArea | null {
   const along = (at: number, from: number, size: number, pixels: number) =>
     Math.round((Math.min(Math.max(at - from, 0), size) / size) * pixels)
@@ -36,7 +39,9 @@ export function areaFromDrag(
     width: Math.abs(x1 - x2),
     height: Math.abs(y1 - y2),
   }
-  return checkPatchArea(area, take) ? null : area
+  if (checkPatchArea(area, take)) return null
+  const marked = unplace(area)
+  return checkPatchArea(marked, model) ? null : marked
 }
 
 /** Whether two marked areas are the same box. */

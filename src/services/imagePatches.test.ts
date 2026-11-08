@@ -30,6 +30,8 @@ const LOCK = 'content-studio/images/lock.json'
 const TAKE = 'content-studio/cache/image-takes/inn/3.png'
 const FOLDER = 'content-studio/cache/image-patches/inn/door'
 const BOARD = `${FOLDER}/board.json`
+const MANIFEST = 'web/images/manifest.json'
+const gameManifest = { inn: { file: 'inn.png', width: 320, height: 200 } }
 
 const lock = {
   inn: {
@@ -56,6 +58,7 @@ function setup({
   makes = (request: ImageRequest) => fakePng(request.width, request.height, 1),
   queue = createSerial(),
   seeds = [11, 12, 13, 14, 15, 16, 17, 18],
+  manifest,
 }: {
   chosen?: boolean
   picture?: boolean
@@ -65,11 +68,14 @@ function setup({
   makes?: (request: ImageRequest) => Uint8Array
   queue?: Serial
   seeds?: number[]
+  /** The manifest as the game has it, in place of the one with the image alone. */
+  manifest?: unknown
 } = {}) {
   const root = tempRepo({
     'content-studio.json': projectJson({ images }),
     'tts/act1/images.json': [inn],
-    ...(chosen ? { [LOCK]: lock } : {}),
+    ...(chosen ? { [LOCK]: lock, [MANIFEST]: gameManifest } : {}),
+    ...(manifest === undefined ? {} : { [MANIFEST]: manifest }),
   })
   if (picture) writeTake(root, TAKE)
   const file = join(root, 'content-studio.json')
@@ -95,7 +101,8 @@ function setup({
     for (let i = 0; i < 400; i++) {
       const view = await patches.view(file, 'inn')
       if (!view || !('patches' in view)) throw new Error('no view')
-      if (!view.patches.find((p) => p.id === patch)?.making.length) return view
+      const mine = view.patches.find((p) => p.id === patch)
+      if (!mine?.making.length && !mine?.takes.some((t) => t.look === 'bringing')) return view
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
     throw new Error('the takes never finished')
@@ -127,14 +134,26 @@ describe('takes of a declared patch', () => {
     await patches.make(file, 'inn', 'door', { count: 1, area })
     expect(await work()).toEqual({
       id: 'door',
-      takes: [{ n: 1, area, earlier: false, chosen: false, isNew: true }],
+      takes: [{ n: 1, area, earlier: false, chosen: false, isNew: true, look: 'ready' }],
       making: [],
       failed: [],
+      oldLook: false,
     })
     expect(JSON.parse(readFileSync(join(root, BOARD), 'utf8'))).toEqual({
       next: 2,
-      takes: [{ n: 1, base: 3, seed: 11, words: 'the door is gone', area, seen: false }],
+      takes: [
+        {
+          n: 1,
+          base: 3,
+          seed: 11,
+          words: 'the door is gone',
+          area,
+          seen: false,
+          look: expect.any(String),
+        },
+      ],
       chosen: {},
+      inGame: {},
     })
     const file1 = await patches.takeFile(file, 'inn', 'door', '1')
     expect(file1).toBe(join(root, FOLDER, '1.png'))
@@ -376,7 +395,7 @@ describe('takes of a declared patch', () => {
     await patches.make(file, 'inn', 'door', { count: 1, area })
     await work()
     expect(readFileSync(join(root, LOCK), 'utf8')).toBe(before)
-    expect(existsSync(join(root, 'web/images/manifest.json'))).toBe(false)
+    expect(JSON.parse(readFileSync(join(root, MANIFEST), 'utf8'))).toEqual(gameManifest)
     expect(existsSync(join(root, 'web/images/inn.png'))).toBe(false)
   })
 
@@ -541,5 +560,176 @@ describe('choosing, un-choosing and dropping a take of a patch', () => {
     const view = (await patches.view(file, 'inn')) as ImagePatchesView
     expect(view.patches[0]).toMatchObject({ making: [], failed: [] })
     release()
+  })
+})
+
+const GAME_DIR = 'web/images'
+const manifestOf = (root: string) => JSON.parse(readFileSync(join(root, MANIFEST), 'utf8'))
+const GAME_PATCH = `${GAME_DIR}/inn.door.png`
+
+describe('the game version of a patch', () => {
+  it('is made with the take: a transparent picture at the size of the game, beside the take', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    const png = new Uint8Array(readFileSync(join(root, FOLDER, '1.game.png')))
+    expect(png[25]).toBe(6)
+    expect([decodePng(png).width, decodePng(png).height]).toEqual([320, 200])
+    expect(await patches.gameFile(file, 'inn', 'door', '1')).toBe(join(root, FOLDER, '1.game.png'))
+    expect(await patches.gameFile(file, 'inn', 'door', '9')).toBeNull()
+    expect(await patches.gameFile(file, 'inn', 'door', '../board')).toBeNull()
+  })
+
+  it('stays as the model made it when the style cannot be read, and says why', async () => {
+    const { root, file, patches, work } = setup()
+    mkdirSync(join(root, 'content-studio/images'), { recursive: true })
+    writeFileSync(join(root, 'content-studio/images/edits.json'), '{ nope')
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    const view = await work()
+    expect(view.takes[0]!.look).toBe('missing')
+    expect(existsSync(join(root, FOLDER, '1.game.png'))).toBe(false)
+    expect(((await patches.view(file, 'inn')) as ImagePatchesView).lookError).toContain(
+      "Can't bring this take to the game's look",
+    )
+  })
+
+  it('is removed with the take it belongs to', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 2, area })
+    await work()
+    await patches.drop(file, 'inn', 'door', 2)
+    expect(existsSync(join(root, FOLDER, '2.game.png'))).toBe(false)
+    expect(existsSync(join(root, FOLDER, '1.game.png'))).toBe(true)
+  })
+})
+
+describe('a chosen take of a patch reaches the game', () => {
+  it('puts a transparent picture beside the image and lists it under the image by patch id', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    expect(await patches.choose(file, 'inn', 'door', 1)).toEqual({ ok: true })
+    expect(manifestOf(root)).toEqual({
+      inn: {
+        ...gameManifest.inn,
+        patches: { door: { file: 'inn.door.png', width: 320, height: 200 } },
+      },
+    })
+    expect(readFileSync(join(root, GAME_PATCH))).toEqual(
+      readFileSync(join(root, FOLDER, '1.game.png')),
+    )
+    expect(JSON.parse(readFileSync(join(root, BOARD), 'utf8'))).toMatchObject({
+      chosen: { '3': 1 },
+      inGame: { '3': 1 },
+    })
+  })
+
+  it('replaces the picture at once when another take is chosen', async () => {
+    const { root, file, patches, work } = setup({
+      makes: (request) => fakePng(request.width, request.height, request.seed),
+    })
+    await patches.make(file, 'inn', 'door', { count: 2, area })
+    await work()
+    await patches.choose(file, 'inn', 'door', 1)
+    await patches.choose(file, 'inn', 'door', 2)
+    expect(readFileSync(join(root, GAME_PATCH))).toEqual(
+      readFileSync(join(root, FOLDER, '2.game.png')),
+    )
+    expect(Object.keys(manifestOf(root).inn.patches)).toEqual(['door'])
+  })
+
+  it('lists several patches of an image side by side, in patch id order', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'sign', { count: 1, area })
+    await work('sign')
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    await patches.choose(file, 'inn', 'sign', 1)
+    await patches.choose(file, 'inn', 'door', 1)
+    expect(Object.keys(manifestOf(root).inn.patches)).toEqual(['door', 'sign'])
+  })
+
+  it('keeps the other fields of the image’s entry, and every other image', async () => {
+    const { root, file, patches, work } = setup({
+      manifest: {
+        inn: { ...gameManifest.inn, extra: 1 },
+        yard: { file: 'yard.png', width: 1, height: 1 },
+      },
+    })
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    await patches.choose(file, 'inn', 'door', 1)
+    const manifest = manifestOf(root)
+    expect(manifest.inn.extra).toBe(1)
+    expect(manifest.yard).toEqual({ file: 'yard.png', width: 1, height: 1 })
+  })
+
+  it('changes nothing and says so when the manifest cannot be read', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    writeFileSync(join(root, MANIFEST), '{ nope')
+    expect(await patches.choose(file, 'inn', 'door', 1)).toMatchObject({ ok: false })
+    expect(readFileSync(join(root, MANIFEST), 'utf8')).toBe('{ nope')
+    expect(existsSync(join(root, GAME_PATCH))).toBe(false)
+    expect(JSON.parse(readFileSync(join(root, BOARD), 'utf8')).chosen).toEqual({})
+  })
+
+  it('refuses a take whose game version cannot be made, and leaves the game as it was', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    mkdirSync(join(root, 'content-studio/images'), { recursive: true })
+    writeFileSync(join(root, 'content-studio/images/edits.json'), '{ nope')
+    const answer = await patches.choose(file, 'inn', 'door', 1)
+    expect(answer).toMatchObject({ ok: false })
+    expect(existsSync(join(root, GAME_PATCH))).toBe(false)
+  })
+
+  it('refuses when the image is not in the game', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    writeFileSync(join(root, MANIFEST), '{}')
+    expect(await patches.choose(file, 'inn', 'door', 1)).toMatchObject({ ok: false })
+  })
+
+  it('takes the patch out of the game when it is un-chosen, and the take stays', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    await patches.choose(file, 'inn', 'door', 1)
+    expect(await patches.unchoose(file, 'inn', 'door')).toEqual({ ok: true })
+    expect(manifestOf(root)).toEqual(gameManifest)
+    expect(existsSync(join(root, GAME_PATCH))).toBe(false)
+    expect(JSON.parse(readFileSync(join(root, BOARD), 'utf8'))).toMatchObject({
+      chosen: {},
+      inGame: {},
+    })
+    expect((await work()).takes).toHaveLength(1)
+  })
+
+  it('finishes un-choosing when pressed again after the board could not be saved', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    await patches.choose(file, 'inn', 'door', 1)
+    // as if the game was cleared but the board was not: manifest entry gone already
+    writeFileSync(join(root, MANIFEST), JSON.stringify(gameManifest))
+    expect(await patches.unchoose(file, 'inn', 'door')).toEqual({ ok: true })
+    expect(JSON.parse(readFileSync(join(root, BOARD), 'utf8')).chosen).toEqual({})
+  })
+
+  it('does not put a choice made before the game got patches in the game', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    const board = JSON.parse(readFileSync(join(root, BOARD), 'utf8'))
+    writeFileSync(
+      join(root, BOARD),
+      JSON.stringify({ ...board, chosen: { '3': 1 }, inGame: undefined }),
+    )
+    expect((await work()).takes[0]!.chosen).toBe(true)
+    expect(manifestOf(root)).toEqual(gameManifest)
   })
 })

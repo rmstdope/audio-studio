@@ -26,6 +26,8 @@ function PatchBody({
   onBackToArea,
   tie,
   imageSize,
+  game,
+  onGame,
   onSaved,
   onEdit,
 }: {
@@ -41,6 +43,8 @@ function PatchBody({
   /** The named area the game ties the patch to, with its place; none for a patch with no tie. */
   tie: PatchTie | null
   imageSize: { width: number; height: number }
+  game: boolean
+  onGame: (on: boolean) => void
   onSaved: () => void
   onEdit: () => void
 }) {
@@ -129,6 +133,8 @@ function PatchBody({
           onBackToArea={onBackToArea}
           tie={tie}
           imageSize={imageSize}
+          game={game}
+          onGame={onGame}
         />
       ) : (
         words
@@ -153,6 +159,8 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const query = useImagePatches(row.id)
   // The marks the person made their own live here, not in the open patch, so closing and opening a row keeps them.
   const [marks, setMarks] = useState<Record<string, PatchArea>>({})
+  // The box "What the game gets" of each patch lives here too; every box is ticked when the page opens.
+  const [games, setGames] = useState<Record<string, boolean>>({})
   const view = query.data && 'patches' in query.data ? query.data : null
   const [open, setOpen] = useState(
     () => new Set(row.patches.filter((patch) => patch.gameChanged).map((patch) => patch.id)),
@@ -204,6 +212,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                     )}
                     {summary && <span className="game-patch-summary">{summary.text}</span>}
                     {summary?.chip && <span className="chip chip-ok">{summary.chip}</span>}
+                    {work?.oldLook && <span className="chip chip-warn">Old look</span>}
                   </span>
                 </span>
               </button>
@@ -218,6 +227,8 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   onBackToArea={() => setMarks(({ [patch.id]: _own, ...others }) => others)}
                   tie={tieOf(row, patch)}
                   imageSize={row}
+                  game={games[patch.id] ?? true}
+                  onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
                 />

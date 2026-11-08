@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { lookOf, type Look } from './imageLook'
 import { StyleSchema } from './images'
-import { bringToLook, fitToSize, isCropped, type Pixels } from './imagePixels'
+import { bringToLook, cropWindow, fitToSize, isCropped, type Pixels } from './imagePixels'
 
 /** A picture made of `colour(x, y)`. */
 function picture(
@@ -155,5 +155,24 @@ describe('colours', () => {
     const b = bringToLook(ramp, look({ palette: six }), { width: 20, height: 10 })
     expect(a.data).toEqual(b.data)
     for (let i = 3; i < a.data.length; i += 4) expect(a.data[i]).toBe(255)
+  })
+})
+
+describe('cropWindow', () => {
+  it('keeps the middle of a wider picture and all of its height', () => {
+    expect(cropWindow({ width: 1024, height: 640 }, { width: 100, height: 100 })).toEqual({
+      x: 192,
+      y: 0,
+      width: 640,
+      height: 640,
+    })
+  })
+  it('keeps the whole of a picture that has the target shape', () => {
+    expect(cropWindow({ width: 1024, height: 640 }, { width: 640, height: 400 })).toEqual({
+      x: 0,
+      y: 0,
+      width: 1024,
+      height: 640,
+    })
   })
 })

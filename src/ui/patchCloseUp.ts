@@ -10,6 +10,8 @@ export function closeUp(area: PatchArea, take: { width: number; height: number }
   const y = Math.max(0, Math.round(area.y - area.height * AROUND))
   const right = Math.min(take.width, Math.round(area.x + area.width * (1 + AROUND)))
   const bottom = Math.min(take.height, Math.round(area.y + area.height * (1 + AROUND)))
+  // An area wholly outside the picture (the game cuts off its edges) shows the whole picture.
+  if (right <= x || bottom <= y) return { x: 0, y: 0, width: take.width, height: take.height }
   return { x, y, width: right - x, height: bottom - y }
 }
 

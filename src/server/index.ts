@@ -1741,6 +1741,13 @@ export function startServer({
           return imageAnswer(await imagePatches.drop(projectFile, id, patch, Number(n)))
         }),
       },
+      '/api/images/:id/patches/:patch/takes/:n/game': {
+        GET: guard(async (request) => {
+          const { id, patch, n } = request.params
+          const file = await imagePatches.gameFile(projectFile, id, patch, n)
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
+      },
       '/api/images/:id/patches/:patch/takes/:n/seen': {
         POST: fromOwnPage(async (request) => {
           const { id, patch, n } = request.params

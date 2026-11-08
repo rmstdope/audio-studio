@@ -5507,6 +5507,7 @@ describe('the image patch routes', () => {
     'content-studio/images/lock.json': {
       inn: { take: 3, inputs: { text: 'a low inn', width: 320, height: 200 } },
     },
+    'web/images/manifest.json': { inn: { file: 'inn.png', width: 320, height: 200 } },
   })
   mkdirSync(join(root, 'content-studio/cache/image-takes/inn'), { recursive: true })
   writeFileSync(join(root, 'content-studio/cache/image-takes/inn/3.png'), fakePng(256, 256, 1))
@@ -5546,6 +5547,12 @@ describe('the image patch routes', () => {
     expect((await fetch(new URL('/api/images/inn/patches/door/takes/9', studio.url))).status).toBe(
       404,
     )
+    const game = await fetch(new URL('/api/images/inn/patches/door/takes/1/game', studio.url))
+    expect(game.status).toBe(200)
+    expect((await game.arrayBuffer()).byteLength).toBeGreaterThan(50)
+    expect(
+      (await fetch(new URL('/api/images/inn/patches/door/takes/9/game', studio.url))).status,
+    ).toBe(404)
     expect((await send('POST', '/door/takes/1/seen')).status).toBe(200)
     expect((await send('POST', '/door/choose', { n: 1 })).status).toBe(200)
     const refused = await send('DELETE', '/door/takes/1')

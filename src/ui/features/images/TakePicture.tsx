@@ -7,7 +7,7 @@ import { modelCaption, pictureRendering } from '../../imagesText'
 export type Showing = 'model' | 'game'
 
 /** A short stable tag of some text, to tell a picture's address from its address under another look. */
-function tag(text: string): string {
+export function tag(text: string): string {
   let hash = 0
   for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
   return hash.toString(36)

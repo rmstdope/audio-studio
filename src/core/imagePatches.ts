@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { AreaBox } from './images'
-import type { Pixels } from './imagePixels'
+import type { Look, LookSize } from './imageLook'
+import { bringToLook, type Pixels } from './imagePixels'
 
 /** How many pixels of a patch fade in from the edge of its marked area. */
 export const PATCH_FEATHER = 24
@@ -32,6 +33,8 @@ export const PatchTakeSchema = z.strictObject({
   area: PatchAreaSchema,
   /** It has been laid over the picture once; a take that has not shows "new". */
   seen: z.boolean().default(false),
+  /** What its game version (`<n>.game.png`) was brought to (`lookKey`); absent until it is. */
+  look: z.string().optional(),
 })
 
 /** One take of a patch. */
@@ -45,6 +48,11 @@ export const PatchBoardSchema = z.strictObject({
   next: z.number().int().positive().default(1),
   takes: z.array(PatchTakeSchema).default([]),
   chosen: z.record(z.string(), z.number().int().positive()).default({}),
+  /**
+   * The take of the patch the game gets on each take of the image: set by Choose, taken away by
+   * Un-choose. A choice made before the game got patches is in `chosen` only.
+   */
+  inGame: z.record(z.string(), z.number().int().positive()).default({}),
 })
 
 /** A patch's board. */
@@ -68,6 +76,11 @@ export interface PatchTakeView {
   chosen: boolean
   /** Not yet laid over the picture. */
   isNew: boolean
+  /**
+   * The game's version: brought to the look now, being brought, brought to another look, or not
+   * there (never brought, or its file is gone).
+   */
+  look: 'ready' | 'bringing' | 'old' | 'missing'
 }
 
 /** A take of a patch waiting or being made. */
@@ -94,13 +107,23 @@ export interface PatchWorkView {
   takes: PatchTakeView[]
   making: PatchMakingView[]
   failed: PatchFailedView[]
+  /** The patch is in the game, in another look than the style asks for now. */
+  oldLook: boolean
 }
 
 /** The patches of an image as the page shows them: those made on the take the game shows. */
 export interface ImagePatchesView {
   ok: true
   /** The chosen take the patches lie over and its size, or null when there is no picture of one to patch. */
-  take: { n: number; width: number; height: number } | null
+  take: { n: number; width: number; height: number; cropped: boolean } | null
+  /** The size the game shows the image at. */
+  game: { width: number; height: number }
+  /** Why the takes cannot be brought to the game's look (the style); null when they can. */
+  lookError: string | null
+  /** What the game's versions are brought to now (`lookKey`); null when the style cannot be used. */
+  lookKey: string | null
+  /** The images lock cannot be read, so which take of the image is chosen is not known. */
+  lockUnread: boolean
   /** Whether a take is chosen but its picture is missing or cannot be read. */
   pictureGone: boolean
   /** Whether takes of patches can be made on this computer, and why not if they cannot. */
@@ -457,4 +480,37 @@ export function markFromArea(
   const y2 = Math.min(take.height, Math.round((box.y + box.height) * sy) + PATCH_FEATHER)
   const mark = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 }
   return checkPatchArea(mark, take) ? null : mark
+}
+
+/**
+ * The patch as the game gets it: a transparent picture of the game's size that keeps only the dots
+ * the patch changes. The take with the patch painted in (the patch blended over it by its own
+ * transparency) and the take alone are both brought to the look, and a dot of the first that
+ * differs from the second is kept, fully solid; every other dot is fully transparent. The soft
+ * edge thus fades out in the look's own dither, and laid over the take's game version the result
+ * is exactly the painted take brought to the look.
+ */
+export function gamePatch(take: Pixels, patch: Pixels, look: Look, size: LookSize): Pixels {
+  const blended = new Uint8Array(take.data)
+  for (let i = 0; i < blended.length; i += 4) {
+    const a = patch.data[i + 3]! / 255
+    if (a === 0) continue
+    for (let c = 0; c < 3; c++) {
+      blended[i + c] = Math.round(take.data[i + c]! * (1 - a) + patch.data[i + c]! * a)
+    }
+  }
+  const before = bringToLook(take, look, size)
+  const after = bringToLook({ ...take, data: blended }, look, size)
+  const data = new Uint8Array(size.width * size.height * 4)
+  for (let i = 0; i < data.length; i += 4) {
+    if (
+      before.data[i] === after.data[i] &&
+      before.data[i + 1] === after.data[i + 1] &&
+      before.data[i + 2] === after.data[i + 2]
+    ) {
+      continue
+    }
+    data.set([after.data[i]!, after.data[i + 1]!, after.data[i + 2]!, 255], i)
+  }
+  return { width: size.width, height: size.height, data }
 }

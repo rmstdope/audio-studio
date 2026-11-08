@@ -32,7 +32,11 @@ const placedAt = (id: string, box: AreaBox, over: Partial<AreaRow> = {}) =>
 
 const view = (over: Partial<ImagePatchesView> = {}): ImagePatchesView => ({
   ok: true,
-  take: { n: 2, width: 1024, height: 640 },
+  take: { n: 2, width: 1024, height: 640, cropped: false },
+  game: { width: 640, height: 400 },
+  lookError: null,
+  lookKey: 'k',
+  lockUnread: false,
   pictureGone: false,
   maker: { ok: true },
   patches: [],

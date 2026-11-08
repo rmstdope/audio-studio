@@ -127,6 +127,14 @@ describe('the game’s look words', () => {
       head: 'Brought 9 of 14 images to the new look.',
       rest: "5 couldn't be: the model's picture for each is missing. Their old look stays until you make new takes.",
     })
+    expect(
+      bringFailureText(3, [
+        { reason: `the model's picture of its patch "Bread taken" is missing` },
+      ]),
+    ).toEqual({
+      head: 'Brought 2 of 3 images to the new look.',
+      rest: `1 couldn't be: the model's picture of its patch "Bread taken" is missing. Its old look stays until you make new takes.`,
+    })
   })
 })
 

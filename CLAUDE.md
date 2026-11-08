@@ -104,7 +104,9 @@ bundle breaks.
   same save as the box and on Refresh from the game; the entry keeps its other fields as they were.
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
-- The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock
+- The game reads `manifest.json`: keep its format exactly. For images that includes a chosen
+  patch's `<image>.<patch>.png` in the clips folder and `patches` under the image's entry, which
+  only add to the format. The studio's own state goes in the lock
   file and in the studio folder `content-studio/` beside the project file (a fixed name): its
   `.gitignore`, written at start when missing, keeps out `content-studio/cache/`, which holds the
   rest (the sound effects' takes in `content-studio/cache/effect-boards/` and

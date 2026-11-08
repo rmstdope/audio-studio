@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   checkPatchArea,
+  gamePatch,
   ChoosePatchTakeBody,
   keepArea,
   MakePatchTakesBody,
@@ -402,8 +403,27 @@ describe('the patch board and what is asked of it', () => {
     expect(PatchBoardSchema.parse(board).chosen).toEqual({ '3': 1 })
   })
 
+  it("keeps what is in the game and the look of a take's game version", () => {
+    const board = PatchBoardSchema.parse({
+      takes: [
+        {
+          n: 1,
+          base: 3,
+          seed: 1,
+          words: 'w',
+          area: { x: 0, y: 0, width: 9, height: 9 },
+          look: 'k',
+        },
+      ],
+      chosen: { '3': 1 },
+      inGame: { '3': 1 },
+    })
+    expect(board.takes[0]!.look).toBe('k')
+    expect(board.inGame).toEqual({ '3': 1 })
+  })
+
   it('starts empty', () => {
-    expect(PatchBoardSchema.parse({})).toEqual({ next: 1, takes: [], chosen: {} })
+    expect(PatchBoardSchema.parse({})).toEqual({ next: 1, takes: [], chosen: {}, inGame: {} })
   })
 
   it('asks for one to four new takes of an area, or a failed take again', () => {
@@ -447,5 +467,52 @@ describe('the mark a named area gives a patch', () => {
     expect(
       markFromArea({ x: 10, y: 10, width: 20, height: 20 }, size, { width: 640, height: 400 }),
     ).toEqual({ x: 0, y: 0, width: 20 * 2 + 20 + PATCH_FEATHER, height: 40 + 20 + PATCH_FEATHER })
+  })
+})
+
+describe('gamePatch', () => {
+  const look = {
+    colours: {
+      kind: 'palette' as const,
+      palette: [
+        [0, 0, 0],
+        [255, 255, 255],
+      ] as [number, number, number][],
+    },
+    dithering: 'patterned' as const,
+  }
+  const size = { width: 64, height: 64 }
+  const base = plain(128, 128, [0, 0, 0])
+  const paint = (area: { x: number; y: number; width: number; height: number }) =>
+    keepArea(plain(128, 128, [255, 255, 255]), area)
+
+  it('keeps only the dots that differ, each fully solid or fully transparent, in palette colours', () => {
+    const out = gamePatch(base, paint({ x: 32, y: 32, width: 64, height: 64 }), look, size)
+    expect(out.width).toBe(64)
+    let solid = 0
+    for (let i = 0; i < out.data.length; i += 4) {
+      const a = out.data[i + 3]!
+      expect(a === 0 || a === 255).toBe(true)
+      if (a === 255) {
+        solid++
+        expect([0, 255]).toContain(out.data[i]!)
+        expect(out.data[i]).toBe(out.data[i + 1]!)
+      }
+    }
+    expect(solid).toBeGreaterThan(0)
+    expect(solid).toBeLessThan(64 * 64)
+  })
+
+  it('is transparent where the area leaves the image alone', () => {
+    const out = gamePatch(base, paint({ x: 32, y: 32, width: 64, height: 64 }), look, size)
+    expect(alphaAt(out, 2, 2)).toBe(0)
+  })
+
+  it('shows no change when the area lies outside what the game shows', () => {
+    // a wide take cropped to a square: the sides are cut off
+    const wide = plain(256, 128, [0, 0, 0])
+    const edge = keepArea(plain(256, 128, [255, 255, 255]), { x: 0, y: 0, width: 32, height: 128 })
+    const out = gamePatch(wide, edge, look, size)
+    expect([...out.data].filter((_, i) => i % 4 === 3 && out.data[i] !== 0)).toEqual([])
   })
 })
