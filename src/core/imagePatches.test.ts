@@ -17,7 +17,7 @@ import {
   remakeCovered,
   setAsideQuestion,
 } from './imagePatches'
-import type { PatchRow } from './images'
+import type { AreaRow, PatchRow } from './images'
 import type { Pixels } from './imagePixels'
 
 /** A picture of one opaque colour. */
@@ -541,7 +541,11 @@ describe('patches set aside', () => {
   const door = patch('Door open', [1, 2])
   const lamp = patch('Lamp lit', [1])
   const well = patch('Well covered', [])
-  const row = (chosenTake: number | null, ...patches: PatchRow[]) => ({ chosenTake, patches })
+  const row = (chosenTake: number | null, ...patches: PatchRow[]) => ({
+    chosenTake,
+    patches,
+    areas: [] as AreaRow[],
+  })
 
   describe('makeAgainOf', () => {
     it('is the patches chosen on another take only, in the game’s order', () => {
@@ -572,6 +576,8 @@ describe('patches set aside', () => {
         leaving: ['Bread taken', 'Door open'],
         to: 4,
         returning: [],
+        leavingAreas: [],
+        returningAreas: 0,
       })
     })
     it('names what comes back on the take chosen', () => {
@@ -580,6 +586,8 @@ describe('patches set aside', () => {
         leaving: ['Bread taken'],
         to: 1,
         returning: ['Door open', 'Lamp lit'],
+        leavingAreas: [],
+        returningAreas: 0,
       })
     })
     it('asks nothing when what leaves comes back on the new take', () => {
@@ -591,6 +599,8 @@ describe('patches set aside', () => {
         leaving: ['Bread taken', 'Door open'],
         to: null,
         returning: [],
+        leavingAreas: [],
+        returningAreas: 0,
       })
     })
     it('leaves a patch out of the Drop question when it is chosen on the take in the game too', () => {
@@ -604,6 +614,8 @@ describe('patches set aside', () => {
         leaving: ['Bread taken', 'Door open'],
         to: null,
         returning: [],
+        leavingAreas: [],
+        returningAreas: 0,
       })
       expect(setAsideQuestion(row(4, bread, well), { kind: 'drop', n: 3 })).toBeNull()
     })
@@ -732,5 +744,98 @@ describe('planRemake', () => {
     const bad = { x: 1000, y: 0, width: 100, height: 100 }
     const plan = planRemake([{ ...base, id: 'a', mark: bad, earlier }], image, take)
     expect(plan.make[0]!.area).toEqual(earlier)
+  })
+})
+
+describe('named areas set aside', () => {
+  const box = { x: 1, y: 1, width: 10, height: 10 }
+  const area = (title: string, ...takes: number[]): AreaRow => ({
+    id: title.toLowerCase().replace(/ /g, '-'),
+    title,
+    placed: false,
+    box: null,
+    boxes: Object.fromEntries(takes.map((n) => [n, box])),
+    elsewhere: [],
+    elsewhereGone: false,
+  })
+  const well = area('Well', 2)
+  const gate = area('Gate', 1, 2)
+  const bell = area('Bell', 1)
+  const none = area('Notice')
+  const row = (chosenTake: number | null, areas: AreaRow[], patches: PatchRow[] = []) => ({
+    chosenTake,
+    patches,
+    areas,
+  })
+
+  it('asks nothing when the take in the game has no placed areas', () => {
+    expect(setAsideQuestion(row(4, [well, none]), { kind: 'choose', n: 2 })).toBeNull()
+    expect(setAsideQuestion(row(null, [well]), { kind: 'choose', n: 2 })).toBeNull()
+    expect(setAsideQuestion(row(4, [none]), { kind: 'unchoose' })).toBeNull()
+  })
+  it('names the areas that leave, in the game’s order, and counts those that come back', () => {
+    expect(setAsideQuestion(row(2, [well, none, gate, bell]), { kind: 'choose', n: 4 })).toEqual({
+      from: 2,
+      leaving: [],
+      to: 4,
+      returning: [],
+      leavingAreas: ['Well', 'Gate'],
+      returningAreas: 0,
+    })
+    expect(setAsideQuestion(row(2, [well, gate, bell]), { kind: 'choose', n: 1 })).toEqual({
+      from: 2,
+      leaving: [],
+      to: 1,
+      returning: [],
+      leavingAreas: ['Well'],
+      returningAreas: 2,
+    })
+  })
+  it('asks nothing when every area that leaves has a box on the new take too', () => {
+    expect(setAsideQuestion(row(2, [gate]), { kind: 'choose', n: 1 })).toBeNull()
+  })
+  it('asks on Un-choose with nothing coming back', () => {
+    expect(setAsideQuestion(row(2, [well, bell]), { kind: 'unchoose' })).toMatchObject({
+      from: 2,
+      to: null,
+      leavingAreas: ['Well'],
+      returningAreas: 0,
+    })
+  })
+  it('asks on Drop about the areas set aside on that take only', () => {
+    expect(setAsideQuestion(row(4, [well, gate, bell]), { kind: 'drop', n: 2 })).toMatchObject({
+      from: 2,
+      leavingAreas: ['Well', 'Gate'],
+    })
+    expect(setAsideQuestion(row(4, [well]), { kind: 'drop', n: 3 })).toBeNull()
+    // An area the take in the game has a box for is not set aside by dropping another take.
+    expect(setAsideQuestion(row(4, [area('Well', 2, 4)]), { kind: 'drop', n: 2 })).toBeNull()
+  })
+  it('puts patches and areas in one question', () => {
+    const bread: PatchRow = {
+      id: 'bread',
+      title: 'Bread taken',
+      description: '',
+      words: '',
+      changed: false,
+      gameChanged: false,
+      gameWas: null,
+      chosenOn: [2],
+      chosenOnGone: false,
+      chosenArea: null,
+    }
+    expect(setAsideQuestion(row(2, [well], [bread]), { kind: 'choose', n: 4 })).toEqual({
+      from: 2,
+      leaving: ['Bread taken'],
+      to: 4,
+      returning: [],
+      leavingAreas: ['Well'],
+      returningAreas: 0,
+    })
+    // Areas alone ask when only patches would come back.
+    expect(setAsideQuestion(row(2, [well], [bread]), { kind: 'unchoose' })).toMatchObject({
+      leaving: ['Bread taken'],
+      leavingAreas: ['Well'],
+    })
   })
 })

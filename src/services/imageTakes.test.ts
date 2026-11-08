@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { setImageWords } from './imageEdits'
+import { setImageAreaBox, setImageWords } from './imageEdits'
 import { readImages } from './imageLists'
 import { createImageTakes } from './imageTakes'
 import type { ImageModelId } from '../core/imageModels'
@@ -356,12 +356,105 @@ describe('choosing', () => {
       height: 200,
       areas,
     })
-    await takes.choose(file, 'inn', 2)
-    expect(JSON.parse(read('web/images/manifest.json')).inn.areas).toEqual(areas)
     await takes.unchoose(file, 'inn')
     expect(JSON.parse(read('web/images/manifest.json'))).toEqual({})
     await takes.choose(file, 'inn', 1)
     expect(JSON.parse(read('web/images/manifest.json')).inn.areas).toEqual(areas)
+  })
+
+  describe('the boxes of each take', () => {
+    const box = { x: 80, y: 50, width: 160, height: 100 }
+    const other = { x: 0, y: 0, width: 32, height: 20 }
+    const fountain = { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }
+    const withBox = () =>
+      made({
+        'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }],
+        [EDITS]: { style: STYLE, images: { inn: { areas: { fountain: box } } } },
+      })
+    const manifestAreas = (read: (p: string) => string) =>
+      JSON.parse(read('web/images/manifest.json')).inn?.areas
+
+    it('gives the game only the boxes of the take chosen, and gives them back with it', async () => {
+      const { takes, file, read } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      expect(manifestAreas(read)).toEqual({ fountain })
+      // The boxes of no take yet went onto the take that was in the game.
+      expect(JSON.parse(read(EDITS)).images.inn).toEqual({ takeAreas: { '1': { fountain: box } } })
+      expect(await takes.choose(file, 'inn', 2)).toEqual({ ok: true })
+      expect(manifestAreas(read)).toBeUndefined()
+      expect(JSON.parse(read(EDITS)).images.inn.takeAreas).toEqual({ '1': { fountain: box } })
+      expect(await takes.choose(file, 'inn', 1)).toEqual({ ok: true })
+      expect(manifestAreas(read)).toEqual({ fountain })
+    })
+
+    it('places a box on the take in the game and keeps the other take’s', async () => {
+      const { takes, file, read } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      await takes.choose(file, 'inn', 2)
+      expect(await setImageAreaBox(file, 'inn', 'fountain', other)).toEqual({ ok: true })
+      expect(manifestAreas(read)).toEqual({ fountain: { x: 0, y: 0, width: 0.1, height: 0.1 } })
+      expect(JSON.parse(read(EDITS)).images.inn.takeAreas).toEqual({
+        '1': { fountain: box },
+        '2': { fountain: other },
+      })
+      await takes.choose(file, 'inn', 1)
+      expect(manifestAreas(read)).toEqual({ fountain })
+    })
+
+    it('takes the boxes of no take yet along with the next take chosen', async () => {
+      const { takes, file, read } = await withBox()
+      await takes.choose(file, 'inn', 2)
+      expect(manifestAreas(read)).toEqual({ fountain })
+      expect(JSON.parse(read(EDITS)).images.inn).toEqual({ takeAreas: { '2': { fountain: box } } })
+    })
+
+    it('moves the boxes of no take yet onto the take in the game when it is un-chosen', async () => {
+      const { takes, file, read } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      // Boxes of no take yet, written by hand (or placed before takes kept their own).
+      const edits = JSON.parse(read(EDITS))
+      edits.images.inn = { areas: { fountain: box } }
+      writeFileSync(join(dirname(file), EDITS), JSON.stringify(edits))
+      expect(await takes.unchoose(file, 'inn')).toEqual({ ok: true })
+      expect(JSON.parse(read(EDITS)).images.inn).toEqual({ takeAreas: { '1': { fountain: box } } })
+    })
+
+    it('does not wait forever when a box is saved while the take is un-chosen', async () => {
+      const { takes, file } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      const both = Promise.all([
+        takes.unchoose(file, 'inn'),
+        setImageAreaBox(file, 'inn', 'fountain', other),
+      ])
+      const timeout = new Promise((resolve) => setTimeout(() => resolve('stuck'), 3000))
+      expect(await Promise.race([both, timeout])).not.toBe('stuck')
+    })
+
+    it('refuses Choose and Un-choose, changing nothing, when the edits cannot be read', async () => {
+      const { takes, file, read } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      writeFileSync(
+        join(dirname(file), EDITS),
+        JSON.stringify({ style: STYLE, images: { inn: { areas: { fountain: { x: 'a' } } } } }),
+      )
+      for (const answer of [
+        await takes.choose(file, 'inn', 2),
+        await takes.unchoose(file, 'inn'),
+      ]) {
+        expect(answer).toMatchObject({ ok: false })
+        expect(JSON.stringify(answer)).toContain('The named areas could not be kept')
+      }
+      expect(JSON.parse(read(LOCK)).inn.take).toBe(1)
+    })
+
+    it('keeps a dropped take’s boxes in the edits, its rows reading Place again with no take to name', async () => {
+      const { takes, file, read, row } = await withBox()
+      await takes.choose(file, 'inn', 1)
+      await takes.choose(file, 'inn', 2)
+      expect(await takes.drop(file, 'inn', 1)).toEqual({ ok: true })
+      expect(JSON.parse(read(EDITS)).images.inn.takeAreas).toEqual({ '1': { fountain: box } })
+      expect((await row()).areas[0]).toMatchObject({ placed: false, elsewhereGone: true })
+    })
   })
 
   it('accepts changed words and style: the chosen take counts as made from them, up to date again', async () => {

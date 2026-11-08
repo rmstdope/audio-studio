@@ -593,6 +593,139 @@ describe('patches set aside', () => {
   })
 })
 
+describe('named areas set aside', () => {
+  const box = { x: 1, y: 1, width: 10, height: 10 }
+  const area = (title: string, ...takes: number[]) => ({
+    id: title.toLowerCase().replace(/ /g, '-'),
+    title,
+    placed: takes.includes(2),
+    box: takes.includes(2) ? box : null,
+    boxes: Object.fromEntries(takes.map((n) => [n, box])),
+    elsewhere: [],
+    elsewhereGone: false,
+  })
+  const patch = (title: string, chosenOn: number[]) => ({
+    id: title.toLowerCase().replace(/ /g, '-'),
+    title,
+    description: '',
+    words: '',
+    changed: false,
+    gameChanged: false,
+    gameWas: null,
+    chosenOn,
+    chosenOnGone: false,
+    chosenArea: null,
+  })
+  const five = ['Bucket', 'Well', 'Cottage door', 'Old oak', 'Path north'].map((t) => area(t, 2))
+  const inGame = (
+    areas = five,
+    patches: ReturnType<typeof patch>[] = [],
+    answer: unknown = { ok: true },
+  ) =>
+    show(
+      view({ takes: [take(1), take(2, { chosen: true }), take(4)] }),
+      { chosenTake: 2, status: 'chosen', areas, patches },
+      undefined,
+      answer,
+    )
+  const q = (s: Awaited<ReturnType<typeof inGame>>) =>
+    s.container.querySelector('[role="alertdialog"]')
+  const items = (s: Awaited<ReturnType<typeof inGame>>) =>
+    [...q(s)!.querySelectorAll('li')].map((li) => li.textContent)
+
+  it('asks before Choose when areas are placed, naming them with no headings', async () => {
+    const s = await inGame()
+    await s.click(s.button('Choose'))
+    expect(s.calls).toHaveLength(0)
+    expect(s.container.querySelector('[data-side="left"] [role="alertdialog"]')).not.toBeNull()
+    expect(s.text()).toContain('Choose take 4?')
+    expect(s.text()).toContain(
+      '5 named areas are placed on take 2. The game will stop using them until you place them on take 4.',
+    )
+    expect(items(s)).toEqual(['Bucket', 'Well', 'Cottage door', 'Old oak', 'Path north'])
+    expect(q(s)!.querySelector('h4')).toBeNull()
+    expect(s.text()).toContain('Choosing take 2 again brings them all back.')
+    expect(document.activeElement?.textContent).toBe('Choose take 4')
+    expect(s.button('Drop').disabled).toBe(true)
+    await s.click(s.button('Choose take 4'))
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose', body: { n: 4 } })
+  })
+
+  it('names only the areas placed on the take in the game', async () => {
+    const s = await inGame([area('Bucket', 2), area('Well', 1)])
+    await s.click(s.button('Choose'))
+    expect(items(s)).toEqual(['Bucket'])
+    expect(s.text()).toContain('1 named area is placed on take 2.')
+    expect(s.text()).toContain('Choosing take 2 again brings it back.')
+  })
+
+  it('asks once for patches and areas, in two lists under small headings, patches first', async () => {
+    const s = await inGame([area('Bucket', 2), area('Well', 2)], [patch('Door open', [2])])
+    await s.click(s.button('Choose'))
+    expect(s.text()).toContain(
+      'Take 2 has 1 chosen patch and 2 placed named areas. The game will stop showing the patch and stop using the areas until you make and place them again.',
+    )
+    expect([...q(s)!.querySelectorAll('h4')].map((h) => h.textContent)).toEqual([
+      'Patches',
+      'Named areas',
+    ])
+    expect(items(s)).toEqual(['Door open', 'Bucket', 'Well'])
+  })
+
+  it('counts the areas that come back with the take chosen', async () => {
+    const s = await inGame([area('Bucket', 2), area('Well', 4), area('Gate', 4)])
+    await s.click(s.button('Choose'))
+    expect(s.text()).toContain(
+      '2 named areas placed on take 4 come back. Choosing take 2 again brings back what leaves now.',
+    )
+  })
+
+  it('asks nothing when the take in the game has no placed areas, also if the new one has some', async () => {
+    const s = await inGame([area('Bucket', 4), area('Well')])
+    await s.click(s.button('Choose'))
+    expect(q(s)).toBeNull()
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose' })
+  })
+
+  it('adds the areas to the Un-choose question', async () => {
+    const s = await inGame()
+    await s.click(s.button('Un-choose'))
+    expect(s.text()).toContain('Un-choose take 2?')
+    expect(s.text()).toContain(
+      'The game shows no image here until you choose another. Take 2 stays among the takes.',
+    )
+    expect(s.text()).toContain(
+      '5 named areas are placed on take 2. The game will stop using them until you place them on another take.',
+    )
+    await s.click(s.button('Un-choose'))
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/unchoose' })
+  })
+
+  it('asks before Drop of a take with areas set aside on it, in the place of its picture', async () => {
+    const s = await inGame([area('Bucket', 4), area('Well', 4), area('Gate', 2)])
+    await s.click(s.button('Drop'))
+    expect(s.calls).toHaveLength(0)
+    expect(s.container.querySelector('[data-side="right"] [role="alertdialog"]')).not.toBeNull()
+    expect(s.text()).toContain('Drop take 4?')
+    expect(s.text()).toContain(
+      '2 named areas were placed on take 4. After this they cannot be brought back; only new ones can be placed.',
+    )
+    expect(items(s)).toEqual(['Bucket', 'Well'])
+    await s.click(s.button('Cancel'))
+    expect(document.activeElement?.textContent).toBe('Drop')
+    await s.key('d')
+    await s.click(s.button('Drop take 4'))
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/takes/4', method: 'DELETE' })
+  })
+
+  it('keeps the question open with the message in red when it cannot be saved', async () => {
+    const s = await inGame(five, [], { ok: false, message: 'manifest.json cannot be used' })
+    await s.click(s.button('Choose'))
+    await s.click(s.button('Choose take 4'))
+    expect(q(s)!.querySelector('.adopt-error')?.textContent).toBe('manifest.json cannot be used')
+  })
+})
+
 describe('making takes', () => {
   const making = [
     { n: 4, state: 'making' as const, elapsed: 10, expected: 60 },

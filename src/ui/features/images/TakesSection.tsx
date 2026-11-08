@@ -40,8 +40,7 @@ import {
   refusal,
   pictureRendering,
   setAsideDim,
-  setAsideDropSentence,
-  setAsideSentence,
+  setAsideLead,
   setAsideTitle,
   takeCountText,
   unchooseNote,
@@ -107,6 +106,32 @@ function EmptyFrame({
       <b>{title}</b>
       {hint && <span className="faint small">{hint}</span>}
     </div>
+  )
+}
+
+/**
+ * The body of a question about what is set aside: the sentence, then the titles that leave, one
+ * per line; with both patches and areas, two lists each under its small heading, patches first.
+ */
+function SetAsideLists({ ask, question }: { ask: SetAsideAsk; question: SetAsideQuestion }) {
+  const both = question.leaving.length > 0 && question.leavingAreas.length > 0
+  const list = (heading: string, titles: string[]) =>
+    titles.length > 0 && (
+      <>
+        {both && <h4 className="confirm-heading">{heading}</h4>}
+        <ul className="confirm-effects">
+          {titles.map((title) => (
+            <li key={title}>{title}</li>
+          ))}
+        </ul>
+      </>
+    )
+  return (
+    <>
+      <p>{setAsideLead(ask, question)}</p>
+      {list('Patches', question.leaving)}
+      {list('Named areas', question.leavingAreas)}
+    </>
   )
 }
 
@@ -605,12 +630,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                         {asking.kind === 'unchoose' && (
                           <span className="muted">{unchooseNote(question.from)}</span>
                         )}
-                        <p>{setAsideSentence(question.from, question.leaving.length)}</p>
-                        <ul className="confirm-effects">
-                          {question.leaving.map((title) => (
-                            <li key={title}>{title}</li>
-                          ))}
-                        </ul>
+                        <SetAsideLists ask={asking} question={question} />
                       </>
                     )
                   }
@@ -702,16 +722,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                   {asking?.kind === 'drop' && question ? (
                     <Confirm
                       title={setAsideTitle(asking, asking.n)}
-                      lead={
-                        <>
-                          <p>{setAsideDropSentence(question.from, question.leaving.length)}</p>
-                          <ul className="confirm-effects">
-                            {question.leaving.map((title) => (
-                              <li key={title}>{title}</li>
-                            ))}
-                          </ul>
-                        </>
-                      }
+                      lead={<SetAsideLists ask={asking} question={question} />}
                       effects={[]}
                       error={askError}
                       back="Cancel"

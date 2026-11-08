@@ -160,7 +160,9 @@ export function checkAreaBox(box: AreaBox, size: { width: number; height: number
  * it was written over, `gameWas`), which part's addition it uses (`partStyle`: a part id, or
  * null for none; absent is the first part that lists it), and its own words for the patches the
  * game asks for (`patches`, by patch id, kept even when the game stops asking for one), and the
- * boxes marked for its named areas (`areas`, by area id, kept likewise).
+ * boxes marked for its named areas: `takeAreas` by take number then area id, each take keeping its
+ * own, and `areas`, by area id, the boxes of no take yet (placed before takes kept their own, or
+ * with no take chosen), which go with the take chosen. All kept even when the game stops asking.
  */
 const ImageEditSchema = z
   .object({
@@ -169,6 +171,9 @@ const ImageEditSchema = z
     partStyle: z.string().nullable().optional(),
     patches: z.record(z.string(), PatchEditSchema).optional(),
     areas: z.record(z.string(), AreaBoxSchema).optional(),
+    takeAreas: z
+      .record(z.string().regex(/^\d+$/, 'a take number'), z.record(z.string(), AreaBoxSchema))
+      .optional(),
   })
   .refine((edit) => (edit.text === undefined) === (edit.gameWas === undefined), {
     error: 'give text and gameWas together',
@@ -242,7 +247,7 @@ export function formatImageEdits(edits: ImageEdits): string {
     Object.keys(edits.images)
       .sort()
       .map((id) => {
-        const { text, gameWas, partStyle, patches, areas } = edits.images[id]!
+        const { text, gameWas, partStyle, patches, areas, takeAreas } = edits.images[id]!
         const sorted =
           patches &&
           Object.fromEntries(
@@ -250,17 +255,33 @@ export function formatImageEdits(edits: ImageEdits): string {
               .sort()
               .map((patch) => [patch, patches[patch]]),
           )
-        const boxes =
-          areas &&
+        const keyed = (boxesOf: Record<string, AreaBox>) =>
           Object.fromEntries(
-            Object.keys(areas)
+            Object.keys(boxesOf)
               .sort()
               .map((area) => {
-                const { x, y, width, height } = areas[area]!
+                const { x, y, width, height } = boxesOf[area]!
                 return [area, { x, y, width, height }]
               }),
           )
-        return [id, { text, gameWas, partStyle, patches: sorted, areas: boxes }]
+        const perTake =
+          takeAreas &&
+          Object.fromEntries(
+            Object.keys(takeAreas)
+              .sort((a, b) => Number(a) - Number(b))
+              .map((take) => [take, keyed(takeAreas[take]!)]),
+          )
+        return [
+          id,
+          {
+            text,
+            gameWas,
+            partStyle,
+            patches: sorted,
+            areas: areas && keyed(areas),
+            takeAreas: perTake,
+          },
+        ]
       }),
   )
   return `${JSON.stringify(out, null, 2)}\n`
@@ -605,6 +626,18 @@ export function areaFractions(
   )
 }
 
+/** The placed areas as the game receives them when the image's take `take` is the one in the game; none when it has none. */
+export function areaFractionsOn(
+  areas: readonly AreaRow[],
+  take: number,
+  size: { width: number; height: number },
+): Record<string, AreaFractions> | undefined {
+  return areaFractions(
+    areas.map((area) => ({ ...area, box: area.boxes[take] ?? null })),
+    size,
+  )
+}
+
 /** A manifest entry with its `areas` set, or taken away when there are none; its other fields stay in place. */
 export function withAreas<T extends object>(
   entry: T,
@@ -614,17 +647,41 @@ export function withAreas<T extends object>(
   return (areas ? { ...rest, areas } : rest) as T & { areas?: Record<string, AreaFractions> }
 }
 
-/** The edits with the box of one named area of an image set, replaced or (null) taken away. */
+/**
+ * The edits with the boxes of no take yet (`areas`) moved onto `take`; a box the take has already
+ * is kept over the one moved. Unchanged when there are none.
+ */
+export function adoptAreas(edits: ImageEdits, id: string, take: number): ImageEdits {
+  const { areas, takeAreas, ...rest } = edits.images[id] ?? {}
+  if (!areas) return edits
+  const own = { ...areas, ...takeAreas?.[String(take)] }
+  return withImage(edits, id, { ...rest, takeAreas: { ...takeAreas, [String(take)]: own } })
+}
+
+/**
+ * The edits with the box of one named area of an image set, replaced or (null) taken away: on
+ * `take` (the boxes of no take yet go onto it first), or among the boxes of no take yet when
+ * there is none.
+ */
 export function applyAreaBox(
   edits: ImageEdits,
   id: string,
   area: string,
   box: AreaBox | null,
+  take: number | null = null,
 ): ImageEdits {
-  const { areas, ...rest } = edits.images[id] ?? {}
-  const { [area]: _old, ...others } = areas ?? {}
-  const next = box ? { ...others, [area]: box } : others
-  return withImage(edits, id, Object.keys(next).length ? { ...rest, areas: next } : rest)
+  if (take === null) {
+    const { areas, ...rest } = edits.images[id] ?? {}
+    const { [area]: _old, ...others } = areas ?? {}
+    const next = box ? { ...others, [area]: box } : others
+    return withImage(edits, id, Object.keys(next).length ? { ...rest, areas: next } : rest)
+  }
+  const { takeAreas, ...rest } = adoptAreas(edits, id, take).images[id] ?? {}
+  const { [String(take)]: mine, ...others } = takeAreas ?? {}
+  const { [area]: _old, ...kept } = mine ?? {}
+  const next = box ? { ...kept, [area]: box } : kept
+  const all = Object.keys(next).length ? { ...others, [String(take)]: next } : others
+  return withImage(edits, id, Object.keys(all).length ? { ...rest, takeAreas: all } : rest)
 }
 
 /** The edits with the user's words for one patch of an image set, or taken back (`words` undefined). */
@@ -787,8 +844,14 @@ export interface AreaRow {
   title: string
   /** The area has been placed on the picture. */
   placed: boolean
-  /** Where it is, in the image's pixels; null while it is still to place. */
+  /** Where it is on the take in the game, in the image's pixels; null while it is still to place. */
   box: AreaBox | null
+  /** The boxes it has on the takes still on the image's board, by take number (the take in the game's too). */
+  boxes: Record<number, AreaBox>
+  /** With no box on the take in the game: the other takes it has one on, ascending (it needs placing again). */
+  elsewhere: number[]
+  /** With no box on the take in the game: it has one on a take since dropped. */
+  elsewhereGone: boolean
 }
 
 /** The status chip of an image. */
@@ -1023,6 +1086,8 @@ export function summarizeImages(input: ImagesInput): {
     for (const then of stale) lookPairs.push([then, key!])
     if (stale.length) oldIds.add(image.id)
     const wasText = made ? styleParts(withoutPalette(made.style))?.[2] : null
+    const boardTakes = input.imageTakes?.[image.id]
+    const onBoard = boardTakes ? new Set(boardTakes) : null
     const row: ImageRow = {
       id: image.id,
       title: image.title,
@@ -1054,9 +1119,32 @@ export function summarizeImages(input: ImagesInput): {
               : (input.patchAreas?.[image.id]?.[patch.id]?.[made.take] ?? null),
         }
       }),
-      areas: image.areas.map((area) => {
-        const box = own?.areas?.[area.id] ?? null
-        return { ...area, placed: box !== null, box }
+      areas: image.areas.map((area): AreaRow => {
+        const boxes: Record<number, AreaBox> = {}
+        let gone = false
+        for (const [key, byArea] of Object.entries(own?.takeAreas ?? {})) {
+          const mine = byArea[area.id]
+          if (!mine) continue
+          if (onBoard && !onBoard.has(Number(key))) gone = true
+          else boxes[Number(key)] = mine
+        }
+        const legacy = own?.areas?.[area.id] ?? null
+        const take = made?.take ?? null
+        // Boxes of no take yet belong to the take in the game.
+        if (take !== null && legacy && !boxes[take]) boxes[take] = legacy
+        const box = take !== null ? (boxes[take] ?? null) : legacy
+        return {
+          ...area,
+          placed: box !== null,
+          box,
+          boxes,
+          elsewhere: box
+            ? []
+            : Object.keys(boxes)
+                .map(Number)
+                .sort((a, b) => a - b),
+          elsewhereGone: box === null && gone,
+        }
       }),
       prompt: assemblePrompt(words, eff),
       actStyle: shared

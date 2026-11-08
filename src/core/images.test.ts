@@ -7,8 +7,10 @@ import {
   StyleSchema,
   applyActStyleChange,
   applyActStylePick,
+  adoptAreas,
   applyAreaBox,
   areaFractions,
+  areaFractionsOn,
   withAreas,
   checkAreaBox,
   applyStyleChange,
@@ -1184,8 +1186,8 @@ describe('the named areas the game declares', () => {
   it('lists them in the game’s order, none placed yet', () => {
     const [row] = rowsOf(withAreas).images.acts[0]!.rows
     expect(row!.areas).toEqual([
-      { ...fountain, placed: false, box: null },
-      { ...notice, placed: false, box: null },
+      { ...fountain, placed: false, box: null, boxes: {}, elsewhere: [], elsewhereGone: false },
+      { ...notice, placed: false, box: null, boxes: {}, elsewhere: [], elsewhereGone: false },
     ])
     expect(rowsOf(inn).images.acts[0]!.rows[0]!.areas).toEqual([])
   })
@@ -1306,8 +1308,8 @@ describe('the boxes marked for named areas', () => {
   it('shows a marked area as placed with its box', () => {
     const edits = applyAreaBox(none, inn.id, 'fountain', box)
     expect(withBoxes([fountain(), notice()], edits)).toEqual([
-      { ...fountain(), placed: true, box },
-      { ...notice(), placed: false, box: null },
+      { ...fountain(), placed: true, box, boxes: {}, elsewhere: [], elsewhereGone: false },
+      { ...notice(), placed: false, box: null, boxes: {}, elsewhere: [], elsewhereGone: false },
     ])
   })
   it('keeps a box when the game stops asking for the area, and shows it if the id returns', () => {
@@ -1318,7 +1320,117 @@ describe('the boxes marked for named areas', () => {
       title: 'Well',
       placed: true,
       box,
+      boxes: {},
+      elsewhere: [],
+      elsewhereGone: false,
     })
+  })
+})
+
+describe('the boxes of each take', () => {
+  const box = { x: 10, y: 20, width: 50, height: 40 }
+  const other = { x: 100, y: 20, width: 50, height: 40 }
+  const areas: GameArea[] = [
+    { id: 'fountain', title: 'Fountain' },
+    { id: 'old-notice', title: 'Old notice' },
+  ]
+  const madeFrom = summarizeImages(input()).images.acts[0]!.rows[0]!.madeFrom
+  const rows = (edits: ImageEdits, chosenTake: number | null, takes?: number[]) =>
+    summarizeImages(
+      input({
+        lists: [
+          {
+            id: 'act1',
+            title: 'Act I',
+            file: 'tts/act1/images.json',
+            state: { status: 'ok', images: [{ ...inn, areas }] },
+            canRefresh: true,
+          },
+        ],
+        edits: edits.images,
+        ...(chosenTake !== null && { chosen: { [inn.id]: { ...madeFrom, take: chosenTake } } }),
+        ...(takes && { imageTakes: { [inn.id]: takes } }),
+      }),
+    ).images.acts[0]!.rows[0]!.areas
+  const on = (edits: ImageEdits, id: string, take: number, b = box) =>
+    applyAreaBox(edits, inn.id, id, b, take)
+
+  it('keeps a box on the take it was placed on, apart from the legacy ones', () => {
+    const edits = on(on(none, 'fountain', 2), 'old-notice', 3, other)
+    expect(edits.images[inn.id]?.takeAreas).toEqual({
+      '2': { fountain: box },
+      '3': { 'old-notice': other },
+    })
+    expect(edits.images[inn.id]?.areas).toBeUndefined()
+    expect(applyAreaBox(applyAreaBox(none, inn.id, 'x', box), inn.id, 'x', null)).toEqual(none)
+    expect(on(on(none, 'fountain', 2), 'fountain', 2, other).images[inn.id]?.takeAreas).toEqual({
+      '2': { fountain: other },
+    })
+    expect(applyAreaBox(on(none, 'fountain', 2), inn.id, 'fountain', null, 2)).toEqual(none)
+  })
+  it('puts only the box on the take in the game in the row, the others set aside', () => {
+    const edits = on(on(none, 'fountain', 2), 'old-notice', 1, other)
+    const [fountain, notice] = rows(edits, 2, [1, 2])
+    expect(fountain).toMatchObject({ placed: true, box, elsewhere: [], boxes: { 2: box } })
+    expect(notice).toMatchObject({ placed: false, box: null, elsewhere: [1], boxes: { 1: other } })
+    const [again] = rows(edits, 1, [1, 2])
+    expect(again).toMatchObject({ placed: false, elsewhere: [2] })
+  })
+  it('counts a box on a take no longer on the board as gone', () => {
+    const edits = on(on(none, 'fountain', 1), 'old-notice', 3, other)
+    const [fountain, notice] = rows(edits, 2, [2, 3])
+    expect(fountain).toMatchObject({ placed: false, elsewhere: [], elsewhereGone: true, boxes: {} })
+    expect(notice).toMatchObject({ elsewhere: [3], elsewhereGone: false })
+    // A board that was not read counts nothing as gone.
+    expect(rows(edits, 2)[0]).toMatchObject({ elsewhere: [1], elsewhereGone: false })
+  })
+  it('lists the earlier takes in order, with no take chosen too', () => {
+    const edits = on(on(on(none, 'fountain', 3), 'fountain', 1, other), 'old-notice', 2)
+    expect(rows(edits, null, [1, 2, 3])[0]).toMatchObject({ placed: false, elsewhere: [1, 3] })
+  })
+  it('counts the legacy boxes on the take in the game, and as placed with none', () => {
+    const edits = applyAreaBox(none, inn.id, 'fountain', box)
+    expect(rows(edits, 2, [1, 2])[0]).toMatchObject({ placed: true, box, boxes: { 2: box } })
+    expect(rows(edits, null)[0]).toMatchObject({ placed: true, box, boxes: {} })
+    // A box of the take's own wins over a legacy one.
+    const both = on(edits, 'fountain', 2, other)
+    expect(rows(both, 2, [2])[0]).toMatchObject({ box: other })
+  })
+  it('moves the legacy boxes onto a take, a box already there winning', () => {
+    const legacy = applyAreaBox(
+      applyAreaBox(none, inn.id, 'fountain', box),
+      inn.id,
+      'old-notice',
+      box,
+    )
+    const adopted = adoptAreas(on(legacy, 'old-notice', 4, other), inn.id, 4)
+    expect(adopted.images[inn.id]?.areas).toBeUndefined()
+    expect(adopted.images[inn.id]?.takeAreas).toEqual({
+      '4': { fountain: box, 'old-notice': other },
+    })
+    expect(adoptAreas(none, inn.id, 4)).toEqual(none)
+  })
+  it('places a box on the take in the game and takes the legacy boxes along', () => {
+    const legacy = applyAreaBox(none, inn.id, 'fountain', box)
+    const next = applyAreaBox(legacy, inn.id, 'old-notice', other, 2)
+    expect(next.images[inn.id]).toEqual({
+      takeAreas: { '2': { fountain: box, 'old-notice': other } },
+    })
+  })
+  it('passes to the game the boxes of the take asked for, as fractions', () => {
+    const edits = on(on(none, 'fountain', 2), 'old-notice', 1, other)
+    const row = rows(edits, 2, [1, 2])
+    expect(areaFractionsOn(row, 1, inn)).toEqual(areaFractions([{ ...row[1]!, box: other }], inn))
+    expect(areaFractionsOn(row, 5, inn)).toBeUndefined()
+  })
+  it('is written by take, in order, and read back', () => {
+    const edits = on(on(on(none, 'z', 10), 'a', 2, other), 'b', 2)
+    const text = formatImageEdits(edits)
+    expect(text.indexOf('"2"')).toBeLessThan(text.indexOf('"10"'))
+    expect(readImageEditsValue(JSON.parse(text), 'e').edits).toEqual(edits)
+    expect(
+      readImageEditsValue({ images: { inn: { takeAreas: { two: {} } } } }, 'e').problems.length,
+    ).toBe(1)
   })
 })
 
@@ -1331,6 +1443,9 @@ describe('areas for the game', () => {
     title: id,
     placed: box !== null,
     box,
+    boxes: {},
+    elsewhere: [],
+    elsewhereGone: false,
   })
   const size = { width: 320, height: 200 }
 

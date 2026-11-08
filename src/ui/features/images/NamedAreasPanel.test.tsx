@@ -25,6 +25,9 @@ const area = (id: string, over: Partial<AreaRow> = {}): AreaRow => ({
   title: `Title of ${id}`,
   placed: false,
   box: null,
+  boxes: {},
+  elsewhere: [],
+  elsewhereGone: false,
   ...over,
 })
 const placedAt = (id: string, box: AreaBox, over: Partial<AreaRow> = {}) =>
@@ -48,6 +51,7 @@ interface Options {
   answer?: ImagePatchesView | (() => Promise<Response>)
   saved?: { status: number; body: unknown }
   chosenPatches?: { id: string; title: string; src: string }[]
+  chosenTake?: number | null
 }
 
 /** Renders the panel for an image of 320 x 200 with these areas; gives what was saved. */
@@ -66,16 +70,19 @@ async function render(areas: AreaRow[], options: Options = {}) {
   document.body.append(host)
   const root = createRoot(host)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const row = { id: 'inn', width: 320, height: 200, areas } as ImageRow
-  await act(async () => {
-    root.render(
-      createElement(
-        QueryClientProvider,
-        { client },
-        createElement(NamedAreasPanel, { row, chosenPatches: options.chosenPatches }),
-      ),
-    )
-  })
+  const draw = async (now: AreaRow[], chosenTake: number | null) => {
+    const row = { id: 'inn', width: 320, height: 200, areas: now, chosenTake } as ImageRow
+    await act(async () => {
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(NamedAreasPanel, { row, chosenPatches: options.chosenPatches }),
+        ),
+      )
+    })
+  }
+  await draw(areas, options.chosenTake ?? null)
   await settle()
   cleanups.push(() => {
     act(() => root.unmount())
@@ -85,7 +92,7 @@ async function render(areas: AreaRow[], options: Options = {}) {
   if (stage) {
     stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 200 }) as DOMRect
   }
-  return { host, puts, stage }
+  return { host, puts, stage, draw }
 }
 
 /** Lets pending requests, state updates and animation frames run. */
@@ -642,5 +649,84 @@ describe('the named areas panel', () => {
       await act(async () => mainOf(host, 1).click())
       expect(host.querySelectorAll('img.named-area-patch').length).toBe(1)
     })
+  })
+})
+
+describe('areas to place again', () => {
+  const again = (id: string, ...elsewhere: number[]) =>
+    area(id, { elsewhere, boxes: Object.fromEntries(elsewhere.map((n) => [n, box])) })
+  const box = { x: 10, y: 10, width: 40, height: 30 }
+  const chips = (host: HTMLElement) => rows(host).map((r) => r.querySelector('.chip')?.textContent)
+  const note = (host: HTMLElement) => host.querySelector('.place-again-line')?.textContent
+
+  it('reads Place again for a box on another take, in the game’s order, with the line above the list', async () => {
+    const { host } = await render(
+      [again('a', 2), placedAt('b', box, { boxes: { 4: box } }), area('c'), again('d', 2)],
+      { chosenTake: 4 },
+    )
+    expect(chips(host)).toEqual(['Place again', 'Placed', 'To place', 'Place again'])
+    expect(host.textContent).toContain('1 of 4 placed')
+    expect(note(host)).toBe(
+      'Placed on take 2 of the image, so the game does not use them now. Place them here, or choose take 2 again to bring them back.',
+    )
+    const line = host.querySelector('.place-again-line')!
+    expect(line.nextElementSibling?.classList.contains('named-area-list')).toBe(true)
+    // The picture is clean: only the box of the take in the game shows.
+    expect(boxes(host)).toHaveLength(1)
+  })
+
+  it('has no line while nothing reads Place again', async () => {
+    const { host } = await render([placedAt('a', box), area('b')], { chosenTake: 4 })
+    expect(note(host)).toBeUndefined()
+  })
+
+  it('says the singular words for one, and names every earlier take', async () => {
+    const one = await render([again('a', 1, 2), area('b')], { chosenTake: 4 })
+    expect(note(one.host)).toBe(
+      'Placed on takes 1 and 2 of the image, so the game does not use it now. Place it here, or choose one of those takes again to bring it back.',
+    )
+  })
+
+  it('names no take when it was dropped', async () => {
+    const { host } = await render([area('a', { elsewhereGone: true })], { chosenTake: 4 })
+    expect(chips(host)).toEqual(['Place again'])
+    expect(note(host)).toBe(
+      'Placed on an earlier take of the image, so the game does not use it now. Place it here.',
+    )
+  })
+
+  it('keeps the rows off and names the way back only when no take is chosen', async () => {
+    const { host } = await render([again('a', 2), again('b', 2)], {
+      chosenTake: null,
+      answer: view({ take: null }),
+    })
+    expect(chips(host)).toEqual(['Place again', 'Place again'])
+    expect(mainOf(host, 0).disabled).toBe(true)
+    expect(host.textContent).toContain('Choose a take to mark the areas on it.')
+    expect(note(host)).toBe(
+      'Placed on take 2 of the image, so the game does not use them now. Choose take 2 again to bring them back.',
+    )
+  })
+
+  it('shows Clear only on a row placed on the take in the game', async () => {
+    const { host } = await render([again('a', 2), placedAt('b', box, { boxes: { 4: box } })], {
+      chosenTake: 4,
+    })
+    expect(selectedIds(host)).toEqual([0])
+    expect(host.querySelector('.named-area-clear')).toBeNull()
+    await act(async () => mainOf(host, 1).click())
+    expect(host.querySelector('.named-area-clear')).not.toBeNull()
+  })
+
+  it('selects the first area still needing a place when the take in the game changes', async () => {
+    const { host, draw } = await render([area('x'), placedAt('a', box, { boxes: { 2: box } })], {
+      chosenTake: 2,
+    })
+    expect(selectedIds(host)).toEqual([0])
+    await act(async () => mainOf(host, 1).click())
+    expect(selectedIds(host)).toEqual([1])
+    await draw([again('x', 2), again('a', 2)], 4)
+    await settle()
+    expect(selectedIds(host)).toEqual([0])
   })
 })

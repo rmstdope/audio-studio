@@ -127,14 +127,79 @@ export function setAsideDropSentence(from: number, count: number): string {
     : `${count} chosen patches were made on take ${from}. After this they cannot be brought back; only new ones can be made.`
 }
 
+/** "1 chosen patch" or "3 chosen patches". */
+const patchCount = (n: number) => `${n} chosen ${n === 1 ? 'patch' : 'patches'}`
+
+/** "1 placed named area" or "5 placed named areas". */
+const areaCount = (n: number) => `${n} placed named ${n === 1 ? 'area' : 'areas'}`
+
+/**
+ * The sentence that opens a question: what the game does with what leaves. Patches alone keep the
+ * words of the patch question; areas alone and both have their own.
+ */
+export function setAsideLead(ask: SetAsideAsk, q: SetAsideQuestion): string {
+  const patches = q.leaving.length
+  const areas = q.leavingAreas.length
+  const dropping = ask.kind === 'drop'
+  if (areas === 0) {
+    return dropping ? setAsideDropSentence(q.from, patches) : setAsideSentence(q.from, patches)
+  }
+  if (patches === 0) {
+    const one = areas === 1
+    if (dropping) {
+      return `${areas} named ${one ? 'area was' : 'areas were'} placed on take ${q.from}. After this ${one ? 'it cannot' : 'they cannot'} be brought back; only ${one ? 'a new one can' : 'new ones can'} be placed.`
+    }
+    const where = q.to === null ? 'another take' : `take ${q.to}`
+    return `${areas} named ${one ? 'area is' : 'areas are'} placed on take ${q.from}. The game will stop using ${one ? 'it' : 'them'} until you place ${one ? 'it' : 'them'} on ${where}.`
+  }
+  const has = `Take ${q.from} has ${patchCount(patches)} and ${areaCount(areas)}.`
+  return dropping
+    ? `${has} After this they cannot be brought back; only new ones can be made and placed.`
+    : `${has} The game will stop showing the ${patches === 1 ? 'patch' : 'patches'} and stop using the ${areas === 1 ? 'area' : 'areas'} until you make and place them again.`
+}
+
 /** The dim line of a Choose or Un-choose question: the way back, and what comes back with the new take. */
 export function setAsideDim(q: SetAsideQuestion): string {
-  if (q.returning.length === 0) {
-    return `Choosing take ${q.from} again brings ${q.leaving.length === 1 ? 'it' : 'them all'} back.`
+  const leaves = q.leaving.length + q.leavingAreas.length
+  const withAreas = q.leavingAreas.length > 0 || q.returningAreas > 0
+  if (q.returning.length === 0 && q.returningAreas === 0) {
+    return `Choosing take ${q.from} again brings ${leaves === 1 ? 'it' : 'them all'} back.`
   }
-  const n = q.returning.length
-  const comes = `${n} ${n === 1 ? 'patch' : 'patches'} made on take ${q.to} ${n === 1 ? 'comes' : 'come'} back: ${q.returning.join(', ')}.`
-  return `${comes} Choosing take ${q.from} again brings ${joined(q.leaving)} back.`
+  const comes: string[] = []
+  if (q.returning.length > 0) {
+    const n = q.returning.length
+    comes.push(
+      `${n} ${n === 1 ? 'patch' : 'patches'} made on take ${q.to} ${n === 1 ? 'comes' : 'come'} back: ${q.returning.join(', ')}.`,
+    )
+  }
+  if (q.returningAreas > 0) {
+    const n = q.returningAreas
+    comes.push(
+      `${n} named ${n === 1 ? 'area' : 'areas'} placed on take ${q.to} ${n === 1 ? 'comes' : 'come'} back.`,
+    )
+  }
+  const brings = withAreas ? 'brings back what leaves now' : `brings ${joined(q.leaving)} back`
+  return `${comes.join(' ')} Choosing take ${q.from} again ${brings}.`
+}
+
+/**
+ * The line above the list of areas to place again (`count` of them): the takes they were placed on
+ * (none: those takes were dropped) and how to get them back, given the take chosen now (null: none).
+ */
+export function placeAgainLine(takes: number[], chosen: number | null, count: number): string {
+  const one = count === 1
+  const use = `so the game does not use ${one ? 'it' : 'them'} now.`
+  if (takes.length === 0) {
+    return `Placed on an earlier take of the image, ${use}${chosen === null ? '' : ` Place ${one ? 'it' : 'them'} here.`}`
+  }
+  const where = `${takes.length === 1 ? 'take' : 'takes'} ${joined(takes.map(String))}`
+  const back = takes.length === 1 ? `take ${takes[0]}` : 'one of those takes'
+  const bring = `bring ${one ? 'it' : 'them'} back`
+  const way =
+    chosen === null
+      ? `Choose ${back} again to ${bring}.`
+      : `Place ${one ? 'it' : 'them'} here, or choose ${back} again to ${bring}.`
+  return `Placed on ${where} of the image, ${use} ${way}`
 }
 
 /** The line on an act's row naming the patches to make again. */

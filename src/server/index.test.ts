@@ -5161,8 +5161,24 @@ describe('the images routes', () => {
   it('shows the named areas the game lists, read again each time, without making the image out of date', async () => {
     const areas = async () => (await summary()).acts[0].rows[0].areas
     expect(await areas()).toEqual([
-      { id: 'sign', title: 'Sign', placed: false, box: null },
-      { id: 'door', title: 'Door', placed: false, box: null },
+      {
+        id: 'sign',
+        title: 'Sign',
+        placed: false,
+        box: null,
+        boxes: {},
+        elsewhere: [],
+        elsewhereGone: false,
+      },
+      {
+        id: 'door',
+        title: 'Door',
+        placed: false,
+        box: null,
+        boxes: {},
+        elsewhere: [],
+        elsewhereGone: false,
+      },
     ])
     const file = join(imagesRoot, 'tts/act1/images.json')
     const listed = JSON.parse(await Bun.file(file).text())
@@ -5180,8 +5196,24 @@ describe('the images routes', () => {
         ]),
       )
       expect(await areas()).toEqual([
-        { id: 'sign', title: 'Old sign', placed: false, box: null },
-        { id: 'well', title: 'Well', placed: false, box: null },
+        {
+          id: 'sign',
+          title: 'Old sign',
+          placed: false,
+          box: null,
+          boxes: {},
+          elsewhere: [],
+          elsewhereGone: false,
+        },
+        {
+          id: 'well',
+          title: 'Well',
+          placed: false,
+          box: null,
+          boxes: {},
+          elsewhere: [],
+          elsewhereGone: false,
+        },
       ])
       expect((await summary()).acts[0].rows[0].status).toBe('none yet')
     } finally {

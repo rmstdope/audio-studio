@@ -92,11 +92,13 @@ async function readTakeLooks(
  * For each image whose patches have a board: the takes of the image each patch has a chosen take
  * on (`chosen`, whether or not the picture is still on the board), the area each of those chosen
  * takes was made with (only for a take of the image whose picture is there), and the takes on the
- * image's own board. Boards that cannot be read count as holding nothing.
+ * image's own board, also for an image in `withBoxes` (one with boxes kept per take, whose dropped
+ * takes are found by it). Boards that cannot be read count as holding nothing.
  */
 export async function readPatchChoices(
   root: string,
   images: { id: string; patches: { id: string }[] }[],
+  withBoxes: ReadonlySet<string> = new Set(),
 ): Promise<{
   patchChoices: Record<string, Record<string, number[]>>
   patchAreas: Record<string, Record<string, Record<number, PatchArea>>>
@@ -106,7 +108,7 @@ export async function readPatchChoices(
   const patchAreas: Record<string, Record<string, Record<number, PatchArea>>> = {}
   const imageTakes: Record<string, number[]> = {}
   for (const { id, patches } of images) {
-    if (patches.length === 0) continue
+    if (patches.length === 0 && !withBoxes.has(id)) continue
     for (const patch of patches) {
       const folder = `${CACHE_DIR}/image-patches/${id}/${patch.id}`
       const board = await readResource(root, `${folder}/board.json`, PatchBoardSchema, [])
@@ -187,7 +189,13 @@ export async function readImages(
   const styleLook = styleLookOf(edits)
   const listed = lists.flatMap((list) => (list.state.status === 'ok' ? list.state.images : []))
   const summary = summarizeImages({
-    ...(await readPatchChoices(root, listed)),
+    ...(await readPatchChoices(
+      root,
+      listed,
+      new Set(
+        Object.entries(edits.edits.images).flatMap(([id, edit]) => (edit.takeAreas ? [id] : [])),
+      ),
+    )),
     gameFiles,
     look: styleLook.look,
     lookError: styleLook.error,
