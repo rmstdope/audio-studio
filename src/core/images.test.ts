@@ -22,6 +22,7 @@ import {
   resolvePatchCompare,
   summarizeImages,
   type ChosenEntry,
+  type GameArea,
   type GamePatch,
   type ImageEdits,
   type ImageStyle,
@@ -43,6 +44,7 @@ const inn = {
   width: 320,
   height: 200,
   patches: [] as GamePatch[],
+  areas: [] as GameArea[],
 }
 
 describe('the game files', () => {
@@ -1008,5 +1010,100 @@ describe('the patches the game asks for', () => {
         expect(act.rows[0]!.patches.map((p) => p.id)).toEqual(['bread-taken', 'lamp-lit'])
       }
     })
+  })
+})
+
+describe('the named areas the game declares', () => {
+  const fountain = { id: 'fountain', title: 'Fountain' }
+  const notice = { id: 'old-notice', title: 'Old notice' }
+  const withAreas = { ...inn, areas: [fountain, notice] }
+  const game = (areas: unknown) => ({
+    id: inn.id,
+    title: inn.title,
+    text: inn.description,
+    width: 320,
+    height: 200,
+    areas,
+  })
+  const asked = (areas: unknown) => ImageListSchema.safeParse([game(areas)])
+  const rowsOf = (...images: (typeof inn)[]) =>
+    summarizeImages(
+      input({
+        parts: images.map((_, i) => ({ id: `act${i + 1}`, title: `Act ${i + 1}` })),
+        lists: images.map((image, i) => ({
+          id: `act${i + 1}`,
+          title: `Act ${i + 1}`,
+          file: `tts/act${i + 1}/images.json`,
+          state: { status: 'ok' as const, images: [image] },
+          canRefresh: true,
+        })),
+      }),
+    )
+
+  it('reads them, and an image with none or an empty list has an empty list', () => {
+    expect(asked([fountain, notice]).data?.[0]?.areas).toEqual([fountain, notice])
+    expect(ImageListSchema.parse([{ ...game(undefined), areas: undefined }])[0]!.areas).toEqual([])
+    expect(asked([]).data?.[0]?.areas).toEqual([])
+  })
+  it('refuses an area with no id or title, a bad id, or an id repeated in the image', () => {
+    expect(asked([{ ...fountain, id: undefined }]).success).toBe(false)
+    expect(asked([{ ...fountain, id: 'Old Notice' }]).success).toBe(false)
+    expect(asked([{ ...fountain, title: '' }]).success).toBe(false)
+    const twice = asked([fountain, { ...fountain, title: 'Again' }])
+    expect(twice.error?.issues.map((i) => i.path)).toEqual([[0, 'areas', 1, 'id']])
+  })
+  it('lists them in the game’s order, none placed yet', () => {
+    const [row] = rowsOf(withAreas).images.acts[0]!.rows
+    expect(row!.areas).toEqual([
+      { ...fountain, placed: false },
+      { ...notice, placed: false },
+    ])
+    expect(rowsOf(inn).images.acts[0]!.rows[0]!.areas).toEqual([])
+  })
+  it('does not make a chosen take out of date when an area changes', () => {
+    const plain = rowsOf(inn).images.acts[0]!.rows[0]!
+    const { images } = summarizeImages(
+      input({
+        lists: [
+          {
+            id: 'act1',
+            title: 'Act I',
+            file: 'tts/act1/images.json',
+            state: {
+              status: 'ok',
+              images: [{ ...withAreas, areas: [{ ...fountain, title: 'Well' }] }],
+            },
+            canRefresh: true,
+          },
+        ],
+        chosen: { [inn.id]: plain.madeFrom },
+      }),
+    )
+    expect(images.acts[0]!.rows[0]!.status).toBe('chosen')
+  })
+  it('is a disagreement when an area is missing or its id or title differs', () => {
+    for (const other of [
+      [fountain],
+      [fountain, { ...notice, id: 'sign' }],
+      [fountain, { ...notice, title: 'Sign' }],
+    ]) {
+      const { images } = rowsOf(withAreas, { ...inn, areas: other })
+      expect(images.acts[0]!.conflicts[0]!.differs).toEqual(['named areas'])
+      expect(images.acts[0]!.rows).toEqual([])
+    }
+  })
+  it('names the areas among the other kinds in the problem', () => {
+    const { images, problems } = rowsOf(withAreas, { ...inn, description: 'x', areas: [fountain] })
+    expect(images.acts[0]!.conflicts[0]!.differs).toEqual(['words', 'named areas'])
+    expect(problems[0]!.message).toBe(
+      `the image "${inn.id}" has other words and other named areas in tts/act2/images.json`,
+    )
+  })
+  it('is not a disagreement in another order, and uses the first act’s order', () => {
+    const { images, problems } = rowsOf(withAreas, { ...inn, areas: [notice, fountain] })
+    expect(problems).toEqual([])
+    for (const act of images.acts) {
+      expect(act.rows[0]!.areas.map((a) => a.id)).toEqual(['fountain', 'old-notice'])
+    }
   })
 })

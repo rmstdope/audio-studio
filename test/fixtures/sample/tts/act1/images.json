@@ -15,6 +15,11 @@
     "patches": [
       { "id": "bread-taken", "title": "Bread taken", "text": "Remove the bread from the table" },
       { "id": "fire-out", "title": "Fire out", "text": "Put out the fire in the hearth" }
+    ],
+    "areas": [
+      { "id": "table", "title": "Table" },
+      { "id": "hearth", "title": "Hearth" },
+      { "id": "lantern", "title": "Lantern" }
     ]
   },
   {

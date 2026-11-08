@@ -44,6 +44,16 @@ export function disagreeText(acts: string[], differs: ConflictKind[]): string {
   return `The game's lists disagree about this image: ${joined(acts)} give it different ${about}. Fix them in the game, then Refresh from the game.`
 }
 
+/** The count at the head of the Named areas panel. */
+export function areasCountText(placed: number, total: number): string {
+  return `${placed} of ${total} placed`
+}
+
+/** The line under an image's status on the act's list: how many named areas are left; null when none are. */
+export function areasToPlaceText(left: number, total: number): string | null {
+  return left > 0 ? `${left} of ${total} ${total === 1 ? 'area' : 'areas'} to place` : null
+}
+
 /** The palette's size, as the Style page shows it. */
 export function paletteText(count: number): string {
   return `${count} ${count === 1 ? 'colour' : 'colours'}`

@@ -288,7 +288,8 @@ Between languages, lines are matched by `id`.
     "height": 200,
     "patches": [
       { "id": "bread-taken", "title": "Bread taken", "text": "Remove the bread from the table" }
-    ]
+    ],
+    "areas": [{ "id": "fountain", "title": "Fountain" }]
   }
 ]
 ```
@@ -300,6 +301,12 @@ over the image when it needs them, in the game's order. Each has an `id` (a slug
 image), a `title` and `text`, the words for the edit. The studio shows them on the image's page and
 lets the user reword them; making them is a later step. An image several parts list must list the
 same patches (id, title and words; the order may differ), or the lists disagree.
+
+`areas` is optional (absent or `[]` means none): the named areas the game wants placed on the image,
+in the game's order, each an `id` (a slug, used once in the image) and a `title`; the game never
+gives coordinates. The studio shows them on the image's page and in the act's list as placed or
+still to place. An image several parts list must list the same areas (id and title; the order may
+differ), or the lists disagree.
 
 **A sound effect** (`effects.from.shared`):
 

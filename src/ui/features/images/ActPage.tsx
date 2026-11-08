@@ -1,7 +1,7 @@
 import { imagesDone, type ImagesAct, type ImageRow, type ImagesSummary } from '../../../core/images'
 import { useImageMaking, useRefreshDialog } from '../../api'
 import { shortTitle } from '../../format'
-import { chosenLine, disagreeText } from '../../imagesText'
+import { areasToPlaceText, chosenLine, disagreeText } from '../../imagesText'
 import { ActLinks } from './ActLinks'
 import { makingStatusText } from '../../musicTakesText'
 import { routeHref } from '../../route'
@@ -15,6 +15,12 @@ const STATUS_CHIP: Record<ImageRow['status'], string> = {
   'none yet': 'chip',
   chosen: 'chip chip-ok',
   'out of date': 'chip chip-warn',
+}
+
+/** The act list's line for an image's named areas left to place; nothing when none are. */
+function AreasLeft({ row }: { row: ImageRow }) {
+  const line = areasToPlaceText(row.areas.filter((area) => !area.placed).length, row.areas.length)
+  return line && <div className="muted images-areas">{line}</div>
 }
 
 /**
@@ -205,6 +211,7 @@ export function ActPage({
                           <span className={STATUS_CHIP[row.status]}>{row.status}</span>
                         )}
                         {row.looksOld && <span className="chip chip-warn">Old look</span>}
+                        <AreasLeft row={row} />
                       </td>
                     </tr>
                   )

@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagesRoute } from '../../route'
-import type { GamePatch, ImageEdits, ImageStyle, MadeFrom } from '../../../core/images'
+import type { GameArea, GamePatch, ImageEdits, ImageStyle, MadeFrom } from '../../../core/images'
 import type { ProjectSummary } from '../../../core/summary'
 import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
 import { projectJson } from '../../../../test/helpers'
@@ -52,6 +52,7 @@ const inn = {
   width: 320,
   height: 200,
   patches: [] as GamePatch[],
+  areas: [] as GameArea[],
 }
 const barn = {
   id: 'barn',
@@ -60,6 +61,7 @@ const barn = {
   width: 160,
   height: 100,
   patches: [] as GamePatch[],
+  areas: [] as GameArea[],
 }
 
 interface Options {
@@ -70,6 +72,8 @@ interface Options {
   actTwo?: 'missing' | 'empty'
   /** The patches the game asks for on the inn. */
   patches?: GamePatch[]
+  /** The named areas the game wants placed on the inn. */
+  areas?: GameArea[]
   /** The images Act II lists (overrides `actTwo`). */
   actTwoImages?: (typeof inn)[]
   /** What the chosen pictures were brought to; the look now when absent. */
@@ -87,7 +91,10 @@ function summary(options: Options = {}): ProjectSummary {
         id: 'act1',
         title: 'Act I: The Lantern',
         file: 'a1.json',
-        state: { status: 'ok', images: [{ ...inn, patches: options.patches ?? [] }, barn] },
+        state: {
+          status: 'ok',
+          images: [{ ...inn, patches: options.patches ?? [], areas: options.areas ?? [] }, barn],
+        },
         canRefresh: true,
       },
       {
@@ -965,5 +972,59 @@ describe('the patches the game asks for', () => {
     expect(text(page.querySelector('.images-row-off .adopt-error'))).toBe(
       "The game's lists disagree about this image: Act I and Act II give it different words and patches. Fix them in the game, then Refresh from the game.",
     )
+  })
+})
+
+describe('the named areas the game declares', () => {
+  const fountain = { id: 'fountain', title: 'Fountain' }
+  const notice = { id: 'old-notice', title: 'Old notice' }
+  const lamp = { id: 'lamp-lit', title: 'Lamp lit', description: 'Light the lamp' }
+  const image = { view: 'images', page: 'image', image: 'inn', from: 'act1' } as const
+  const act = { view: 'images', page: 'act', part: 'act1' } as const
+  const heading = (page: HTMLElement) => [...page.querySelectorAll('h2')].map((h) => text(h))
+  const chosen = (page: HTMLElement) => text(page.querySelector('.page-header .muted'))
+  const lineOf = (page: HTMLElement, at = 0) =>
+    text([...page.querySelectorAll('tbody tr')][at]!.querySelector('.images-areas'))
+
+  it('lists them on the image’s page below the workbench and above the patches', () => {
+    const page = render(image, summary({ areas: [fountain, notice], patches: [lamp] }))
+    expect(heading(page)).toEqual(['Prompt', 'Named areas', 'Patches the game asks for'])
+    expect(text(page.querySelector('.named-areas-head'))).toBe('Named areas0 of 2 placed')
+    expect([...page.querySelectorAll('.named-area')].map((r) => text(r))).toEqual([
+      'FountainfountainTo place',
+      'Old noticeold-noticeTo place',
+    ])
+  })
+  it('leaves the page as it is when the game names none', () => {
+    const page = render(image)
+    expect(page.querySelector('.named-areas')).toBeNull()
+    expect(heading(page)).not.toContain('Named areas')
+  })
+  it('says on the act’s list how many are left, under the status, and counts nothing else', () => {
+    const page = render(act, summary({ areas: [fountain, notice] }))
+    expect(lineOf(page)).toBe('2 of 2 areas to place')
+    expect(page.querySelectorAll('tbody tr')[1]!.querySelector('.images-areas')).toBeNull()
+    expect(page.querySelector('.images-status .images-areas')).not.toBeNull()
+    const none = render(act, summary())
+    expect(none.querySelector('.images-areas')).toBeNull()
+    expect(chosen(page)).toBe(chosen(none))
+    expect(chosen(page)).toContain('chosen')
+  })
+  it('says one area in the singular, and keeps the line under the making chip', () => {
+    const page = render(act, summary({ areas: [fountain] }), { inn: { takes: 2, left: 1 } })
+    expect(lineOf(page)).toBe('1 of 1 area to place')
+    const status = page.querySelector('.images-status')!
+    expect(status.querySelector('.chip')).not.toBeNull()
+    expect(status.lastElementChild!.className).toContain('images-areas')
+  })
+  it('says named areas among the things the lists disagree on, and shows no line for it', () => {
+    const page = render(
+      act,
+      summary({ areas: [fountain], actTwoImages: [{ ...inn, description: 'x', areas: [] }] }),
+    )
+    expect(text(page.querySelector('.images-row-off .adopt-error'))).toBe(
+      "The game's lists disagree about this image: Act I and Act II give it different words and named areas. Fix them in the game, then Refresh from the game.",
+    )
+    expect(page.querySelector('.images-areas')).toBeNull()
   })
 })
