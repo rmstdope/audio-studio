@@ -114,14 +114,14 @@ export function keepArea(edited: Pixels, area: PatchArea, feather = PATCH_FEATHE
 /** How many pixels outside a side of the marked area are compared with the take. */
 export const PATCH_MATCH_BAND = 8
 
-/** The drift from the take, out of 255 on the worst colour channel, above which a patch is taken as asked for. */
+/** The difference from the take inside the area once the drift is corrected, out of 255 on the worst colour channel, above which a patch is taken as asked for. */
 export const PATCH_BIG_DIFFERENCE = 30
 
 /** The distance in pixels over which a big difference eases in from the sides. */
 export const PATCH_EASE = 48
 
-/** How many positions each way along a side are averaged, so that one speck does not set the colour. */
-const MATCH_SMOOTH = 12
+/** How many positions each way along a side the median is taken over, so that one speck does not set the colour. */
+const MATCH_SMOOTH = 6
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */
 interface MatchSide {
@@ -135,8 +135,8 @@ interface MatchSide {
  * The edited picture with its colours matched to the take around the marked area, so that the patch
  * shows no seam. Along each side of the area that is not on the picture's edge, the strip just
  * outside it tells how far the edit's colours drift from the take there, place by place, so an area
- * across a horizon is matched against the sky and the grass separately. A small drift is corrected
- * across the whole area; a big one (above `PATCH_BIG_DIFFERENCE`) is what was asked for, so only the
+ * across a horizon is matched against the sky and the grass separately. A small difference (the drift is all
+ * there is) is corrected across the whole area; a big one (above `PATCH_BIG_DIFFERENCE`, left inside the area once the drift outside is corrected) is what was asked for, so only the
  * sides are brought to the take and the difference eases in from them. An area with no side to
  * look at is returned as painted.
  */
@@ -169,16 +169,12 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       }
       return sum.map((v) => v / depths) as [number, number, number]
     })
+    // A median, not a mean: it follows a step such as a horizon instead of smearing it.
     return raw.map((_, k) => {
-      const sum: [number, number, number] = [0, 0, 0]
-      let n = 0
-      for (let j = Math.max(0, k - MATCH_SMOOTH); j <= Math.min(count - 1, k + MATCH_SMOOTH); j++) {
-        sum[0] += raw[j]![0]
-        sum[1] += raw[j]![1]
-        sum[2] += raw[j]![2]
-        n++
-      }
-      return sum.map((v) => v / n) as [number, number, number]
+      const window = raw.slice(Math.max(0, k - MATCH_SMOOTH), Math.min(count, k + MATCH_SMOOTH + 1))
+      const median = (c: number) =>
+        window.map((o) => o[c]!).sort((x, y) => x - y)[window.length >> 1]!
+      return [median(0), median(1), median(2)] as [number, number, number]
     })
   }
 
@@ -220,26 +216,17 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
   const data = new Uint8Array(edited.data)
   if (sides.length === 0) return { width, height, data }
 
-  // How far the edit drifts from the take around the area: the worst channel's mean size.
-  const drift = [0, 0, 0]
-  let samples = 0
-  for (const side of sides) {
-    for (let k = 0; k < Math.max(area.width, area.height); k++) {
-      const o = side.offsetAt(Math.min(right - 1, area.x + k), Math.min(bottom - 1, area.y + k))
-      for (let c = 0; c < 3; c++) drift[c]! += Math.abs(o[c]!)
-      samples++
-    }
-  }
-  const big = Math.max(...drift.map((v) => v / samples)) > PATCH_BIG_DIFFERENCE
-
+  // The correction at each pixel of the area: the sides' offsets, weighted by closeness.
+  const correction = new Float32Array(area.width * area.height * 3)
+  const nearest = new Float32Array(area.width * area.height)
   for (let y = area.y; y < bottom; y++) {
     for (let x = area.x; x < right; x++) {
       const sum = [0, 0, 0]
       let weights = 0
-      let nearest = Infinity
+      let near = Infinity
       for (const side of sides) {
         const d = side.distance(x, y)
-        nearest = Math.min(nearest, d)
+        near = Math.min(near, d)
         const w = 1 / ((d + 1) * (d + 1))
         const o = side.offsetAt(x, y)
         sum[0]! += w * o[0]
@@ -247,14 +234,37 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
         sum[2]! += w * o[2]
         weights += w
       }
+      const k = (y - area.y) * area.width + (x - area.x)
+      for (let c = 0; c < 3; c++) correction[k * 3 + c] = sum[c]! / weights
+      nearest[k] = near
+    }
+  }
+
+  // How far the edit still differs from the take inside the area once the drift outside is
+  // corrected: what the instruction asked for. Little is a drift; a lot is taken as asked for.
+  const residual = [0, 0, 0]
+  for (let y = area.y; y < bottom; y++) {
+    for (let x = area.x; x < right; x++) {
+      const k = (y - area.y) * area.width + (x - area.x)
+      const i = (y * width + x) * 4
+      for (let c = 0; c < 3; c++) {
+        residual[c]! += Math.abs(edited.data[i + c]! + correction[k * 3 + c]! - take.data[i + c]!)
+      }
+    }
+  }
+  const big = Math.max(...residual) / (area.width * area.height) > PATCH_BIG_DIFFERENCE
+
+  for (let y = area.y; y < bottom; y++) {
+    for (let x = area.x; x < right; x++) {
+      const k = (y - area.y) * area.width + (x - area.x)
       let strength = 1
       if (big) {
-        const t = Math.min(1, nearest / PATCH_EASE)
+        const t = Math.min(1, nearest[k]! / PATCH_EASE)
         strength = 1 - t * t * (3 - 2 * t)
       }
       const i = (y * width + x) * 4
       for (let c = 0; c < 3; c++) {
-        const v = edited.data[i + c]! + (strength * sum[c]!) / weights
+        const v = edited.data[i + c]! + strength * correction[k * 3 + c]!
         data[i + c] = Math.max(0, Math.min(255, Math.round(v)))
       }
     }

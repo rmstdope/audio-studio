@@ -102,15 +102,32 @@ describe('matchToTake', () => {
     expect(rgbAt(matched, 51, 100)).toEqual([100, 140, 60])
   })
 
-  it('leaves the middle as painted for a big difference and brings the sides to the take', () => {
+  it('corrects a drift of the whole picture across the area, even a big one', () => {
+    const edited = plain(200, 200, [60, 100, 20])
+    const matched = matchToTake(edited, take, area)
+    expect(rgbAt(matched, 100, 100)).toEqual([100, 140, 60])
+  })
+
+  it('leaves the middle as painted when the instruction asked for a big difference', () => {
     const edited = painted(200, 200, (x, y) =>
-      x >= 50 && x < 150 && y >= 50 && y < 150 ? [20, 30, 10] : [60, 100, 20],
+      x >= 50 && x < 150 && y >= 50 && y < 150 ? [20, 30, 10] : [110, 150, 70],
     )
     const matched = matchToTake(edited, take, area)
     expect(rgbAt(matched, 100, 100)).toEqual([20, 30, 10])
-    // The painting outside the area was 40 short of the take, so the side is lifted by that much.
-    expect(rgbAt(matched, 50, 100)[0]!).toBeGreaterThan(55)
-    expect(rgbAt(matched, 80, 100)[0]!).toBeLessThan(rgbAt(matched, 50, 100)[0]!)
+    // The painting outside was 10 over the take, so the side is brought down by that much.
+    expect(rgbAt(matched, 50, 100)[0]!).toBeLessThan(20)
+    expect(rgbAt(matched, 90, 100)[0]!).toBeGreaterThan(rgbAt(matched, 50, 100)[0]!)
+  })
+
+  it('matches an area that is not square by its own sides', () => {
+    const edited = plain(400, 100, [110, 150, 70])
+    const matched = matchToTake(edited, plain(400, 100, [100, 140, 60]), {
+      x: 50,
+      y: 40,
+      width: 300,
+      height: 20,
+    })
+    expect(rgbAt(matched, 200, 50)).toEqual([100, 140, 60])
   })
 
   it('matches the sky part and the grass part of a side separately', () => {
@@ -121,6 +138,9 @@ describe('matchToTake', () => {
     const matched = matchToTake(horizonEdited, horizonTake, area)
     expect(rgbAt(matched, 51, 60)).toEqual([100, 140, 200])
     expect(rgbAt(matched, 51, 140)).toEqual([100, 140, 60])
+    // Right at the horizon each part is still matched to what lies next to it.
+    expect(rgbAt(matched, 51, 99)).toEqual([100, 140, 200])
+    expect(rgbAt(matched, 51, 100)).toEqual([100, 140, 60])
   })
 
   it('does not look past a side on the picture edge, and matches the other sides', () => {
