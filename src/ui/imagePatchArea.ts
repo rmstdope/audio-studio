@@ -47,7 +47,13 @@ export function areaFromDrag(
     height: Math.abs(y1 - y2),
   }
   if (checkPatchArea(area, take)) return null
-  const marked = unplace(area)
+  const placed = unplace(area)
+  // A side on the shown picture's edge is on the model's own, past what the game's version crops.
+  const left = area.x === 0 ? 0 : placed.x
+  const top = area.y === 0 ? 0 : placed.y
+  const right = area.x + area.width === take.width ? model.width : placed.x + placed.width
+  const bottom = area.y + area.height === take.height ? model.height : placed.y + placed.height
+  const marked = { x: left, y: top, width: right - left, height: bottom - top }
   return checkPatchArea(marked, model) ? null : marked
 }
 

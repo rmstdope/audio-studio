@@ -940,6 +940,24 @@ describe('what the game gets', () => {
     expect((host.querySelector('.patch-mark') as HTMLElement).style.left).toBe(ticked)
   })
 
+  it('draws a mark reaching past the part the game shows on the edges of the game’s version', async () => {
+    const { host } = await render(
+      [patchRow('a')],
+      one(
+        {},
+        {
+          take: { n: 3, width: 1024, height: 576, cropped: true },
+          game: { width: 640, height: 400 },
+        },
+      ),
+    )
+    await open(host)
+    await drag(stageOf(host), [2, 2], [1022, 574])
+    const mark = host.querySelector('.patch-mark') as HTMLElement
+    expect(mark.style.left).toBe('0%')
+    expect(mark.style.width).toBe('100%')
+  })
+
   it('says a take is being brought, and turns Choose off, ticked or not', async () => {
     const { host } = await render(
       [patchRow('a')],
