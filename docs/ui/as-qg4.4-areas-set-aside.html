@@ -1,43 +1,874 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Named areas set aside</title><style>
-:root{--bg:#06070c;--panel:#10121a;--raised:#191c24;--inset:#0d0f14;--line:rgb(255 255 255/8%);--line-strong:rgb(255 255 255/14%);--text:#eceef3;--soft:#c7ccd6;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--accent-ink:#1a0a02;--warn:#ffc24b;--warn-bg:#2d2412;--danger-bg:#2e1720;--danger-ink:#ff94a8;--ok:#3ddc97;color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,sans-serif;padding:24px}
-.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-.intro h1{font-size:20px;margin:0 0 4px}.intro p{margin:0;color:var(--muted);max-width:760px}
-.state{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:22px 0 -6px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
-.panel h2{margin:0;font-size:16px}.panel p{margin:0}
-.muted{color:var(--muted)}.faint{color:var(--faint)}.small{font-size:12px}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.col{display:flex;flex-direction:column;gap:10px;min-width:0}
-.lbl{font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
-.btn{background:var(--raised);border:1px solid var(--line-strong);color:var(--text);border-radius:9px;padding:6px 12px;font:inherit}
-.btn.p{background:var(--accent);color:var(--accent-ink);border:0;font-weight:600}.btn[disabled]{opacity:.45}
-.btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.q{background:var(--raised);border:1px solid var(--line-strong);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.q h3{margin:0;font-size:15px}.q ul{margin:0;padding-left:18px;color:var(--soft)}.q p{margin:0}
-.q h4{margin:2px 0 -6px;font-size:12px;font-weight:600;color:var(--muted)}
-.red{color:var(--danger-ink);font-size:13px}
-.pic{position:relative;aspect-ratio:8/5;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,#27395e 0 45%,#6b4a3a 45% 62%,#2a2f3f 62%)}
-.pic.b{background:linear-gradient(200deg,#3b2a55 0 38%,#3e6b5a 38% 70%,#23262f 70%)}
-.frame{aspect-ratio:8/5;background:var(--inset);border-radius:8px;display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center;padding:12px}
-.box{position:absolute;border:2px solid var(--accent);border-radius:3px}
-.box span{position:absolute;top:-19px;left:-2px;font-size:11px;background:var(--accent);color:var(--accent-ink);padding:0 5px;border-radius:3px;white-space:nowrap}
-.ghost{position:absolute;border:1px dashed rgb(255 255 255/55%);border-radius:3px}
-.ghost span{position:absolute;top:2px;left:4px;font-size:11px;color:rgb(255 255 255/70%);white-space:nowrap}
-.chip{font-size:11px;border-radius:99px;padding:1px 8px;white-space:nowrap}
-.chip.ok{background:rgb(61 220 151/15%);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}
-.head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
-.areas{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;align-items:start}
-.alist{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
-.alist li{display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--line)}
-.alist li.sel{background:var(--raised);border-radius:7px}
-.alist b{font-weight:600;display:block}.alist .grow{flex:1;min-width:0}
-.back{background:var(--raised);border-radius:9px;padding:8px 10px;color:var(--soft);font-size:13px}
-table{width:100%;border-collapse:collapse}th{font-size:12px;color:var(--faint);text-align:left;font-weight:500;padding:6px}
-td{border-top:1px solid var(--line);padding:8px 6px;vertical-align:top}
-.th{width:84px;height:52px;border-radius:5px;background:linear-gradient(200deg,#3b2a55 0 38%,#3e6b5a 38% 70%,#23262f 70%)}
-.wline{color:var(--warn);font-size:12px;margin-top:2px}
-.takes{display:flex;gap:8px}.takes div{flex:1}
-@media(max-width:700px){.two,.areas{grid-template-columns:1fr}}
-</style></head><body><div class="wrap"><div class="intro"><h1>Named areas set aside</h1><p>Choosing another take of an image with placed named areas: the question, what the list shows, the act’s page, and the states around them.</p></div><div class="state">Named areas only</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Choose take 4?</h3><p>5 named areas are placed on take 2. The game will stop using them until you place them on take 4.</p><ul><li>Bucket</li><li>Well</li><li>Cottage door</li><li>Old oak</li><li>Path north</li></ul><p class="faint small">Choosing take 2 again brings them all back.</p><div class="btns"><button class="btn p">Choose take 4</button><button class="btn">Cancel</button></div></div></div><div class="col"><div class="lbl">Take 4</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">Both patches and named areas</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Choose take 4?</h3><p>Take 2 has 3 chosen patches and 5 placed named areas. The game will stop showing the patches and stop using the areas until you make and place them again.</p><h4>Patches</h4><ul><li>Door open</li><li>Lamp lit</li><li>Bread taken</li></ul><h4>Named areas</h4><ul><li>Bucket</li><li>Well</li><li>Cottage door</li><li>Old oak</li><li>Path north</li></ul><p class="faint small">Choosing take 2 again brings them all back.</p><div class="btns"><button class="btn p">Choose take 4</button><button class="btn">Cancel</button></div></div></div><div class="col"><div class="lbl">Take 4</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">Going back, with areas placed on the take in the game</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Choose take 2?</h3><p>2 named areas are placed on take 4. The game will stop using them until you place them on take 2.</p><ul><li>Bucket</li><li>Well</li></ul><p class="faint small">5 named areas placed on take 2 come back. Choosing take 4 again brings back what leaves now.</p><div class="btns"><button class="btn p">Choose take 2</button><button class="btn">Cancel</button></div></div></div><div class="col"><div class="lbl">Take 2</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">One area</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Choose take 4?</h3><p>1 named area is placed on take 2. The game will stop using it until you place it on take 4.</p><ul><li>Bucket</li></ul><p class="faint small">Choosing take 2 again brings it back.</p><div class="btns"><button class="btn p">Choose take 4</button><button class="btn">Cancel</button></div></div></div><div class="col"><div class="lbl">Take 4</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">Un-choose</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Un-choose take 2?</h3><p>The game shows no image here until you choose another. Take 2 stays among the takes.</p><p>5 named areas are placed on take 2. The game will stop using them until you place them on another take.</p><ul><li>Bucket</li><li>Well</li><li>Cottage door</li><li>Old oak</li><li>Path north</li></ul><p class="faint small">Choosing take 2 again brings them all back.</p><div class="btns"><button class="btn p">Un-choose</button><button class="btn">Cancel</button></div></div></div><div class="col"><div class="lbl">Take 4</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">Drop, when the take has areas set aside on it</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Drop take 2?</h3><p>5 named areas were placed on take 2. After this they cannot be brought back; only new ones can be placed.</p><ul><li>Bucket</li><li>Well</li><li>Cottage door</li><li>Old oak</li><li>Path north</li></ul><div class="btns"><button class="btn p">Drop take 2</button><button class="btn">Cancel</button></div></div></div><div class="col"><div class="lbl">Take 2</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">Drop, with both</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Drop take 2?</h3><p>Take 2 has 3 chosen patches and 5 placed named areas. After this they cannot be brought back; only new ones can be made and placed.</p><h4>Patches</h4><ul><li>Door open</li><li>Lamp lit</li><li>Bread taken</li></ul><h4>Named areas</h4><ul><li>Bucket</li><li>Well</li><li>Cottage door</li><li>Old oak</li><li>Path north</li></ul><div class="btns"><button class="btn p">Drop take 2</button><button class="btn">Cancel</button></div></div></div><div class="col"><div class="lbl">Take 2</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">Could not be saved: the question stays, nothing changes</div><div class="panel"><div class="two"><div class="col"><div class="lbl">In the game</div><div class="q"><h3>Choose take 4?</h3><p>5 named areas are placed on take 2. The game will stop using them until you place them on take 4.</p><ul><li>Bucket</li><li>Well</li><li>Cottage door</li><li>Old oak</li><li>Path north</li></ul><p class="faint small">Choosing take 2 again brings them all back.</p><div class="btns"><button class="btn p">Choose take 4</button><button class="btn">Cancel</button></div><p class="red" role="alert">web/public/images/generated/manifest.json cannot be used</p></div></div><div class="col"><div class="lbl">Take 4</div><div class="pic b"></div><div class="btns"><button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button></div></div></div></div><div class="state">After the yes: the list on the new take</div><section class="panel"><div class="head"><h2>Named areas</h2><span class="muted">0 of 5 placed</span></div><p class="muted">The parts of this picture the game names, so that a player can click them.</p><div class="areas"><div class="col"><div class="pic b"></div><p class="muted small">Drag over the picture to mark “Bucket”.</p></div><div class="col"><div class="back">Placed on take 2 of the image, so the game does not use them now. Place them here, or choose take 2 again to bring them back.</div><ul class="alist"><li class="sel"><span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Well</b><span class="mono muted">well</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Cottage door</b><span class="mono muted">cottage_door</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span><span class="chip warn">Place again</span></li></ul></div></div></section><div class="state">Partway: placed again on this take</div><section class="panel"><div class="head"><h2>Named areas</h2><span class="muted">2 of 5 placed</span></div><p class="muted">The parts of this picture the game names, so that a player can click them.</p><div class="areas"><div class="col"><div class="pic b"></div><p class="muted small">Drag over the picture to mark “Bucket”.</p></div><div class="col"><div class="back">Placed on take 2 of the image, so the game does not use them now. Place them here, or choose take 2 again to bring them back.</div><ul class="alist"><li class="sel"><span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span><span class="chip ok">Placed</span></li><li class=""><span class="grow"><b>Well</b><span class="mono muted">well</span></span><span class="chip ok">Placed</span></li><li class=""><span class="grow"><b>Cottage door</b><span class="mono muted">cottage_door</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span><span class="chip warn">Place again</span></li></ul></div></div></section><div class="state">Un-chosen: no take in the game</div><section class="panel"><div class="head"><h2>Named areas</h2><span class="muted">0 of 5 placed</span></div><p class="muted">The parts of this picture the game names, so that a player can click them.</p><div class="areas"><div class="col"><div class="frame">Choose a take to mark the areas on it.</div></div><div class="col"><div class="back">Placed on take 2 of the image, so the game does not use them now. Choose take 2 again to bring them back.</div><ul class="alist"><li><span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span><span class="chip warn">Place again</span></li><li><span class="grow"><b>Well</b><span class="mono muted">well</span></span><span class="chip warn">Place again</span></li><li><span class="grow"><b>Cottage door</b><span class="mono muted">cottage_door</span></span><span class="chip warn">Place again</span></li><li><span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span><span class="chip warn">Place again</span></li><li><span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span><span class="chip warn">Place again</span></li></ul></div></div></section><div class="state">Placed on two earlier takes</div><section class="panel"><div class="head"><h2>Named areas</h2><span class="muted">0 of 5 placed</span></div><p class="muted">The parts of this picture the game names, so that a player can click them.</p><div class="areas"><div class="col"><div class="pic b"></div><p class="muted small">Drag over the picture to mark “Bucket”.</p></div><div class="col"><div class="back">Placed on takes 1 and 2 of the image, so the game does not use them now. Place them here, or choose one of those takes again to bring them back.</div><ul class="alist"><li class="sel"><span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Well</b><span class="mono muted">well</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Cottage door</b><span class="mono muted">cottage_door</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span><span class="chip warn">Place again</span></li></ul></div></div></section><div class="state">The take they were placed on was dropped</div><section class="panel"><div class="head"><h2>Named areas</h2><span class="muted">0 of 5 placed</span></div><p class="muted">The parts of this picture the game names, so that a player can click them.</p><div class="areas"><div class="col"><div class="pic b"></div><p class="muted small">Drag over the picture to mark “Bucket”.</p></div><div class="col"><div class="back">Placed on an earlier take of the image, so the game does not use them now. Place them here.</div><ul class="alist"><li class="sel"><span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Well</b><span class="mono muted">well</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Cottage door</b><span class="mono muted">cottage_door</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span><span class="chip warn">Place again</span></li><li class=""><span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span><span class="chip warn">Place again</span></li></ul></div></div></section><div class="state">The act’s Images page</div><div class="panel"><table><tr><th></th><th>Image</th><th>Prompt</th><th>Status</th></tr><tr><td><div class="th"></div></td><td><b>Village square</b><div class="mono muted">village_square</div></td><td class="muted">A village square at dusk, a well at the centre…</td><td><span class="chip ok">Chosen</span><div class="muted small" style="margin-top:4px">5 of 5 areas to place</div></td></tr></table></div><div class="state">The act’s Images page, with patches set aside as well</div><div class="panel"><table><tr><th></th><th>Image</th><th>Prompt</th><th>Status</th></tr><tr><td><div class="th"></div></td><td><b>Village square</b><div class="mono muted">village_square</div></td><td class="muted">A village square at dusk, a well at the centre…<div class="wline">make again: Door open, Lamp lit, Bread taken</div></td><td><span class="chip ok">Chosen</span><div class="muted small" style="margin-top:4px">5 of 5 areas to place</div></td></tr></table></div></div></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Named areas set aside</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/8%);
+        --line-strong: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --ok: #3ddc97;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .intro h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .intro p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .state {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 22px 0 -6px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .panel h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .panel p {
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+      }
+      .lbl {
+        font-size: 12px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 6px 12px;
+        font: inherit;
+      }
+      .btn.p {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border: 0;
+        font-weight: 600;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+      }
+      .btns {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .q {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .q h3 {
+        margin: 0;
+        font-size: 15px;
+      }
+      .q ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .q p {
+        margin: 0;
+      }
+      .q h4 {
+        margin: 2px 0 -6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .red {
+        color: var(--danger-ink);
+        font-size: 13px;
+      }
+      .pic {
+        position: relative;
+        aspect-ratio: 8/5;
+        border-radius: 8px;
+        overflow: hidden;
+        background: linear-gradient(160deg, #27395e 0 45%, #6b4a3a 45% 62%, #2a2f3f 62%);
+      }
+      .pic.b {
+        background: linear-gradient(200deg, #3b2a55 0 38%, #3e6b5a 38% 70%, #23262f 70%);
+      }
+      .frame {
+        aspect-ratio: 8/5;
+        background: var(--inset);
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+        padding: 12px;
+      }
+      .box {
+        position: absolute;
+        border: 2px solid var(--accent);
+        border-radius: 3px;
+      }
+      .box span {
+        position: absolute;
+        top: -19px;
+        left: -2px;
+        font-size: 11px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        padding: 0 5px;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
+      .ghost {
+        position: absolute;
+        border: 1px dashed rgb(255 255 255/55%);
+        border-radius: 3px;
+      }
+      .ghost span {
+        position: absolute;
+        top: 2px;
+        left: 4px;
+        font-size: 11px;
+        color: rgb(255 255 255/70%);
+        white-space: nowrap;
+      }
+      .chip {
+        font-size: 11px;
+        border-radius: 99px;
+        padding: 1px 8px;
+        white-space: nowrap;
+      }
+      .chip.ok {
+        background: rgb(61 220 151/15%);
+        color: var(--ok);
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: baseline;
+      }
+      .areas {
+        display: grid;
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .alist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--line);
+      }
+      .alist li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .alist li.sel {
+        background: var(--raised);
+        border-radius: 7px;
+      }
+      .alist b {
+        font-weight: 600;
+        display: block;
+      }
+      .alist .grow {
+        flex: 1;
+        min-width: 0;
+      }
+      .back {
+        background: var(--raised);
+        border-radius: 9px;
+        padding: 8px 10px;
+        color: var(--soft);
+        font-size: 13px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        font-size: 12px;
+        color: var(--faint);
+        text-align: left;
+        font-weight: 500;
+        padding: 6px;
+      }
+      td {
+        border-top: 1px solid var(--line);
+        padding: 8px 6px;
+        vertical-align: top;
+      }
+      .th {
+        width: 84px;
+        height: 52px;
+        border-radius: 5px;
+        background: linear-gradient(200deg, #3b2a55 0 38%, #3e6b5a 38% 70%, #23262f 70%);
+      }
+      .wline {
+        color: var(--warn);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      .takes {
+        display: flex;
+        gap: 8px;
+      }
+      .takes div {
+        flex: 1;
+      }
+      @media (max-width: 700px) {
+        .two,
+        .areas {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>Named areas set aside</h1>
+        <p>
+          Choosing another take of an image with placed named areas: the question, what the list
+          shows, the act’s page, and the states around them.
+        </p>
+      </div>
+      <div class="state">Named areas only</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Choose take 4?</h3>
+              <p>
+                5 named areas are placed on take 2. The game will stop using them until you place
+                them on take 4.
+              </p>
+              <ul>
+                <li>Bucket</li>
+                <li>Well</li>
+                <li>Cottage door</li>
+                <li>Old oak</li>
+                <li>Path north</li>
+              </ul>
+              <p class="faint small">Choosing take 2 again brings them all back.</p>
+              <div class="btns">
+                <button class="btn p">Choose take 4</button><button class="btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 4</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">Both patches and named areas</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Choose take 4?</h3>
+              <p>
+                Take 2 has 3 chosen patches and 5 placed named areas. The game will stop showing the
+                patches and stop using the areas until you make and place them again.
+              </p>
+              <h4>Patches</h4>
+              <ul>
+                <li>Door open</li>
+                <li>Lamp lit</li>
+                <li>Bread taken</li>
+              </ul>
+              <h4>Named areas</h4>
+              <ul>
+                <li>Bucket</li>
+                <li>Well</li>
+                <li>Cottage door</li>
+                <li>Old oak</li>
+                <li>Path north</li>
+              </ul>
+              <p class="faint small">Choosing take 2 again brings them all back.</p>
+              <div class="btns">
+                <button class="btn p">Choose take 4</button><button class="btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 4</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">Going back, with areas placed on the take in the game</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Choose take 2?</h3>
+              <p>
+                2 named areas are placed on take 4. The game will stop using them until you place
+                them on take 2.
+              </p>
+              <ul>
+                <li>Bucket</li>
+                <li>Well</li>
+              </ul>
+              <p class="faint small">
+                5 named areas placed on take 2 come back. Choosing take 4 again brings back what
+                leaves now.
+              </p>
+              <div class="btns">
+                <button class="btn p">Choose take 2</button><button class="btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 2</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">One area</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Choose take 4?</h3>
+              <p>
+                1 named area is placed on take 2. The game will stop using it until you place it on
+                take 4.
+              </p>
+              <ul>
+                <li>Bucket</li>
+              </ul>
+              <p class="faint small">Choosing take 2 again brings it back.</p>
+              <div class="btns">
+                <button class="btn p">Choose take 4</button><button class="btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 4</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">Un-choose</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Un-choose take 2?</h3>
+              <p>
+                The game shows no image here until you choose another. Take 2 stays among the takes.
+              </p>
+              <p>
+                5 named areas are placed on take 2. The game will stop using them until you place
+                them on another take.
+              </p>
+              <ul>
+                <li>Bucket</li>
+                <li>Well</li>
+                <li>Cottage door</li>
+                <li>Old oak</li>
+                <li>Path north</li>
+              </ul>
+              <p class="faint small">Choosing take 2 again brings them all back.</p>
+              <div class="btns">
+                <button class="btn p">Un-choose</button><button class="btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 4</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">Drop, when the take has areas set aside on it</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Drop take 2?</h3>
+              <p>
+                5 named areas were placed on take 2. After this they cannot be brought back; only
+                new ones can be placed.
+              </p>
+              <ul>
+                <li>Bucket</li>
+                <li>Well</li>
+                <li>Cottage door</li>
+                <li>Old oak</li>
+                <li>Path north</li>
+              </ul>
+              <div class="btns">
+                <button class="btn p">Drop take 2</button><button class="btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 2</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">Drop, with both</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Drop take 2?</h3>
+              <p>
+                Take 2 has 3 chosen patches and 5 placed named areas. After this they cannot be
+                brought back; only new ones can be made and placed.
+              </p>
+              <h4>Patches</h4>
+              <ul>
+                <li>Door open</li>
+                <li>Lamp lit</li>
+                <li>Bread taken</li>
+              </ul>
+              <h4>Named areas</h4>
+              <ul>
+                <li>Bucket</li>
+                <li>Well</li>
+                <li>Cottage door</li>
+                <li>Old oak</li>
+                <li>Path north</li>
+              </ul>
+              <div class="btns">
+                <button class="btn p">Drop take 2</button><button class="btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 2</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">Could not be saved: the question stays, nothing changes</div>
+      <div class="panel">
+        <div class="two">
+          <div class="col">
+            <div class="lbl">In the game</div>
+            <div class="q">
+              <h3>Choose take 4?</h3>
+              <p>
+                5 named areas are placed on take 2. The game will stop using them until you place
+                them on take 4.
+              </p>
+              <ul>
+                <li>Bucket</li>
+                <li>Well</li>
+                <li>Cottage door</li>
+                <li>Old oak</li>
+                <li>Path north</li>
+              </ul>
+              <p class="faint small">Choosing take 2 again brings them all back.</p>
+              <div class="btns">
+                <button class="btn p">Choose take 4</button><button class="btn">Cancel</button>
+              </div>
+              <p class="red" role="alert">
+                web/public/images/generated/manifest.json cannot be used
+              </p>
+            </div>
+          </div>
+          <div class="col">
+            <div class="lbl">Take 4</div>
+            <div class="pic b"></div>
+            <div class="btns">
+              <button class="btn" disabled>Drop</button><button class="btn" disabled>Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="state">After the yes: the list on the new take</div>
+      <section class="panel">
+        <div class="head">
+          <h2>Named areas</h2>
+          <span class="muted">0 of 5 placed</span>
+        </div>
+        <p class="muted">
+          The parts of this picture the game names, so that a player can click them.
+        </p>
+        <div class="areas">
+          <div class="col">
+            <div class="pic b"></div>
+            <p class="muted small">Drag over the picture to mark “Bucket”.</p>
+          </div>
+          <div class="col">
+            <div class="back">
+              Placed on take 2 of the image, so the game does not use them now. Place them here, or
+              choose take 2 again to bring them back.
+            </div>
+            <ul class="alist">
+              <li class="sel">
+                <span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Well</b><span class="mono muted">well</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"
+                  ><b>Cottage door</b><span class="mono muted">cottage_door</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <div class="state">Partway: placed again on this take</div>
+      <section class="panel">
+        <div class="head">
+          <h2>Named areas</h2>
+          <span class="muted">2 of 5 placed</span>
+        </div>
+        <p class="muted">
+          The parts of this picture the game names, so that a player can click them.
+        </p>
+        <div class="areas">
+          <div class="col">
+            <div class="pic b"></div>
+            <p class="muted small">Drag over the picture to mark “Bucket”.</p>
+          </div>
+          <div class="col">
+            <div class="back">
+              Placed on take 2 of the image, so the game does not use them now. Place them here, or
+              choose take 2 again to bring them back.
+            </div>
+            <ul class="alist">
+              <li class="sel">
+                <span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Well</b><span class="mono muted">well</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="grow"
+                  ><b>Cottage door</b><span class="mono muted">cottage_door</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <div class="state">Un-chosen: no take in the game</div>
+      <section class="panel">
+        <div class="head">
+          <h2>Named areas</h2>
+          <span class="muted">0 of 5 placed</span>
+        </div>
+        <p class="muted">
+          The parts of this picture the game names, so that a player can click them.
+        </p>
+        <div class="areas">
+          <div class="col"><div class="frame">Choose a take to mark the areas on it.</div></div>
+          <div class="col">
+            <div class="back">
+              Placed on take 2 of the image, so the game does not use them now. Choose take 2 again
+              to bring them back.
+            </div>
+            <ul class="alist">
+              <li>
+                <span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li>
+                <span class="grow"><b>Well</b><span class="mono muted">well</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li>
+                <span class="grow"
+                  ><b>Cottage door</b><span class="mono muted">cottage_door</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li>
+                <span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li>
+                <span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <div class="state">Placed on two earlier takes</div>
+      <section class="panel">
+        <div class="head">
+          <h2>Named areas</h2>
+          <span class="muted">0 of 5 placed</span>
+        </div>
+        <p class="muted">
+          The parts of this picture the game names, so that a player can click them.
+        </p>
+        <div class="areas">
+          <div class="col">
+            <div class="pic b"></div>
+            <p class="muted small">Drag over the picture to mark “Bucket”.</p>
+          </div>
+          <div class="col">
+            <div class="back">
+              Placed on takes 1 and 2 of the image, so the game does not use them now. Place them
+              here, or choose one of those takes again to bring them back.
+            </div>
+            <ul class="alist">
+              <li class="sel">
+                <span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Well</b><span class="mono muted">well</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"
+                  ><b>Cottage door</b><span class="mono muted">cottage_door</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <div class="state">The take they were placed on was dropped</div>
+      <section class="panel">
+        <div class="head">
+          <h2>Named areas</h2>
+          <span class="muted">0 of 5 placed</span>
+        </div>
+        <p class="muted">
+          The parts of this picture the game names, so that a player can click them.
+        </p>
+        <div class="areas">
+          <div class="col">
+            <div class="pic b"></div>
+            <p class="muted small">Drag over the picture to mark “Bucket”.</p>
+          </div>
+          <div class="col">
+            <div class="back">
+              Placed on an earlier take of the image, so the game does not use them now. Place them
+              here.
+            </div>
+            <ul class="alist">
+              <li class="sel">
+                <span class="grow"><b>Bucket</b><span class="mono muted">bucket</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Well</b><span class="mono muted">well</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"
+                  ><b>Cottage door</b><span class="mono muted">cottage_door</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Old oak</b><span class="mono muted">old_oak</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+              <li class="">
+                <span class="grow"><b>Path north</b><span class="mono muted">path_north</span></span
+                ><span class="chip warn">Place again</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <div class="state">The act’s Images page</div>
+      <div class="panel">
+        <table>
+          <tr>
+            <th></th>
+            <th>Image</th>
+            <th>Prompt</th>
+            <th>Status</th>
+          </tr>
+          <tr>
+            <td><div class="th"></div></td>
+            <td>
+              <b>Village square</b>
+              <div class="mono muted">village_square</div>
+            </td>
+            <td class="muted">A village square at dusk, a well at the centre…</td>
+            <td>
+              <span class="chip ok">Chosen</span>
+              <div class="muted small" style="margin-top: 4px">5 of 5 areas to place</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div class="state">The act’s Images page, with patches set aside as well</div>
+      <div class="panel">
+        <table>
+          <tr>
+            <th></th>
+            <th>Image</th>
+            <th>Prompt</th>
+            <th>Status</th>
+          </tr>
+          <tr>
+            <td><div class="th"></div></td>
+            <td>
+              <b>Village square</b>
+              <div class="mono muted">village_square</div>
+            </td>
+            <td class="muted">
+              A village square at dusk, a well at the centre…
+              <div class="wline">make again: Door open, Lamp lit, Bread taken</div>
+            </td>
+            <td>
+              <span class="chip ok">Chosen</span>
+              <div class="muted small" style="margin-top: 4px">5 of 5 areas to place</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>
