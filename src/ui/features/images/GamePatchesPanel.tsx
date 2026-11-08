@@ -25,7 +25,7 @@ function PatchBody({
   onMark,
   onBackToArea,
   tie,
-  image,
+  imageSize,
   onSaved,
   onEdit,
 }: {
@@ -40,7 +40,7 @@ function PatchBody({
   onBackToArea: () => void
   /** The named area the game ties the patch to, with its place; none for a patch with no tie. */
   tie: PatchTie | null
-  image: { width: number; height: number }
+  imageSize: { width: number; height: number }
   onSaved: () => void
   onEdit: () => void
 }) {
@@ -128,7 +128,7 @@ function PatchBody({
           onMark={onMark}
           onBackToArea={onBackToArea}
           tie={tie}
-          image={image}
+          imageSize={imageSize}
         />
       ) : (
         words
@@ -217,7 +217,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   onMark={(area) => setMarks((now) => ({ ...now, [patch.id]: area }))}
                   onBackToArea={() => setMarks(({ [patch.id]: _own, ...others }) => others)}
                   tie={tieOf(row, patch)}
-                  image={row}
+                  imageSize={row}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
                 />

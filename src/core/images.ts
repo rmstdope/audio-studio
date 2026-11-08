@@ -74,10 +74,7 @@ const ImageShape = z.object({
 })
 
 /** Refines an image: a patch may only name one of the image's own named areas. */
-function tiesToListedAreas(
-  image: { patches: { id: string; area?: string | undefined }[]; areas: { id: string }[] },
-  ctx: z.RefinementCtx,
-) {
+function tiesToListedAreas(image: z.infer<typeof ImageShape>, ctx: z.RefinementCtx) {
   const listed = new Set(image.areas.map((area) => area.id))
   image.patches.forEach((patch, at) => {
     if (patch.area !== undefined && !listed.has(patch.area)) {

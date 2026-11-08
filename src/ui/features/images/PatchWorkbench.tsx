@@ -138,7 +138,7 @@ export function PatchWorkbench({
   onMark,
   onBackToArea,
   tie,
-  image: imageSize,
+  imageSize,
 }: {
   imageId: string
   patchId: string
@@ -153,7 +153,7 @@ export function PatchWorkbench({
   onBackToArea: () => void
   tie: PatchTie | null
   /** The image's size, the pixels its named areas are in. */
-  image: { width: number; height: number }
+  imageSize: { width: number; height: number }
 }) {
   const make = useMakePatchTakes(imageId, patchId)
   const stop = useStopPatchTakes(imageId, patchId)
@@ -466,10 +466,12 @@ export function PatchWorkbench({
           ) : fromArea ? (
             <button
               type="button"
-              className="btn btn-ghost patch-back"
+              className="patch-back"
               onClick={() => {
                 onBackToArea()
-                makeButton.current?.focus()
+                // Make may be off (no model, takes being made): focus then goes to the heading.
+                if (makeButton.current && !makeButton.current.disabled) makeButton.current.focus()
+                else setPendingFocus('heading')
               }}
             >
               {backToAreaText(tie.title)}
