@@ -1,4 +1,5 @@
 import type { ConflictKind, ImageRow, ImagesSummary } from '../core/images'
+import type { SetAsideAsk, SetAsideQuestion } from '../core/imagePatches'
 import type { ImagesRoute } from './route'
 
 /** The line under an act's heading: how many of its images have a chosen one. */
@@ -101,6 +102,61 @@ export function makeTakesText(count: number, hasTakes: boolean): string {
 /** What the Un-choose question says will happen. */
 export function unchooseNote(take: number): string {
   return `The game shows no image here until you choose another. Take ${take} stays among the takes.`
+}
+
+/** The title of the question asked before choosing, un-choosing or dropping a take. */
+export function setAsideTitle(ask: SetAsideAsk, from: number): string {
+  return ask.kind === 'choose'
+    ? `Choose take ${ask.n}?`
+    : ask.kind === 'drop'
+      ? `Drop take ${ask.n}?`
+      : `Un-choose take ${from}?`
+}
+
+/** What choosing away from a take does to its chosen patches (`count` of them, made on take `from`). */
+export function setAsideSentence(from: number, count: number): string {
+  return count === 1
+    ? `1 chosen patch was made on take ${from}. The game will stop showing it until you make a new one.`
+    : `${count} chosen patches were made on take ${from}. The game will stop showing them until you make new ones.`
+}
+
+/** What dropping a take does to its chosen patches. */
+export function setAsideDropSentence(from: number, count: number): string {
+  return count === 1
+    ? `1 chosen patch was made on take ${from}. After this it cannot be brought back; only a new one can be made.`
+    : `${count} chosen patches were made on take ${from}. After this they cannot be brought back; only new ones can be made.`
+}
+
+/** The dim line of a Choose or Un-choose question: the way back, and what comes back with the new take. */
+export function setAsideDim(q: SetAsideQuestion): string {
+  if (q.returning.length === 0) {
+    return `Choosing take ${q.from} again brings ${q.leaving.length === 1 ? 'it' : 'them all'} back.`
+  }
+  const n = q.returning.length
+  const comes = `${n} ${n === 1 ? 'patch' : 'patches'} made on take ${q.to} ${n === 1 ? 'comes' : 'come'} back: ${q.returning.join(', ')}.`
+  return `${comes} Choosing take ${q.from} again brings ${joined(q.leaving)} back.`
+}
+
+/** The line on an act's row naming the patches to make again. */
+export function makeAgainActLine(titles: string[]): string {
+  return `make again: ${titles.join(', ')}`
+}
+
+/**
+ * The line above an opened patch to make again: the takes of the image it was chosen on (none: they
+ * were dropped) and how to get it back, given the take chosen now (null: none is).
+ */
+export function makeAgainOpenLine(takes: number[], chosen: number | null): string {
+  if (takes.length === 0) {
+    return 'Chosen on an earlier take of the image, so the game does not show it now. Make a new one here.'
+  }
+  const where = `${takes.length === 1 ? 'take' : 'takes'} ${joined(takes.map(String))}`
+  const back = takes.length === 1 ? `take ${takes[0]}` : 'one of those takes'
+  const way =
+    chosen === null
+      ? `Choose ${back} again to bring it back.`
+      : `Make a new one here, or choose ${back} again to bring it back.`
+  return `Chosen on ${where} of the image, so the game does not show it now. ${way}`
 }
 
 /** The smallest share of the game's size the two pictures are shrunk to side by side, before they stack. */

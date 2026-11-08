@@ -1,7 +1,8 @@
+import { makeAgainOf } from '../../../core/imagePatches'
 import { imagesDone, type ImagesAct, type ImageRow, type ImagesSummary } from '../../../core/images'
 import { useImageMaking, useRefreshDialog } from '../../api'
 import { shortTitle } from '../../format'
-import { areasToPlaceText, chosenLine, disagreeText } from '../../imagesText'
+import { areasToPlaceText, chosenLine, disagreeText, makeAgainActLine } from '../../imagesText'
 import { ActLinks } from './ActLinks'
 import { makingStatusText } from '../../musicTakesText'
 import { routeHref } from '../../route'
@@ -161,6 +162,7 @@ export function ActPage({
                   )
                 }
                 const row = act.rows.find((r) => r.id === id)
+                const again = row ? makeAgainOf(row) : []
                 return (
                   row && (
                     <tr key={id}>
@@ -194,6 +196,11 @@ export function ActPage({
                         )}
                         {row.patches.some((patch) => patch.gameChanged) && (
                           <div className="chg">the game changed a patch&apos;s words</div>
+                        )}
+                        {again.length > 0 && (
+                          <div className="chg">
+                            {makeAgainActLine(again.map((patch) => patch.title))}
+                          </div>
                         )}
                         {row.actStyle?.on === false && act.addition !== null && (
                           <div className="chg">{name}&apos;s style left out</div>

@@ -86,6 +86,7 @@ async function show(
   data: ImageTakesView,
   over: Partial<ImageRow> = {},
   prompt?: ReturnType<typeof createElement>,
+  answer: unknown = { ok: true },
 ) {
   const calls: { url: string; method: string; body: unknown }[] = []
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -94,7 +95,7 @@ async function show(
       method: init?.method ?? 'GET',
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
     })
-    return Response.json({ ok: true })
+    return Response.json(answer)
   }) as typeof fetch
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(['image-takes', 'inn'], data)
@@ -105,15 +106,17 @@ async function show(
     act(() => root.unmount())
     container.remove()
   })
-  act(() =>
-    root.render(
-      createElement(
-        QueryClientProvider,
-        { client },
-        createElement(TakesSection, { row: { ...row, ...over }, prompt }),
+  const draw = (now: Partial<ImageRow>) =>
+    act(() =>
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(TakesSection, { row: { ...row, ...over, ...now }, prompt }),
+        ),
       ),
-    ),
-  )
+    )
+  draw({})
   await act(async () => {})
   const buttons = (text: string) =>
     [...container.querySelectorAll('button')].filter((b) => b.textContent === text)
@@ -134,7 +137,8 @@ async function show(
   /** The take on the right, from the heading of its side. */
   const right = () => container.querySelector('[data-side="right"] b')?.textContent
   const left = () => container.querySelector('[data-side="left"] b')?.textContent
-  return { client, container, calls, buttons, button, click, key, text, right, left }
+  const rerender = (now: Partial<ImageRow>) => draw(now)
+  return { client, container, calls, buttons, button, click, key, text, right, left, rerender }
 }
 
 const three = [take(1), take(2), take(3)]
@@ -376,6 +380,215 @@ describe('un-choosing', () => {
     await s.click(s.button('Un-choose'))
     await s.click(s.button('Un-choose'))
     expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/unchoose', method: 'POST' })
+  })
+})
+
+describe('patches set aside', () => {
+  const patch = (title: string, chosenOn: number[], chosenOnGone = false) => ({
+    id: title.toLowerCase().replace(/ /g, '-'),
+    title,
+    description: '',
+    words: '',
+    changed: false,
+    gameChanged: false,
+    gameWas: null,
+    chosenOn,
+    chosenOnGone,
+  })
+  const three = [patch('Bread taken', [2]), patch('Door open', [2]), patch('Lamp lit', [2])]
+  /** Take 2 is in the game with these patches chosen on it; takes 1 and 4 are others. */
+  const inGame = (patches = three, answer: unknown = { ok: true }) =>
+    show(
+      view({ takes: [take(1), take(2, { chosen: true }), take(4)] }),
+      { chosenTake: 2, status: 'chosen', patches },
+      undefined,
+      answer,
+    )
+  const q = (s: Awaited<ReturnType<typeof inGame>>) =>
+    s.container.querySelector('[role="alertdialog"]')
+
+  it('asks before Choose, in the place of the picture in the game, and names the patches', async () => {
+    const s = await inGame()
+    await s.click(s.button('Choose'))
+    expect(s.calls).toHaveLength(0)
+    expect(s.container.querySelector('[data-side="left"] [role="alertdialog"]')).not.toBeNull()
+    expect(s.text()).toContain('Choose take 4?')
+    expect(s.text()).toContain(
+      '3 chosen patches were made on take 2. The game will stop showing them until you make new ones.',
+    )
+    expect([...q(s)!.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Bread taken',
+      'Door open',
+      'Lamp lit',
+    ])
+    expect(s.text()).toContain('Choosing take 2 again brings them all back.')
+    expect(s.button('Choose take 4')).toBeDefined()
+    expect(document.activeElement?.textContent).toBe('Choose take 4')
+    // the take on the right stays in view with Drop and Choose off
+    expect(s.right()).toBe('Take 4')
+    expect(s.button('Drop').disabled).toBe(true)
+    expect(s.button('Choose').disabled).toBe(true)
+  })
+
+  it('chooses on the yes and not before', async () => {
+    const s = await inGame()
+    await s.click(s.button('Choose'))
+    await s.click(s.button('Choose take 4'))
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose', body: { n: 4 } })
+    expect(q(s)).toBeNull()
+  })
+
+  it('asks the same on C, rests ← → C D while open, and Cancel returns focus to Choose', async () => {
+    const s = await inGame()
+    await s.key('c')
+    expect(s.text()).toContain('Choose take 4?')
+    await s.key('ArrowLeft')
+    await s.key('c')
+    await s.key('d')
+    expect(s.right()).toBe('Take 4')
+    expect(s.calls).toHaveLength(0)
+    await s.click(s.button('Cancel'))
+    expect(s.calls).toHaveLength(0)
+    expect(q(s)).toBeNull()
+    expect(document.activeElement?.textContent).toBe('Choose')
+  })
+
+  it('says the singular words for one patch', async () => {
+    const s = await inGame([patch('Bread taken', [2])])
+    await s.click(s.button('Choose'))
+    expect(s.text()).toContain(
+      '1 chosen patch was made on take 2. The game will stop showing it until you make a new one.',
+    )
+    expect(s.text()).toContain('Choosing take 2 again brings it back.')
+  })
+
+  it('says which patches come back with the take chosen', async () => {
+    const s = await inGame([
+      patch('Bread taken', [2]),
+      patch('Door open', [4]),
+      patch('Lamp lit', [4]),
+    ])
+    await s.click(s.button('Choose'))
+    expect(s.text()).toContain(
+      '2 patches made on take 4 come back: Door open, Lamp lit. Choosing take 2 again brings Bread taken back.',
+    )
+  })
+
+  it('does not ask when the take in the game has no chosen patches, even if the new one has some', async () => {
+    const s = await inGame([patch('Door open', [4]), patch('Well', [])])
+    await s.click(s.button('Choose'))
+    expect(q(s)).toBeNull()
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose' })
+  })
+
+  it('keeps the question open with the studio’s message in red when the choice cannot be saved', async () => {
+    const s = await inGame(three, { ok: false, message: 'manifest.json cannot be used' })
+    await s.click(s.button('Choose'))
+    await s.click(s.button('Choose take 4'))
+    expect(q(s)).not.toBeNull()
+    expect(q(s)!.querySelector('.adopt-error')?.textContent).toBe('manifest.json cannot be used')
+    expect(s.left()).not.toBe('Take 4')
+  })
+
+  it('adds the patches to the Un-choose question, with its own words and button', async () => {
+    const s = await inGame()
+    await s.click(s.button('Un-choose'))
+    expect(s.text()).toContain('Un-choose take 2?')
+    expect(s.text()).toContain(
+      'The game shows no image here until you choose another. Take 2 stays among the takes.',
+    )
+    expect(s.text()).toContain('3 chosen patches were made on take 2.')
+    expect([...q(s)!.querySelectorAll('li')]).toHaveLength(3)
+    expect(s.text()).toContain('Choosing take 2 again brings them all back.')
+    await s.click(s.button('Un-choose'))
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/unchoose' })
+  })
+
+  it('asks before Drop of a take with patches set aside, in the place of its picture', async () => {
+    const s = await inGame([
+      patch('Bread taken', [4]),
+      patch('Door open', [4]),
+      patch('Lamp lit', []),
+    ])
+    await s.click(s.button('Drop'))
+    expect(s.calls).toHaveLength(0)
+    expect(s.container.querySelector('[data-side="right"] [role="alertdialog"]')).not.toBeNull()
+    expect(s.text()).toContain('Drop take 4?')
+    expect(s.text()).toContain(
+      '2 chosen patches were made on take 4. After this they cannot be brought back; only new ones can be made.',
+    )
+    expect([...q(s)!.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Bread taken',
+      'Door open',
+    ])
+    await s.click(s.button('Cancel'))
+    expect(document.activeElement?.textContent).toBe('Drop')
+    await s.key('d')
+    await s.click(s.button('Drop take 4'))
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/takes/4', method: 'DELETE' })
+  })
+
+  it('keeps the question’s words on screen until the save and the reload are done', async () => {
+    const s = await inGame()
+    await s.click(s.button('Choose'))
+    // the project reload after the save is slow: the row already shows the new take meanwhile
+    globalThis.fetch = (async () => new Promise(() => {})) as unknown as typeof fetch
+    await s.click(s.button('Choose take 4'))
+    s.rerender({ chosenTake: 4, patches: three.map((p) => ({ ...p, chosenOn: [2] })) })
+    expect(q(s)!.textContent).toContain('3 chosen patches were made on take 2.')
+    expect(q(s)!.querySelectorAll('li')).toHaveLength(3)
+  })
+
+  it('Cancel of the Drop question returns focus to Drop, with the button and with D', async () => {
+    const s = await inGame([patch('Bread taken', [4])])
+    await s.key('d')
+    await s.click(s.button('Cancel'))
+    expect(document.activeElement?.textContent).toBe('Drop')
+  })
+
+  it('keeps the Un-choose question open with the message, also when the request fails', async () => {
+    const refused = await inGame(three, { ok: false, message: 'cannot be used' })
+    await refused.click(refused.button('Un-choose'))
+    await refused.click(refused.button('Un-choose'))
+    for (let i = 0; i < 20 && !q(refused)?.querySelector('.adopt-error'); i++) {
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 5)))
+    }
+    expect(q(refused)!.querySelector('.adopt-error')?.textContent).toBe('cannot be used')
+    const failed = await inGame()
+    globalThis.fetch = (async () => {
+      throw new Error('network down')
+    }) as unknown as typeof fetch
+    await failed.click(failed.button('Choose'))
+    await failed.click(failed.button('Choose take 4'))
+    for (let i = 0; i < 20 && !q(failed)?.querySelector('.adopt-error'); i++) {
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 5)))
+    }
+    expect(q(failed)!.querySelector('.adopt-error')?.textContent).toBe('network down')
+    expect(q(failed)!.textContent).toContain('3 chosen patches were made on take 2.')
+  })
+
+  it('switches Un-choose off while a question is open', async () => {
+    const s = await inGame([patch('Bread taken', [4])])
+    await s.click(s.button('Drop'))
+    expect(s.button('Un-choose').disabled).toBe(true)
+  })
+
+  it('drops at once a take with no patches set aside', async () => {
+    const s = await inGame()
+    await s.click(s.button('Drop'))
+    expect(q(s)).toBeNull()
+    expect(s.calls.at(-1)).toMatchObject({ method: 'DELETE' })
+  })
+
+  it('keeps the Drop question open with the message when the drop cannot be saved', async () => {
+    const s = await inGame([patch('Bread taken', [4])], { ok: false, message: 'no luck' })
+    await s.click(s.button('Drop'))
+    await s.click(s.button('Drop take 4'))
+    for (let i = 0; i < 20 && !q(s)?.querySelector('.adopt-error'); i++) {
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 5)))
+    }
+    expect(q(s)!.querySelector('.adopt-error')?.textContent).toBe('no luck')
+    expect(s.right()).toBe('Take 4')
   })
 })
 

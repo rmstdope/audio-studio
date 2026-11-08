@@ -6,16 +6,22 @@ import { useEffect, useRef, type ReactNode } from 'react'
  */
 export function Confirm({
   title,
+  lead,
   effects,
   note,
+  error,
   back = 'Back to the audition',
   onBack,
   backDisabled = false,
   children,
 }: {
   title: string
+  /** Lines before the list of effects. */
+  lead?: ReactNode
   effects: ReactNode[]
   note?: string
+  /** Why the last try failed, in red under the buttons. */
+  error?: string | null
   /** What the button that goes back without acting says. */
   back?: string
   onBack: () => void
@@ -35,6 +41,7 @@ export function Confirm({
   return (
     <section ref={panel} className="panel confirm" role="alertdialog" aria-label={title}>
       <h2 className="section-title">{title}</h2>
+      {lead}
       {effects.length > 0 && (
         <ul className="confirm-effects">
           {effects.map((effect, i) => (
@@ -49,6 +56,7 @@ export function Confirm({
         </button>
         {children}
       </div>
+      {error && <span className="adopt-error">{error}</span>}
     </section>
   )
 }

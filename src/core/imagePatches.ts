@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AreaBox } from './images'
+import type { AreaBox, ImageRow, PatchRow } from './images'
 import type { Look, LookSize } from './imageLook'
 import { bringToLook, type Pixels } from './imagePixels'
 
@@ -513,4 +513,58 @@ export function gamePatch(take: Pixels, patch: Pixels, look: Look, size: LookSiz
     data.set([after.data[i]!, after.data[i + 1]!, after.data[i + 2]!, 255], i)
   }
   return { width: size.width, height: size.height, data }
+}
+
+/** What the page asks first about: choosing a take, un-choosing the chosen one, or dropping a take. */
+export type SetAsideAsk =
+  { kind: 'choose'; n: number } | { kind: 'unchoose' } | { kind: 'drop'; n: number }
+
+/** What a question about patches set aside names: the titles that leave, and those that come back. */
+export interface SetAsideQuestion {
+  /** The take the leaving patches were chosen on (the take in the game, or the one dropped). */
+  from: number
+  /** Titles of the chosen patches of `from`, in the game's order. */
+  leaving: string[]
+  /** The take being chosen; null on Un-choose and Drop. */
+  to: number | null
+  /** Titles of the patches chosen on `to`, which come back. */
+  returning: string[]
+}
+
+/**
+ * The patches the game still asks for that need making again: one with a take chosen on a take of
+ * the image other than the one in the game, and none on that one, in the game's order.
+ */
+export function makeAgainOf(row: Pick<ImageRow, 'chosenTake' | 'patches'>): PatchRow[] {
+  return row.patches.filter(
+    (patch) =>
+      !(row.chosenTake !== null && patch.chosenOn.includes(row.chosenTake)) &&
+      (patch.chosenOn.length > 0 || patch.chosenOnGone),
+  )
+}
+
+/**
+ * What to ask before the ask changes the image's takes, or null when nothing needs asking: the
+ * chosen patches of the take in the game leave on Choose and Un-choose (unless they come back on
+ * the new take), and those chosen on a dropped take can no longer be brought back.
+ */
+export function setAsideQuestion(
+  row: Pick<ImageRow, 'chosenTake' | 'patches'>,
+  ask: SetAsideAsk,
+): SetAsideQuestion | null {
+  const from = ask.kind === 'drop' ? ask.n : row.chosenTake
+  if (from === null) return null
+  const to = ask.kind === 'choose' ? ask.n : null
+  const back = (patch: PatchRow) => to !== null && patch.chosenOn.includes(to)
+  // Dropping a take sets nothing aside for a patch the game still shows through its own take.
+  const shown = (patch: PatchRow) =>
+    ask.kind === 'drop' && row.chosenTake !== null && patch.chosenOn.includes(row.chosenTake)
+  const leaving = row.patches.filter((p) => p.chosenOn.includes(from) && !back(p) && !shown(p))
+  if (leaving.length === 0) return null
+  return {
+    from,
+    leaving: leaving.map((p) => p.title),
+    to,
+    returning: row.patches.filter(back).map((p) => p.title),
+  }
 }

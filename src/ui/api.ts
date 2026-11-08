@@ -1779,7 +1779,8 @@ export function useDropImageTake(imageId: string) {
   return useImageTakesChange<number>(
     imageId,
     (n) => ({ path: `/takes/${n}`, method: 'DELETE' }),
-    false,
+    // The patches chosen on the dropped take can no longer be brought back: the rows say so.
+    true,
   )
 }
 

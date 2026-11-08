@@ -27,6 +27,8 @@ const patch = (id: string, over: Partial<PatchRow> = {}): PatchRow => ({
   changed: false,
   gameChanged: false,
   gameWas: null,
+  chosenOn: [],
+  chosenOnGone: false,
   ...over,
 })
 
