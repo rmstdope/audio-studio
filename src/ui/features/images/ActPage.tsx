@@ -162,6 +162,7 @@ export function ActPage({
                   )
                 }
                 const row = act.rows.find((r) => r.id === id)
+                const again = row ? makeAgainOf(row) : []
                 return (
                   row && (
                     <tr key={id}>
@@ -196,9 +197,9 @@ export function ActPage({
                         {row.patches.some((patch) => patch.gameChanged) && (
                           <div className="chg">the game changed a patch&apos;s words</div>
                         )}
-                        {makeAgainOf(row).length > 0 && (
+                        {again.length > 0 && (
                           <div className="chg">
-                            {makeAgainActLine(makeAgainOf(row).map((patch) => patch.title))}
+                            {makeAgainActLine(again.map((patch) => patch.title))}
                           </div>
                         )}
                         {row.actStyle?.on === false && act.addition !== null && (

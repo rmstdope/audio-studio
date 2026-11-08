@@ -7,7 +7,11 @@ import {
   type ImageTakeView,
   type ImageTakesView,
 } from '../../../core/imageTakes'
-import { setAsideQuestion, type SetAsideAsk } from '../../../core/imagePatches'
+import {
+  setAsideQuestion,
+  type SetAsideAsk,
+  type SetAsideQuestion,
+} from '../../../core/imagePatches'
 import type { ImageRow } from '../../../core/images'
 import {
   IMAGE_MODEL_IDS,
@@ -133,6 +137,11 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   // The question open: choosing, un-choosing or dropping a take with chosen patches asks first.
   const [asking, setAsking] = useState<SetAsideAsk | null>(null)
   const open = asking !== null
+  // What the question said when it opened: it stays as it was while the save and the reload land.
+  const [frozen, setFrozen] = useState<{ question: SetAsideQuestion | null; take: number }>({
+    question: null,
+    take: 0,
+  })
   const [saved, setSaved] = useState(0)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
   const [showing, setShowing] = useState<Showing>('game')
@@ -336,6 +345,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
       return
     }
     beforeChange()
+    setFrozen({ question: setAsideQuestion(row, ask), take: chosen?.n ?? 0 })
     setAsking(ask)
   }
   /** Closes the question without acting, and returns focus to the button that opened it. */
@@ -438,7 +448,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
     refusal(make.data) ?? refusal(choose.data) ?? refusal(drop.data) ?? refusal(unchoose.data)
   const error = make.error ?? choose.error ?? drop.error ?? unchoose.error ?? stop.error
   // The red line under an open question's buttons: the studio's own message for the last try.
-  const question = asking === null ? null : setAsideQuestion(row, asking)
+  const question = frozen.question
   const answering = asking?.kind === 'choose' ? choose : asking?.kind === 'drop' ? drop : unchoose
   const askError = refusal(answering.data) ?? answering.error?.message ?? null
 
@@ -586,9 +596,9 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
         >
           <div className="image-stage" data-stacked={stacked} ref={setStage}>
             <div className="image-side" data-side="left">
-              {asking && asking.kind !== 'drop' && (chosen || asking.kind === 'choose') ? (
+              {asking && asking.kind !== 'drop' ? (
                 <Confirm
-                  title={setAsideTitle(asking, chosen?.n ?? 0)}
+                  title={setAsideTitle(asking, frozen.take)}
                   lead={
                     question && (
                       <>
@@ -609,7 +619,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                     question
                       ? setAsideDim(question)
                       : asking.kind === 'unchoose'
-                        ? unchooseNote(chosen!.n)
+                        ? unchooseNote(frozen.take)
                         : undefined
                   }
                   error={askError}
@@ -653,11 +663,15 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                   lockUnread={lockUnread}
                   heading={leftHeading}
                   opener={unchooseButton}
-                  unchoosing={unchoose.isPending}
+                  unchoosing={unchoose.isPending || open}
                   saving={choose.isPending}
                   saved={saved}
                   onUnchoose={() => {
                     unchoose.reset()
+                    setFrozen({
+                      question: setAsideQuestion(row, { kind: 'unchoose' }),
+                      take: chosen?.n ?? 0,
+                    })
                     setAsking({ kind: 'unchoose' })
                   }}
                   size={size}

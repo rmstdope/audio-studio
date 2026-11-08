@@ -919,7 +919,7 @@ export interface ImagesInput {
   takeLooks?: Record<string, (string | null)[]>
   /** The takes of each image each of its patches has a chosen take on, by image id then patch id. */
   patchChoices?: Record<string, Record<string, number[]>>
-  /** The takes on each image's board, by image id; absent means none. */
+  /** The takes on each image's board, by image id; an image absent here has a board that was not read. */
   imageTakes?: Record<string, number[]>
 }
 
@@ -1032,7 +1032,9 @@ export function summarizeImages(input: ImagesInput): {
       patches: image.patches.map((patch) => {
         const mine = own?.patches?.[patch.id]
         const bases = input.patchChoices?.[image.id]?.[patch.id] ?? []
-        const there = new Set(input.imageTakes?.[image.id] ?? [])
+        // An image whose board was not read has takes unknown: nothing counts as dropped.
+        const known = input.imageTakes?.[image.id]
+        const there = new Set(known ?? bases)
         return {
           ...patch,
           words: mine?.text ?? patch.description,

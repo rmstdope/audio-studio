@@ -987,9 +987,9 @@ describe('the patches the game asks for', () => {
         [[], false],
       ])
     })
-    it('counts every chosen take as on a dropped one when the image has no takes', () => {
+    it('takes the image’s takes as unknown, and marks nothing dropped, when its board was not read', () => {
       const row = rowOf({ patchChoices: { [inn.id]: { 'bread-taken': [3] } } })
-      expect(row.patches[0]).toMatchObject({ chosenOn: [], chosenOnGone: true })
+      expect(row.patches[0]).toMatchObject({ chosenOn: [3], chosenOnGone: false })
     })
     it('does not make the image out of date, nor change what a take is made from', () => {
       const plain = rowOf({}, inn)

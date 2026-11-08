@@ -556,7 +556,10 @@ export function setAsideQuestion(
   if (from === null) return null
   const to = ask.kind === 'choose' ? ask.n : null
   const back = (patch: PatchRow) => to !== null && patch.chosenOn.includes(to)
-  const leaving = row.patches.filter((p) => p.chosenOn.includes(from) && !back(p))
+  // Dropping a take sets nothing aside for a patch the game still shows through its own take.
+  const shown = (patch: PatchRow) =>
+    ask.kind === 'drop' && row.chosenTake !== null && patch.chosenOn.includes(row.chosenTake)
+  const leaving = row.patches.filter((p) => p.chosenOn.includes(from) && !back(p) && !shown(p))
   if (leaving.length === 0) return null
   return {
     from,

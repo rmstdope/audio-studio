@@ -588,6 +588,11 @@ describe('patches set aside', () => {
         returning: [],
       })
     })
+    it('leaves a patch out of the Drop question when it is chosen on the take in the game too', () => {
+      expect(
+        setAsideQuestion(row(4, patch('Bread taken', [2, 4])), { kind: 'drop', n: 2 }),
+      ).toBeNull()
+    })
     it('asks on Drop about the patches set aside on that take only', () => {
       expect(setAsideQuestion(row(4, bread, door, lamp), { kind: 'drop', n: 2 })).toEqual({
         from: 2,
