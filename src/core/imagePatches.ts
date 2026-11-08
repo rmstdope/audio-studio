@@ -123,7 +123,7 @@ export const PATCH_EASE = 48
 /** How many positions each way along a side the median is taken over, so that one speck does not set the colour. */
 const MATCH_SMOOTH = 24
 
-/** Out of 255, how far a place along a side may differ from the drift of all the sides together and still be followed in full. */
+/** Out of 255, how far a place along a side may differ from the commonest tone around the area and still be followed in full. */
 const MATCH_FOLLOW = 22
 
 /** Out of 255, how far beyond `MATCH_FOLLOW` a place may differ before it is not followed at all: it is something the edit painted there. */
@@ -139,21 +139,32 @@ const MATCH_SAME = 8
 const MATCH_SAMPLES = 400
 
 /**
- * The commonest offset among the places: the one with the most others within `MATCH_SAME` of it on
- * every channel, taken as the median of those. Unlike the median of all, it stays on the sky when
- * objects of many different tones cover most of the strip around it.
+ * The offset to take as the drift around the area: of the tones that many places agree on (within
+ * `MATCH_SAME` on every channel; any group at least a quarter as big as the biggest), the one
+ * nearest `anchor`, the median offset of the whole picture, as the median of that group. The whole
+ * picture is mostly untouched by the edit, so its median is the drift even where objects cover most
+ * of the strip around the area, and among tones that are about equally common (a gradual drift) it
+ * keeps the middle one instead of an end.
  */
-function commonest(offsets: [number, number, number][]): number[] {
+function commonest(offsets: [number, number, number][], anchor: number[]): number[] {
   const step = Math.max(1, Math.ceil(offsets.length / MATCH_SAMPLES))
   const sample = offsets.filter((_, k) => k % step === 0)
   const near = (a: number[], b: number[]) =>
     [0, 1, 2].every((c) => Math.abs(a[c]! - b[c]!) <= MATCH_SAME)
-  let best: [number, number, number][] = []
-  for (const o of sample) {
-    const group = sample.filter((other) => near(o, other))
-    if (group.length > best.length) best = group
+  const groups = sample.map((o) => sample.filter((other) => near(o, other)))
+  const biggest = Math.max(...groups.map((g) => g.length))
+  let best: number[] = anchor
+  let nearest = Infinity
+  for (const group of groups) {
+    if (group.length * 4 < biggest) continue
+    const centre = [0, 1, 2].map((c) => middle(group.map((o) => o[c]!)))
+    const gap = [0, 1, 2].reduce((sum, c) => sum + Math.abs(centre[c]! - anchor[c]!), 0)
+    if (gap < nearest) {
+      nearest = gap
+      best = centre
+    }
   }
-  return [0, 1, 2].map((c) => middle(best.map((o) => o[c]!)))
+  return best
 }
 
 /** One side of the marked area with the colour offset (take minus edit) measured next to it. */
@@ -260,7 +271,21 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
   // tone instead, gradually, so no hard step shows. This is judged before smoothing, so that
   // objects covering most of a side cannot outvote the sky.
   if (strips.length > 0) {
-    const reference = commonest(strips.flatMap((strip) => strip.offsets))
+    // The median offset of the whole picture outside the area, from a sparse grid of places.
+    const grid: [number, number, number][] = []
+    const stride = Math.max(1, Math.floor(Math.sqrt((width * height) / MATCH_SAMPLES)))
+    for (let y = 0; y < height; y += stride) {
+      for (let x = 0; x < width; x += stride) {
+        if (x >= area.x && x < right && y >= area.y && y < bottom) continue
+        grid.push(offsetAtPixel(x, y))
+      }
+    }
+    const basis = grid.length > 0 ? grid : strips.flatMap((strip) => strip.offsets)
+    const anchor = [0, 1, 2].map((c) => middle(basis.map((o) => o[c]!)))
+    const reference = commonest(
+      strips.flatMap((strip) => strip.offsets),
+      anchor,
+    )
     for (const { offsets } of strips) {
       for (const o of offsets) {
         for (let c = 0; c < 3; c++) {
