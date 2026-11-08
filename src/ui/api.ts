@@ -1028,6 +1028,24 @@ export function useSetImageWords(imageId: string) {
   }))
 }
 
+/** Saves the user's own words for a patch the game asks for on an image (null takes them back). */
+export function useSetImagePatchWords(imageId: string, patchId: string) {
+  return useImageEdit<string | null>(`image-${imageId}`, (words) => ({
+    method: 'PATCH',
+    path: `/api/images/${encodeURIComponent(imageId)}/game-patches/${encodeURIComponent(patchId)}`,
+    body: { words },
+  }))
+}
+
+/** Settles a patch whose game words changed under the user's words. */
+export function useImagePatchCompare(imageId: string, patchId: string) {
+  return useImageEdit<'keep' | 'game'>(`image-${imageId}`, (choice) => ({
+    method: 'POST',
+    path: `/api/images/${encodeURIComponent(imageId)}/game-patches/${encodeURIComponent(patchId)}/compare`,
+    body: { choice },
+  }))
+}
+
 /** Saves whether an image uses its act's style addition. */
 export function useSetImageActStyle(imageId: string) {
   return useImageEdit<{ on: boolean } | { from: string | null }>(`image-${imageId}`, (body) => ({

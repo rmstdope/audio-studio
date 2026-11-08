@@ -1423,11 +1423,14 @@ start on. It is saved from the Images row of Setup's Models panel (`PUT /api/ima
 `manifest` what the game reads there. Both are required.
 
 **The game's lists** (read only, `core/images.ts`). `from.part` holds an act's images in the game's
-order: `{ id, title, text, width, height, file? }`; `text` is what the studio calls the image's
+order: `{ id, title, text, width, height, file?, patches? }`; `text` is what the studio calls the image's
 **description**, in its pages, its API and its code. `file` is the picture the game shows for it now
 when the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or
 `.webp`; read only, never moved or written, shown as "The game's own image" until a take is chosen);
-the id a slug. An id used twice in one list is a problem with both places, and neither image is
+the id a slug. `patches` (as-bo8.1) is the optional list of small changes the game lays over the
+image: `[{ id, title, text }]` in the game's order, `text` read as `description` as for the image.
+A patch with no id (a slug), title or words, or an id used twice in the image, makes the whole act's
+list unreadable, with the file and place named. An image id used twice in one list is a problem with both places, and neither image is
 shown. An id several acts list (as-94e) is one image, below. A list that is not there yet is not a
 problem (the game has not written it).
 
@@ -1468,8 +1471,23 @@ style and None. `partStyle: null` in the image's edit means None; `partStyle: <a
 act, and a missing, unlisted or style-less pick is the first listing act (None when it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`. The
 screens are drawn in `docs/ui/as-94e-shared-images.html`.
 
+**The patches the game asks for** (as-bo8.1; `ImageRow.patches`, `ui/features/images/GamePatchesPanel.tsx`).
+An image whose list carries patches gets a full-width panel, "Patches the game asks for", directly
+below the workbench and above the patch experiment (whose heading is "Try a patch of your own"): a
+list of titles, each with its id, that open in place (any number at once; all closed on load except a
+patch whose game words changed under the user's) to one field of words, reworded as the image's own
+words are. The rewording is `images.<id>.patches.<patchId>: { text, gameWas }` in the edits
+(`applyPatchWordsChange`, `resolvePatchCompare`; `PATCH /api/images/:id/game-patches/:patch`,
+`{ words }`, and `POST …/compare`, `{ choice }`), with the same notice, "Use the game's" and "Keep
+mine", inside the patch; the act's list adds "the game changed a patch's words" to the image's prompt
+cell. A patch the game no longer lists leaves the panel but its words stay in the edits and come back
+with the id. Patches are one more thing the lists of a shared image can disagree on (`ConflictKind`
+`patches`: id, title or words differ; the same patches in another order do not, and the page uses
+the first listing act's order). A rewording changes no prompt or take: it never makes an image out
+of date. Refresh's panel says nothing of patches. Screens: `docs/ui/as-bo8.1-image-patches.html`.
+
 **The studio's own words** are the edits' `images`, committed like the music edits and joining the
-Changes panel: `{ <id>: { text, gameWas, partStyle } }`. `gameWas` is the game's text when the words
+Changes panel: `{ <id>: { text, gameWas, partStyle, patches } }`. `gameWas` is the game's text when the words
 were written; a game description that differs from it raises the compare notice (**Keep mine** moves
 `gameWas`, **Use the game's** removes the words). Emptied words, or the game's own typed back, remove
 them; an edit left with nothing is removed. The edits are written with the style first (its keys in
@@ -2620,6 +2638,8 @@ Small, independently useful increments:
     9. **Make takes for the whole act** (as-23x.3, done: §8.7): one press on an act's Images page makes four
        takes for every image with no chosen take, after a question in the panel.
     10. **Patches** (as-b9x, an experiment, done: §8.7): an area of a chosen take edited in context and shown over it; nothing reaches the game.
+    11. **The game's patches listed** (as-bo8.1, done: §8.7): the image list carries patches, an image's
+        page lists them and they can be reworded; making and choosing them is the next step of as-bo8.
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.

@@ -5123,7 +5123,14 @@ describe('the images routes', () => {
       },
     }),
     'tts/act1/images.json': [
-      { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 },
+      {
+        id: 'inn',
+        title: 'Inn',
+        text: 'a low inn',
+        width: 320,
+        height: 200,
+        patches: [{ id: 'lamp-lit', title: 'Lamp lit', text: 'Light the lamp' }],
+      },
     ],
     'content-studio/images/edits.json': {
       style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
@@ -5157,6 +5164,8 @@ describe('the images routes', () => {
       ['PATCH', '/api/image-style', { look: 'x' }],
       ['POST', '/api/images/inn/compare', { choice: 'keep' }],
       ['PATCH', '/api/images/inn/act-style', { on: false }],
+      ['PATCH', '/api/images/inn/game-patches/lamp-lit', { words: 'x' }],
+      ['POST', '/api/images/inn/game-patches/lamp-lit/compare', { choice: 'keep' }],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5173,6 +5182,28 @@ describe('the images routes', () => {
     expect((await send('PATCH', '/api/images/inn', { words: 3 })).status).toBe(400)
     expect((await send('PATCH', '/api/images/ghost', { words: 'x' })).status).toBe(404)
     expect((await send('POST', '/api/images/inn/compare', { choice: 'maybe' })).status).toBe(400)
+  })
+
+  it('saves the words of a patch the game asks for, and settles it', async () => {
+    const path = '/api/images/inn/game-patches/lamp-lit'
+    expect((await summary()).acts[0].rows[0].patches[0]).toMatchObject({ changed: false })
+    expect(await (await send('PATCH', path, { words: 'Dim the lamp' })).json()).toEqual({
+      ok: true,
+    })
+    expect((await summary()).acts[0].rows[0].patches[0]).toMatchObject({
+      words: 'Dim the lamp',
+      changed: true,
+    })
+    expect((await send('PATCH', path, { words: 3 })).status).toBe(400)
+    expect((await send('POST', `${path}/compare`, { choice: 'maybe' })).status).toBe(400)
+    expect((await send('PATCH', '/api/images/inn/game-patches/ghost', { words: 'x' })).status).toBe(
+      404,
+    )
+    expect(
+      (await send('PATCH', '/api/images/ghost/game-patches/lamp-lit', { words: 'x' })).status,
+    ).toBe(404)
+    expect((await send('POST', `${path}/compare`, { choice: 'game' })).status).toBe(200)
+    expect((await summary()).acts[0].rows[0].patches[0].changed).toBe(false)
   })
 
   it('saves an image leaving its act’s style out, refuses a bad body and an unknown image', async () => {

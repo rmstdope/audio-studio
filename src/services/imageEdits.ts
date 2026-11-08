@@ -2,10 +2,12 @@ import { dirname } from 'node:path'
 import {
   applyActStyleChange,
   applyActStylePick,
+  applyPatchWordsChange,
   applyStyleChange,
   applyWordsChange,
   formatImageEdits,
   resolveCompare,
+  resolvePatchCompare,
   type ImageEdits,
   type StyleField,
 } from '../core/images'
@@ -65,6 +67,39 @@ function edit<T>(
 function descriptionOf(id: string) {
   return (summary: Summary) =>
     summary.acts.flatMap((act) => act.rows).find((row) => row.id === id)?.description ?? null
+}
+
+/** The game's words of one patch of an image, from the pages; null when the image or the patch is not listed. */
+function patchWordsOf(id: string, patch: string) {
+  return (summary: Summary) =>
+    summary.acts
+      .flatMap((act) => act.rows)
+      .find((row) => row.id === id)
+      ?.patches.find((p) => p.id === patch)?.description ?? null
+}
+
+/** Saves the user's own words for a patch the game asks for on an image; null or empty takes them back. */
+export function setImagePatchWords(
+  projectFile: string,
+  id: string,
+  patch: string,
+  text: string | null,
+): Promise<ImageEditResult> {
+  return edit(projectFile, patchWordsOf(id, patch), (edits, game) =>
+    applyPatchWordsChange(edits, id, patch, text, game),
+  )
+}
+
+/** Settles a patch whose game words changed under the user's words. */
+export function resolveImagePatchCompare(
+  projectFile: string,
+  id: string,
+  patch: string,
+  choice: 'keep' | 'game',
+): Promise<ImageEditResult> {
+  return edit(projectFile, patchWordsOf(id, patch), (edits, game) =>
+    resolvePatchCompare(edits, id, patch, choice, game),
+  )
 }
 
 /** Saves the user's own words for an image; null or empty takes them back. */

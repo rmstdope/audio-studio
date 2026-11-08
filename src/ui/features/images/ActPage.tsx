@@ -186,6 +186,9 @@ export function ActPage({
                               : 'changed here'}
                           </div>
                         )}
+                        {row.patches.some((patch) => patch.gameChanged) && (
+                          <div className="chg">the game changed a patch&apos;s words</div>
+                        )}
                         {row.actStyle?.on === false && act.addition !== null && (
                           <div className="chg">{name}&apos;s style left out</div>
                         )}

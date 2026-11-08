@@ -11,7 +11,11 @@
     "title": "The lantern hall",
     "text": "A long stone hall hung with lanterns, a table set for one.",
     "width": 320,
-    "height": 200
+    "height": 200,
+    "patches": [
+      { "id": "bread-taken", "title": "Bread taken", "text": "Remove the bread from the table" },
+      { "id": "fire-out", "title": "Fire out", "text": "Put out the fire in the hearth" }
+    ]
   },
   {
     "id": "cellar-door",

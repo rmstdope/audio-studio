@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagesRoute } from '../../route'
-import type { ImageEdits, ImageStyle, MadeFrom } from '../../../core/images'
+import type { GamePatch, ImageEdits, ImageStyle, MadeFrom } from '../../../core/images'
 import type { ProjectSummary } from '../../../core/summary'
 import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
 import { projectJson } from '../../../../test/helpers'
@@ -45,8 +45,22 @@ const style: ImageStyle = {
   palette: ['#000000', '#ffffff'],
   parts: { act1: 'lantern light' },
 }
-const inn = { id: 'inn', title: 'The Inn', description: 'a low inn', width: 320, height: 200 }
-const barn = { id: 'barn', title: 'The Barn', description: 'a barn', width: 160, height: 100 }
+const inn = {
+  id: 'inn',
+  title: 'The Inn',
+  description: 'a low inn',
+  width: 320,
+  height: 200,
+  patches: [] as GamePatch[],
+}
+const barn = {
+  id: 'barn',
+  title: 'The Barn',
+  description: 'a barn',
+  width: 160,
+  height: 100,
+  patches: [] as GamePatch[],
+}
 
 interface Options {
   edits?: ImageEdits['images']
@@ -54,6 +68,8 @@ interface Options {
   style?: ImageStyle | null
   editsInvalid?: boolean
   actTwo?: 'missing' | 'empty'
+  /** The patches the game asks for on the inn. */
+  patches?: GamePatch[]
   /** The images Act II lists (overrides `actTwo`). */
   actTwoImages?: (typeof inn)[]
   /** What the chosen pictures were brought to; the look now when absent. */
@@ -71,7 +87,7 @@ function summary(options: Options = {}): ProjectSummary {
         id: 'act1',
         title: 'Act I: The Lantern',
         file: 'a1.json',
-        state: { status: 'ok', images: [inn, barn] },
+        state: { status: 'ok', images: [{ ...inn, patches: options.patches ?? [] }, barn] },
         canRefresh: true,
       },
       {
@@ -900,5 +916,54 @@ describe('accepting what changed since an image’s take was chosen', () => {
     const notice = page.querySelector('.notice-warn')!
     expect([...notice.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Accept')
     expect(text(notice)).toContain('A changed size needs a new take.')
+  })
+})
+
+describe('the patches the game asks for', () => {
+  const lamp = { id: 'lamp-lit', title: 'Lamp lit', description: 'Light the lamp' }
+  const door = { id: 'door-ajar', title: 'Door ajar', description: 'Open the door' }
+  const heading = (page: HTMLElement) => [...page.querySelectorAll('h2')].map((h) => text(h))
+
+  it('puts a panel under the workbench and above the trial, whose heading is renamed', () => {
+    const page = render(
+      { view: 'images', page: 'image', image: 'inn', from: 'act1' },
+      summary({ patches: [lamp, door] }),
+    )
+    expect(heading(page)).toEqual(['Prompt', 'Patches the game asks for'])
+    expect(page.querySelectorAll('.game-patch-row').length).toBe(2)
+  })
+
+  it('leaves the page as it is when the game asks for none', () => {
+    const page = render({ view: 'images', page: 'image', image: 'inn', from: 'act1' })
+    expect(page.querySelector('.game-patches')).toBeNull()
+    expect(heading(page)).not.toContain('Patches the game asks for')
+  })
+
+  it('flags on the act’s list an image whose patch words changed under the user’s, and nothing else', () => {
+    const edits = { inn: { patches: { 'lamp-lit': { text: 'Dim it', gameWas: 'Old' } } } }
+    const flagged = render(
+      { view: 'images', page: 'act', part: 'act1' },
+      summary({ patches: [lamp, door], edits }),
+    )
+    const [inn, barn] = [...flagged.querySelectorAll('tbody tr')]
+    expect(text(inn!.querySelector('.images-prompt .chg'))).toBe("the game changed a patch's words")
+    expect(barn!.querySelector('.chg')).toBeNull()
+    const mine = { inn: { patches: { 'lamp-lit': { text: 'Dim it', gameWas: 'Light the lamp' } } } }
+    const settled = render(
+      { view: 'images', page: 'act', part: 'act1' },
+      summary({ patches: [lamp, door], edits: mine }),
+    )
+    expect(settled.querySelector('.chg')).toBeNull()
+    expect(text(settled.querySelector('tbody tr'))).not.toContain('patch')
+  })
+
+  it('says patches among the things the lists disagree on', () => {
+    const page = render(
+      { view: 'images', page: 'act', part: 'act1' },
+      summary({ patches: [lamp], actTwoImages: [{ ...inn, description: 'x', patches: [] }] }),
+    )
+    expect(text(page.querySelector('.images-row-off .adopt-error'))).toBe(
+      "The game's lists disagree about this image: Act I and Act II give it different words and patches. Fix them in the game, then Refresh from the game.",
+    )
   })
 })

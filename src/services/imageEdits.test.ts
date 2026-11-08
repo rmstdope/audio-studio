@@ -7,8 +7,10 @@ import { loadProject } from './workspace'
 import { readImages } from './imageLists'
 import {
   resolveImageCompare,
+  resolveImagePatchCompare,
   setImageActStyle,
   setImageActStylePick,
+  setImagePatchWords,
   setImageWords,
   setStyleField,
   type ImageEditResult,
@@ -293,5 +295,63 @@ describe('through the project load', () => {
       chmodSync(join(root, 'content-studio/images'), 0o755)
     }
     expect(read(EDITS)).toBe(before)
+  })
+})
+
+describe('the words of a patch the game asks for', () => {
+  const lamp = { id: 'lamp-lit', title: 'Lamp lit', text: 'Light the lamp' }
+  const patched = () => repo({ 'tts/act1/images.json': [{ ...inn, patches: [lamp] }] })
+
+  it('keeps them with the game’s words, in the image’s edit, and touches no game file', async () => {
+    const { file, read } = patched()
+    const before = read('tts/act1/images.json')
+    expect(await setImagePatchWords(file, 'inn', 'lamp-lit', ' Dim the lamp ')).toEqual({
+      ok: true,
+    })
+    expect(JSON.parse(read(EDITS))).toEqual({
+      style,
+      images: {
+        inn: { patches: { 'lamp-lit': { text: 'Dim the lamp', gameWas: 'Light the lamp' } } },
+      },
+    })
+    expect(read('tts/act1/images.json')).toEqual(before)
+  })
+
+  it('takes them back with null, leaving the image’s own words', async () => {
+    const { file, read } = patched()
+    await setImageWords(file, 'inn', 'cosy')
+    await setImagePatchWords(file, 'inn', 'lamp-lit', 'Dim')
+    await setImagePatchWords(file, 'inn', 'lamp-lit', null)
+    expect(JSON.parse(read(EDITS)).images).toEqual({ inn: { text: 'cosy', gameWas: 'a low inn' } })
+  })
+
+  it('is null for an image or a patch the game does not list, and refuses broken edits', async () => {
+    const { file } = patched()
+    expect(await setImagePatchWords(file, 'ghost', 'lamp-lit', 'x')).toBeNull()
+    expect(await setImagePatchWords(file, 'inn', 'ghost', 'x')).toBeNull()
+    const broken = repo({
+      'tts/act1/images.json': [{ ...inn, patches: [lamp] }],
+      [EDITS]: '{nope',
+    })
+    expect(await setImagePatchWords(broken.file, 'inn', 'lamp-lit', 'x')).toMatchObject({
+      ok: false,
+    })
+  })
+
+  it('settles a changed patch: keep mine moves the baseline, the game’s drops mine', async () => {
+    const { file, read } = repo({
+      'tts/act1/images.json': [{ ...inn, patches: [lamp] }],
+      [EDITS]: {
+        style,
+        images: { inn: { patches: { 'lamp-lit': { text: 'Dim', gameWas: 'Light it' } } } },
+      },
+    })
+    expect(await resolveImagePatchCompare(file, 'inn', 'lamp-lit', 'keep')).toEqual({ ok: true })
+    expect(JSON.parse(read(EDITS)).images.inn.patches['lamp-lit']).toEqual({
+      text: 'Dim',
+      gameWas: 'Light the lamp',
+    })
+    expect(await resolveImagePatchCompare(file, 'inn', 'lamp-lit', 'game')).toEqual({ ok: true })
+    expect(JSON.parse(read(EDITS)).images).toEqual({})
   })
 })

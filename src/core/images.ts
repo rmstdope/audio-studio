@@ -13,9 +13,25 @@ const GameFile = z
     error: 'use a picture (.png, .jpg, .gif or .webp)',
   })
 
+/** The slug rule for the ids of images and of their patches. */
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/** A patch the game asks for on an image: a small change laid over it. The words are `text` in the game's list. */
+const GamePatchSchema = z
+  .object({
+    id: z.string().regex(SLUG, 'use lower-case letters, digits and - only'),
+    title: z.string().min(1),
+    /** What should change, in the game's words. */
+    text: z.string().min(1),
+  })
+  .transform(({ text, ...patch }) => ({ ...patch, description: text }))
+
+/** A patch the game asks for on an image; its words are its description inside the studio. */
+export type GamePatch = z.infer<typeof GamePatchSchema>
+
 /** An image as the game lists it. The id names the image everywhere, so it is a slug. */
 const ImageShape = z.object({
-  id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
+  id: z.string().regex(SLUG, 'use lower-case letters, digits and - only'),
   title: z.string().min(1),
   /** What the image shows, in the game's words. */
   text: z.string().min(1),
@@ -23,6 +39,23 @@ const ImageShape = z.object({
   height: z.number().int().positive(),
   /** The picture the game shows for it now, when it is not one the studio made. Read only. */
   file: GameFile.optional(),
+  /** The patches the game asks for on it, in its order; an id may be used once. */
+  patches: z
+    .array(GamePatchSchema)
+    .default([])
+    .superRefine((patches, ctx) => {
+      const seen = new Set<string>()
+      patches.forEach((patch, at) => {
+        if (seen.has(patch.id)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [at, 'id'],
+            message: `the patch id "${patch.id}" is used more than once in this image`,
+          })
+        }
+        seen.add(patch.id)
+      })
+    }),
 })
 
 /**
@@ -53,16 +86,21 @@ export const StyleSchema = z.object({
   parts: z.record(z.string(), z.string().min(1)).default({}),
 })
 
+/** The user's words for one patch over the game's, with the game's words they were written over. */
+const PatchEditSchema = z.object({ text: z.string().min(1), gameWas: z.string() })
+
 /**
  * The studio's change to one image: its own words over the game's (`text`, with the game's words
- * it was written over, `gameWas`), and which part's addition it uses (`partStyle`: a part id, or
- * null for none; absent is the first part that lists it).
+ * it was written over, `gameWas`), which part's addition it uses (`partStyle`: a part id, or
+ * null for none; absent is the first part that lists it), and its own words for the patches the
+ * game asks for (`patches`, by patch id, kept even when the game stops asking for one).
  */
 const ImageEditSchema = z
   .object({
     text: z.string().min(1).optional(),
     gameWas: z.string().optional(),
     partStyle: z.string().nullable().optional(),
+    patches: z.record(z.string(), PatchEditSchema).optional(),
   })
   .refine((edit) => (edit.text === undefined) === (edit.gameWas === undefined), {
     error: 'give text and gameWas together',
@@ -136,8 +174,15 @@ export function formatImageEdits(edits: ImageEdits): string {
     Object.keys(edits.images)
       .sort()
       .map((id) => {
-        const { text, gameWas, partStyle } = edits.images[id]!
-        return [id, { text, gameWas, partStyle }]
+        const { text, gameWas, partStyle, patches } = edits.images[id]!
+        const sorted =
+          patches &&
+          Object.fromEntries(
+            Object.keys(patches)
+              .sort()
+              .map((patch) => [patch, patches[patch]]),
+          )
+        return [id, { text, gameWas, partStyle, patches: sorted }]
       }),
   )
   return `${JSON.stringify(out, null, 2)}\n`
@@ -446,6 +491,54 @@ export function applyStyleChange(
   return { ...edits, style: { ...edits.style, [field]: words } }
 }
 
+/** The edits with the user's words for one patch of an image set, or taken back (`words` undefined). */
+function withPatch(
+  edits: ImageEdits,
+  id: string,
+  patch: string,
+  words: z.infer<typeof PatchEditSchema> | undefined,
+): ImageEdits {
+  const { patches, ...rest } = edits.images[id] ?? {}
+  const { [patch]: _old, ...others } = patches ?? {}
+  const next = words ? { ...others, [patch]: words } : others
+  return withImage(edits, id, Object.keys(next).length ? { ...rest, patches: next } : rest)
+}
+
+/** The edits with the user's words for one patch of an image changed; empty text, or the game's own, takes them back. */
+export function applyPatchWordsChange(
+  edits: ImageEdits,
+  id: string,
+  patch: string,
+  text: string | null,
+  gameWords: string,
+): ImageEdits {
+  const words = (text ?? '').trim()
+  const was = edits.images[id]?.patches?.[patch]?.gameWas
+  return withPatch(
+    edits,
+    id,
+    patch,
+    words === '' || words === gameWords.trim()
+      ? undefined
+      : { text: words, gameWas: was ?? gameWords },
+  )
+}
+
+/** Settles a patch whose game words changed: keep the user's words (new baseline) or take the game's. */
+export function resolvePatchCompare(
+  edits: ImageEdits,
+  id: string,
+  patch: string,
+  choice: 'keep' | 'game',
+  gameWords: string,
+): ImageEdits {
+  const own = edits.images[id]?.patches?.[patch]
+  if (choice === 'game' || own === undefined) {
+    return applyPatchWordsChange(edits, id, patch, null, gameWords)
+  }
+  return withPatch(edits, id, patch, { ...own, gameWas: gameWords })
+}
+
 /** Settles an image whose game description changed: keep the user's words (new baseline) or take the game's. */
 export function resolveCompare(
   edits: ImageEdits,
@@ -470,8 +563,18 @@ function lookChangeNames(pairs: [string | null, string][]): string[] {
 /** How a problem names each thing the lists can disagree about. */
 const KIND_PHRASE: Record<ConflictKind, string> = {
   words: 'other words',
+  patches: 'other patches',
   sizes: 'another size',
   names: 'another name',
+}
+
+/** An image's patches as one string, by id, so the same patches in another order are the same. */
+function patchesKey(image: GameImage): string {
+  return JSON.stringify(
+    image.patches
+      .map(({ id, title, description }) => [id, title, description])
+      .sort(([a], [b]) => (a! < b! ? -1 : 1)),
+  )
 }
 
 /** What differs between the listings of one image, in the order words, sizes, names. */
@@ -481,6 +584,7 @@ function differences(images: GameImage[]): ConflictKind[] {
   if (rest.some((i) => i.description !== first!.description)) kinds.push('words')
   if (rest.some((i) => i.width !== first!.width || i.height !== first!.height)) kinds.push('sizes')
   if (rest.some((i) => i.title !== first!.title)) kinds.push('names')
+  if (rest.some((i) => patchesKey(i) !== patchesKey(first!))) kinds.push('patches')
   return kinds
 }
 
@@ -508,6 +612,22 @@ export function imagesDone(act: {
   return { done: total - needs.length, total, needs }
 }
 
+/** One patch of an image as its page shows it. */
+export interface PatchRow {
+  id: string
+  title: string
+  /** The game's words. */
+  description: string
+  /** The words that will be used: the user's, else the game's. */
+  words: string
+  /** The user's own words are in use. */
+  changed: boolean
+  /** The game's words changed since the user wrote their own. */
+  gameChanged: boolean
+  /** The game's words when the user's were written. */
+  gameWas: string | null
+}
+
 /** The status chip of an image. */
 export type ImageStatus = 'none yet' | 'chosen' | 'out of date'
 
@@ -527,6 +647,8 @@ export interface ImageRow {
   gameChanged: boolean
   /** The game's description when the user's words were written. */
   gameWas: string | null
+  /** The patches the game asks for on it, in the game's order (the first act's, for a shared image). */
+  patches: PatchRow[]
   /** The whole prompt. */
   prompt: string
   /**
@@ -561,7 +683,7 @@ export interface ActStyleChoice {
 }
 
 /** What the acts' lists can disagree about for one image. */
-export type ConflictKind = 'words' | 'sizes' | 'names'
+export type ConflictKind = 'words' | 'sizes' | 'names' | 'patches'
 
 /** An image that several acts list differently: shown in none of them, but in place in each. */
 export interface ImageConflict {
@@ -741,6 +863,16 @@ export function summarizeImages(input: ImagesInput): {
       changed: own?.text !== undefined,
       gameChanged: own?.text !== undefined && own.gameWas !== image.description,
       gameWas: own?.gameWas ?? null,
+      patches: image.patches.map((patch) => {
+        const mine = own?.patches?.[patch.id]
+        return {
+          ...patch,
+          words: mine?.text ?? patch.description,
+          changed: mine !== undefined,
+          gameChanged: mine !== undefined && mine.gameWas !== patch.description,
+          gameWas: mine?.gameWas ?? null,
+        }
+      }),
       prompt: assemblePrompt(words, eff),
       actStyle: shared
         ? choices.length

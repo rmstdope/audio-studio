@@ -5005,3 +5005,53 @@ button.cue-chip[aria-expanded='true'] {
   font-size: 12.5px;
   color: var(--muted);
 }
+
+/* The patches the game asks for on an image's page (as-bo8.1) */
+.game-patches {
+  gap: 12px;
+}
+.game-patches p {
+  margin: 0;
+}
+.game-patch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.game-patch-list > li {
+  border-bottom: 1px solid var(--line);
+}
+.game-patch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 10px 2px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.game-patch-row b,
+.game-patch-row .mono {
+  overflow-wrap: anywhere;
+}
+.game-patch-chev {
+  width: 14px;
+  color: var(--faint);
+}
+.game-patch-mark {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--warn);
+}
+.game-patch-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 2px 14px 24px;
+}
