@@ -68,6 +68,14 @@ function PatchBody({
   const save = useSetImagePatchWords(imageId, patch.id)
   const compare = useImagePatchCompare(imageId, patch.id)
   const field = useRef<HTMLTextAreaElement>(null)
+  // The save under way, set the moment the field is left: a press of Make comes before any render.
+  const saving = useRef<Promise<boolean> | null>(null)
+  const trackSaving = (saved: Promise<boolean>) => {
+    saving.current = saved
+    void saved.then(() => {
+      if (saving.current === saved) saving.current = null
+    })
+  }
   const settle = (choice: 'keep' | 'game') =>
     compare.mutate(choice, {
       onSuccess: (result) => {
@@ -132,6 +140,7 @@ function PatchBody({
         save={save}
         onSaved={onSaved}
         onEdit={onEdit}
+        onSaving={trackSaving}
         inputRef={field}
       />
       {patch.changed && <span className="muted">The game&apos;s words: {patch.description}</span>}
@@ -147,6 +156,7 @@ function PatchBody({
           view={view}
           work={work}
           words={words}
+          wordsSaving={() => saving.current}
           mark={mark}
           onMark={onMark}
           onBackToArea={onBackToArea}

@@ -1039,3 +1039,76 @@ describe('what the game gets', () => {
     expect(heading(host)).toBe('Looking at Take 1 Chosen Old look')
   })
 })
+
+describe('Make pressed straight after typing the words (as-d3b)', () => {
+  /** An open patch with an area marked, whose words saves wait until `release` is called. */
+  async function typedAndLeft(answer: () => Response) {
+    const { host, sent } = await render([patchRow('a')], () => view([work('a')]))
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    const served = globalThis.fetch
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    globalThis.fetch = (async (path: string, init?: RequestInit) => {
+      if (init?.method !== 'PATCH') return served(path, init)
+      sent.push({ method: 'PATCH', path, body: JSON.parse(String(init.body)) })
+      await held
+      return answer()
+    }) as unknown as typeof fetch
+    const field = host.querySelector('textarea')!
+    const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await act(async () => {
+      set.call(field, 'snowy winter night')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // The press of the mouse leaves the field; the click comes before anything has rendered.
+    await act(async () => {
+      field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+      button(host, 'Make 2 takes')!.click()
+    })
+    await settle()
+    return { host, sent, release }
+  }
+  const madeIn = (sent: { method: string; path: string }[]) =>
+    sent.filter((s) => s.method === 'POST' && s.path.endsWith('/takes'))
+
+  it('asks for the takes only once the words are saved', async () => {
+    const { sent, release } = await typedAndLeft(() => Response.json({ ok: true }))
+    expect(sent.map((s) => s.method)).toEqual(['PATCH'])
+    await act(async () => release())
+    await settle()
+    expect(sent.map((s) => s.method)).toEqual(['PATCH', 'POST'])
+    expect(madeIn(sent)).toHaveLength(1)
+  })
+
+  it('keeps Make off while it waits, so a second press asks for nothing more', async () => {
+    const { host, sent, release } = await typedAndLeft(() => Response.json({ ok: true }))
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    await act(async () => button(host, 'Make 2 takes')!.click())
+    await act(async () => release())
+    await settle()
+    expect(madeIn(sent)).toHaveLength(1)
+  })
+
+  it('makes nothing when the words could not be saved, and says why', async () => {
+    const { host, sent, release } = await typedAndLeft(() =>
+      Response.json({
+        ok: false,
+        problems: [{ file: 'edits.json', path: 'words', message: 'Too long' }],
+      }),
+    )
+    await act(async () => release())
+    await settle()
+    expect(madeIn(sent)).toEqual([])
+    expect(text(host)).toContain('Too long')
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+  })
+
+  it('makes nothing when the save itself failed', async () => {
+    const { host, sent, release } = await typedAndLeft(() => new Response('', { status: 500 }))
+    await act(async () => release())
+    await settle()
+    expect(madeIn(sent)).toEqual([])
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+  })
+})

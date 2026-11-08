@@ -19,6 +19,7 @@ export function WordsField({
   save,
   onSaved,
   onEdit,
+  onSaving,
   inputRef,
   failTitle = 'Could not be saved',
 }: {
@@ -31,6 +32,8 @@ export function WordsField({
   onSaved: () => void
   /** The person began changing the field. */
   onEdit: () => void
+  /** A save began: what it hands over says, once it is over, whether the words were saved. */
+  onSaving?: (saved: Promise<boolean>) => void
   inputRef?: Ref<HTMLTextAreaElement>
   /** The heading over the problems a failed save reports. */
   failTitle?: string
@@ -38,14 +41,21 @@ export function WordsField({
   const id = useId()
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? words
-  const send = (value: string | null) =>
-    save.mutate(value, {
-      onSuccess: (result) => {
-        if (!result.ok) return
-        setDraft(null)
-        onSaved()
-      },
-    })
+  const send = (value: string | null) => {
+    const saved = save
+      .mutateAsync(value, {
+        onSuccess: (result) => {
+          if (!result.ok) return
+          setDraft(null)
+          onSaved()
+        },
+      })
+      .then(
+        (result) => result.ok,
+        () => false,
+      )
+    onSaving?.(saved)
+  }
   const leave = () => {
     if (draft === null) return
     if (draft.trim() === words) return setDraft(null)
