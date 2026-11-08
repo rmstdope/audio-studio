@@ -699,6 +699,9 @@ describe('a patch tied to a named area', () => {
     title: 'Bucket',
     placed: true,
     box: { x: 100, y: 100, width: 200, height: 150 },
+    boxes: {},
+    elsewhere: [],
+    elsewhereGone: false,
   }
   const unplaced = { ...bucket, placed: false, box: null }
   const grown = { left: `${((100 - 24) / 1024) * 100}%`, width: `${((200 + 48) / 1024) * 100}%` }

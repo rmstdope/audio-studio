@@ -30,6 +30,7 @@ import {
   ImageLockSchema,
   acceptableReasons,
   areaFractions,
+  areaFractionsOn,
   withAreas,
   formatImageLock,
   outOfDateReasons,
@@ -42,6 +43,7 @@ import { IMAGES_LOCK_FILE, type Problem } from '../core/project'
 import { readResource, writeAtomic } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
+import { adoptImageAreas } from './imageEdits'
 import { createImageHealth, type ImageHealthStore } from './imageHealth'
 import { downloadOf, ImageToolError, makeImageTake, type ImageGenerator } from './images'
 import {
@@ -60,6 +62,16 @@ import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
 export { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR }
+
+/** The refusal for boxes that could not be moved onto a take: the edits file's own message. */
+function notAdopted(
+  answer: { ok: false } & ({ problems: Problem[] } | { file: string; problems: Problem[] }),
+) {
+  return {
+    ok: false as const,
+    message: `The named areas could not be kept: ${answer.problems[0]?.message ?? 'the images edits cannot be used'}.`,
+  }
+}
 
 /** What a change to takes answered: done, refused with a reason, or a file that cannot be used. */
 export type ImageTakesAnswer = { ok: true } | { ok: false; message: string } | ProjectFailure | null
@@ -379,7 +391,7 @@ export function createImageTakes({
           height: found.row.height,
           ...(Object.keys(patches).length ? { patches } : {}),
         },
-        areaFractions(row.areas, row),
+        take === undefined ? areaFractions(row.areas, row) : areaFractionsOn(row.areas, take, row),
       )
       if (!next && JSON.stringify(manifest[id]) === JSON.stringify(listed)) {
         return { ok: true as const }
@@ -881,6 +893,9 @@ export function createImageTakes({
                 : `Take ${n} could not be brought to the game's look: ${png.error}`,
           }
         }
+        // The boxes of no take yet belong to the take in the game, else to the one chosen now.
+        const adopted = await adoptImageAreas(projectFile, id, found.row.chosenTake ?? n)
+        if (adopted && !adopted.ok) return notAdopted(adopted)
         const answer = await publish(found, png, (previous) =>
           previous?.take === n && previous.look === key
             ? null
@@ -945,6 +960,12 @@ export function createImageTakes({
           if (!manifest) return { ok: false, message: 'The images manifest could not be read.' }
           if (!lock) return { ok: false, message: 'The images lock could not be read.' }
           if (!lock[id]) return { ok: false, message: 'No take is chosen for this image.' }
+          const adopted = await adoptImageAreas(
+            projectFile,
+            id,
+            lock[id].take ?? found.row.chosenTake ?? 0,
+          )
+          if (adopted && !adopted.ok) return notAdopted(adopted)
           if (id in manifest) {
             delete manifest[id]
             await writeAtomic(

@@ -5481,4 +5481,18 @@ button.cue-chip[aria-expanded='true'] {
   width: 90px;
   height: 4px;
   vertical-align: middle;
+
+.confirm-heading {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.place-again-line {
+  background: var(--raised);
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: var(--text-soft);
+  font-size: 12px;
 }

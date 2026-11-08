@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import {
+  adoptAreas,
   applyActStyleChange,
   applyActStylePick,
   applyAreaBox,
@@ -131,13 +132,15 @@ export function setImageAreaBox(
     projectFile,
     (summary) => {
       const row = summary.acts.flatMap((act) => act.rows).find((r) => r.id === id)
-      return row?.areas.some((a) => a.id === area) ? { width: row.width, height: row.height } : null
+      return row?.areas.some((a) => a.id === area)
+        ? { width: row.width, height: row.height, take: row.chosenTake }
+        : null
     },
     (edits, size) => {
       const why = box && checkAreaBox(box, size)
       return why
         ? [{ file, path: `images.${id}.areas.${area}`, message: why }]
-        : applyAreaBox(edits, id, area, box)
+        : applyAreaBox(edits, id, area, box, size.take)
     },
     // The game gets the box in the same save; a clear never fails for want of an entry.
     async (project) => {
@@ -147,6 +150,33 @@ export function setImageAreaBox(
         : [{ file: project.images!.manifest, path: `images.${id}`, message: sync.message }]
     },
   )
+}
+
+/**
+ * Moves the boxes of an image that belong to no take yet onto `take`, before the take in the game
+ * changes. Nothing is written when there are none (null when the project has no images).
+ */
+export function adoptImageAreas(
+  projectFile: string,
+  id: string,
+  take: number,
+): Promise<ImageEditResult> {
+  return serial.run(projectFile, async () => {
+    const root = dirname(projectFile)
+    const read = await readImageEdits(root)
+    if (read.problems.length) return { ok: false, problems: read.problems }
+    const next = adoptAreas(read.edits, id, take)
+    if (next === read.edits) return { ok: true }
+    try {
+      await writeAtomic(root, IMAGES_EDITS_FILE, formatImageEdits(next))
+    } catch (error) {
+      return {
+        ok: false,
+        problems: [{ file: IMAGES_EDITS_FILE, path: '', message: writeFailure(error) }],
+      }
+    }
+    return { ok: true }
+  })
 }
 
 /** Settles a patch whose game words changed under the user's words. */

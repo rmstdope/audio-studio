@@ -12,7 +12,13 @@ import {
   type Handle,
   type Point,
 } from '../../imageAreaBox'
-import { areaLineText, areaSaveFailedText, areaTagText, areasCountText } from '../../imagesText'
+import {
+  areaLineText,
+  areaSaveFailedText,
+  areaTagText,
+  areasCountText,
+  placeAgainLine,
+} from '../../imagesText'
 
 /** A patch the game has chosen for an image, which can be laid over the picture for looking. */
 export interface ChosenPatch {
@@ -101,6 +107,14 @@ export function NamedAreasPanel({
     })
   }, [row.areas])
 
+  // A new take in the game: the first area still needing a place is selected, as on arrival.
+  const taken = useRef(row.chosenTake)
+  useEffect(() => {
+    if (taken.current === row.chosenTake) return
+    taken.current = row.chosenTake
+    select(row.areas.find((area) => !area.placed)?.id ?? null)
+  }, [row.chosenTake, row.areas])
+
   // Esc cancels a drag in progress.
   useEffect(() => {
     if (!gesture) return
@@ -118,6 +132,9 @@ export function NamedAreasPanel({
     return { ...area, placed: box !== null, box }
   })
   const placedCount = areas.filter((area) => area.placed).length
+  // The areas placed on another take and not on the one in the game, and the takes still there.
+  const again = areas.filter((a) => !a.placed && (a.elsewhere.length > 0 || a.elsewhereGone))
+  const againTakes = [...new Set(again.flatMap((a) => a.elsewhere))].sort((a, b) => a - b)
   const current = areas.find((area) => area.id === selected) ?? null
 
   const view = picture && 'patches' in picture ? picture : null
@@ -367,6 +384,11 @@ export function NamedAreasPanel({
             </div>
           )}
         </div>
+        {again.length > 0 && (
+          <p className="place-again-line">
+            {placeAgainLine(againTakes, row.chosenTake, again.length)}
+          </p>
+        )}
         <ul className="named-area-list">
           {areas.map((area) => {
             const isSelected = ready && area.id === selected
@@ -405,6 +427,8 @@ export function NamedAreasPanel({
                 )}
                 {area.placed ? (
                   <span className="chip chip-ok">Placed</span>
+                ) : area.elsewhere.length > 0 || area.elsewhereGone ? (
+                  <span className="chip chip-attention">Place again</span>
                 ) : (
                   <span className="chip chip-attention">To place</span>
                 )}

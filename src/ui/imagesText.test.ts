@@ -24,10 +24,13 @@ import {
   overlapPairLine,
   makeAgainOpenLine,
   setAsideDim,
+  setAsideLead,
+  placeAgainLine,
   setAsideDropSentence,
   setAsideSentence,
   setAsideTitle,
 } from './imagesText'
+import type { SetAsideQuestion } from '../core/imagePatches'
 import { parseRoute, routeHref } from './route'
 import { openWorkspace } from './sidebarActs'
 
@@ -219,6 +222,8 @@ describe('the questions about patches set aside', () => {
       leaving,
       to,
       returning,
+      leavingAreas: [],
+      returningAreas: 0,
     })
     expect(setAsideDim(q(['A', 'B', 'C'], 4, []))).toBe(
       'Choosing take 2 again brings them all back.',
@@ -297,6 +302,117 @@ describe('overlapping patches', () => {
     expect(overlapActLine(pairs.slice(0, 1))).toBe('patches overlap: Bread taken and Door ajar')
     expect(overlapActLine(pairs)).toBe(
       'patches overlap: Bread taken and Door ajar; Bread taken and Fire out; Door ajar and Fire out',
+
+describe('the questions about named areas set aside', () => {
+  const q = (over: Partial<SetAsideQuestion> = {}): SetAsideQuestion => ({
+    from: 2,
+    leaving: [],
+    to: 4,
+    returning: [],
+    leavingAreas: ['Well', 'Gate', 'Bell', 'Door', 'Sign'],
+    returningAreas: 0,
+    ...over,
+  })
+  const choose = { kind: 'choose', n: 4 } as const
+  const unchoose = { kind: 'unchoose' } as const
+  const drop = { kind: 'drop', n: 2 } as const
+
+  it('says what the game does with the areas, on Choose, Un-choose and Drop', () => {
+    expect(setAsideLead(choose, q())).toBe(
+      '5 named areas are placed on take 2. The game will stop using them until you place them on take 4.',
+    )
+    expect(setAsideLead(choose, q({ leavingAreas: ['Well'] }))).toBe(
+      '1 named area is placed on take 2. The game will stop using it until you place it on take 4.',
+    )
+    expect(setAsideLead(unchoose, q({ to: null }))).toBe(
+      '5 named areas are placed on take 2. The game will stop using them until you place them on another take.',
+    )
+    expect(setAsideLead(unchoose, q({ to: null, leavingAreas: ['Well'] }))).toBe(
+      '1 named area is placed on take 2. The game will stop using it until you place it on another take.',
+    )
+    expect(setAsideLead(drop, q({ to: null }))).toBe(
+      '5 named areas were placed on take 2. After this they cannot be brought back; only new ones can be placed.',
+    )
+    expect(setAsideLead(drop, q({ to: null, leavingAreas: ['Well'] }))).toBe(
+      '1 named area was placed on take 2. After this it cannot be brought back; only a new one can be placed.',
+    )
+  })
+  it('says it once for patches and areas together, each noun in its own number', () => {
+    const both = q({ leaving: ['A', 'B', 'C'] })
+    expect(setAsideLead(choose, both)).toBe(
+      'Take 2 has 3 chosen patches and 5 placed named areas. The game will stop showing the patches and stop using the areas until you make and place them again.',
+    )
+    expect(setAsideLead(unchoose, q({ leaving: ['A'], leavingAreas: ['Well'], to: null }))).toBe(
+      'Take 2 has 1 chosen patch and 1 placed named area. The game will stop showing the patch and stop using the area until you make and place them again.',
+    )
+    expect(setAsideLead(choose, q({ leaving: ['A'] }))).toBe(
+      'Take 2 has 1 chosen patch and 5 placed named areas. The game will stop showing the patch and stop using the areas until you make and place them again.',
+    )
+    expect(setAsideLead(drop, q({ leaving: ['A', 'B', 'C'], to: null }))).toBe(
+      'Take 2 has 3 chosen patches and 5 placed named areas. After this they cannot be brought back; only new ones can be made and placed.',
+    )
+  })
+  it('keeps the words of the patch question when no area is in it', () => {
+    const only = q({ leaving: ['A', 'B'], leavingAreas: [] })
+    expect(setAsideLead(choose, only)).toBe(setAsideSentence(2, 2))
+    expect(setAsideLead(drop, only)).toBe(setAsideDropSentence(2, 2))
+  })
+  it('says how to bring them back, and counts what comes back', () => {
+    expect(setAsideDim(q())).toBe('Choosing take 2 again brings them all back.')
+    expect(setAsideDim(q({ leavingAreas: ['Well'] }))).toBe('Choosing take 2 again brings it back.')
+    expect(setAsideDim(q({ leaving: ['A'] }))).toBe('Choosing take 2 again brings them all back.')
+    expect(setAsideDim(q({ returningAreas: 5, to: 4 }))).toBe(
+      '5 named areas placed on take 4 come back. Choosing take 2 again brings back what leaves now.',
+    )
+    expect(setAsideDim(q({ returningAreas: 1, to: 4 }))).toBe(
+      '1 named area placed on take 4 comes back. Choosing take 2 again brings back what leaves now.',
+    )
+    expect(
+      setAsideDim(
+        q({
+          leavingAreas: [],
+          leaving: ['A'],
+          to: 1,
+          returning: ['Door open', 'Lamp lit'],
+          returningAreas: 5,
+        }),
+      ),
+    ).toBe(
+      '2 patches made on take 1 come back: Door open, Lamp lit. 5 named areas placed on take 1 come back. Choosing take 2 again brings back what leaves now.',
+    )
+    expect(setAsideDim(q({ to: 1, returning: ['Door open', 'Lamp lit'] }))).toBe(
+      '2 patches made on take 1 come back: Door open, Lamp lit. Choosing take 2 again brings back what leaves now.',
+    )
+  })
+})
+
+describe('the line over the areas to place again', () => {
+  it('says where they were placed and how to get them back', () => {
+    expect(placeAgainLine([2], 4, 5)).toBe(
+      'Placed on take 2 of the image, so the game does not use them now. Place them here, or choose take 2 again to bring them back.',
+    )
+    expect(placeAgainLine([2], 4, 1)).toBe(
+      'Placed on take 2 of the image, so the game does not use it now. Place it here, or choose take 2 again to bring it back.',
+    )
+    expect(placeAgainLine([1, 2], 4, 3)).toBe(
+      'Placed on takes 1 and 2 of the image, so the game does not use them now. Place them here, or choose one of those takes again to bring them back.',
+    )
+    expect(placeAgainLine([2], null, 3)).toBe(
+      'Placed on take 2 of the image, so the game does not use them now. Choose take 2 again to bring them back.',
+    )
+    expect(placeAgainLine([1, 2], null, 1)).toBe(
+      'Placed on takes 1 and 2 of the image, so the game does not use it now. Choose one of those takes again to bring it back.',
+    )
+  })
+  it('names no take when they were placed on one since dropped', () => {
+    expect(placeAgainLine([], 4, 3)).toBe(
+      'Placed on an earlier take of the image, so the game does not use them now. Place them here.',
+    )
+    expect(placeAgainLine([], 4, 1)).toBe(
+      'Placed on an earlier take of the image, so the game does not use it now. Place it here.',
+    )
+    expect(placeAgainLine([], null, 3)).toBe(
+      'Placed on an earlier take of the image, so the game does not use them now.',
     )
   })
 })

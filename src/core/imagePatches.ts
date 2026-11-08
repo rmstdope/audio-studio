@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AreaBox, ImageRow, PatchRow } from './images'
+import type { AreaBox, AreaRow, ImageRow, PatchRow } from './images'
 import type { Look, LookSize } from './imageLook'
 import { bringToLook, type Pixels } from './imagePixels'
 
@@ -567,6 +567,10 @@ export interface SetAsideQuestion {
   to: number | null
   /** Titles of the patches chosen on `to`, which come back. */
   returning: string[]
+  /** Titles of the named areas with a box on `from`, in the game's order. */
+  leavingAreas: string[]
+  /** How many named areas have a box on `to`, which come back. */
+  returningAreas: number
 }
 
 /**
@@ -606,27 +610,39 @@ export function overlappingPatches(patches: readonly PatchRow[]): [PatchRow, Pat
 
 /**
  * What to ask before the ask changes the image's takes, or null when nothing needs asking: the
- * chosen patches of the take in the game leave on Choose and Un-choose (unless they come back on
- * the new take), and those chosen on a dropped take can no longer be brought back.
+ * chosen patches and the placed named areas of the take in the game leave on Choose and Un-choose
+ * (unless they come back on the new take), and those chosen or placed on a dropped take can no
+ * longer be brought back.
  */
 export function setAsideQuestion(
-  row: Pick<ImageRow, 'chosenTake' | 'patches'>,
+  row: Pick<ImageRow, 'chosenTake' | 'patches' | 'areas'>,
   ask: SetAsideAsk,
 ): SetAsideQuestion | null {
   const from = ask.kind === 'drop' ? ask.n : row.chosenTake
   if (from === null) return null
   const to = ask.kind === 'choose' ? ask.n : null
   const back = (patch: PatchRow) => to !== null && patch.chosenOn.includes(to)
-  // Dropping a take sets nothing aside for a patch the game still shows through its own take.
-  const shown = (patch: PatchRow) =>
-    ask.kind === 'drop' && row.chosenTake !== null && patch.chosenOn.includes(row.chosenTake)
-  const leaving = row.patches.filter((p) => p.chosenOn.includes(from) && !back(p) && !shown(p))
-  if (leaving.length === 0) return null
+  const backArea = (area: AreaRow) => to !== null && area.boxes[to] !== undefined
+  // Dropping a take sets nothing aside for what the game still has through its own take.
+  const dropShown = (has: boolean) => ask.kind === 'drop' && row.chosenTake !== null && has
+  const leaving = row.patches.filter(
+    (p) =>
+      p.chosenOn.includes(from) && !back(p) && !dropShown(p.chosenOn.includes(row.chosenTake!)),
+  )
+  const leavingAreas = row.areas.filter(
+    (a) =>
+      a.boxes[from] !== undefined &&
+      !backArea(a) &&
+      !dropShown(a.boxes[row.chosenTake!] !== undefined),
+  )
+  if (leaving.length === 0 && leavingAreas.length === 0) return null
   return {
     from,
     leaving: leaving.map((p) => p.title),
     to,
     returning: row.patches.filter(back).map((p) => p.title),
+    leavingAreas: leavingAreas.map((a) => a.title),
+    returningAreas: row.areas.filter(backArea).length,
   }
 }
 
