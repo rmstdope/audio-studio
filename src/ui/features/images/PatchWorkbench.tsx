@@ -258,7 +258,7 @@ export function PatchWorkbench({
   }
   const onKeyDown = (event: React.KeyboardEvent) => {
     const target = event.target
-    if (event.metaKey || event.ctrlKey || event.altKey || asking) return
+    if (event.metaKey || event.ctrlKey || event.altKey) return
     if (!PATCH_KEYS.has(event.key.toLowerCase()) && !PATCH_KEYS.has(event.key)) return
     // Keys typed into a field or menu are its own.
     if (
@@ -270,6 +270,8 @@ export function PatchWorkbench({
     // The image's own keys rest while focus is inside a patch.
     event.stopPropagation()
     event.preventDefault()
+    // The question open, the keys are heard and do nothing.
+    if (asking) return
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       const next = stepRight(strip, lookingAt, event.key === 'ArrowLeft' ? -1 : 1)
       if (next !== null) setLooking(next)

@@ -392,6 +392,56 @@ describe('takes of a declared patch', () => {
   })
 })
 
+describe('takes of a patch across takes of the image', () => {
+  it('is not refused for takes still being made on another take of the image', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { root, file, patches } = setup({ queue })
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    writeFileSync(join(root, LOCK), JSON.stringify({ inn: { ...lock.inn, take: 4 } }))
+    writeTake(root, 'content-studio/cache/image-takes/inn/4.png')
+    expect(await patches.make(file, 'inn', 'door', { count: 1, area })).toEqual({ ok: true })
+    release()
+  })
+
+  it('does not make a failed take again on another take of the image', async () => {
+    const { root, file, patches, work } = setup({
+      makes: () => {
+        throw new Error('Out of memory')
+      },
+    })
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    writeFileSync(join(root, LOCK), JSON.stringify({ inn: { ...lock.inn, take: 4 } }))
+    writeTake(root, 'content-studio/cache/image-takes/inn/4.png')
+    expect(await patches.make(file, 'inn', 'door', { retry: 1 })).toEqual({
+      ok: false,
+      message: 'Take 1 was made on another take of the image, so it is not made again here.',
+    })
+  })
+
+  it('makes a failed take again once when asked twice at once', async () => {
+    let fail = true
+    const { file, patches, work, requests } = setup({
+      makes: (r) => {
+        if (fail) throw new Error('Out of memory')
+        return fakePng(r.width, r.height, 1)
+      },
+    })
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    fail = false
+    const answers = await Promise.all([
+      patches.make(file, 'inn', 'door', { retry: 1 }),
+      patches.make(file, 'inn', 'door', { retry: 1 }),
+    ])
+    expect(answers.filter((a) => a?.ok)).toHaveLength(1)
+    await work()
+    expect(requests).toHaveLength(2)
+  })
+})
+
 describe('choosing, un-choosing and dropping a take of a patch', () => {
   it('chooses a take, in place of another chosen one, and marks it seen', async () => {
     const { root, file, patches, work } = setup()

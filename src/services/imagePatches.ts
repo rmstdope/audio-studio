@@ -12,6 +12,7 @@ import {
   type PatchTake,
   type PatchWorkView,
 } from '../core/imagePatches'
+import type { PatchRow } from '../core/images'
 import { resolveInRoot } from '../core/paths'
 import { CACHE_DIR, type Problem } from '../core/project'
 import { readResource, writeAtomic } from './files'
@@ -117,23 +118,25 @@ export function createImagePatches({
     const root = dirname(projectFile)
     const summary = await readImages(root, opened.project, [])
     const row = summary?.acts.flatMap((act) => act.rows).find((r) => r.id === id)
-    return row ? { root, id, row, chosen: row.chosenTake } : null
+    return row ? { projectFile, root, id, row, chosen: row.chosenTake } : null
   }
   type Image = Exclude<Awaited<ReturnType<typeof resolve>>, ProjectFailure | null>
+
+  /** An image with one of the patches the game lists on it, and where the patch keeps its takes. */
+  const patchOf = (image: Image, patch: PatchRow) => ({
+    ...image,
+    patch,
+    key: `${image.projectFile}\0${image.id}\0${patch.id}`,
+    folder: patchFolder(image.id, patch.id),
+    board: `${patchFolder(image.id, patch.id)}/board.json`,
+  })
 
   /** The image and one of the patches the game lists on it, or null / a failure. */
   async function resolvePatch(projectFile: string, id: string, patch: string) {
     const image = await resolve(projectFile, id)
     if (!image || 'ok' in image) return image
     const row = image.row.patches.find((p) => p.id === patch)
-    if (!row || !isSafeId(patch)) return null
-    return {
-      ...image,
-      patch: row,
-      key: `${projectFile}\0${id}\0${patch}`,
-      folder: patchFolder(id, patch),
-      board: `${patchFolder(id, patch)}/board.json`,
-    }
+    return row && isSafeId(patch) ? patchOf(image, row) : null
   }
   type Found = Exclude<Awaited<ReturnType<typeof resolvePatch>>, ProjectFailure | null>
 
@@ -278,6 +281,12 @@ export function createImagePatches({
           'Choose a take of the image first. Patches are painted onto the take the game shows.',
       }
     }
+    if (failed && failed.base !== found.chosen) {
+      return {
+        ok: false,
+        message: `Take ${failed.n} was made on another take of the image, so it is not made again here.`,
+      }
+    }
     const picture = await takePicture(found, found.chosen)
     if (!picture) {
       return {
@@ -329,8 +338,7 @@ export function createImagePatches({
       const picture = image.chosen === null ? null : await takePicture(image, image.chosen)
       const patches: PatchWorkView[] = []
       for (const patch of image.row.patches) {
-        const found = (await resolvePatch(projectFile, id, patch.id))!
-        if ('ok' in found) return found
+        const found = patchOf(image, patch)
         // Before the board: a take that lands in between then shows as made, never as neither.
         const entries = entriesOf(found.key).filter((e) => e.base === image.chosen)
         const board = await readBoard(found)
@@ -376,20 +384,22 @@ export function createImagePatches({
       if (!found || 'ok' in found) return found
       const entries = active.get(found.key) ?? new Map<number, Entry>()
       active.set(found.key, entries)
-      if ('count' in request) {
-        // Taken before the first wait, so that of two requests at once only one goes on.
-        if (starting.has(found.key) || [...entries.values()].some((e) => e.state !== 'failed')) {
-          return {
-            ok: false,
-            message: 'Takes of this patch are being made. Wait for them, or stop them.',
-          }
+      // Taken before the first wait, so that of two requests at once only one goes on.
+      const guard = 'count' in request ? found.key : `${found.key}\0${request.retry}`
+      const busy = [...entries.values()].some(
+        (e) => e.state !== 'failed' && e.base === found.chosen,
+      )
+      if (starting.has(guard) || ('count' in request && busy)) {
+        return {
+          ok: false,
+          message: 'Takes of this patch are being made. Wait for them, or stop them.',
         }
-        starting.add(found.key)
       }
+      starting.add(guard)
       try {
         return await start(found, entries, request)
       } finally {
-        starting.delete(found.key)
+        starting.delete(guard)
       }
     },
 

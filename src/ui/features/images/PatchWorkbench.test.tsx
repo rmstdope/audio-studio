@@ -521,6 +521,65 @@ describe('keys inside a patch', () => {
   })
 })
 
+describe('keys and focus around the question and Make', () => {
+  const made = () => view([work('a', { takes: [takeOf(1, { chosen: true }), takeOf(2)] })])
+
+  it('keep the image’s own keys at rest while the Un-choose question is open', async () => {
+    const { host, sent } = await render([patchRow('a')], made)
+    await open(host)
+    await act(async () => button(host, 'Un-choose')!.click())
+    const heard: string[] = []
+    const listen = (event: KeyboardEvent) => heard.push(event.key)
+    document.addEventListener('keydown', listen)
+    cleanups.push(() => document.removeEventListener('keydown', listen))
+    const cancel = button(host, 'Cancel')!
+    await key(cancel, 'd')
+    await key(cancel, 'c')
+    await key(cancel, 'ArrowLeft')
+    expect(heard).toEqual([])
+    expect(sent).toEqual([])
+  })
+
+  it('puts focus on the take looked at when Make is pressed', async () => {
+    const { host } = await render([patchRow('a')], made)
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    await act(async () => button(host, 'Make 2 more takes')!.click())
+    await settle()
+    expect(document.activeElement).toBe(thumbs(host)[0] ?? null)
+  })
+
+  it('reloads the patches when a take of the image is chosen, dropped or un-chosen', async () => {
+    const { useChooseImageTake } = await import('../../api')
+    const client = new QueryClient()
+    const asked: unknown[] = []
+    client.invalidateQueries = (async (filters: { queryKey?: unknown }) => {
+      asked.push(filters.queryKey)
+    }) as typeof client.invalidateQueries
+    globalThis.fetch = (async () => Response.json({ ok: true })) as unknown as typeof fetch
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let choose: ReturnType<typeof useChooseImageTake> | undefined
+    const Probe = () => {
+      choose = useChooseImageTake('inn')
+      return null
+    }
+    await act(async () => {
+      root.render(createElement(QueryClientProvider, { client }, createElement(Probe)))
+    })
+    cleanups.push(() => {
+      act(() => root.unmount())
+      host.remove()
+    })
+    await act(async () => {
+      choose!.mutate(2)
+    })
+    await settle()
+    expect(asked).toContainEqual(['image-patches', 'inn'])
+  })
+})
+
 describe('takes being made and failed', () => {
   it('shows a take waiting, with the Stop button, and turns Make off', async () => {
     const { host, sent } = await render([patchRow('a')], () =>

@@ -1641,6 +1641,8 @@ function useImageTakesChange<Input>(
     onSettled: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: ['image-takes', imageId] }),
+        // The patches lie on the image's chosen take, which a choice, un-choice or drop may change.
+        client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
         client.invalidateQueries({ queryKey: ['image-making'] }),
         ...(project ? [client.invalidateQueries({ queryKey: ['project'] })] : []),
       ]),
