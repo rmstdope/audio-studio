@@ -5058,6 +5058,8 @@ button.cue-chip[aria-expanded='true'] {
 
 /* The named areas the game wants placed on an image (as-qg4.1) */
 .named-areas {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 .named-areas p {
@@ -5089,16 +5091,17 @@ button.cue-chip[aria-expanded='true'] {
 .named-area-text .mono {
   display: block;
 }
+/* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */
 .chip-attention {
   background: var(--attention-bg);
   color: var(--attention-ink);
-  border: 1px solid var(--attention-line);
-  flex: none;
+  box-shadow: inset 0 0 0 1px var(--attention-line);
 }
 .named-area .chip {
   flex: none;
 }
 .images-areas {
+  white-space: normal;
   margin-top: 4px;
   font-size: 12.5px;
 }

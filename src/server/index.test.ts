@@ -5166,24 +5166,27 @@ describe('the images routes', () => {
     ])
     const file = join(imagesRoot, 'tts/act1/images.json')
     const listed = JSON.parse(await Bun.file(file).text())
-    await Bun.write(
-      file,
-      JSON.stringify([
-        {
-          ...listed[0],
-          areas: [
-            { id: 'sign', title: 'Old sign' },
-            { id: 'well', title: 'Well' },
-          ],
-        },
-      ]),
-    )
-    expect(await areas()).toEqual([
-      { id: 'sign', title: 'Old sign', placed: false },
-      { id: 'well', title: 'Well', placed: false },
-    ])
-    expect((await summary()).acts[0].rows[0].status).toBe('none yet')
-    await Bun.write(file, JSON.stringify(listed))
+    try {
+      await Bun.write(
+        file,
+        JSON.stringify([
+          {
+            ...listed[0],
+            areas: [
+              { id: 'sign', title: 'Old sign' },
+              { id: 'well', title: 'Well' },
+            ],
+          },
+        ]),
+      )
+      expect(await areas()).toEqual([
+        { id: 'sign', title: 'Old sign', placed: false },
+        { id: 'well', title: 'Well', placed: false },
+      ])
+      expect((await summary()).acts[0].rows[0].status).toBe('none yet')
+    } finally {
+      await Bun.write(file, JSON.stringify(listed))
+    }
   })
 
   it('shows the images in the project summary', async () => {

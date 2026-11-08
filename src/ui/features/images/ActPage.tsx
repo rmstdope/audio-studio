@@ -17,9 +17,10 @@ const STATUS_CHIP: Record<ImageRow['status'], string> = {
   'out of date': 'chip chip-warn',
 }
 
-/** The act list's line for an image's named areas left to place; null when none are. */
-function areasLeft(row: ImageRow): string | null {
-  return areasToPlaceText(row.areas.filter((area) => !area.placed).length, row.areas.length)
+/** The act list's line for an image's named areas left to place; nothing when none are. */
+function AreasLeft({ row }: { row: ImageRow }) {
+  const line = areasToPlaceText(row.areas.filter((area) => !area.placed).length, row.areas.length)
+  return line && <div className="muted images-areas">{line}</div>
 }
 
 /**
@@ -210,9 +211,7 @@ export function ActPage({
                           <span className={STATUS_CHIP[row.status]}>{row.status}</span>
                         )}
                         {row.looksOld && <span className="chip chip-warn">Old look</span>}
-                        {areasLeft(row) && (
-                          <div className="muted images-areas">{areasLeft(row)}</div>
-                        )}
+                        <AreasLeft row={row} />
                       </td>
                     </tr>
                   )
