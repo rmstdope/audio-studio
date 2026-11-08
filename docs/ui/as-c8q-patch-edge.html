@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patch edge A</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        padding: 24px 16px 64px;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .tag {
+        color: var(--accent-soft-ink);
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin: 0;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 2px 0 4px;
+      }
+      h2 {
+        font-size: 17px;
+        margin: 0;
+      }
+      h3 {
+        font-size: 13px;
+        margin: 0 0 6px;
+        color: var(--soft);
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 6px;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .seg button {
+        background: var(--raised);
+        color: var(--soft);
+        border: 0;
+        padding: 6px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .seg button + button {
+        border-left: 1px solid var(--line-strong);
+      }
+      .seg button[aria-pressed='true'] {
+        background: var(--accent-soft);
+        color: var(--accent-soft-ink);
+      }
+      label.l {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .ta {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 8px 10px;
+        color: var(--text);
+        min-height: 52px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font: inherit;
+        text-align: left;
+      }
+      .btn.p {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: transparent;
+        font-weight: 600;
+      }
+      .btn[disabled] {
+        opacity: 0.55;
+      }
+      .tries {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .btn.on {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+      }
+      .narrow {
+        max-width: 320px;
+      }
+      .note {
+        border-left: 2px solid var(--accent);
+        padding-left: 10px;
+        color: var(--soft);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="tag">Drawing</p>
+        <h1>Option A — The studio matches it, nothing new to set</h1>
+        <p class="muted">
+          Every new patch has its colours matched to the take around it. The screen stays as it is.
+          The picture is simulated and works like the real thing: use the switch.
+        </p>
+      </header>
+
+      <section class="panel" aria-label="Patches">
+        <h2>Patches</h2>
+        <p class="muted">
+          Drag over the chosen take to mark an area, then say what should change there. The whole
+          take is edited and only the marked area is kept, with its colours matched to the take
+          around it. An experiment: nothing here reaches the game.
+        </p>
+        <canvas id="main" width="640" height="360"></canvas>
+        <label class="toggle"><input id="show" type="checkbox" checked /> Show the patch</label>
+
+        <label class="l">What should change in the marked area</label>
+        <div class="ta">The boulder is gone, only grass there.</div>
+        <div class="row"><button class="btn p" type="button">Make patch</button></div>
+        <div class="tries">
+          <button class="btn on" type="button">2. The boulder is gone, only grass there.</button>
+          <button class="btn" type="button">1. The boulder is gone, only grass there.</button>
+        </div>
+        <span class="muted"
+          >Saved in <span class="mono">content-studio/cache/image-patches/inn</span></span
+        >
+      </section>
+
+      <section class="panel">
+        <h3>Today, for comparison</h3>
+        <canvas id="today" width="640" height="360"></canvas>
+        <p class="muted">
+          The same patch as it looks now: the fade is right, but the grass inside is a different
+          tone, so the sides of the marked area show.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>The other states</h2>
+        <div class="grid">
+          <div>
+            <h3>On the picture's own edge</h3>
+            <canvas id="edge" width="640" height="360"></canvas>
+            <p class="muted">
+              The side on the picture's edge has nothing to blend with and does not fade. The other
+              sides still match.
+            </p>
+          </div>
+          <div>
+            <h3>A very small area</h3>
+            <canvas id="small" width="640" height="360"></canvas>
+            <p class="muted">The soft edge shrinks to fit, as it does today.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <div>
+            <h3>While a patch is being made</h3>
+            <div class="row">
+              <button class="btn p" disabled type="button">Make patch</button
+              ><span>Making the patch…</span>
+            </div>
+            <p class="muted">
+              No change from today. The join is settled before the try appears, so a try never shows
+              with a seam first.
+            </p>
+          </div>
+          <div class="narrow">
+            <h3>A narrow window</h3>
+            <canvas id="thin" width="640" height="360"></canvas
+            ><label class="toggle"><input type="checkbox" checked disabled /> Show the patch</label>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script>
+      const V = { match: 'auto', feather: 24, scene: 'boulder', today: true }
+      function rng(s) {
+        return () => {
+          s |= 0
+          s = (s + 0x6d2b79f5) | 0
+          let t = Math.imul(s ^ (s >>> 15), 1 | s)
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        }
+      }
+      const W = 640,
+        H = 360,
+        R = rng(7),
+        N = 256,
+        tbl = new Float32Array(N * N)
+      for (let i = 0; i < N * N; i++) tbl[i] = R()
+      function vn(x, y) {
+        const xi = Math.floor(x),
+          yi = Math.floor(y),
+          fx = x - xi,
+          fy = y - yi,
+          u = fx * fx * (3 - 2 * fx),
+          v = fy * fy * (3 - 2 * fy),
+          g = (a, b) => tbl[(b & 255) * N + (a & 255)]
+        return (
+          (g(xi, yi) * (1 - u) + g(xi + 1, yi) * u) * (1 - v) +
+          (g(xi, yi + 1) * (1 - u) + g(xi + 1, yi + 1) * u) * v
+        )
+      }
+      function fbm(x, y) {
+        return vn(x / 40, y / 22) * 0.45 + vn(x / 14, y / 7) * 0.3 + vn(x / 4, y / 3) * 0.25
+      }
+      function scene(boulder) {
+        const d = new Float32Array(W * H * 3)
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            let r, g, b
+            const horizon = 96 + 18 * Math.sin(x / 70) + 8 * Math.sin(x / 23)
+            if (y < horizon) {
+              const t = y / horizon,
+                n = fbm(x + 900, y * 2)
+              r = 120 + 80 * t + 18 * n
+              g = 160 + 60 * t + 14 * n
+              b = 215 + 25 * t
+            } else {
+              const n = fbm(x, y),
+                s = vn(x / 2.2, y / 9)
+              r = 66 + 56 * n + 14 * s
+              g = 104 + 62 * n + 16 * s
+              b = 40 + 30 * n
+            }
+            if (boulder) {
+              const ex = (x - 310) / 62,
+                ey = (y - 222) / 42,
+                e = ex * ex + ey * ey
+              if (e < 1) {
+                const n = fbm(x + 300, y + 300),
+                  l = 0.7 + 0.45 * (-ex * 0.5 - ey * 0.7)
+                r = (120 + 50 * n) * l
+                g = (118 + 46 * n) * l
+                b = (112 + 44 * n) * l
+              } else if (ey > 0.2 && e < 1.5 && ey < 1.3) {
+                const a = 0.55 * (1 - (e - 1) / 0.5)
+                r *= 1 - a
+                g *= 1 - a
+                b *= 1 - a
+              }
+            }
+            const i = (y * W + x) * 3
+            d[i] = r
+            d[i + 1] = g
+            d[i + 2] = b
+          }
+        return d
+      }
+      const TAKE = scene(true)
+      function editFor() {
+        const e = scene(false)
+        const [dr, dg, db] = [14, -9, -16]
+        const m = V.scene === 'shadow' ? 0.55 : 1
+        for (let i = 0; i < e.length; i += 3) {
+          e[i] = e[i] * m + dr + vn((i / 3 / W) * 6, 3) * 6
+          e[i + 1] = e[i + 1] * m + dg
+          e[i + 2] = e[i + 2] * m + db
+        }
+        return e
+      }
+      const EDIT = editFor()
+      const sm = (t) => {
+        t = Math.min(1, Math.max(0, t))
+        return t * t * (3 - 2 * t)
+      }
+      function dist(a, x, y) {
+        return Math.min(
+          a.x > 0 ? x - a.x + 0.5 : 1e9,
+          a.x + a.w < W ? a.x + a.w - x - 0.5 : 1e9,
+          a.y > 0 ? y - a.y + 0.5 : 1e9,
+          a.y + a.h < H ? a.y + a.h - y - 0.5 : 1e9,
+        )
+      }
+      function offset(a) {
+        let s = [0, 0, 0],
+          n = 0
+        for (let y = a.y; y < a.y + a.h; y++)
+          for (let x = a.x; x < a.x + a.w; x++) {
+            if (dist(a, x, y) > 16) continue
+            const i = (y * W + x) * 3
+            const ex = (x - 310) / 62,
+              ey = (y - 222) / 42
+            if (ex * ex + ey * ey < 1.6) continue
+            for (let c = 0; c < 3; c++) s[c] += TAKE[i + c] - EDIT[i + c]
+            n++
+          }
+        return n ? s.map((v) => v / n) : [0, 0, 0]
+      }
+      function draw(id, a, on, feather, match) {
+        const c = document.getElementById(id)
+        if (!c) return
+        const x2 = c.getContext('2d'),
+          im = x2.createImageData(W, H),
+          off = match === 'none' ? [0, 0, 0] : offset(a),
+          half = Math.min(a.w, a.h) / 2,
+          f = Math.max(1, Math.min(feather, Math.floor(half)))
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 3,
+              j = (y * W + x) * 4
+            let r = TAKE[i],
+              g = TAKE[i + 1],
+              b = TAKE[i + 2]
+            if (on && x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h) {
+              const d = dist(a, x, y),
+                al = sm(d / f),
+                k =
+                  match === 'whole' || (match === 'auto' && Math.hypot(...off) < 30)
+                    ? 1
+                    : match === 'edge' || match === 'auto'
+                      ? 1 - sm(d / half)
+                      : 0
+              const er = EDIT[i] + off[0] * k,
+                eg = EDIT[i + 1] + off[1] * k,
+                eb = EDIT[i + 2] + off[2] * k
+              r = r * (1 - al) + er * al
+              g = g * (1 - al) + eg * al
+              b = b * (1 - al) + eb * al
+            }
+            im.data[j] = r
+            im.data[j + 1] = g
+            im.data[j + 2] = b
+            im.data[j + 3] = 255
+          }
+        x2.putImageData(im, 0, 0)
+      }
+      const A = { x: 220, y: 150, w: 180, h: 150 }
+      let feather = V.feather,
+        on = true
+      function paint() {
+        draw('main', A, on, feather, V.match)
+        if (V.today) draw('today', A, on, 24, 'none')
+        draw('edge', { x: 0, y: 150, w: 180, h: 150 }, true, feather, V.match)
+        draw('small', { x: 300, y: 210, w: 26, h: 22 }, true, feather, V.match)
+        draw('thin', A, true, feather, V.match)
+      }
+      document.getElementById('show').addEventListener('change', (e) => {
+        on = e.target.checked
+        paint()
+      })
+      document.querySelectorAll('[data-f]').forEach((b) =>
+        b.addEventListener('click', () => {
+          feather = +b.dataset.f
+          document
+            .querySelectorAll('[data-f]')
+            .forEach((o) => o.setAttribute('aria-pressed', String(+o.dataset.f === feather)))
+          paint()
+        }),
+      )
+      paint()
+    </script>
+  </body>
+</html>
