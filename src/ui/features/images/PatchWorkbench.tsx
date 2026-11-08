@@ -164,6 +164,7 @@ export function PatchWorkbench({
   view,
   work,
   words,
+  saveWords,
   mark,
   onMark,
   onBackToArea,
@@ -178,6 +179,8 @@ export function PatchWorkbench({
   work: PatchWorkView
   /** The patch's field of words. */
   words: ReactNode
+  /** Sees the field of words saved: whether it was, or null with nothing to save. */
+  saveWords: () => Promise<boolean> | null
   /** The mark the person made their own; none starts the patch from its named area, if it has one. */
   mark: PatchArea | null
   onMark: (area: PatchArea) => void
@@ -201,6 +204,7 @@ export function PatchWorkbench({
   const [count, setCount] = useState(2)
   const [asking, setAsking] = useState(false)
   const [pendingFocus, setPendingFocus] = useState<number | 'heading' | null>(null)
+  const [waitingForWords, setWaitingForWords] = useState(false)
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
   // Focus asked for by a press of Make does not scroll: a mouse press stays where it was.
@@ -280,7 +284,7 @@ export function PatchWorkbench({
   const atArea = marked !== null && fromArea !== null && sameArea(marked, fromArea)
   const busy = making.length > 0
   const hasTakes = takes.length > 0 || busy
-  const canMake = marked !== null && !busy && !make.isPending && view.maker.ok
+  const canMake = marked !== null && !busy && !make.isPending && !waitingForWords && view.maker.ok
   const canChange = !lockUnread && !choose.isPending && !drop.isPending
   const canChoose = canChange && lookError === null && shown !== null && shown.look !== 'bringing'
   const overlaid = showing ? shown : null
@@ -564,7 +568,7 @@ export function PatchWorkbench({
             className="takes-count"
             aria-label="Number of new takes"
             value={count}
-            disabled={busy || make.isPending || !view.maker.ok}
+            disabled={busy || make.isPending || waitingForWords || !view.maker.ok}
             onChange={(event) => setCount(Number(event.target.value))}
           >
             {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
@@ -584,7 +588,14 @@ export function PatchWorkbench({
               // goes to the take looked at in the grid, so ← and → keep stepping it.
               focusQuietly.current = true
               setPendingFocus(lookingAt ?? 'heading')
-              make.mutate({ count, area: marked })
+              const saving = saveWords()
+              if (saving === null) return make.mutate({ count, area: marked })
+              // The takes are made from the saved words, so they must be the words in the field.
+              setWaitingForWords(true)
+              void saving.then((saved) => {
+                setWaitingForWords(false)
+                if (saved) make.mutate({ count, area: marked })
+              })
             }}
           >
             {makeTakesText(count, hasTakes)}
