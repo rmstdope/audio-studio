@@ -69,6 +69,8 @@ async function readTakeLooks(
       for (const take of board.takes) {
         const picture = resolveInRoot(root, `${folder}/${take.n}.png`)
         if (!(await Bun.file(picture).exists()) && !inGame.has(take.n)) continue
+        const painted = resolveInRoot(root, `${IMAGE_TAKES_DIR}/${id}/${take.base}.png`)
+        if (!(await Bun.file(painted).exists()) && !inGame.has(take.n)) continue
         const game = resolveInRoot(root, `${folder}/${take.n}.game.png`)
         ;(looks[id] ??= []).push((await Bun.file(game).exists()) ? (take.look ?? null) : null)
       }

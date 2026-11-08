@@ -144,6 +144,43 @@ describe('a chosen patch across the image’s own choices', () => {
   })
 })
 
+describe('patches the image no longer matches', () => {
+  it('keeps a patch the game stopped asking for in the list when the image is published again', async () => {
+    const s = await chosenPatch()
+    writeFileSync(join(s.root, 'tts/act1/images.json'), JSON.stringify([{ ...inn, patches: [] }]))
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+    expect(await s.takes.choose(s.file, 'inn', 2)).toEqual({ ok: true })
+    expect(s.manifest().inn.patches.door.file).toBe('inn.door.png')
+  })
+
+  it('does not count or bring patch takes made on an image take that was dropped', async () => {
+    const s = await chosenPatch()
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+    expect(await s.patches.make(s.file, 'inn', 'door', { count: 1, area })).toEqual({ ok: true })
+    await s.wait()
+    expect(await s.takes.choose(s.file, 'inn', 2)).toEqual({ ok: true })
+    // patch take 2 was painted on image take 1; drop image take 1
+    expect(await s.takes.drop(s.file, 'inn', 1)).toEqual({ ok: true })
+    writeFileSync(
+      join(s.root, EDITS),
+      JSON.stringify({
+        style: { look: 'pixel art', keepOut: 'text', palette: ['#00ff00', '#0000ff'], parts: {} },
+        images: {},
+      }),
+    )
+    const run = await (async () => {
+      expect(await s.takes.bringAll(s.file)).toEqual({ ok: true })
+      for (let i = 0; i < 400; i++) {
+        const state = s.takes.lookRun(s.file)
+        if (!state || !state.running) return state
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+      throw new Error('never ended')
+    })()
+    expect(run).toBeNull()
+  })
+})
+
 describe('a chosen patch across a new look', () => {
   const newLook = ['#00ff00', '#0000ff', '#ffff00']
   const restyle = (root: string, palette: string[]) =>
@@ -192,6 +229,15 @@ describe('a chosen patch across a new look', () => {
     }
     expect(solid).toBeGreaterThan(0)
     expect((await rowOf(s)).row.looksOld).toBe(false)
+  })
+
+  it('counts the image once and gives the image’s reason when it and its patch both fail', async () => {
+    const s = await chosenPatch()
+    rmSync(join(s.root, 'content-studio/cache/image-takes/inn/2.png'))
+    rmSync(join(s.root, FOLDER, '1.png'))
+    restyle(s.root, newLook)
+    const done = await run(s)
+    expect(done?.failed).toEqual([{ id: 'inn', reason: 'missing' }])
   })
 
   it('names the patch that could not be brought, and leaves it in the game in its old look', async () => {

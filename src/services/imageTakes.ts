@@ -46,6 +46,7 @@ import { createImageHealth, type ImageHealthStore } from './imageHealth'
 import { downloadOf, ImageToolError, makeImageTake, type ImageGenerator } from './images'
 import {
   patchesInGame,
+  type ManifestPatch,
   changePatchBoard,
   patchPictureOf,
   patchGameOf,
@@ -353,13 +354,20 @@ export function createImageTakes({
       // The patches the game gets are those chosen on the take the game shows: choosing another
       // take takes the others out of the list in this same save (their pictures stay in the folder).
       const take = (next ?? lock[id])?.take
-      const patches =
+      const patches: Record<string, ManifestPatch> =
         take === undefined
           ? {}
           : await patchesInGame(
               { root: found.root, clips: found.config.clips, row: found.row },
               take,
             )
+      // A patch the game stopped asking for stays in the list, as the image's own entry would.
+      const declared = new Set(found.row.patches.map((patch) => patch.id))
+      for (const [patch, listedPatch] of Object.entries(
+        (manifest[id]?.patches ?? {}) as Record<string, ManifestPatch>,
+      )) {
+        if (!declared.has(patch)) patches[patch] = listedPatch
+      }
       const file = `${id}.png`
       // The boxes read again in the turn: one placed since `found` was read is what the game gets.
       const fresh = await resolve(found.projectFile, id)
@@ -528,6 +536,11 @@ export function createImageTakes({
             resolveInRoot(found.root, patchPictureOf(found.id, patch.id, take.n)),
           ).exists()
           if (!exists && !inGame.has(take.n)) continue
+          // A take painted on an image take that was dropped has nothing to be brought from.
+          const painted = await Bun.file(
+            resolveInRoot(found.root, `${IMAGE_TAKES_DIR}/${found.id}/${take.base}.png`),
+          ).exists()
+          if (!painted && !inGame.has(take.n)) continue
           const there = await Bun.file(
             resolveInRoot(found.root, patchGameOf(found.id, patch.id, take.n)),
           ).exists()
