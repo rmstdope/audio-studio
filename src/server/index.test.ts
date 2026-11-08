@@ -5262,6 +5262,7 @@ describe('the image takes routes', () => {
       ['POST', '/api/image-acts/act1/make-all', undefined],
       ['POST', '/api/image-acts/act1/stop', undefined],
       ['POST', '/api/image-acts/act1/batch/close', undefined],
+      ['POST', '/api/images/inn/patches', { area: {}, instruction: 'x' }],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5376,6 +5377,66 @@ describe('the image takes routes', () => {
     expect((await send('POST', '/api/images/inn/choose', { n: 'x' })).status).toBe(400)
     expect((await send('POST', '/api/images/ghost/takes', { count: 1 })).status).toBe(404)
     expect((await fetch(new URL('/api/images/ghost/takes', studio.url))).status).toBe(404)
+  })
+})
+
+describe('the image patch routes', () => {
+  const root = tempRepo({
+    'content-studio.json': projectJson({
+      images: {
+        from: { part: 'tts/{part}/images.json' },
+        clips: 'web/images',
+        manifest: 'web/images/manifest.json',
+      },
+    }),
+    'tts/act1/images.json': [
+      { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 },
+    ],
+    'content-studio/images/lock.json': {
+      inn: { take: 3, inputs: { text: 'a low inn', width: 320, height: 200 } },
+    },
+  })
+  mkdirSync(join(root, 'content-studio/cache/image-takes/inn'), { recursive: true })
+  writeFileSync(join(root, 'content-studio/cache/image-takes/inn/3.png'), fakePng(256, 256, 1))
+  const studio = startServer({
+    projectFile: join(root, 'content-studio.json'),
+    port: 0,
+    transcriber: null,
+    images: {
+      ready: () => ({ ok: true }),
+      installed: () => true,
+      generate: async (request) => ({
+        png: fakePng(request.width, request.height, request.seed),
+        seed: request.seed,
+      }),
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const post = (body: unknown) =>
+    fetch(new URL('/api/images/inn/patches', studio.url), {
+      method: 'POST',
+      headers: { origin: studio.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  const area = { x: 16, y: 16, width: 64, height: 64 }
+
+  it('makes a patch of the chosen take and serves its picture', async () => {
+    expect((await post({ area, instruction: 'the door is gone' })).status).toBe(200)
+    let view = { making: true, patches: [] as { n: number; instruction: string }[] }
+    for (let i = 0; i < 200 && view.making; i++) {
+      view = await (await fetch(new URL('/api/images/inn/patches', studio.url))).json()
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(view.patches).toMatchObject([{ n: 1, instruction: 'the door is gone' }])
+    const picture = await fetch(new URL('/api/images/inn/patches/1', studio.url))
+    expect(picture.status).toBe(200)
+    expect((await picture.arrayBuffer()).byteLength).toBeGreaterThan(100)
+    expect((await fetch(new URL('/api/images/inn/patches/9', studio.url))).status).toBe(404)
+  })
+
+  it('refuses a request without an instruction, and an image not listed', async () => {
+    expect((await post({ area, instruction: '  ' })).status).toBe(400)
+    expect((await fetch(new URL('/api/images/nope/patches', studio.url))).status).toBe(404)
   })
 })
 

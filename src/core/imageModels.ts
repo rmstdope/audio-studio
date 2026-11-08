@@ -49,6 +49,9 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
   },
 }
 
+/** The mflux command that changes an existing picture from an instruction; FLUX.2 klein's own. */
+export const IMAGE_EDIT_COMMAND = 'mflux-generate-flux2-edit'
+
 /** The image model with this id. */
 export function imageModel(id: ImageModelId): ImageModel {
   return IMAGE_MODELS[id]

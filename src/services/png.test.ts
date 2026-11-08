@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { decodePng, encodePng } from './png'
+import { inflateSync } from 'node:zlib'
+import { decodePng, encodePng, encodeTransparentPng, pngSize } from './png'
 import type { Pixels } from '../core/imagePixels'
 
 const gradient = (w: number, h: number): Pixels => {
@@ -16,6 +17,22 @@ describe('png', () => {
     const back = decodePng(encodePng(picture))
     expect([back.width, back.height]).toEqual([37, 19])
     expect(back.data).toEqual(picture.data)
+  })
+  it('reads the size from the start of the file', () => {
+    expect(pngSize(encodePng(gradient(37, 19)).subarray(0, 33))).toEqual({ width: 37, height: 19 })
+  })
+  it('says a file is not a PNG when asked its size', () => {
+    expect(() => pngSize(new TextEncoder().encode('not a picture'))).toThrow('not a PNG')
+  })
+  it('keeps the transparency of a picture written with it', () => {
+    const picture = gradient(9, 5)
+    picture.data[3] = 0
+    picture.data[7] = 128
+    const png = encodeTransparentPng(picture)
+    expect(png[25]).toBe(6) // the colour type of RGBA
+    const length = new DataView(png.buffer, png.byteOffset).getUint32(33)
+    const raw = inflateSync(png.subarray(41, 41 + length))
+    expect([raw[4], raw[8], raw[12]]).toEqual([0, 128, 255])
   })
   it('reads what other encoders write: RGBA with filters, and a palette picture', async () => {
     const source = encodePng(gradient(40, 30))

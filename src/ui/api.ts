@@ -19,7 +19,9 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
+import type { ImagePatchesView, PatchArea } from '../core/imagePatches'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
+import type { ImagePatchAnswer } from '../services/imagePatches'
 import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
 import type {
@@ -1615,6 +1617,40 @@ function useImageTakesChange<Input>(
         client.invalidateQueries({ queryKey: ['image-making'] }),
         ...(project ? [client.invalidateQueries({ queryKey: ['project'] })] : []),
       ]),
+  })
+}
+
+/** The patches of an image's chosen take; polled while one is being made. */
+export function useImagePatches(imageId: string) {
+  return useQuery({
+    queryKey: ['image-patches', imageId],
+    queryFn: () =>
+      getJson<ImagePatchesView | ProjectFailure>(
+        `/api/images/${encodeURIComponent(imageId)}/patches`,
+      ),
+    refetchInterval: (query) => {
+      const view = query.state.data
+      return view && 'making' in view && view.making ? 1000 : false
+    },
+  })
+}
+
+/** Asks for a patch of an image's chosen take: the marked area and what should change there. */
+export function useMakeImagePatch(imageId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: { area: PatchArea; instruction: string }) => {
+      const response = await fetch(`/api/images/${encodeURIComponent(imageId)}/patches`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`making the patch answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<ImagePatchAnswer>
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
   })
 }
 

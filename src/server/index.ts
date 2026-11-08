@@ -13,6 +13,8 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
+import { MakePatchBody } from '../core/imagePatches'
+import { createImagePatches, type ImagePatchAnswer } from '../services/imagePatches'
 import { ChooseImageTakeBody, MakeImageTakesBody } from '../core/imageTakes'
 import { BriefChangeBody } from '../core/music'
 import {
@@ -314,7 +316,9 @@ const ModelsBody = z
 const StageParam = z.enum(['audition', 'draft', 'final'])
 
 /** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
-function imageAnswer(result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAnswer): Response {
+function imageAnswer(
+  result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAnswer | ImagePatchAnswer,
+): Response {
   if (!result) return Response.json({ error: 'not found' }, { status: 404 })
   return Response.json(result, { status: result.ok ? 200 : 409 })
 }
@@ -587,6 +591,7 @@ export function startServer({
   const imageGenerator =
     images ??
     (process.env.CONTENT_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator())
+  const imagePatches = createImagePatches({ generator: imageGenerator })
   const imageHealth = createImageHealth()
   const imageTakes = createImageTakes({ generator: imageGenerator, health: imageHealth })
   const musicGenerator = music ?? sharedMusic(projectFile)
@@ -1662,6 +1667,29 @@ export function startServer({
       '/api/images/bring-all': {
         GET: guard(async () => Response.json(imageTakes.lookRun(projectFile))),
         POST: fromOwnPage(async () => imageAnswer(await imageTakes.bringAll(projectFile))),
+      },
+      '/api/images/:id/patches': {
+        GET: guard(async (request) => {
+          const view = await imagePatches.view(projectFile, request.params.id)
+          return view ? Response.json(view) : notFound()
+        }),
+        POST: fromOwnPage(async (request) => {
+          const body = MakePatchBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { area, instruction }' }, { status: 400 })
+          }
+          return imageAnswer(await imagePatches.make(projectFile, request.params.id, body.data))
+        }),
+      },
+      '/api/images/:id/patches/:n': {
+        GET: guard(async (request) => {
+          const file = await imagePatches.patchFile(
+            projectFile,
+            request.params.id,
+            request.params.n,
+          )
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
       },
       '/api/images/:id/takes': {
         GET: guard(async (request) => {

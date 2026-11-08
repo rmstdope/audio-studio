@@ -5,6 +5,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   checkImageRequest,
+  IMAGE_EDIT_COMMAND,
   IMAGE_MODEL_IDS,
   imageFailureReason,
   imageModel,
@@ -26,6 +27,8 @@ export interface ImageRequest {
   seed: number
   /** The model to make it with. */
   model: ImageModelId
+  /** The path of a picture to change, the prompt then being the instruction; none makes a new one. */
+  editing?: string
 }
 
 /** One take as generated: a PNG, and the seed it was made from. */
@@ -53,6 +56,8 @@ export interface ImageGenerator {
   installed(model: ImageModelId): boolean | Promise<boolean>
   /** How much of this model's download is here; a generator without it is whole or absent by `installed`. */
   download?(model: ImageModelId): ImageDownload | Promise<ImageDownload>
+  /** Whether a picture can be edited here; a generator without it can. */
+  canEdit?(): boolean | Promise<boolean>
   /** One take; the model loads for it and leaves memory when it is made. Aborting ends it, and it rejects. */
   generate(request: ImageRequest, signal?: AbortSignal): Promise<GeneratedImage>
 }
@@ -191,9 +196,10 @@ export interface MfluxCommand {
 export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand {
   const model = imageModel(request.model)
   return {
-    program: model.command,
+    program: request.editing ? IMAGE_EDIT_COMMAND : model.command,
     args: [
       '--model', model.mflux,
+      ...(request.editing ? ['--image-paths', request.editing] : []),
       '--prompt', request.prompt,
       '--width', String(request.width),
       '--height', String(request.height),
@@ -232,6 +238,7 @@ export function createMfluxGenerator({
   return {
     ready: () => mfluxReady(machine),
     installed: (model) => imageModelInstalled(hubDir, model),
+    canEdit: () => machine.which(IMAGE_EDIT_COMMAND),
     download: (model) => imageModelDownload(hubDir, model),
     async generate(request, signal) {
       const problem = checkImageRequest(request)
