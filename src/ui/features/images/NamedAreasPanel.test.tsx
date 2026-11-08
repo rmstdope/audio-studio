@@ -1,17 +1,23 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import type { AreaRow, ImageRow } from '../../../core/images'
+import type { AreaBox, AreaRow, ImageRow } from '../../../core/images'
+import type { ImagePatchesView } from '../../../core/imagePatches'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
-GlobalRegistrator.register()
+GlobalRegistrator.register({ url: 'http://localhost/' })
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
+const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { NamedAreasPanel } = await import('./NamedAreasPanel')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const cleanups: (() => void)[] = []
-afterEach(() => cleanups.splice(0).forEach((c) => c()))
+const realFetch = globalThis.fetch
+afterEach(() => {
+  cleanups.splice(0).forEach((c) => c())
+  globalThis.fetch = realFetch
+})
 afterAll(() => GlobalRegistrator.unregister())
 
 const area = (id: string, over: Partial<AreaRow> = {}): AreaRow => ({
@@ -21,33 +27,117 @@ const area = (id: string, over: Partial<AreaRow> = {}): AreaRow => ({
   box: null,
   ...over,
 })
+const placedAt = (id: string, box: AreaBox, over: Partial<AreaRow> = {}) =>
+  area(id, { placed: true, box, ...over })
 
-/** Renders the panel for an image with these areas. */
-async function render(areas: AreaRow[]) {
+const view = (over: Partial<ImagePatchesView> = {}): ImagePatchesView => ({
+  take: { n: 2, width: 1024, height: 640 },
+  pictureGone: false,
+  patches: [],
+  making: null,
+  failed: null,
+  folder: 'content-studio/cache/image-patches/inn',
+  ...over,
+})
+
+interface Options {
+  answer?: ImagePatchesView | (() => Promise<Response>)
+  saved?: { status: number; body: unknown }
+  chosenPatches?: { id: string; title: string; src: string }[]
+}
+
+/** Renders the panel for an image of 320 x 200 with these areas; gives what was saved. */
+async function render(areas: AreaRow[], options: Options = {}) {
+  const puts: { path: string; body: { box: AreaBox | null } }[] = []
+  const saved = options.saved ?? { status: 200, body: { ok: true } }
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      puts.push({ path: url, body: JSON.parse(String(init.body)) })
+      return Response.json(saved.body, { status: saved.status })
+    }
+    if (typeof options.answer === 'function') return options.answer()
+    return Response.json(options.answer ?? view())
+  }) as typeof fetch
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const row = { id: 'inn', width: 320, height: 200, areas } as ImageRow
   await act(async () => {
-    root.render(createElement(NamedAreasPanel, { row: { id: 'inn', areas } as ImageRow }))
+    root.render(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(NamedAreasPanel, { row, chosenPatches: options.chosenPatches }),
+      ),
+    )
   })
+  await settle()
   cleanups.push(() => {
     act(() => root.unmount())
     host.remove()
   })
-  return host
+  const stage = host.querySelector<HTMLElement>('.named-area-stage')
+  if (stage) {
+    stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 200 }) as DOMRect
+  }
+  return { host, puts, stage }
+}
+
+/** Lets pending requests, state updates and animation frames run. */
+async function settle() {
+  for (let i = 0; i < 5; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
+}
+
+/** Sends a pointer event of `type` at this picture point (one screen pixel per image pixel). */
+async function pointer(target: Element, type: string, x: number, y: number) {
+  await act(async () => {
+    target.dispatchEvent(
+      new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0, pointerId: 1 }),
+    )
+  })
+}
+
+/** A drag over the picture from one point to another. */
+async function drag(
+  stage: Element,
+  from: [number, number],
+  to: [number, number],
+  on: Element = stage,
+) {
+  await pointer(on, 'pointerdown', ...from)
+  await pointer(stage, 'pointermove', ...to)
+  await pointer(stage, 'pointerup', ...to)
+  await settle()
+}
+
+async function press(target: Element, key: string, shiftKey = false) {
+  await act(async () => {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true }))
+  })
+  await settle()
 }
 
 const rows = (host: HTMLElement) => [...host.querySelectorAll('.named-area')]
+const mainOf = (host: HTMLElement, at: number) =>
+  rows(host)[at]!.querySelector<HTMLButtonElement>('.named-area-main')!
+const selectedIds = (host: HTMLElement) =>
+  rows(host).flatMap((r, at) => (r.classList.contains('selected') ? [at] : []))
+const line = (host: HTMLElement) => host.querySelector('.named-area-line')?.textContent
+const boxes = (host: HTMLElement) => [...host.querySelectorAll<HTMLElement>('.named-area-box')]
+const tagOf = (host: HTMLElement, id: string) =>
+  host.querySelector<HTMLElement>(`[data-area="${id}"]`)!
 
 describe('the named areas panel', () => {
   it('shows nothing when the game names no area', async () => {
-    expect((await render([])).innerHTML).toBe('')
+    expect((await render([])).host.innerHTML).toBe('')
   })
+
   it('opens with its heading, the count and the line, then a row per area in order', async () => {
-    const host = await render([area('b'), area('a')])
+    const { host } = await render([area('b'), area('a')])
     expect(host.querySelector('h2')!.textContent).toBe('Named areas')
     expect(host.querySelector('.named-areas-head')!.textContent).toBe('Named areas0 of 2 placed')
-    expect(host.querySelector('p')!.textContent).toBe(
+    expect(host.querySelector('.named-areas-intro')!.textContent).toBe(
       'The parts of this picture the game names, so that a player can click them.',
     )
     expect(rows(host).map((r) => r.querySelector('b')!.textContent)).toEqual([
@@ -56,8 +146,10 @@ describe('the named areas panel', () => {
     ])
     expect(rows(host)[0]!.querySelector('.mono')!.textContent).toBe('b')
   })
+
   it('marks an area placed or to place, and counts the placed ones', async () => {
-    const host = await render([area('a', { placed: true }), area('b'), area('c')])
+    const box = { x: 10, y: 10, width: 20, height: 20 }
+    const { host } = await render([placedAt('a', box), area('b'), area('c')])
     expect(rows(host).map((r) => r.querySelector('.chip')!.textContent)).toEqual([
       'Placed',
       'To place',
@@ -67,12 +159,403 @@ describe('the named areas panel', () => {
     expect(rows(host)[1]!.querySelector('.chip-attention')).not.toBeNull()
     expect(host.querySelector('.named-areas-head')!.textContent).toContain('1 of 3 placed')
   })
+
   it('shows two areas with one title, told apart by their ids', async () => {
-    const host = await render([area('a', { title: 'Door' }), area('b', { title: 'Door' })])
+    const { host } = await render([area('a', { title: 'Door' }), area('b', { title: 'Door' })])
     expect(rows(host).map((r) => r.querySelector('.mono')!.textContent)).toEqual(['a', 'b'])
   })
-  it('is read only: nothing in it can be pressed or tabbed to', async () => {
-    const host = await render([area('a'), area('b')])
-    expect(host.querySelectorAll('button, a, input, textarea, select, [tabindex]').length).toBe(0)
+
+  describe('arriving', () => {
+    it('selects the first area still to place and says what to do', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([
+        placedAt('a', box),
+        area('b', { title: 'Old notice' }),
+        area('c'),
+      ])
+      expect(selectedIds(host)).toEqual([1])
+      expect(line(host)).toBe('Drag over the picture to mark “Old notice”.')
+      expect(host.querySelector('.named-area-clear')).toBeNull()
+    })
+
+    it('selects nothing when every area is placed, and says how to change one', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([placedAt('a', box), placedAt('b', box)])
+      expect(selectedIds(host)).toEqual([])
+      expect(line(host)).toBe('Press an area in the list or on the picture to change it.')
+    })
+
+    it('shows the chosen take’s picture in the shape of the image', async () => {
+      const { host, stage } = await render([area('a')])
+      expect(host.querySelector<HTMLImageElement>('img.named-area-take')!.src).toContain(
+        '/api/images/inn/takes/2',
+      )
+      expect(stage!.style.aspectRatio).toBe('320 / 200')
+    })
+  })
+
+  describe('without a picture to mark on', () => {
+    it('says to choose a take, and selects and lines nothing', async () => {
+      const { host } = await render([area('a')], { answer: view({ take: null }) })
+      expect(host.querySelector('.named-area-empty')!.textContent).toBe(
+        'Choose a take to mark the areas on it.',
+      )
+      expect(host.querySelector('.named-area-line')).toBeNull()
+      expect(selectedIds(host)).toEqual([])
+      expect(mainOf(host, 0).disabled).toBe(true)
+      expect(host.querySelector('.named-areas-head')!.textContent).toContain('0 of 1 placed')
+    })
+
+    it('says the picture is missing, and keeps the boxes already placed in the list', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([placedAt('a', box)], {
+        answer: view({ take: null, pictureGone: true }),
+      })
+      expect(host.querySelector('.named-area-empty')!.textContent).toBe(
+        "The chosen take's picture is missing or cannot be read, so the areas cannot be marked on it.",
+      )
+      expect(rows(host)[0]!.querySelector('.chip')!.textContent).toBe('Placed')
+      expect(mainOf(host, 0).disabled).toBe(true)
+    })
+
+    it('says so too when the picture cannot be read once asked for', async () => {
+      const { host } = await render([area('a')])
+      await act(async () => {
+        host.querySelector('img.named-area-take')!.dispatchEvent(new Event('error'))
+      })
+      expect(host.querySelector('.named-area-empty')!.textContent).toContain('missing or cannot')
+      expect(selectedIds(host)).toEqual([])
+    })
+
+    it('keeps the picture’s place empty while it loads, with the list as usual', async () => {
+      const { host } = await render([area('a')], { answer: () => new Promise<Response>(() => {}) })
+      expect(host.querySelector('.named-area-empty')!.textContent).toBe('')
+      expect(host.querySelector('.named-area-line')).toBeNull()
+      expect(rows(host).length).toBe(1)
+    })
+  })
+
+  describe('selecting', () => {
+    it('selects the row pressed, and says to mark it or change it', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([area('a'), placedAt('b', box, { title: 'Well' })])
+      await act(async () => mainOf(host, 1).click())
+      expect(selectedIds(host)).toEqual([1])
+      expect(line(host)).toContain('Drag the box to move it')
+      expect(rows(host)[1]!.querySelector('.named-area-clear')!.textContent).toBe('Clear')
+      await act(async () => mainOf(host, 0).click())
+      expect(selectedIds(host)).toEqual([0])
+      expect(host.querySelector('.named-area-clear')).toBeNull()
+    })
+
+    it('selects a placed box by clicking it, the smallest where they overlap', async () => {
+      const { host, stage } = await render([
+        placedAt('big', { x: 0, y: 0, width: 200, height: 100 }),
+        placedAt('small', { x: 10, y: 10, width: 20, height: 20 }),
+      ])
+      await drag(stage!, [100, 50], [100, 50])
+      expect(selectedIds(host)).toEqual([0])
+      await drag(stage!, [15, 15], [15, 15])
+      expect(selectedIds(host)).toEqual([1])
+    })
+
+    it('selects a box clicked inside the selected one, even without moving it', async () => {
+      const { host, stage } = await render([
+        placedAt('big', { x: 0, y: 0, width: 200, height: 100 }),
+        placedAt('small', { x: 10, y: 10, width: 20, height: 20 }),
+      ])
+      await act(async () => mainOf(host, 0).click())
+      await drag(stage!, [15, 15], [15, 15])
+      expect(selectedIds(host)).toEqual([1])
+      expect(host.querySelectorAll('.handle').length).toBe(8)
+    })
+
+    it('draws the selected box on top with eight handles, the others without', async () => {
+      const { host } = await render([
+        placedAt('a', { x: 0, y: 0, width: 50, height: 50 }),
+        placedAt('b', { x: 100, y: 0, width: 50, height: 50 }),
+      ])
+      await act(async () => mainOf(host, 0).click())
+      expect(boxes(host).at(-1)!.dataset.area).toBe('a')
+      expect(tagOf(host, 'a').querySelectorAll('.handle').length).toBe(8)
+      expect(tagOf(host, 'b').querySelectorAll('.handle').length).toBe(0)
+    })
+  })
+
+  describe('drawing', () => {
+    it('draws the selected area’s box and saves it as the mouse lets go, staying selected', async () => {
+      const { host, stage, puts } = await render([area('a'), area('b')])
+      await drag(stage!, [20, 30], [120, 90])
+      expect(puts).toEqual([
+        {
+          path: '/api/images/inn/areas/a',
+          body: { box: { x: 20, y: 30, width: 100, height: 60 } },
+        },
+      ])
+      expect(rows(host)[0]!.querySelector('.chip')!.textContent).toBe('Placed')
+      expect(host.querySelector('.named-areas-head')!.textContent).toContain('1 of 2 placed')
+      expect(selectedIds(host)).toEqual([0])
+      expect(host.querySelectorAll('.handle').length).toBe(8)
+      expect(document.activeElement).toBe(mainOf(host, 0))
+      expect(host.querySelector('button.save, .btn-primary')).toBeNull()
+    })
+
+    it('stops at the picture’s edges', async () => {
+      const { stage, puts } = await render([area('a')])
+      await drag(stage!, [300, 180], [900, 900])
+      expect(puts[0]!.body.box).toEqual({ x: 300, y: 180, width: 20, height: 20 })
+    })
+
+    it('shows a dashed box while dragging', async () => {
+      const { host, stage } = await render([area('a')])
+      await pointer(stage!, 'pointerdown', 10, 10)
+      await pointer(stage!, 'pointermove', 80, 60)
+      expect(host.querySelector('.named-area-box.drawing')).not.toBeNull()
+      await pointer(stage!, 'pointerup', 80, 60)
+    })
+
+    it('draws nothing for a drag too small to be a box', async () => {
+      const { host, stage, puts } = await render([area('a')])
+      await drag(stage!, [50, 50], [52, 90])
+      expect(puts).toEqual([])
+      expect(host.querySelector('.named-area-box')).toBeNull()
+    })
+
+    it('starts a drawing on another area’s box as a drawing of the selected one', async () => {
+      const { stage, puts } = await render([
+        area('a'),
+        placedAt('b', { x: 100, y: 100, width: 100, height: 60 }),
+      ])
+      await drag(stage!, [110, 110], [150, 150])
+      expect(puts[0]!.path).toBe('/api/images/inn/areas/a')
+    })
+
+    it('keeps the old box until let go, and then replaces it', async () => {
+      const old = { x: 10, y: 10, width: 40, height: 40 }
+      const { host, stage, puts } = await render([placedAt('a', old)])
+      await act(async () => mainOf(host, 0).click())
+      await pointer(stage!, 'pointerdown', 200, 100)
+      await pointer(stage!, 'pointermove', 260, 150)
+      expect(tagOf(host, 'a').style.left).toBe(`${(10 / 320) * 100}%`)
+      await pointer(stage!, 'pointerup', 260, 150)
+      await settle()
+      expect(puts[0]!.body.box).toEqual({ x: 200, y: 100, width: 60, height: 50 })
+      expect(tagOf(host, 'a').style.left).toBe(`${(200 / 320) * 100}%`)
+    })
+
+    it('cancels with Esc, leaving everything as it was', async () => {
+      const { host, stage, puts } = await render([area('a')])
+      await pointer(stage!, 'pointerdown', 10, 10)
+      await pointer(stage!, 'pointermove', 80, 60)
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      })
+      await pointer(stage!, 'pointerup', 80, 60)
+      await settle()
+      expect(puts).toEqual([])
+      expect(host.querySelector('.named-area-box')).toBeNull()
+      expect(selectedIds(host)).toEqual([0])
+    })
+
+    it('does nothing when no area is selected and the drag starts on nothing', async () => {
+      const { stage, puts } = await render([placedAt('a', { x: 10, y: 10, width: 20, height: 20 })])
+      await drag(stage!, [100, 100], [200, 150])
+      expect(puts).toEqual([])
+    })
+  })
+
+  describe('moving and resizing', () => {
+    const start = { x: 100, y: 50, width: 60, height: 40 }
+    const setup = async () => {
+      const made = await render([placedAt('a', start)])
+      await act(async () => mainOf(made.host, 0).click())
+      return made
+    }
+
+    it('moves the box by a drag that starts inside it', async () => {
+      const { stage, puts } = await setup()
+      await drag(stage!, [120, 60], [140, 70])
+      expect(puts[0]!.body.box).toEqual({ ...start, x: 120, y: 60 })
+    })
+
+    it('resizes it by a drag on a handle', async () => {
+      const { host, stage, puts } = await setup()
+      await drag(stage!, [160, 90], [200, 120], host.querySelector('.handle-se')!)
+      expect(puts[0]!.body.box).toEqual({ x: 100, y: 50, width: 100, height: 70 })
+    })
+
+    it('resizes by a side handle and keeps the smallest size', async () => {
+      const { host, stage, puts } = await setup()
+      await drag(stage!, [100, 70], [300, 70], host.querySelector('.handle-w')!)
+      expect(puts[0]!.body.box).toEqual({ x: 156, y: 50, width: 4, height: 40 })
+    })
+
+    it('saves nothing for a press on the box without moving', async () => {
+      const { stage, puts } = await setup()
+      await drag(stage!, [120, 60], [120, 60])
+      expect(puts).toEqual([])
+    })
+  })
+
+  describe('clearing', () => {
+    const box = { x: 100, y: 50, width: 60, height: 40 }
+
+    it('clears at once from the row’s button, leaving the area selected and to place', async () => {
+      const { host, puts } = await render([placedAt('a', box)])
+      await act(async () => mainOf(host, 0).click())
+      await act(async () => host.querySelector<HTMLButtonElement>('.named-area-clear')!.click())
+      await settle()
+      expect(puts).toEqual([{ path: '/api/images/inn/areas/a', body: { box: null } }])
+      expect(rows(host)[0]!.querySelector('.chip')!.textContent).toBe('To place')
+      expect(selectedIds(host)).toEqual([0])
+      expect(host.querySelector('.named-area-clear')).toBeNull()
+      expect(document.activeElement).toBe(mainOf(host, 0))
+      expect(line(host)).toContain('Drag over the picture to mark')
+    })
+
+    it('clears with the Delete key, focus staying on the row', async () => {
+      const { host, puts } = await render([placedAt('a', box)])
+      await act(async () => mainOf(host, 0).click())
+      mainOf(host, 0).focus()
+      await press(mainOf(host, 0), 'Delete')
+      expect(puts[0]!.body).toEqual({ box: null })
+      expect(document.activeElement).toBe(mainOf(host, 0))
+    })
+  })
+
+  describe('the keyboard', () => {
+    const box = { x: 100, y: 50, width: 60, height: 40 }
+    const setup = async () => {
+      const made = await render([placedAt('a', box)])
+      await act(async () => mainOf(made.host, 0).click())
+      return made
+    }
+
+    it('moves the selected box by a step with the arrow keys', async () => {
+      const { host, puts } = await setup()
+      await press(mainOf(host, 0), 'ArrowRight')
+      await press(mainOf(host, 0), 'ArrowUp')
+      expect(puts.map((p) => p.body.box)).toEqual([
+        { ...box, x: 104 },
+        { ...box, x: 104, y: 46 },
+      ])
+    })
+
+    it('resizes by its right and bottom edges with Shift', async () => {
+      const { host, puts } = await setup()
+      await press(mainOf(host, 0), 'ArrowRight', true)
+      await press(mainOf(host, 0), 'ArrowUp', true)
+      expect(puts.map((p) => p.body.box)).toEqual([
+        { ...box, width: 64 },
+        { ...box, width: 64, height: 36 },
+      ])
+    })
+
+    it('does nothing for an area still to place, and saves nothing at an edge', async () => {
+      const edge = await render([placedAt('a', { x: 0, y: 0, width: 30, height: 30 })])
+      await act(async () => mainOf(edge.host, 0).click())
+      await press(mainOf(edge.host, 0), 'ArrowLeft')
+      expect(edge.puts).toEqual([])
+      const none = await render([area('a')])
+      await press(mainOf(none.host, 0), 'ArrowRight')
+      expect(none.puts).toEqual([])
+    })
+
+    it('reaches the rows, then the Clear button of the selected row, by Tab', async () => {
+      const { host } = await setup()
+      const tabbable = [...host.querySelectorAll('button')].filter((b) => !b.disabled)
+      expect(tabbable.map((b) => b.className)).toEqual(['named-area-main', 'btn named-area-clear'])
+      expect(host.querySelector('.named-area-stage')!.hasAttribute('tabindex')).toBe(false)
+    })
+  })
+
+  describe('saving', () => {
+    it('takes the box back, and says why under the explanation, when saving fails', async () => {
+      const { host, stage } = await render([area('a', { title: 'Market stalls' })], {
+        saved: {
+          status: 409,
+          body: { ok: false, problems: [{ file: 'f', path: '', message: 'the disk is full' }] },
+        },
+      })
+      await drag(stage!, [20, 30], [120, 90])
+      expect(host.querySelector('.adopt-error')!.textContent).toBe(
+        '“Market stalls” could not be saved: the disk is full.',
+      )
+      expect(host.querySelector('.named-area-box')).toBeNull()
+      expect(rows(host)[0]!.querySelector('.chip')!.textContent).toBe('To place')
+      expect(host.querySelector('.named-areas-head')!.textContent).toContain('0 of 1 placed')
+    })
+
+    it('puts a cleared box back when clearing fails, and drops the line at the next change', async () => {
+      const box = { x: 100, y: 50, width: 60, height: 40 }
+      const { host } = await render([placedAt('a', box)], {
+        saved: { status: 500, body: {} },
+      })
+      await act(async () => mainOf(host, 0).click())
+      await act(async () => host.querySelector<HTMLButtonElement>('.named-area-clear')!.click())
+      await settle()
+      expect(host.querySelector('.adopt-error')!.textContent).toContain('could not be saved')
+      expect(rows(host)[0]!.querySelector('.chip')!.textContent).toBe('Placed')
+    })
+  })
+
+  describe('the titles on the picture', () => {
+    it('cuts a long title short with an ellipsis, the row keeping it whole', async () => {
+      const title = 'The very long name of the great market square'
+      const { host } = await render([
+        placedAt('a', { x: 100, y: 100, width: 10, height: 10 }, { title }),
+      ])
+      expect(tagOf(host, 'a').querySelector('span')!.textContent).toBe('The very long na…')
+      expect(rows(host)[0]!.querySelector('b')!.textContent).toBe(title)
+    })
+
+    it('puts the tag under the box at the top of the picture, and to its right edge at the right', async () => {
+      const { host } = await render([
+        placedAt('top', { x: 10, y: 0, width: 40, height: 30 }),
+        placedAt('right', { x: 280, y: 100, width: 40, height: 30 }),
+        placedAt('mid', { x: 100, y: 100, width: 40, height: 30 }),
+      ])
+      expect(tagOf(host, 'top').className).toContain('low')
+      expect(tagOf(host, 'right').className).toContain('right')
+      expect(tagOf(host, 'mid').className).not.toMatch(/low|right/)
+    })
+
+    it('follows the game’s new title for the same id, the box staying', async () => {
+      const box = { x: 100, y: 100, width: 40, height: 30 }
+      const { host } = await render([placedAt('a', box, { title: 'Well' })])
+      expect(tagOf(host, 'a').querySelector('span')!.textContent).toBe('Well')
+    })
+  })
+
+  describe('the chosen patches', () => {
+    const patches = [
+      { id: 'p1', title: 'Bread taken', src: '/p1.png' },
+      { id: 'p2', title: 'Lamp lit', src: '/p2.png' },
+    ]
+
+    it('has no switches and no heading without chosen patches', async () => {
+      const { host } = await render([area('a')])
+      expect(host.textContent).not.toContain('Show on the picture:')
+      expect(host.querySelector('input[type=checkbox]')).toBeNull()
+    })
+
+    it('has a switch per patch, all off, that lays the patch over the picture', async () => {
+      const { host } = await render([area('a'), area('b')], { chosenPatches: patches })
+      expect(host.querySelector('.named-area-switches')!.textContent).toContain(
+        'Show on the picture:',
+      )
+      const switches = [...host.querySelectorAll<HTMLInputElement>('input[type=checkbox]')]
+      expect(switches.map((s) => s.checked)).toEqual([false, false])
+      expect(host.querySelector('img.named-area-patch')).toBeNull()
+      await act(async () => switches[1]!.click())
+      expect(host.querySelector<HTMLImageElement>('img.named-area-patch')!.src).toContain('/p2.png')
+    })
+
+    it('stays as left while moving between areas', async () => {
+      const { host } = await render([area('a'), area('b')], { chosenPatches: patches })
+      await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
+      await act(async () => mainOf(host, 1).click())
+      expect(host.querySelectorAll('img.named-area-patch').length).toBe(1)
+    })
   })
 })
