@@ -14,9 +14,13 @@ interface Box {
   height: number
 }
 
+/** How near a picture's edge, in screen pixels, a drag counts as reaching it. */
+const EDGE_REACH = 4
+
 /**
  * The marked area of a drag over a picture, in the pixels of the take it shows, stopping at the
- * picture's edges; null for a click, or for a drag too small to patch. A picture that is not
+ * picture's edges, and with a side just short of an edge (`EDGE_REACH`) on it, so that no aim is
+ * needed to mark up to the edge; null for a click, or for a drag too small to patch. A picture that is not
  * the model's own (the game's version) gives its `unplace` to turn the area back into the model's pixels.
  */
 export function areaFromDrag(
@@ -27,8 +31,11 @@ export function areaFromDrag(
   unplace: (area: PatchArea) => PatchArea = (area) => area,
   model: { width: number; height: number } = take,
 ): PatchArea | null {
-  const along = (at: number, from: number, size: number, pixels: number) =>
-    Math.round((Math.min(Math.max(at - from, 0), size) / size) * pixels)
+  const along = (at: number, from: number, size: number, pixels: number) => {
+    const inside = at - from
+    const reached = inside <= EDGE_REACH ? 0 : inside >= size - EDGE_REACH ? size : inside
+    return Math.round((reached / size) * pixels)
+  }
   const x1 = along(start.x, box.left, box.width, take.width)
   const x2 = along(end.x, box.left, box.width, take.width)
   const y1 = along(start.y, box.top, box.height, take.height)

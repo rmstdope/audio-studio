@@ -29,6 +29,24 @@ describe('areaFromDrag', () => {
     })
   })
 
+  it('counts a drag that starts or stops a few screen pixels inside an edge as reaching it', () => {
+    expect(areaFromDrag({ x: 102, y: 52 }, { x: 609, y: 335 }, box, take)).toEqual({
+      x: 0,
+      y: 0,
+      width: 1024,
+      height: 576,
+    })
+  })
+
+  it('keeps a side further inside the edge than that where it was dragged', () => {
+    expect(areaFromDrag({ x: 105, y: 55 }, { x: 606, y: 332 }, box, take)).toEqual({
+      x: 10,
+      y: 10,
+      width: 1002,
+      height: 554,
+    })
+  })
+
   it('gives nothing for a click or a drag too small to patch', () => {
     expect(areaFromDrag({ x: 110, y: 60 }, { x: 110, y: 60 }, box, take)).toBeNull()
     expect(areaFromDrag({ x: 110, y: 60 }, { x: 112, y: 160 }, box, take)).toBeNull()
