@@ -31,12 +31,11 @@ const placedAt = (id: string, box: AreaBox, over: Partial<AreaRow> = {}) =>
   area(id, { placed: true, box, ...over })
 
 const view = (over: Partial<ImagePatchesView> = {}): ImagePatchesView => ({
+  ok: true,
   take: { n: 2, width: 1024, height: 640 },
   pictureGone: false,
+  maker: { ok: true },
   patches: [],
-  making: null,
-  failed: null,
-  folder: 'content-studio/cache/image-patches/inn',
   ...over,
 })
 

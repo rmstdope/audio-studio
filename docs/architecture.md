@@ -2675,7 +2675,7 @@ Small, independently useful increments:
         on the image's chosen take, compared and chosen; reaching the game is the next step of as-bo8.
     13. **The game's named areas listed** (as-qg4.1, done: §8.7): the image list carries named areas, an image's
         page and the act's list show which are left to place; placing them is the next step of as-qg4.
-    13. **Named areas marked** (as-qg4.2, done: §8.7): a box per area on the chosen take, kept in the image's edits; reaching the game is the next step of as-qg4.
+    14. **Named areas marked** (as-qg4.2, done: §8.7): a box per area on the chosen take, kept in the image's edits; reaching the game is the next step of as-qg4.
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.
