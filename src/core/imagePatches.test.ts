@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { checkPatchArea, keepArea, PATCH_FEATHER } from './imagePatches'
+import { checkPatchArea, keepArea, matchToTake, PATCH_FEATHER } from './imagePatches'
 import type { Pixels } from './imagePixels'
 
 /** A picture of one opaque colour. */
@@ -71,5 +71,85 @@ describe('checkPatchArea', () => {
 
   it('refuses an area too small to patch', () => {
     expect(checkPatchArea({ x: 0, y: 0, width: 7, height: 100 }, size)).toContain('too small')
+  })
+})
+
+/** A picture painted by a function of the pixel's place. */
+function painted(
+  width: number,
+  height: number,
+  at: (x: number, y: number) => [number, number, number],
+): Pixels {
+  const data = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) data.set([...at(x, y), 255], (y * width + x) * 4)
+  }
+  return { width, height, data }
+}
+
+const rgbAt = (p: Pixels, x: number, y: number) => [
+  ...p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3),
+]
+
+describe('matchToTake', () => {
+  const area = { x: 50, y: 50, width: 100, height: 100 }
+  const take = plain(200, 200, [100, 140, 60])
+
+  it('corrects a small drift across the whole area, the middle too', () => {
+    const edited = plain(200, 200, [110, 150, 70])
+    const matched = matchToTake(edited, take, area)
+    expect(rgbAt(matched, 100, 100)).toEqual([100, 140, 60])
+    expect(rgbAt(matched, 51, 100)).toEqual([100, 140, 60])
+  })
+
+  it('leaves the middle as painted for a big difference and brings the sides to the take', () => {
+    const edited = painted(200, 200, (x, y) =>
+      x >= 50 && x < 150 && y >= 50 && y < 150 ? [20, 30, 10] : [60, 100, 20],
+    )
+    const matched = matchToTake(edited, take, area)
+    expect(rgbAt(matched, 100, 100)).toEqual([20, 30, 10])
+    // The painting outside the area was 40 short of the take, so the side is lifted by that much.
+    expect(rgbAt(matched, 50, 100)[0]!).toBeGreaterThan(55)
+    expect(rgbAt(matched, 80, 100)[0]!).toBeLessThan(rgbAt(matched, 50, 100)[0]!)
+  })
+
+  it('matches the sky part and the grass part of a side separately', () => {
+    const horizon = (c: [number, number, number], d: [number, number, number]) =>
+      painted(200, 200, (_x, y) => (y < 100 ? c : d))
+    const horizonTake = horizon([100, 140, 200], [100, 140, 60])
+    const horizonEdited = horizon([110, 150, 210], [90, 130, 50])
+    const matched = matchToTake(horizonEdited, horizonTake, area)
+    expect(rgbAt(matched, 51, 60)).toEqual([100, 140, 200])
+    expect(rgbAt(matched, 51, 140)).toEqual([100, 140, 60])
+  })
+
+  it('does not look past a side on the picture edge, and matches the other sides', () => {
+    const edge = { x: 0, y: 50, width: 100, height: 100 }
+    const edited = plain(200, 200, [110, 150, 70])
+    const matched = matchToTake(edited, take, edge)
+    expect(rgbAt(matched, 0, 100)).toEqual([100, 140, 60])
+  })
+
+  it('keeps an area with nothing around it as painted', () => {
+    const edited = plain(64, 64, [110, 150, 70])
+    const matched = matchToTake(edited, plain(64, 64, [0, 0, 0]), {
+      x: 0,
+      y: 0,
+      width: 64,
+      height: 64,
+    })
+    expect(rgbAt(matched, 30, 30)).toEqual([110, 150, 70])
+  })
+
+  it('matches a very small area without error', () => {
+    const edited = plain(200, 200, [110, 150, 70])
+    const matched = matchToTake(edited, take, { x: 90, y: 90, width: 8, height: 8 })
+    expect(rgbAt(matched, 93, 93)).toEqual([100, 140, 60])
+  })
+
+  it('does not change the edited picture it was given', () => {
+    const edited = plain(200, 200, [110, 150, 70])
+    matchToTake(edited, take, area)
+    expect(rgbAt(edited, 100, 100)).toEqual([110, 150, 70])
   })
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { matchToTake } from '../core/imagePatches'
 import { createImagePatches } from './imagePatches'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
@@ -122,6 +123,24 @@ describe('image patches', () => {
     const png = new Uint8Array(readFileSync(join(root, PATCH)))
     expect(png[25]).toBe(6)
     expect([decodePng(png).width, decodePng(png).height]).toEqual([256, 256])
+  })
+
+  it('matches the colours of the kept area to the take around it before saving', async () => {
+    const { root, file, patches, settled } = setup({
+      makes: (request) => fakePng(request.width, request.height, 5),
+    })
+    await patches.make(file, 'inn', { area, instruction: 'the door is gone' })
+    await settled()
+    const take = decodePng(new Uint8Array(readFileSync(join(root, TAKE))))
+    const edited = decodePng(fakePng(256, 256, 5))
+    const saved = decodePng(new Uint8Array(readFileSync(join(root, PATCH))))
+    const colourAt = (p: { width: number; data: Uint8Array }, x: number, y: number) => [
+      ...p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3),
+    ]
+    const matched = matchToTake(edited, take, area)
+    const middle = [area.x + 2, area.y + 64] as const
+    expect(colourAt(saved, ...middle)).toEqual(colourAt(matched, ...middle))
+    expect(colourAt(saved, ...middle)).not.toEqual(colourAt(edited, ...middle))
   })
 
   it('never says nothing is being made before the finished patch shows', async () => {

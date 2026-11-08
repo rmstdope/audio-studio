@@ -3,6 +3,7 @@ import { imageModel } from '../core/imageModels'
 import {
   checkPatchArea,
   keepArea,
+  matchToTake,
   PatchBoardSchema,
   type ImagePatchesView,
   type PatchArea,
@@ -135,7 +136,10 @@ export function createImagePatches({
           `The edited picture came back at ${edited.width} × ${edited.height} instead of ${take.width} × ${take.height}.`,
         )
       }
-      const png = encodeTransparentPng(keepArea(edited, request.area))
+      const around = decodePng(new Uint8Array(await Bun.file(take.path).arrayBuffer()))
+      const png = encodeTransparentPng(
+        keepArea(matchToTake(edited, around, request.area), request.area),
+      )
       const failure = await boards.run(found.key, async () => {
         const board = await readBoard(found)
         if ('ok' in board) return board
