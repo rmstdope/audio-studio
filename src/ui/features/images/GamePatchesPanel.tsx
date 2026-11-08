@@ -1,8 +1,14 @@
 import { useRef, useState } from 'react'
-import { makeAgainOf } from '../../../core/imagePatches'
+import { makeAgainOf, overlappingPatches } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
 import { Problems } from '../../components/Problems'
-import { makeAgainOpenLine } from '../../imagesText'
+import {
+  makeAgainOpenLine,
+  OVERLAP_EXPLANATION,
+  overlapHeading,
+  overlapOpenLine,
+  overlapPairLine,
+} from '../../imagesText'
 import {
   patchSummary,
   type ImagePatchesView,
@@ -33,11 +39,14 @@ function PatchBody({
   onSaved,
   onEdit,
   makeAgainLine,
+  overlapLine,
 }: {
   imageId: string
   patch: PatchRow
   /** Where the patch was chosen and how to get it back, when it needs making again. */
   makeAgainLine: string | null
+  /** What the patch's chosen take overlaps, or null when it overlaps nothing. */
+  overlapLine: string | null
   /** The image's patches with their takes, once they have been loaded. */
   view: ImagePatchesView | null
   work: PatchWorkView | null
@@ -111,6 +120,7 @@ function PatchBody({
   )
   const words = (
     <>
+      {overlapLine && <div className="line-warn">{overlapLine}</div>}
       {makeAgainLine && <div className="make-again-line">{makeAgainLine}</div>}
       <WordsField
         label="What should change"
@@ -173,6 +183,10 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
     () => new Set(row.patches.filter((patch) => patch.gameChanged).map((patch) => patch.id)),
   )
   if (row.patches.length === 0) return null
+  // Nothing is said until the patches are loaded, nor when the chosen picture or the lock cannot be read.
+  const pairs = view && !view.pictureGone && !view.lockUnread ? overlappingPatches(row.patches) : []
+  const overlapsOf = (id: string) =>
+    pairs.flatMap(([a, b]) => (a.id === id ? [b.title] : b.id === id ? [a.title] : []))
   const toggle = (id: string) =>
     setOpen((now) => {
       const next = new Set(now)
@@ -192,6 +206,21 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
       <p className="muted game-patches-intro">
         Small changes the game lays over this image when it needs them.
       </p>
+      {pairs.length > 0 && (
+        <section className="notice notice-warn" aria-label="Overlapping patches">
+          <div className="notice-text">
+            <strong>{overlapHeading(pairs.map(([a, b]) => [a.title, b.title]))}</strong>
+            {pairs.length > 1 && (
+              <ul className="overlap-pairs">
+                {pairs.map(([a, b]) => (
+                  <li key={`${a.id}\0${b.id}`}>{overlapPairLine([a.title, b.title])}</li>
+                ))}
+              </ul>
+            )}
+            <p className="muted">{OVERLAP_EXPLANATION}</p>
+          </div>
+        </section>
+      )}
       <ul className="game-patch-list">
         {row.patches.map((patch) => {
           const isOpen = open.has(patch.id)
@@ -239,6 +268,9 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
+                  overlapLine={
+                    overlapsOf(patch.id).length > 0 ? overlapOpenLine(overlapsOf(patch.id)) : null
+                  }
                   makeAgainLine={
                     again.has(patch.id) ? makeAgainOpenLine(patch.chosenOn, row.chosenTake) : null
                   }

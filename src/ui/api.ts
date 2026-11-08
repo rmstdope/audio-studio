@@ -1693,7 +1693,12 @@ function usePatchTakesChange<Input>(
       }
       return (await response.json()) as NonNullable<ImagePatchAnswer>
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+    // The rows of the images pages say which patch takes are chosen (and overlap), so they reload too.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+        client.invalidateQueries({ queryKey: ['project'] }),
+      ]),
   })
 }
 

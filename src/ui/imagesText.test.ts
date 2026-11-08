@@ -18,6 +18,10 @@ import {
   takeCountText,
   unchooseNote,
   makeAgainActLine,
+  overlapActLine,
+  overlapHeading,
+  overlapOpenLine,
+  overlapPairLine,
   makeAgainOpenLine,
   setAsideDim,
   setAsideDropSentence,
@@ -263,6 +267,36 @@ describe('the marks of a patch to make again', () => {
     )
     expect(makeAgainOpenLine([], 4)).toBe(
       'Chosen on an earlier take of the image, so the game does not show it now. Make a new one here.',
+    )
+  })
+})
+
+describe('overlapping patches', () => {
+  const pairs: [string, string][] = [
+    ['Bread taken', 'Door ajar'],
+    ['Bread taken', 'Fire out'],
+    ['Door ajar', 'Fire out'],
+  ]
+  it('says one overlap in its heading and several in a shorter one', () => {
+    expect(overlapHeading(pairs.slice(0, 1))).toBe(
+      'Two chosen patches overlap: Bread taken and Door ajar.',
+    )
+    expect(overlapHeading(pairs)).toBe('Some chosen patches overlap.')
+  })
+  it('writes a pair, and an open patch’s line naming what it overlaps', () => {
+    expect(overlapPairLine(pairs[1]!)).toBe('Bread taken and Fire out')
+    expect(overlapOpenLine(['Door ajar'])).toBe('The chosen take overlaps Door ajar.')
+    expect(overlapOpenLine(['Door ajar', 'Fire out'])).toBe(
+      'The chosen take overlaps Door ajar and Fire out.',
+    )
+    expect(overlapOpenLine(['Door ajar', 'Fire out', 'Lamp lit'])).toBe(
+      'The chosen take overlaps Door ajar, Fire out and Lamp lit.',
+    )
+  })
+  it('writes the act row’s line with the pairs separated by semicolons', () => {
+    expect(overlapActLine(pairs.slice(0, 1))).toBe('patches overlap: Bread taken and Door ajar')
+    expect(overlapActLine(pairs)).toBe(
+      'patches overlap: Bread taken and Door ajar; Bread taken and Fire out; Door ajar and Fire out',
     )
   })
 })

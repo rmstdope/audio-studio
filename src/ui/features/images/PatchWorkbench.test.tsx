@@ -30,6 +30,7 @@ const patchRow = (id: string, over: Partial<PatchRow> = {}): PatchRow => ({
   gameWas: null,
   chosenOn: [],
   chosenOnGone: false,
+  chosenArea: null,
   ...over,
 })
 
@@ -405,6 +406,16 @@ describe('an open patch with takes', () => {
       ['POST', '/api/images/inn/patches/a/choose', { n: 1 }],
       ['DELETE', '/api/images/inn/patches/a/takes/1', null],
     ])
+  })
+
+  it('has the project reloaded after a choice, so the act’s row follows what was saved', async () => {
+    const { host, client } = await render([patchRow('a')], made())
+    client.setQueryData(['project'], {})
+    await open(host)
+    await act(async () => thumbs(host)[0]!.click())
+    expect(client.getQueryState(['project'])?.isInvalidated).toBe(false)
+    await act(async () => button(host, 'Choose')!.click())
+    expect(client.getQueryState(['project'])?.isInvalidated).toBe(true)
   })
 
   it('asks before un-choosing, in the picture’s place, and Cancel gives focus back', async () => {

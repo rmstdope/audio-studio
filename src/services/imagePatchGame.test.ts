@@ -161,6 +161,15 @@ describe('patches set aside, as the rows say', () => {
     expect(await s.takes.choose(s.file, 'inn', 2)).toEqual({ ok: true })
     expect(makeAgainOf(await rowOf(s))).toEqual([])
   })
+  it('gives the area of the chosen patch take, only on the take in the game and while its picture is there', async () => {
+    const s = await chosenPatch()
+    expect((await rowOf(s)).patches[0]!.chosenArea).toEqual(area)
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+    expect((await rowOf(s)).patches[0]!.chosenArea).toBeNull()
+    expect(await s.takes.choose(s.file, 'inn', 2)).toEqual({ ok: true })
+    rmSync(join(s.root, 'content-studio/cache/image-takes/inn/2.png'))
+    expect((await rowOf(s)).patches[0]!.chosenArea).toBeNull()
+  })
   it('keeps the patch marked after the take it was chosen on is dropped, without touching the game', async () => {
     const s = await chosenPatch()
     expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })

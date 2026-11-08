@@ -394,6 +394,7 @@ describe('patches set aside', () => {
     gameWas: null,
     chosenOn,
     chosenOnGone,
+    chosenArea: null,
   })
   const three = [patch('Bread taken', [2]), patch('Door open', [2]), patch('Lamp lit', [2])]
   /** Take 2 is in the game with these patches chosen on it; takes 1 and 4 are others. */

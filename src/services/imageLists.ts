@@ -1,5 +1,5 @@
 import { explainStyleProblem, lookOf, type Look } from '../core/imageLook'
-import { PatchBoardSchema } from '../core/imagePatches'
+import { PatchBoardSchema, type PatchArea } from '../core/imagePatches'
 import { ImageBoardSchema } from '../core/imageTakes'
 import {
   ImageLockSchema,
@@ -90,17 +90,20 @@ async function readTakeLooks(
 
 /**
  * For each image whose patches have a board: the takes of the image each patch has a chosen take
- * on (`chosen`, whether or not the picture is still on the board), and the takes on the image's
- * own board. Boards that cannot be read count as holding nothing.
+ * on (`chosen`, whether or not the picture is still on the board), the area each of those chosen
+ * takes was made with (only for a take of the image whose picture is there), and the takes on the
+ * image's own board. Boards that cannot be read count as holding nothing.
  */
 export async function readPatchChoices(
   root: string,
   images: { id: string; patches: { id: string }[] }[],
 ): Promise<{
   patchChoices: Record<string, Record<string, number[]>>
+  patchAreas: Record<string, Record<string, Record<number, PatchArea>>>
   imageTakes: Record<string, number[]>
 }> {
   const patchChoices: Record<string, Record<string, number[]>> = {}
+  const patchAreas: Record<string, Record<string, Record<number, PatchArea>>> = {}
   const imageTakes: Record<string, number[]> = {}
   for (const { id, patches } of images) {
     if (patches.length === 0) continue
@@ -110,11 +113,18 @@ export async function readPatchChoices(
       if (board === 'missing' || board === 'invalid') continue
       const bases = Object.keys(board.chosen).map(Number)
       if (bases.length) (patchChoices[id] ??= {})[patch.id] = bases
+      for (const [base, n] of Object.entries(board.chosen)) {
+        const take = board.takes.find((t) => t.n === n)
+        const picture = resolveInRoot(root, `${IMAGE_TAKES_DIR}/${id}/${base}.png`)
+        if (take && (await Bun.file(picture).exists())) {
+          ;((patchAreas[id] ??= {})[patch.id] ??= {})[Number(base)] = take.area
+        }
+      }
     }
     const board = await readResource(root, `${IMAGE_BOARD_DIR}/${id}.json`, ImageBoardSchema, [])
     if (board !== 'missing' && board !== 'invalid') imageTakes[id] = board.takes.map((t) => t.n)
   }
-  return { patchChoices, imageTakes }
+  return { patchChoices, patchAreas, imageTakes }
 }
 
 /**

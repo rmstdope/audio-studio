@@ -940,6 +940,7 @@ describe('the patches the game asks for', () => {
           gameWas: null,
           chosenOn: [],
           chosenOnGone: false,
+          chosenArea: null,
         },
         {
           ...lamp,
@@ -949,6 +950,7 @@ describe('the patches the game asks for', () => {
           gameWas: null,
           chosenOn: [],
           chosenOnGone: false,
+          chosenArea: null,
         },
       ])
       expect(rowOf({}, inn).patches).toEqual([])
@@ -986,6 +988,19 @@ describe('the patches the game asks for', () => {
         [[2, 4], true],
         [[], false],
       ])
+    })
+    it('gives each patch the area of its chosen take on the take in the game only', () => {
+      const here = { x: 1, y: 2, width: 30, height: 40 }
+      const there = { x: 5, y: 5, width: 9, height: 9 }
+      const plain = rowOf({}, inn)
+      const row = rowOf({
+        chosen: { [inn.id]: { ...plain.madeFrom, take: 2 } },
+        patchChoices: { [inn.id]: { 'bread-taken': [1, 2], 'lamp-lit': [1] } },
+        patchAreas: {
+          [inn.id]: { 'bread-taken': { 1: there, 2: here }, 'lamp-lit': { 1: there } },
+        },
+      })
+      expect(row.patches.map((p) => p.chosenArea)).toEqual([here, null])
     })
     it('takes the image’s takes as unknown, and marks nothing dropped, when its board was not read', () => {
       const row = rowOf({ patchChoices: { [inn.id]: { 'bread-taken': [3] } } })
