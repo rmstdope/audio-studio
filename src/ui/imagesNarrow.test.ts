@@ -3,6 +3,12 @@ import { readFileSync } from 'node:fs'
 
 const css = readFileSync(new URL('./styles.css', import.meta.url), 'utf8')
 
+/** The body of the first rule for `selector` in `from`, or nothing when there is none. */
+const rule = (selector: string, from = css) => {
+  const at = from.indexOf(`${selector} {`)
+  return at < 0 ? '' : from.slice(at, from.indexOf('}', at))
+}
+
 describe('the images list in a narrow window', () => {
   it('drops the table’s minimum width, or each card is wider than the window and its status is off the edge', () => {
     const narrow = css.slice(css.indexOf('@media (max-width: 700px) {\n  .images-cmp'))
@@ -14,10 +20,6 @@ describe('the images list in a narrow window', () => {
 
 describe('the two sides of an image’s takes', () => {
   it('sit side by side when both fit, and one above the other when the stage says they stack', () => {
-    const rule = (selector: string) => {
-      const at = css.indexOf(`${selector} {`)
-      return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
-    }
     expect(rule(".image-stage[data-stacked='false']")).toMatch(
       /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
     )
@@ -26,11 +28,6 @@ describe('the two sides of an image’s takes', () => {
 })
 
 describe('an image’s workbench', () => {
-  const rule = (selector: string, from = css) => {
-    const at = from.indexOf(`${selector} {`)
-    return at < 0 ? '' : from.slice(at, from.indexOf('}', at))
-  }
-
   it('puts the tools beside the pictures, both held in view, the takes scrolling on their own', () => {
     expect(rule('.image-workbench')).toMatch(
       /grid-template-columns:\s*minmax\(260px, 300px\) minmax\(0, 1fr\)/,
@@ -46,5 +43,15 @@ describe('an image’s workbench', () => {
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
     expect(rule('.image-workbench', block)).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
     expect(block).toMatch(/position:\s*static/)
+  })
+})
+
+describe('a patch row the game asks for (as-9b8)', () => {
+  it('holds the chevron on the first line, and wraps only the words beside it', () => {
+    expect(rule('.game-patch-row')).not.toMatch(/flex-wrap/)
+    expect(rule('.game-patch-chev')).toMatch(/flex:\s*none/)
+    expect(rule('.game-patch-words')).toMatch(/flex-wrap:\s*wrap/)
+    expect(rule('.game-patch-words')).toMatch(/flex:\s*1/)
+    expect(rule('.game-patch-words')).toMatch(/min-width:\s*0/)
   })
 })
