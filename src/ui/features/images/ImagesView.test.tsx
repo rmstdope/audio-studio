@@ -1014,6 +1014,12 @@ describe('the named areas the game declares', () => {
     expect(page.querySelector('.images-status .images-areas')).not.toBeNull()
     const none = render(act, summary())
     expect(none.querySelector('.images-areas')).toBeNull()
+    const box = { x: 1, y: 1, width: 10, height: 10 }
+    const some = render(
+      act,
+      summary({ areas: [fountain, notice], edits: { inn: { areas: { fountain: box } } } }),
+    )
+    expect(lineOf(some)).toBe('1 of 2 areas to place')
     expect(chosen(page)).toBe(chosen(none))
     expect(chosen(page)).toContain('chosen')
   })

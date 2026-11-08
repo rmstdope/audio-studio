@@ -7,6 +7,8 @@ import {
   StyleSchema,
   applyActStyleChange,
   applyActStylePick,
+  applyAreaBox,
+  checkAreaBox,
   applyStyleChange,
   applyPatchWordsChange,
   applyWordsChange,
@@ -1055,8 +1057,8 @@ describe('the named areas the game declares', () => {
   it('lists them in the game’s order, none placed yet', () => {
     const [row] = rowsOf(withAreas).images.acts[0]!.rows
     expect(row!.areas).toEqual([
-      { ...fountain, placed: false },
-      { ...notice, placed: false },
+      { ...fountain, placed: false, box: null },
+      { ...notice, placed: false, box: null },
     ])
     expect(rowsOf(inn).images.acts[0]!.rows[0]!.areas).toEqual([])
   })
@@ -1105,5 +1107,90 @@ describe('the named areas the game declares', () => {
     for (const act of images.acts) {
       expect(act.rows[0]!.areas.map((a) => a.id)).toEqual(['fountain', 'old-notice'])
     }
+  })
+})
+
+describe('the boxes marked for named areas', () => {
+  const size = { width: 320, height: 200 }
+  const box = { x: 10, y: 20, width: 50, height: 40 }
+  const fountain = () => ({ id: 'fountain', title: 'Fountain' })
+  const notice = () => ({ id: 'old-notice', title: 'Old notice' })
+  it('accepts a box inside the picture and refuses one outside or too small', () => {
+    expect(checkAreaBox(box, size)).toBeNull()
+    expect(checkAreaBox({ x: 0, y: 0, width: 320, height: 200 }, size)).toBeNull()
+    expect(checkAreaBox({ x: 300, y: 0, width: 30, height: 10 }, size)).not.toBeNull()
+    expect(checkAreaBox({ x: -1, y: 0, width: 30, height: 10 }, size)).not.toBeNull()
+    expect(checkAreaBox({ x: 0, y: 0, width: 3, height: 10 }, size)).not.toBeNull()
+    expect(checkAreaBox({ x: 0, y: 0, width: 10.5, height: 10 }, size)).not.toBeNull()
+  })
+  it('sets, replaces and clears a box, dropping what is left empty', () => {
+    const one = applyAreaBox(none, 'inn', 'fountain', box)
+    expect(one.images.inn?.areas).toEqual({ fountain: box })
+    const moved = applyAreaBox(one, 'inn', 'fountain', { ...box, x: 11 })
+    expect(moved.images.inn?.areas?.fountain?.x).toBe(11)
+    expect(applyAreaBox(moved, 'inn', 'fountain', null)).toEqual(none)
+  })
+  it('keeps the other edits of the image when clearing', () => {
+    const edits = applyAreaBox(
+      applyWordsChange(none, 'inn', 'Mine', 'Game'),
+      'inn',
+      'fountain',
+      box,
+    )
+    const cleared = applyAreaBox(edits, 'inn', 'fountain', null)
+    expect(cleared.images.inn?.text).toBe('Mine')
+    expect(cleared.images.inn?.areas).toBeUndefined()
+  })
+  it('is written by area id, with the box keys in a fixed order', () => {
+    const edits = applyAreaBox(applyAreaBox(none, 'inn', 'z', box), 'inn', 'a', {
+      height: 40,
+      width: 50,
+      y: 20,
+      x: 10,
+    })
+    const text = formatImageEdits(edits)
+    expect(text.indexOf('"a"')).toBeLessThan(text.indexOf('"z"'))
+    expect(text).toContain('"x": 10')
+    expect(text.indexOf('"x"')).toBeLessThan(text.indexOf('"width"'))
+    expect(readImageEditsValue(JSON.parse(text), 'e').edits).toEqual(edits)
+  })
+  it('refuses a box that is not four whole numbers when reading', () => {
+    const read = readImageEditsValue(
+      { images: { inn: { areas: { fountain: { x: 1, y: 2, width: 'x', height: 4 } } } } },
+      'e',
+    )
+    expect(read.problems.length).toBe(1)
+  })
+  const withBoxes = (areas: GameArea[], edits: ImageEdits) =>
+    summarizeImages(
+      input({
+        lists: [
+          {
+            id: 'act1',
+            title: 'Act I',
+            file: 'tts/act1/images.json',
+            state: { status: 'ok', images: [{ ...inn, areas }] },
+            canRefresh: true,
+          },
+        ],
+        edits: edits.images,
+      }),
+    ).images.acts[0]!.rows[0]!.areas
+  it('shows a marked area as placed with its box', () => {
+    const edits = applyAreaBox(none, inn.id, 'fountain', box)
+    expect(withBoxes([fountain(), notice()], edits)).toEqual([
+      { ...fountain(), placed: true, box },
+      { ...notice(), placed: false, box: null },
+    ])
+  })
+  it('keeps a box when the game stops asking for the area, and shows it if the id returns', () => {
+    const edits = applyAreaBox(none, inn.id, 'fountain', box)
+    expect(withBoxes([notice()], edits).map((a) => a.id)).toEqual(['old-notice'])
+    expect(withBoxes([{ ...fountain(), title: 'Well' }], edits)[0]).toEqual({
+      id: 'fountain',
+      title: 'Well',
+      placed: true,
+      box,
+    })
   })
 })

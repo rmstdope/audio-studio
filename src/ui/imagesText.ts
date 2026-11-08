@@ -172,3 +172,24 @@ export function bringFailureText(
     rest: `${failed.length} couldn't be: ${reasons.join('; ')}. ${failed.length === 1 ? 'Its' : 'Their'} old look stays until you make new takes.`,
   }
 }
+
+/** The line under the picture of the Named areas panel: what can be done now. */
+export function areaLineText(selected: { title: string; placed: boolean } | null): string {
+  if (!selected) return 'Press an area in the list or on the picture to change it.'
+  return selected.placed
+    ? 'Drag the box to move it, or its corners and sides to resize it. Arrow keys move it; with Shift they resize it.'
+    : `Drag over the picture to mark “${selected.title}”.`
+}
+
+/** The red line when a box could not be saved: the area's title and the reason. */
+export function areaSaveFailedText(title: string, reason: string): string {
+  return `“${title}” could not be saved: ${reason.replace(/\.$/, '')}.`
+}
+
+/** The widest a title is on the picture, in characters, before it is cut short with "…". */
+export const AREA_TAG_WIDEST = 16
+
+/** A title as the picture's tag shows it: cut short at the widest size. */
+export function areaTagText(title: string): string {
+  return title.length > AREA_TAG_WIDEST ? `${title.slice(0, AREA_TAG_WIDEST)}…` : title
+}

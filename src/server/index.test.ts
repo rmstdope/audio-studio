@@ -5161,8 +5161,8 @@ describe('the images routes', () => {
   it('shows the named areas the game lists, read again each time, without making the image out of date', async () => {
     const areas = async () => (await summary()).acts[0].rows[0].areas
     expect(await areas()).toEqual([
-      { id: 'sign', title: 'Sign', placed: false },
-      { id: 'door', title: 'Door', placed: false },
+      { id: 'sign', title: 'Sign', placed: false, box: null },
+      { id: 'door', title: 'Door', placed: false, box: null },
     ])
     const file = join(imagesRoot, 'tts/act1/images.json')
     const listed = JSON.parse(await Bun.file(file).text())
@@ -5180,8 +5180,8 @@ describe('the images routes', () => {
         ]),
       )
       expect(await areas()).toEqual([
-        { id: 'sign', title: 'Old sign', placed: false },
-        { id: 'well', title: 'Well', placed: false },
+        { id: 'sign', title: 'Old sign', placed: false, box: null },
+        { id: 'well', title: 'Well', placed: false, box: null },
       ])
       expect((await summary()).acts[0].rows[0].status).toBe('none yet')
     } finally {
@@ -5201,6 +5201,7 @@ describe('the images routes', () => {
       ['PATCH', '/api/images/inn/act-style', { on: false }],
       ['PATCH', '/api/images/inn/game-patches/lamp-lit', { words: 'x' }],
       ['POST', '/api/images/inn/game-patches/lamp-lit/compare', { choice: 'keep' }],
+      ['PUT', '/api/images/inn/areas/sign', { box: null }],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5239,6 +5240,21 @@ describe('the images routes', () => {
     ).toBe(404)
     expect((await send('POST', `${path}/compare`, { choice: 'game' })).status).toBe(200)
     expect((await summary()).acts[0].rows[0].patches[0].changed).toBe(false)
+  })
+
+  it('marks a named area and clears it, refusing what cannot be kept', async () => {
+    const path = '/api/images/inn/areas/sign'
+    const box = { x: 10, y: 20, width: 50, height: 40 }
+    const placed = async () => (await summary()).acts[0].rows[0].areas[0]
+    expect(await (await send('PUT', path, { box })).json()).toEqual({ ok: true })
+    expect(await placed()).toMatchObject({ placed: true, box })
+    expect(await (await send('PUT', path, { box: null })).json()).toEqual({ ok: true })
+    expect(await placed()).toMatchObject({ placed: false, box: null })
+    expect((await send('PUT', path, { box: { ...box, x: 300 } })).status).toBe(409)
+    expect((await send('PUT', path, { box: 3 })).status).toBe(400)
+    expect((await send('PUT', path, {})).status).toBe(400)
+    expect((await send('PUT', '/api/images/inn/areas/ghost', { box })).status).toBe(404)
+    expect((await send('PUT', '/api/images/ghost/areas/sign', { box })).status).toBe(404)
   })
 
   it('saves an image leaving its act’s style out, refuses a bad body and an unknown image', async () => {

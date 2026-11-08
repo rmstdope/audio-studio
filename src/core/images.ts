@@ -102,11 +102,46 @@ export const StyleSchema = z.object({
 /** The user's words for one patch over the game's, with the game's words they were written over. */
 const PatchEditSchema = z.object({ text: z.string().min(1), gameWas: z.string() })
 
+/** The smallest side of a box marked for a named area, in the image's pixels. */
+export const MIN_AREA_SIZE = 4
+
+/** Where a named area is on its image: a rectangle in the image's own pixels (the game's size). */
+const AreaBoxSchema = z
+  .object({
+    x: z.number().int(),
+    y: z.number().int(),
+    width: z.number().int(),
+    height: z.number().int(),
+  })
+  .strict()
+
+/** A box marked for a named area. */
+export type AreaBox = z.infer<typeof AreaBoxSchema>
+
+/** Why a box cannot be kept on an image of this size (outside it, not whole pixels, too small); null when it can. */
+export function checkAreaBox(box: AreaBox, size: { width: number; height: number }): string | null {
+  const whole = [box.x, box.y, box.width, box.height].every(Number.isInteger)
+  if (!whole) return 'a box is made of whole pixels'
+  if (box.width < MIN_AREA_SIZE || box.height < MIN_AREA_SIZE) {
+    return `a box is at least ${MIN_AREA_SIZE} pixels each way`
+  }
+  if (
+    box.x < 0 ||
+    box.y < 0 ||
+    box.x + box.width > size.width ||
+    box.y + box.height > size.height
+  ) {
+    return 'a box lies inside the picture'
+  }
+  return null
+}
+
 /**
  * The studio's change to one image: its own words over the game's (`text`, with the game's words
  * it was written over, `gameWas`), which part's addition it uses (`partStyle`: a part id, or
  * null for none; absent is the first part that lists it), and its own words for the patches the
- * game asks for (`patches`, by patch id, kept even when the game stops asking for one).
+ * game asks for (`patches`, by patch id, kept even when the game stops asking for one), and the
+ * boxes marked for its named areas (`areas`, by area id, kept likewise).
  */
 const ImageEditSchema = z
   .object({
@@ -114,6 +149,7 @@ const ImageEditSchema = z
     gameWas: z.string().optional(),
     partStyle: z.string().nullable().optional(),
     patches: z.record(z.string(), PatchEditSchema).optional(),
+    areas: z.record(z.string(), AreaBoxSchema).optional(),
   })
   .refine((edit) => (edit.text === undefined) === (edit.gameWas === undefined), {
     error: 'give text and gameWas together',
@@ -187,7 +223,7 @@ export function formatImageEdits(edits: ImageEdits): string {
     Object.keys(edits.images)
       .sort()
       .map((id) => {
-        const { text, gameWas, partStyle, patches } = edits.images[id]!
+        const { text, gameWas, partStyle, patches, areas } = edits.images[id]!
         const sorted =
           patches &&
           Object.fromEntries(
@@ -195,7 +231,17 @@ export function formatImageEdits(edits: ImageEdits): string {
               .sort()
               .map((patch) => [patch, patches[patch]]),
           )
-        return [id, { text, gameWas, partStyle, patches: sorted }]
+        const boxes =
+          areas &&
+          Object.fromEntries(
+            Object.keys(areas)
+              .sort()
+              .map((area) => {
+                const { x, y, width, height } = areas[area]!
+                return [area, { x, y, width, height }]
+              }),
+          )
+        return [id, { text, gameWas, partStyle, patches: sorted, areas: boxes }]
       }),
   )
   return `${JSON.stringify(out, null, 2)}\n`
@@ -504,6 +550,19 @@ export function applyStyleChange(
   return { ...edits, style: { ...edits.style, [field]: words } }
 }
 
+/** The edits with the box of one named area of an image set, replaced or (null) taken away. */
+export function applyAreaBox(
+  edits: ImageEdits,
+  id: string,
+  area: string,
+  box: AreaBox | null,
+): ImageEdits {
+  const { areas, ...rest } = edits.images[id] ?? {}
+  const { [area]: _old, ...others } = areas ?? {}
+  const next = box ? { ...others, [area]: box } : others
+  return withImage(edits, id, Object.keys(next).length ? { ...rest, areas: next } : rest)
+}
+
 /** The edits with the user's words for one patch of an image set, or taken back (`words` undefined). */
 function withPatch(
   edits: ImageEdits,
@@ -654,8 +713,10 @@ export interface PatchRow {
 export interface AreaRow {
   id: string
   title: string
-  /** The area has been placed on the picture. Nothing places one yet, so this is false. */
+  /** The area has been placed on the picture. */
   placed: boolean
+  /** Where it is, in the image's pixels; null while it is still to place. */
+  box: AreaBox | null
 }
 
 /** The status chip of an image. */
@@ -905,7 +966,10 @@ export function summarizeImages(input: ImagesInput): {
           gameWas: mine?.gameWas ?? null,
         }
       }),
-      areas: image.areas.map((area) => ({ ...area, placed: false })),
+      areas: image.areas.map((area) => {
+        const box = own?.areas?.[area.id] ?? null
+        return { ...area, placed: box !== null, box }
+      }),
       prompt: assemblePrompt(words, eff),
       actStyle: shared
         ? choices.length

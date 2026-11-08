@@ -39,7 +39,7 @@ import type {
   StopResult,
 } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
-import type { StyleField } from '../core/images'
+import type { AreaBox, StyleField } from '../core/images'
 import type { ImageEditResult } from '../services/imageEdits'
 import type { RemoveResult } from '../services/musicOrphans'
 import type {
@@ -1034,6 +1034,15 @@ export function useSetImagePatchWords(imageId: string, patchId: string) {
     method: 'PATCH',
     path: `/api/images/${encodeURIComponent(imageId)}/game-patches/${encodeURIComponent(patchId)}`,
     body: { words },
+  }))
+}
+
+/** Saves the box of a named area of an image (null takes it away). */
+export function useSetImageAreaBox(imageId: string) {
+  return useImageEdit<{ area: string; box: AreaBox | null }>(`image-${imageId}`, (value) => ({
+    method: 'PUT',
+    path: `/api/images/${encodeURIComponent(imageId)}/areas/${encodeURIComponent(value.area)}`,
+    body: { box: value.box },
   }))
 }
 

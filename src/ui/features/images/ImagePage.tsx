@@ -210,7 +210,7 @@ export function ImagePage({
           </section>
         }
       />
-      <NamedAreasPanel row={row} />
+      <NamedAreasPanel key={row.id} row={row} />
       <GamePatchesPanel key={row.id} row={row} />
       <PatchesSection key={row.chosenTake} imageId={row.id} />
     </>

@@ -1490,20 +1490,32 @@ the first listing act's order). A rewording changes no prompt or take: it never 
 of date. Refresh's panel says nothing of patches. Screens: `docs/ui/as-bo8.1-image-patches.html`.
 
 **The named areas the game declares** (as-qg4.1; `ImageRow.areas`, `ui/features/images/NamedAreasPanel.tsx`).
-An image whose list carries areas gets a full-width, read-only panel, "Named areas", directly below
-the workbench and above "Patches the game asks for": its count ("1 of 5 placed"), one line of
-explanation, and a row per area in the game's order (title, id, and the mark "Placed" or "To place").
-`AreaRow.placed` is false for every area until placing exists (the next step of as-qg4 derives it);
-nothing of the studio's own is stored. The act's list adds "4 of 5 areas to place" under an image's
+An image whose list carries areas gets a full-width panel, "Named areas", directly below the
+workbench and above "Patches the game asks for": its count ("1 of 5 placed"), one line of
+explanation, and below them two parts side by side (one column when narrow, the picture first): the
+chosen take on the left and the list of areas on the right, a row per area in the game's order
+(title, id, the mark "Placed" or "To place", and "Clear" on the selected placed row). **Marking**
+(as-qg4.2): one area is selected at a time (on arrival the first still to place); dragging on the
+picture draws its box, a drag inside the selected box moves it, one on a handle (eight) resizes it,
+a click selects the smallest box under the pointer, Esc cancels a drag, and the arrow keys (a fixed
+step of 4 pixels; with Shift the right and bottom edges) and Delete work from the row. Every change
+is saved as it is made (`PUT /api/images/:id/areas/:area`, `{ box }`, null clears), shown at once
+and taken back with a red line if saving fails. A box is `{ x, y, width, height }` whole pixels of the
+image's own size (at least 4 each way, inside the picture), kept in the image's edit as
+`areas.<area id>` (`applyAreaBox`, `checkAreaBox`; sorted by id), so one set serves a shared image
+and a box survives the game dropping the area and asking for it again. `AreaRow.box` and `placed`
+come from it. The pure geometry is `ui/imageAreaBox.ts`. Chosen patches (`chosenPatches`, none yet)
+can be laid over the picture by switches, for looking only. Nothing reaches the game yet.
+The act's list adds "4 of 5 areas to place" under an image's
 status while some are left; it changes neither "n of m chosen" nor the needs-attention view. Areas
 are no part of what a picture is made from, so changing them never makes an image out of date, and
 Refresh's panel says nothing of them. They are one more thing a shared image's lists can disagree
 on (`ConflictKind` `named areas`: id or title differs or an area is missing; the same areas in
 another order do not, and the page uses the first listing act's order). Screens:
-`docs/ui/as-qg4.1-named-areas.html`.
+`docs/ui/as-qg4.1-named-areas.html`, `docs/ui/as-qg4.2-marking-named-areas.html`.
 
 **The studio's own words** are the edits' `images`, committed like the music edits and joining the
-Changes panel: `{ <id>: { text, gameWas, partStyle, patches } }`. `gameWas` is the game's text when the words
+Changes panel: `{ <id>: { text, gameWas, partStyle, patches, areas } }`. `gameWas` is the game's text when the words
 were written; a game description that differs from it raises the compare notice (**Keep mine** moves
 `gameWas`, **Use the game's** removes the words). Emptied words, or the game's own typed back, remove
 them; an edit left with nothing is removed. The edits are written with the style first (its keys in
@@ -2661,6 +2673,7 @@ Small, independently useful increments:
         page lists them and they can be reworded; making and choosing them is the next step of as-bo8.
     12. **The game's named areas listed** (as-qg4.1, done: §8.7): the image list carries named areas, an image's
         page and the act's list show which are left to place; placing them is the next step of as-qg4.
+    13. **Named areas marked** (as-qg4.2, done: §8.7): a box per area on the chosen take, kept in the image's edits; reaching the game is the next step of as-qg4.
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.
