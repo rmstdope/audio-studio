@@ -5,6 +5,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   checkImageRequest,
+  IMAGE_EDIT_COMMAND,
   IMAGE_MODEL_IDS,
   imageFailureReason,
   imageModel,
@@ -26,6 +27,8 @@ export interface ImageRequest {
   seed: number
   /** The model to make it with. */
   model: ImageModelId
+  /** The path of a picture to change, the prompt then being the instruction; none makes a new one. */
+  editing?: string
 }
 
 /** One take as generated: a PNG, and the seed it was made from. */
@@ -191,9 +194,10 @@ export interface MfluxCommand {
 export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand {
   const model = imageModel(request.model)
   return {
-    program: model.command,
+    program: request.editing ? IMAGE_EDIT_COMMAND : model.command,
     args: [
       '--model', model.mflux,
+      ...(request.editing ? ['--image-paths', request.editing] : []),
       '--prompt', request.prompt,
       '--width', String(request.width),
       '--height', String(request.height),

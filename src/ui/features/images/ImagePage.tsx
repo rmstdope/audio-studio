@@ -15,6 +15,7 @@ import { routeHref } from '../../route'
 import { ActStyleBox } from './ActStyleBox'
 import { ActStyleMenu } from './ActStyleMenu'
 import { ActLinks } from './ActLinks'
+import { PatchesSection } from './PatchesSection'
 import { TakesSection } from './TakesSection'
 import { WordsField } from './WordsField'
 
@@ -207,6 +208,7 @@ export function ImagePage({
           </section>
         }
       />
+      {row.chosenTake !== null && <PatchesSection key={row.chosenTake} imageId={row.id} />}
     </>
   )
 }

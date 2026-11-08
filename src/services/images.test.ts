@@ -56,6 +56,22 @@ describe('mfluxArguments', () => {
   })
 })
 
+describe('mfluxArguments of an edit', () => {
+  it("runs FLUX.2 klein's edit command on the picture, at the picture's size", () => {
+    const edit = mfluxArguments({ ...request, editing: '/repo/25.png' }, '/tmp/x.png')
+    expect(edit.program).toBe('mflux-generate-flux2-edit')
+    expect(edit.args).toEqual([
+      '--model', 'flux2-klein-4b',
+      '--image-paths', '/repo/25.png',
+      '--prompt', 'a room',
+      '--width', '1024',
+      '--height', '576',
+      '--seed', '42',
+      '--output', '/tmp/x.png',
+    ]) // prettier-ignore
+  })
+})
+
 describe('mfluxCommandLine', () => {
   it("starts with the model's own command", () => {
     const line = mfluxCommandLine(

@@ -34,23 +34,31 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
 
 /** The PNG of `pixels`: 8-bit RGB (the studio's pictures are opaque), no filtering, so it is the same bytes every time. */
 export function encodePng(pixels: Pixels): Uint8Array {
+  return encode(pixels, 3)
+}
+
+/** The PNG of `pixels` with their transparency: 8-bit RGBA, for a patch laid over a take. */
+export function encodeTransparentPng(pixels: Pixels): Uint8Array {
+  return encode(pixels, 4)
+}
+
+/** The PNG of `pixels` with 3 (RGB) or 4 (RGBA) samples per pixel. */
+function encode(pixels: Pixels, samples: 3 | 4): Uint8Array {
   const { width, height, data } = pixels
-  const raw = new Uint8Array(height * (1 + width * 3))
+  const raw = new Uint8Array(height * (1 + width * samples))
   for (let y = 0; y < height; y++) {
-    let o = y * (1 + width * 3)
+    let o = y * (1 + width * samples)
     raw[o++] = 0
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4
-      raw[o++] = data[i]!
-      raw[o++] = data[i + 1]!
-      raw[o++] = data[i + 2]!
+      for (let c = 0; c < samples; c++) raw[o++] = data[i + c]!
     }
   }
   const header = new Uint8Array(13)
   const view = new DataView(header.buffer)
   view.setUint32(0, width)
   view.setUint32(4, height)
-  header.set([8, 2, 0, 0, 0], 8)
+  header.set([8, samples === 4 ? 6 : 2, 0, 0, 0], 8)
   const parts = [
     Uint8Array.from(SIGNATURE),
     chunk('IHDR', header),
