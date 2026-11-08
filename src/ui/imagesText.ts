@@ -73,6 +73,21 @@ export function currentAct(images: ImagesSummary, route: ImagesRoute): string | 
   return images.acts[0]?.id ?? null
 }
 
+/** The line saying a patch's mark came from its named area. */
+export function markedFromAreaText(title: string): string {
+  return `Marked from the named area “${title}”, with a little room around it. Drag over the picture to change it.`
+}
+
+/** The line saying a patch's named area has no place yet. */
+export function areaNoPlaceText(title: string): string {
+  return `“${title}” has no place yet. Mark it under Named areas and this patch starts there, or drag over the picture to mark this patch by hand.`
+}
+
+/** The button that sends a patch's mark back to its named area. */
+export function backToAreaText(title: string): string {
+  return `Back to “${title}”`
+}
+
 /** The count menu's entry: "1 take", "2 takes". */
 export function takeCountText(n: number): string {
   return `${n} ${n === 1 ? 'take' : 'takes'}`

@@ -4,6 +4,7 @@ import { Problems } from '../../components/Problems'
 import {
   patchSummary,
   type ImagePatchesView,
+  type PatchTie,
   type PatchArea,
   type PatchWorkView,
 } from '../../../core/imagePatches'
@@ -22,6 +23,9 @@ function PatchBody({
   work,
   mark,
   onMark,
+  onBackToArea,
+  tie,
+  image,
   onSaved,
   onEdit,
 }: {
@@ -30,8 +34,13 @@ function PatchBody({
   /** The image's patches with their takes, once they have been loaded. */
   view: ImagePatchesView | null
   work: PatchWorkView | null
+  /** The mark the person made their own; none while the patch starts from its named area. */
   mark: PatchArea | null
   onMark: (area: PatchArea) => void
+  onBackToArea: () => void
+  /** The named area the game ties the patch to, with its place; none for a patch with no tie. */
+  tie: PatchTie | null
+  image: { width: number; height: number }
   onSaved: () => void
   onEdit: () => void
 }) {
@@ -117,12 +126,21 @@ function PatchBody({
           words={words}
           mark={mark}
           onMark={onMark}
+          onBackToArea={onBackToArea}
+          tie={tie}
+          image={image}
         />
       ) : (
         words
       )}
     </div>
   )
+}
+
+/** The named area a patch is tied to, with the place it has now; null for a patch with no tie. */
+function tieOf(row: ImageRow, patch: PatchRow): PatchTie | null {
+  const area = patch.area === undefined ? undefined : row.areas.find((a) => a.id === patch.area)
+  return area ? { title: area.title, box: area.box } : null
 }
 
 /**
@@ -133,7 +151,7 @@ function PatchBody({
 export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [saved, setSaved] = useState(false)
   const query = useImagePatches(row.id)
-  // Marked areas live here, not in the open patch, so closing and opening a row keeps its mark.
+  // The marks the person made their own live here, not in the open patch, so closing and opening a row keeps them.
   const [marks, setMarks] = useState<Record<string, PatchArea>>({})
   const view = query.data && 'patches' in query.data ? query.data : null
   const [open, setOpen] = useState(
@@ -197,6 +215,9 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   work={work}
                   mark={marks[patch.id] ?? null}
                   onMark={(area) => setMarks((now) => ({ ...now, [patch.id]: area }))}
+                  onBackToArea={() => setMarks(({ [patch.id]: _own, ...others }) => others)}
+                  tie={tieOf(row, patch)}
+                  image={row}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
                 />

@@ -1017,6 +1017,86 @@ describe('the patches the game asks for', () => {
   })
 })
 
+describe('a patch tied to a named area', () => {
+  const well = { id: 'well', title: 'Well' }
+  const tied = { id: 'well-dry', title: 'Well dry', description: 'Dry it', area: 'well' }
+  const game = (patches: unknown, areas: unknown = [well]) => ({
+    id: inn.id,
+    title: inn.title,
+    text: inn.description,
+    width: 320,
+    height: 200,
+    patches,
+    areas,
+  })
+  const asked = (patches: unknown, areas?: unknown) =>
+    ImageListSchema.safeParse([game(patches, areas)])
+  const entry = { id: 'well-dry', title: 'Well dry', text: 'Dry it' }
+
+  it('reads the tie, and a patch without one has none', () => {
+    expect(asked([{ ...entry, area: 'well' }]).data?.[0]?.patches).toEqual([tied])
+    expect(asked([entry]).data?.[0]?.patches[0]?.area).toBeUndefined()
+  })
+  it('reports a tie to an area the image does not list, at its place', () => {
+    const bad = asked([{ ...entry, area: 'wel' }])
+    expect(bad.success).toBe(false)
+    expect(bad.error?.issues.map((i) => [i.path, i.message])).toEqual([
+      [
+        [0, 'patches', 0, 'area'],
+        'the patch "well-dry" names the area "wel", which this image does not list',
+      ],
+    ])
+    expect(asked([{ ...entry, area: 'well' }], []).success).toBe(false)
+    expect(asked([{ ...entry, area: 'Not a slug' }]).success).toBe(false)
+  })
+  it('is a disagreement between acts when the tie differs, and only "patches"', () => {
+    const lists = [inn, inn].map((_, i) => ({
+      id: `act${i + 1}`,
+      title: `Act ${i + 1}`,
+      file: `tts/act${i + 1}/images.json`,
+      state: {
+        status: 'ok' as const,
+        images: [{ ...inn, areas: [well], patches: [i ? { ...tied, area: undefined } : tied] }],
+      },
+      canRefresh: true,
+    }))
+    const { images } = summarizeImages(
+      input({
+        parts: [
+          { id: 'act1', title: 'Act 1' },
+          { id: 'act2', title: 'Act 2' },
+        ],
+        lists,
+      }),
+    )
+    expect(images.acts[0]!.conflicts[0]!.differs).toEqual(['patches'])
+  })
+  it('carries the tie in the row and does not make a chosen take out of date when it changes', () => {
+    const run = (area: string | undefined, chosen?: ChosenEntry) =>
+      summarizeImages(
+        input({
+          lists: [
+            {
+              id: 'act1',
+              title: 'Act I',
+              file: 'tts/act1/images.json',
+              state: {
+                status: 'ok',
+                images: [{ ...inn, areas: [well], patches: [{ ...tied, area }] }],
+              },
+              canRefresh: true,
+            },
+          ],
+          ...(chosen ? { chosen: { [inn.id]: chosen } } : {}),
+        }),
+      ).images.acts[0]!.rows[0]!
+    const before = run('well')
+    expect(before.patches[0]!.area).toBe('well')
+    const after = run(undefined, before.madeFrom as ChosenEntry)
+    expect(after.status).toBe('chosen')
+  })
+})
+
 describe('the named areas the game declares', () => {
   const fountain = { id: 'fountain', title: 'Fountain' }
   const notice = { id: 'old-notice', title: 'Old notice' }

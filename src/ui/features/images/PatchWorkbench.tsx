@@ -8,7 +8,9 @@ import {
 } from 'react'
 import {
   checkPatchArea,
+  markFromArea,
   type ImagePatchesView,
+  type PatchTie,
   type PatchArea,
   type PatchMakingView,
   type PatchTakeView,
@@ -26,7 +28,14 @@ import {
 import { Confirm } from '../../components/Confirm'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { areaFromDrag, sameArea } from '../../imagePatchArea'
-import { makeTakesText, refusal, takeCountText } from '../../imagesText'
+import {
+  areaNoPlaceText,
+  backToAreaText,
+  makeTakesText,
+  markedFromAreaText,
+  refusal,
+  takeCountText,
+} from '../../imagesText'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { closeUp, closeUpLayer } from '../../patchCloseUp'
 
@@ -127,6 +136,9 @@ export function PatchWorkbench({
   words,
   mark,
   onMark,
+  onBackToArea,
+  tie,
+  image: imageSize,
 }: {
   imageId: string
   patchId: string
@@ -134,8 +146,14 @@ export function PatchWorkbench({
   work: PatchWorkView
   /** The patch's field of words. */
   words: ReactNode
+  /** The mark the person made their own; none starts the patch from its named area, if it has one. */
   mark: PatchArea | null
   onMark: (area: PatchArea) => void
+  /** Gives the mark back to the named area. */
+  onBackToArea: () => void
+  tie: PatchTie | null
+  /** The image's size, the pixels its named areas are in. */
+  image: { width: number; height: number }
 }) {
   const make = useMakePatchTakes(imageId, patchId)
   const stop = useStopPatchTakes(imageId, patchId)
@@ -156,6 +174,7 @@ export function PatchWorkbench({
   const changing = useRef(false)
   const heading = useRef<HTMLSpanElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
+  const makeButton = useRef<HTMLButtonElement>(null)
   const thumbs = useRef(new Map<number, HTMLButtonElement>())
   const refocusUnchoose = useFocusWhenClosed(asking, unchooseButton)
 
@@ -204,7 +223,11 @@ export function PatchWorkbench({
     )
   }
 
-  const marked = mark && !checkPatchArea(mark, take) ? mark : null
+  // A mark that is not the person's own starts from the named area, so it follows the area.
+  const fromArea = tie?.box ? markFromArea(tie.box, imageSize, take) : null
+  const own = mark && !checkPatchArea(mark, take) ? mark : null
+  const marked = own ?? fromArea
+  const atArea = marked !== null && fromArea !== null && sameArea(marked, fromArea)
   const busy = making.length > 0
   const hasTakes = takes.length > 0 || busy
   const canMake = marked !== null && !busy && !make.isPending && view.maker.ok
@@ -437,6 +460,23 @@ export function PatchWorkbench({
       <div className="patch-bench-left">{left}</div>
       <div className="patch-bench-right">
         {words}
+        {tie &&
+          (atArea ? (
+            <span className="muted small">{markedFromAreaText(tie.title)}</span>
+          ) : fromArea ? (
+            <button
+              type="button"
+              className="btn btn-ghost patch-back"
+              onClick={() => {
+                onBackToArea()
+                makeButton.current?.focus()
+              }}
+            >
+              {backToAreaText(tie.title)}
+            </button>
+          ) : (
+            !marked && <span className="muted small">{areaNoPlaceText(tie.title)}</span>
+          ))}
         <div className="patch-make">
           <select
             className="takes-count"
@@ -455,6 +495,7 @@ export function PatchWorkbench({
             type="button"
             className="btn btn-primary"
             disabled={!canMake}
+            ref={makeButton}
             onClick={() => {
               if (!marked) return
               // The button is off while takes are made, and the browser drops focus from it; focus
@@ -482,7 +523,8 @@ export function PatchWorkbench({
             {view.maker.message}
           </span>
         ) : (
-          !marked && (
+          !marked &&
+          !tie && (
             <span className="muted small">Drag over the picture to mark what should change.</span>
           )
         )}

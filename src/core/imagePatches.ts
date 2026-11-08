@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AreaBox } from './images'
 import type { Pixels } from './imagePixels'
 
 /** How many pixels of a patch fade in from the edge of its marked area. */
@@ -430,4 +431,30 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
     }
   }
   return { width, height, data }
+}
+
+/** The named area the game ties a patch to: its title, and where it is (null while it is not placed). */
+export interface PatchTie {
+  title: string
+  box: AreaBox | null
+}
+
+/**
+ * The mark a named area gives a patch on a take: the area (a box in the image's pixels, scaled to
+ * the take's), grown on every side by the patch's feather so the soft edge fades outside the
+ * thing it changes, and stopping at the picture's edges. Null when the result cannot be patched.
+ */
+export function markFromArea(
+  box: AreaBox,
+  image: { width: number; height: number },
+  take: { width: number; height: number },
+): PatchArea | null {
+  const sx = take.width / image.width
+  const sy = take.height / image.height
+  const x1 = Math.max(0, Math.round(box.x * sx) - PATCH_FEATHER)
+  const y1 = Math.max(0, Math.round(box.y * sy) - PATCH_FEATHER)
+  const x2 = Math.min(take.width, Math.round((box.x + box.width) * sx) + PATCH_FEATHER)
+  const y2 = Math.min(take.height, Math.round((box.y + box.height) * sy) + PATCH_FEATHER)
+  const mark = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 }
+  return checkPatchArea(mark, take) ? null : mark
 }

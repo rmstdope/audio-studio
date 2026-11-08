@@ -4,6 +4,7 @@ import {
   ChoosePatchTakeBody,
   keepArea,
   MakePatchTakesBody,
+  markFromArea,
   matchToTake,
   PATCH_FEATHER,
   PatchBoardSchema,
@@ -417,5 +418,34 @@ describe('the patch board and what is asked of it', () => {
   it('chooses a take by its number', () => {
     expect(ChoosePatchTakeBody.safeParse({ n: 2 }).success).toBe(true)
     expect(ChoosePatchTakeBody.safeParse({ n: 0 }).success).toBe(false)
+  })
+})
+
+describe('the mark a named area gives a patch', () => {
+  const size = { width: 320, height: 200 }
+  it('grows the area by the feather on every side', () => {
+    expect(markFromArea({ x: 100, y: 80, width: 50, height: 40 }, size, size)).toEqual({
+      x: 100 - PATCH_FEATHER,
+      y: 80 - PATCH_FEATHER,
+      width: 50 + 2 * PATCH_FEATHER,
+      height: 40 + 2 * PATCH_FEATHER,
+    })
+  })
+  it('stops at the picture’s edges', () => {
+    expect(markFromArea({ x: 0, y: 150, width: 300, height: 50 }, size, size)).toEqual({
+      x: 0,
+      y: 150 - PATCH_FEATHER,
+      width: 320,
+      height: 50 + PATCH_FEATHER,
+    })
+  })
+  it('is large enough to make even from a very small area', () => {
+    const mark = markFromArea({ x: 100, y: 100, width: 4, height: 4 }, size, size)!
+    expect(checkPatchArea(mark, size)).toBeNull()
+  })
+  it('scales the area to a take of another size first', () => {
+    expect(
+      markFromArea({ x: 10, y: 10, width: 20, height: 20 }, size, { width: 640, height: 400 }),
+    ).toEqual({ x: 0, y: 0, width: 20 * 2 + 20 + PATCH_FEATHER, height: 40 + 20 + PATCH_FEATHER })
   })
 })
