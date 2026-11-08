@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { checkPatchArea, keepArea, matchToTake, PATCH_FEATHER } from './imagePatches'
+import {
+  checkPatchArea,
+  ChoosePatchTakeBody,
+  keepArea,
+  MakePatchTakesBody,
+  matchToTake,
+  PATCH_FEATHER,
+  PatchBoardSchema,
+  patchSummary,
+} from './imagePatches'
 import type { Pixels } from './imagePixels'
 
 /** A picture of one opaque colour. */
@@ -343,5 +352,67 @@ describe('matchToTake', () => {
     const edited = plain(200, 200, [110, 150, 70])
     matchToTake(edited, take, area)
     expect(rgbAt(edited, 100, 100)).toEqual([110, 150, 70])
+  })
+})
+
+describe('patchSummary', () => {
+  it('says no takes yet for a patch without takes', () => {
+    expect(patchSummary([])).toEqual({ text: 'no takes yet', chip: null })
+  })
+
+  it('counts takes and says none is chosen', () => {
+    expect(patchSummary([{ n: 1, chosen: false }])).toEqual({
+      text: '1 take, none chosen',
+      chip: null,
+    })
+    expect(
+      patchSummary([
+        { n: 1, chosen: false },
+        { n: 2, chosen: false },
+      ]),
+    ).toEqual({ text: '2 takes, none chosen', chip: null })
+  })
+
+  it('names the chosen take in a chip', () => {
+    expect(
+      patchSummary([
+        { n: 1, chosen: true },
+        { n: 2, chosen: false },
+        { n: 3, chosen: false },
+      ]),
+    ).toEqual({ text: '3 takes', chip: 'Take 1 chosen' })
+    expect(patchSummary([{ n: 4, chosen: true }])).toEqual({ text: '1 take', chip: 'Take 4 chosen' })
+  })
+})
+
+describe('the patch board and what is asked of it', () => {
+  it('reads a board with a choice per image take', () => {
+    const board = {
+      next: 3,
+      takes: [
+        { n: 1, base: 3, seed: 5, words: 'no door', area: { x: 1, y: 2, width: 30, height: 40 } },
+      ],
+      chosen: { '3': 1 },
+    }
+    expect(PatchBoardSchema.parse(board).takes[0]!.seen).toBe(false)
+    expect(PatchBoardSchema.parse(board).chosen).toEqual({ '3': 1 })
+  })
+
+  it('starts empty', () => {
+    expect(PatchBoardSchema.parse({})).toEqual({ next: 1, takes: [], chosen: {} })
+  })
+
+  it('asks for one to four new takes of an area, or a failed take again', () => {
+    const area = { x: 0, y: 0, width: 20, height: 20 }
+    expect(MakePatchTakesBody.safeParse({ count: 2, area }).success).toBe(true)
+    expect(MakePatchTakesBody.safeParse({ count: 5, area }).success).toBe(false)
+    expect(MakePatchTakesBody.safeParse({ count: 0, area }).success).toBe(false)
+    expect(MakePatchTakesBody.safeParse({ retry: 4 }).success).toBe(true)
+    expect(MakePatchTakesBody.safeParse({ count: 2 }).success).toBe(false)
+  })
+
+  it('chooses a take by its number', () => {
+    expect(ChoosePatchTakeBody.safeParse({ n: 2 }).success).toBe(true)
+    expect(ChoosePatchTakeBody.safeParse({ n: 0 }).success).toBe(false)
   })
 })

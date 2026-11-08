@@ -18,48 +18,110 @@ export const PatchAreaSchema = z.strictObject({
 /** The marked area of a take. */
 export type PatchArea = z.infer<typeof PatchAreaSchema>
 
-/** What the page asks for to make a patch: the marked area and the edit instruction. */
-export const MakePatchBody = z.strictObject({
-  area: PatchAreaSchema,
-  instruction: z.string().trim().min(1),
-})
-
-/** One patch saved on an image's patch board. */
-export const PatchSchema = z.strictObject({
+/** One take of a patch on its board: a picture beside the board, as big as the image's take it lies over. */
+export const PatchTakeSchema = z.strictObject({
+  /** Per patch, never reused. */
   n: z.number().int().positive(),
-  /** The number of the take it was made from. */
-  take: z.number().int().positive(),
+  /** The number of the image's take it was painted on. */
+  base: z.number().int().positive(),
   seed: z.number().int(),
-  instruction: z.string(),
+  /** The patch's words it was made from. */
+  words: z.string(),
+  /** The area it was made with. */
   area: PatchAreaSchema,
+  /** It has been laid over the picture once; a take that has not shows "new". */
+  seen: z.boolean().default(false),
 })
 
-/** One patch saved on an image's patch board. */
-export type Patch = z.infer<typeof PatchSchema>
+/** One take of a patch. */
+export type PatchTake = z.infer<typeof PatchTakeSchema>
 
-/** An image's patch board: the next patch's number and the patches made so far. */
+/**
+ * A patch's board, `content-studio/cache/image-patches/<image>/<patch>/board.json`: the takes made,
+ * the next number, and the take chosen on each take of the image (by its number).
+ */
 export const PatchBoardSchema = z.strictObject({
-  next: z.number().int().positive(),
-  patches: z.array(PatchSchema),
+  next: z.number().int().positive().default(1),
+  takes: z.array(PatchTakeSchema).default([]),
+  chosen: z.record(z.string(), z.number().int().positive()).default({}),
 })
 
-/** An image's patch board. */
+/** A patch's board. */
 export type PatchBoard = z.infer<typeof PatchBoardSchema>
 
-/** The patches of an image's chosen take as the page shows them. */
+/** The body of asking for takes of a patch: this many new ones (1 to 4) of an area, or a failed take again. */
+export const MakePatchTakesBody = z.union([
+  z.strictObject({ count: z.number().int().min(1).max(4), area: PatchAreaSchema }),
+  z.strictObject({ retry: z.number().int().positive() }),
+])
+
+/** The body of choosing a take of a patch. */
+export const ChoosePatchTakeBody = z.strictObject({ n: z.number().int().positive() })
+
+/** A take of a patch as the page shows it. */
+export interface PatchTakeView {
+  n: number
+  area: PatchArea
+  /** Made from words that have since changed. */
+  earlier: boolean
+  chosen: boolean
+  /** Not yet laid over the picture. */
+  isNew: boolean
+}
+
+/** A take of a patch waiting or being made. */
+export interface PatchMakingView {
+  n: number
+  state: 'waiting' | 'making'
+  /** Seconds since it started; 0 while it waits. */
+  elapsed: number
+  /** Seconds an edit is expected to take (a guess). */
+  expected: number
+  area: PatchArea
+}
+
+/** A take of a patch that failed, kept until it is made again. */
+export interface PatchFailedView {
+  n: number
+  message: string
+  area: PatchArea
+}
+
+/** One patch of an image with its takes on the image's chosen take. */
+export interface PatchWorkView {
+  id: string
+  takes: PatchTakeView[]
+  making: PatchMakingView[]
+  failed: PatchFailedView[]
+}
+
+/** The patches of an image as the page shows them: those made on the take the game shows. */
 export interface ImagePatchesView {
+  ok: true
   /** The chosen take the patches lie over and its size, or null when there is no picture of one to patch. */
   take: { n: number; width: number; height: number } | null
   /** Whether a take is chosen but its picture is missing or cannot be read. */
   pictureGone: boolean
-  /** The patches made from the chosen take, oldest first. */
-  patches: Patch[]
-  /** The patch being made or waiting for its turn. */
-  making: { instruction: string; area: PatchArea } | null
-  /** The last patch that could not be made, until the next one is asked for. */
-  failed: { instruction: string; message: string } | null
-  /** The folder, inside the project, the patches are saved in. */
-  folder: string
+  /** Whether takes of patches can be made on this computer, and why not if they cannot. */
+  maker: { ok: true } | { ok: false; message: string }
+  /** The image's patches the game lists, each with its takes. */
+  patches: PatchWorkView[]
+}
+
+/**
+ * What a closed patch row says of how far the patch has come: "no takes yet", "2 takes, none
+ * chosen", or "3 takes" with the chip naming the chosen take.
+ */
+export function patchSummary(takes: readonly { n: number; chosen: boolean }[]): {
+  text: string
+  chip: string | null
+} {
+  if (takes.length === 0) return { text: 'no takes yet', chip: null }
+  const count = `${takes.length} ${takes.length === 1 ? 'take' : 'takes'}`
+  const chosen = takes.find((t) => t.chosen)
+  return chosen
+    ? { text: count, chip: `Take ${chosen.n} chosen` }
+    : { text: `${count}, none chosen`, chip: null }
 }
 
 /** Why this area cannot be patched on a picture of this size, or null when it can. */
