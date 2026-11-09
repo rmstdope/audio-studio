@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagesRoute } from '../../route'
 import type { GameArea, GamePatch, ImageEdits, ImageStyle, MadeFrom } from '../../../core/images'
+import type { ImageTakesView } from '../../../core/imageTakes'
 import type { ProjectSummary } from '../../../core/summary'
 import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
 import { projectJson } from '../../../../test/helpers'
@@ -140,15 +141,33 @@ function summary(options: Options = {}): ProjectSummary {
   return { images } as unknown as ProjectSummary
 }
 
+/** The inn's takes when it has none and takes can be made. */
+const noTakes: ImageTakesView = {
+  ok: true,
+  generator: { ok: true },
+  projectModel: 'klein',
+  models: [
+    { id: 'klein', installed: true, download: 'whole', failed: false },
+    { id: 'z-image-turbo', installed: true, download: 'whole', failed: false },
+  ],
+  takes: [],
+  making: [],
+  failed: [],
+  lockUnread: false,
+  lookError: null,
+}
+
 function render(
   route: ImagesRoute,
   shown: ProjectSummary = summary(),
   making: Record<string, { takes: number; left: number; failed?: number; stopped?: number }> = {},
   run: unknown = null,
   modelState = false,
+  takes?: Partial<ImageTakesView>,
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(['image-making'], making)
+  if (takes) client.setQueryData(['image-takes', 'inn'], { ...noTakes, ...takes })
   client.setQueryData(['look-run'], run)
   if (modelState) {
     const whole = { download: 'whole', failed: false }
@@ -373,6 +392,132 @@ describe('an image’s page', () => {
     expect(text(page)).toContain("The game's words: a low inn")
     await act(async () => button(page, "use the game's").click())
     expect(sent[0]).toEqual({ method: 'PATCH', path: '/api/images/inn', body: { words: null } })
+  })
+
+  describe('Make pressed straight after typing the prompt (as-95q)', () => {
+    /** The page with a new prompt typed and `press` pressed at once, whose save waits for `release`. */
+    async function typedAndPressed(
+      answer: () => Response,
+      press = 'Make 2 takes',
+      takes: Partial<ImageTakesView> = {},
+    ) {
+      const page = render(route, summary(), {}, null, false, takes)
+      const served = globalThis.fetch
+      let release = () => {}
+      const held = new Promise<void>((resolve) => (release = resolve))
+      globalThis.fetch = (async (path: string, init?: RequestInit) => {
+        if (init?.method !== 'PATCH') return served(path, init)
+        sent.push({ method: 'PATCH', path, body: JSON.parse(String(init.body)) })
+        await held
+        return answer()
+      }) as unknown as typeof fetch
+      const field = page.querySelector('textarea')!
+      const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      await act(async () => {
+        set.call(field, 'a cosy inn')
+        field.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      // The press of the mouse leaves the field; the click comes before anything has rendered.
+      await act(async () => {
+        field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+        button(page, press).click()
+      })
+      await settle()
+      return { page, release }
+    }
+    // React Query tells the page on a timer, so a real turn of the clock lets the answer show.
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
+    }
+    const asked = () => sent.filter((s) => s.method !== 'GET').map((s) => s.method)
+    const takesAsked = () =>
+      sent.filter((s) => s.method === 'POST' && s.path === '/api/images/inn/takes')
+
+    it('asks for the takes only once the prompt is saved', async () => {
+      const { release } = await typedAndPressed(() => Response.json({ ok: true }))
+      expect(asked()).toEqual(['PATCH'])
+      await act(async () => release())
+      await settle()
+      expect(asked()).toEqual(['PATCH', 'POST'])
+      expect(takesAsked()).toHaveLength(1)
+    })
+
+    it('keeps Make off while it waits, so a second press asks for nothing more', async () => {
+      const { page, release } = await typedAndPressed(() => Response.json({ ok: true }))
+      expect(button(page, 'Make 2 takes').disabled).toBe(true)
+      await act(async () => button(page, 'Make 2 takes').click())
+      await act(async () => release())
+      await settle()
+      expect(takesAsked()).toHaveLength(1)
+    })
+
+    it('makes nothing when the prompt could not be saved, and says why', async () => {
+      const { page, release } = await typedAndPressed(() =>
+        Response.json({
+          ok: false,
+          problems: [{ file: 'edits.json', path: 'words', message: 'Too long' }],
+        }),
+      )
+      await act(async () => release())
+      await settle()
+      expect(takesAsked()).toEqual([])
+      expect(text(page)).toContain('Too long')
+      expect(button(page, 'Make 2 takes').disabled).toBe(false)
+    })
+
+    it('makes nothing when the save itself failed', async () => {
+      const { page, release } = await typedAndPressed(() => new Response('', { status: 500 }))
+      await act(async () => release())
+      await settle()
+      expect(takesAsked()).toEqual([])
+      expect(button(page, 'Make 2 takes').disabled).toBe(false)
+    })
+
+    describe('Try again on a failed take, which is made from the prompt as it stands', () => {
+      const oneFailed = { failed: [{ n: 1, message: 'It broke.' }] }
+
+      it('asks for the take only once the prompt is saved', async () => {
+        const { release } = await typedAndPressed(
+          () => Response.json({ ok: true }),
+          'Try again',
+          oneFailed,
+        )
+        expect(asked()).toEqual(['PATCH'])
+        await act(async () => release())
+        await settle()
+        expect(asked()).toEqual(['PATCH', 'POST'])
+        expect(takesAsked()[0]!.body).toEqual({ retry: 1 })
+      })
+
+      it('makes nothing when the prompt could not be saved', async () => {
+        const { release } = await typedAndPressed(
+          () => new Response('', { status: 500 }),
+          'Try again',
+          oneFailed,
+        )
+        await act(async () => release())
+        await settle()
+        expect(takesAsked()).toEqual([])
+      })
+
+      it('is off while a press of Make waits for the prompt', async () => {
+        const { page, release } = await typedAndPressed(
+          () => Response.json({ ok: true }),
+          'Make 2 takes',
+          oneFailed,
+        )
+        expect(button(page, 'Try again').disabled).toBe(true)
+        await act(async () => release())
+        await settle()
+      })
+    })
+
+    it('asks for the takes at once when nothing was typed', async () => {
+      const page = render(route, summary(), {}, null, false, {})
+      await act(async () => button(page, 'Make 2 takes').click())
+      await settle()
+      expect(asked()).toEqual(['POST'])
+    })
   })
 
   describe('the act’s style on an image', () => {

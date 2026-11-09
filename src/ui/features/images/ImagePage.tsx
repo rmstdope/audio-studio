@@ -18,7 +18,7 @@ import { ActLinks } from './ActLinks'
 import { NamedAreasPanel } from './NamedAreasPanel'
 import { GamePatchesPanel } from './GamePatchesPanel'
 import { TakesSection } from './TakesSection'
-import { WordsField } from './WordsField'
+import { WordsField, type SaveWordsNow } from './WordsField'
 
 /**
  * An image's own page: what is out of date above, then its workbench: the prompt (the words,
@@ -43,6 +43,7 @@ export function ImagePage({
   const accept = useAcceptImageChange(row.id)
   const canAccept = acceptableReasons(row.reasons)
   const field = useRef<HTMLTextAreaElement>(null)
+  const saveNow = useRef<SaveWordsNow>(null)
   const settle = (choice: 'keep' | 'game') =>
     compare.mutate(choice, {
       onSuccess: (result) => {
@@ -164,6 +165,7 @@ export function ImagePage({
       )}
       <TakesSection
         row={row}
+        saveWords={() => saveNow.current?.() ?? null}
         prompt={
           <section className="panel brief-panel" aria-label="Prompt">
             <div className="brief-panel-head">
@@ -181,6 +183,7 @@ export function ImagePage({
               save={save}
               onSaved={() => setSaved(true)}
               onEdit={() => setSaved(false)}
+              saveNow={saveNow}
               inputRef={field}
             />
             {row.changed && <span className="muted">The game&apos;s words: {row.description}</span>}
