@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>How long a take takes, as timed on this computer</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --warn: #ffc24b;
+        --track: rgb(255 255 255/7%);
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .lead {
+        color: var(--muted);
+        max-width: 760px;
+        margin: 0 0 20px;
+      }
+      h2 {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin: 0 0 8px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+        gap: 16px;
+        max-width: 1100px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .select {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 6px 10px;
+      }
+      .select:after {
+        content: '▾';
+        color: var(--faint);
+      }
+      .menu {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        margin-top: 6px;
+        overflow: hidden;
+      }
+      .menu div {
+        padding: 7px 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .menu .on {
+        background: rgb(255 255 255/6%);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .btn {
+        background: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+        color: #1a0a02;
+        border-radius: 8px;
+        padding: 6px 14px;
+        font-weight: 600;
+      }
+      .cap {
+        color: var(--faint);
+        font-size: 12px;
+        margin-top: 6px;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      .card {
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
+        padding: 12px;
+        margin-top: 10px;
+        background: var(--inset);
+      }
+      .bar {
+        height: 6px;
+        background: var(--track);
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 8px 0 6px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .bar.flow i {
+        width: 35%;
+        margin-left: 30%;
+        opacity: 0.55;
+      }
+      .small {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .line {
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-top: 10px;
+        color: var(--soft);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td,
+      th {
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        font-weight: 400;
+      }
+      th {
+        color: var(--faint);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>How long a take takes, as timed on this computer</h1>
+    <p class="lead">
+      The agreed drawing. Image takes only: every figure comes from the last five finished takes of
+      that model on this computer. Before a model has one, its starting figure is shown and called a
+      guess.
+    </p>
+    <div class="grid">
+      <section class="panel">
+        <h2>Takes menu, nothing timed yet</h2>
+        <div class="select">FLUX.2 klein — a guess: about 20 s a take</div>
+        <div class="menu">
+          <div class="on">FLUX.2 klein 4B — a guess: about 20 s a take</div>
+          <div class="">Z-Image-Turbo — a guess: about 1 min a take</div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Patches’ menu, nothing timed yet</h2>
+        <div class="select">Qwen Image Edit — a guess: about 8 min a take</div>
+        <div class="menu">
+          <div class="on">Qwen Image Edit — a guess: about 8 min a take</div>
+          <div class="">FLUX.2 klein 4B — a guess: about 20 s a take</div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Once timed: only the model that has run</h2>
+        <div class="select">FLUX.2 klein — about 25 s a take</div>
+        <div class="menu">
+          <div class="on">FLUX.2 klein 4B — about 25 s a take</div>
+          <div class="">Z-Image-Turbo — a guess: about 1 min a take</div>
+        </div>
+        <p class="note">
+          The middle of the last five finished takes, a new figure after every take. Klein is timed
+          separately for takes and for patches.
+        </p>
+      </section>
+      <section class="panel">
+        <h2>Closed, narrow window</h2>
+        <div style="width: 280px; max-width: 100%">
+          <div class="row">
+            <div class="select" style="white-space: normal">
+              FLUX.2 klein — a guess: about 20 s a take
+            </div>
+            <div class="select">4</div>
+            <div class="btn">Make 4 takes</div>
+          </div>
+        </div>
+        <p class="note">The same words as the open list, wrapped.</p>
+      </section>
+      <section class="panel">
+        <h2>Rounding</h2>
+        <table>
+          <tr>
+            <th>Typical take</th>
+            <th>Menu</th>
+          </tr>
+          <tr>
+            <td>23 s</td>
+            <td>about 25 s a take</td>
+          </tr>
+          <tr>
+            <td>58 s</td>
+            <td>about 1 min a take</td>
+          </tr>
+          <tr>
+            <td>7 min 40 s</td>
+            <td>about 8 min a take</td>
+          </tr>
+        </table>
+        <p class="note">One figure per model everywhere, whatever the picture or marked area.</p>
+      </section>
+      <section class="panel">
+        <h2>A take being made</h2>
+        <div class="card">
+          <b>Take 1</b>
+          <div class="bar"><i style="width: 30%"></i></div>
+          <span class="small">making · about 15 s left</span>
+        </div>
+        <div class="card">
+          <b>Take 1</b>
+          <div class="bar"><i style="width: 12%"></i></div>
+          <span class="small">making · about 7 min left</span>
+        </div>
+        <div class="card">
+          <b>Take 1</b>
+          <div class="bar"><i style="width: 95%"></i></div>
+          <span class="small">making · taking longer than expected</span>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>The act’s and patches’ lines</h2>
+        <div class="line">Making 8 takes for 2 images · about 2 min left</div>
+        <div class="line">Making 1 take for 1 image · about 15 s left</div>
+        <div class="line">Making 2 takes for 1 patch with Qwen Image Edit · about 12 min left</div>
+      </section>
+      <section class="panel">
+        <h2>Make takes for the act, before pressing</h2>
+        <div class="line">
+          Four takes each, on FLUX.2 klein 4B, the image model on Setup. A guess: about 12 min in
+          all — they are made one after another, and you can leave the page.
+        </div>
+        <div class="line">
+          Four takes each, on FLUX.2 klein 4B, the image model on Setup. About 12 min in all — they
+          are made one after another, and you can leave the page.
+        </div>
+        <p class="note">The first while the model is untimed; the second once it is timed.</p>
+      </section>
+      <section class="panel">
+        <h2>Setup’s Images row</h2>
+        <div class="select">FLUX.2 klein 4B — a guess: about 20 s a take</div>
+        <div class="menu">
+          <div class="on">FLUX.2 klein 4B — a guess: about 20 s a take</div>
+          <div class="">Z-Image-Turbo — about 1 min a take — last take failed</div>
+        </div>
+        <p class="note">The same entries; a warning still follows the figure.</p>
+      </section>
+    </div>
+  </body>
+</html>
