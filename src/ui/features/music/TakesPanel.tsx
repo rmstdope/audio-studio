@@ -212,6 +212,7 @@ export function TakesPanel({
   /** Takes are made from the saved brief, so `ask` waits until it is the brief in the fields. */
   const afterBriefSaved = (ask: () => void) => {
     actions.press('make')
+    make.reset() // a press that ends up asking for nothing leaves no earlier failure behind
     const saving = saveBrief?.() ?? null
     if (saving === null) return ask()
     setWaitingForBrief(true)

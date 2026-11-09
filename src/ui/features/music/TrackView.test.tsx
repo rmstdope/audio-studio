@@ -80,16 +80,17 @@ const take: TakeView = {
 
 const saved = () => Response.json({ ok: true })
 
-/** The track's page, its requests kept; a save of the brief answers only once `release` is called. */
-function render(answer: () => Response, takes: Partial<MusicTakesView> = {}) {
+/** The track's page, its requests kept; a save of the brief answers only once released. */
+function render(answer: () => Response, takes: Partial<MusicTakesView> = {}, failMake = false) {
   const calls: { method: string; url: string; body: unknown }[] = []
-  let release = () => {}
-  const held = new Promise<void>((resolve) => (release = resolve))
+  let open = false
+  const waiting: (() => void)[] = []
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET'
     calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : null })
+    if (method === 'POST' && failMake) return new Response('', { status: 500 })
     if (method !== 'PATCH') return Response.json({ ok: true })
-    await held
+    if (!open) await new Promise<void>((resolve) => waiting.push(resolve))
     return answer()
   }) as typeof fetch
   const container = document.createElement('div')
@@ -113,17 +114,42 @@ function render(answer: () => Response, takes: Partial<MusicTakesView> = {}) {
   const asked = () => calls.filter((c) => c.method !== 'GET').map((c) => c.method)
   const takesAsked = () =>
     calls.filter((c) => c.method === 'POST' && c.url === '/api/music/tracks/hall/takes')
-  const finish = async () => {
-    await act(async () => release())
+  /** Lets the oldest save still held answer. */
+  const releaseOne = async () => {
+    await act(async () => waiting.shift()?.())
     await settle()
   }
-  return { container, button, settle, calls, asked, takesAsked, finish }
+  /** Lets every save answer, now and from here on. */
+  const finish = async () => {
+    open = true
+    await act(async () => waiting.splice(0).forEach((go) => go()))
+    await settle()
+  }
+  return { container, button, settle, calls, asked, takesAsked, releaseOne, finish }
 }
 
 type Shown = ReturnType<typeof render>
 
+/** Types `value` in the field labelled `label`, and leaves the field. */
+async function typeAndLeave(shown: Shown, label: string, value: string) {
+  const field = typeIn(shown, label, value)
+  await act(async () => void field.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+  await shown.settle()
+}
+
 /** Types `value` in the field labelled `label` and presses `press` without leaving it first. */
 async function typeAndPress(shown: Shown, label: string, value: string, press: string) {
+  const field = typeIn(shown, label, value)
+  // The press of the mouse leaves the field; the click comes before anything has rendered.
+  await act(async () => {
+    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    shown.button(press).click()
+  })
+  await shown.settle()
+}
+
+/** Types `value` in the field labelled `label`, and answers the field. */
+function typeIn(shown: Shown, label: string, value: string) {
   const fieldId = [...shown.container.querySelectorAll('label')].find(
     (l) => l.textContent === label,
   )!.htmlFor
@@ -136,12 +162,7 @@ async function typeAndPress(shown: Shown, label: string, value: string, press: s
     Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(field, value)
     field.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  // The press of the mouse leaves the field; the click comes before anything has rendered.
-  await act(async () => {
-    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
-    shown.button(press).click()
-  })
-  await shown.settle()
+  return field
 }
 
 const BRIEF = 'What it should sound like'
@@ -236,6 +257,35 @@ describe('Make pressed straight after typing the brief', () => {
     expect(shown.asked()).toEqual([])
     expect(shown.container.textContent).toContain('Use minutes and seconds, like 1:20.')
     expect(shown.button('Make 2 takes').disabled).toBe(false)
+  })
+
+  it('makes nothing when the brief saves but another field still cannot be read', async () => {
+    const shown = render(saved)
+    await typeAndLeave(shown, LENGTH, 'soon')
+    await typeAndPress(shown, BRIEF, 'A new brief', 'Make 2 takes')
+    await shown.finish()
+    expect(shown.asked()).toEqual(['PATCH'])
+    expect(shown.takesAsked()).toEqual([])
+  })
+
+  it('waits for the saves of every field that is being saved', async () => {
+    const shown = render(saved)
+    await typeAndLeave(shown, BRIEF, 'A new brief')
+    await typeAndPress(shown, LENGTH, '1:20', 'Make 2 takes')
+    await shown.releaseOne()
+    expect(shown.takesAsked()).toEqual([])
+    await shown.finish()
+    expect(shown.takesAsked()).toHaveLength(1)
+  })
+
+  it('takes away an earlier failure to make when a press asks for nothing', async () => {
+    const shown = render(saved, {}, true)
+    await act(async () => shown.button('Make 2 takes').click())
+    await shown.settle()
+    expect(shown.container.textContent).toContain('asking for takes answered 500')
+    await typeAndPress(shown, LENGTH, 'soon', 'Make 2 takes')
+    expect(shown.takesAsked()).toHaveLength(1)
+    expect(shown.container.textContent).not.toContain('asking for takes answered 500')
   })
 
   it('asks for the takes at once when nothing was typed', async () => {
