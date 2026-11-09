@@ -5093,6 +5093,7 @@ button.cue-chip[aria-expanded='true'] {
   grid-template-areas:
     'picture again'
     'picture list';
+  grid-template-rows: auto 1fr;
 }
 .place-again-line {
   grid-area: again;
@@ -5299,6 +5300,7 @@ button.cue-chip[aria-expanded='true'] {
       'picture'
       'again'
       'list';
+    grid-template-rows: none;
   }
 }
 /* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */

@@ -55,3 +55,15 @@ describe('a patch row the game asks for (as-9b8)', () => {
     expect(rule('.game-patch-words')).toMatch(/min-width:\s*0/)
   })
 })
+
+describe('the Place again line above the named areas list (as-7dz)', () => {
+  it('stays at the list, the picture’s spare height going to the list’s row', () => {
+    expect(rule('.named-areas-body.has-place-again')).toMatch(/grid-template-rows:\s*auto 1fr/)
+  })
+
+  it('leaves the rows to their content once picture, line and list are stacked', () => {
+    const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
+    const block = narrow.slice(0, narrow.indexOf('\n}\n'))
+    expect(rule('.named-areas-body.has-place-again', block)).toMatch(/grid-template-rows:\s*none/)
+  })
+})
