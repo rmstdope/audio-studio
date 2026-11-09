@@ -6,7 +6,7 @@ import {
   type EditModelId,
   type ImageDownload,
 } from '../core/imageModels'
-import { isCropped } from '../core/imagePixels'
+import { cropPixels, editWindow, isCropped, pastePixels } from '../core/imagePixels'
 import { ImageLockSchema } from '../core/images'
 import { ImageManifestSchema, type ImageManifest } from '../core/imageTakes'
 import {
@@ -42,7 +42,7 @@ import { downloadOf, makeImageTake, type ImageGenerator } from './images'
 import { describeFailure } from './imageTakes'
 import { choices, sorted } from './musicClips'
 import { isSafeId } from './musicTakes'
-import { decodePng, encodeTransparentPng, pngSize } from './png'
+import { decodePng, encodePng, encodeTransparentPng, pngSize } from './png'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
@@ -292,7 +292,7 @@ export function createImagePatches({
     }
   }
 
-  /** Edits the whole image take and saves the marked area as take `entry.n`. */
+  /** Edits a window of the image take around the marked area and saves the marked area as take `entry.n`. */
   async function run(
     found: Found,
     entry: Entry,
@@ -302,16 +302,23 @@ export function createImagePatches({
     if (entries.get(entry.n) !== entry || entry.state !== 'waiting') return
     const stop = new AbortController()
     entry.stop = stop
+    const seed = newSeed() // before any await, so the takes of one press take their seeds in order
+    const window = editWindow(entry.area, take)
+    const cropFile = `${found.folder}/editing-${entry.n}.png`
     try {
+      const around = decodePng(new Uint8Array(await Bun.file(take.path).arrayBuffer()))
+      // The model gets the marked area with some context, not the whole picture: faster, and the
+      // thing to change is larger in its view.
+      await writeAtomic(found.root, cropFile, encodePng(cropPixels(around, window)))
       const made = await makeImageTake(
         { generator, queue, free },
         {
           prompt: entry.words,
-          width: take.width,
-          height: take.height,
-          seed: newSeed(),
+          width: window.width,
+          height: window.height,
+          seed,
           model: entry.model,
-          editing: take.path,
+          editing: resolveInRoot(found.root, cropFile),
         },
         stop.signal,
         () => {
@@ -320,13 +327,13 @@ export function createImagePatches({
         },
       )
       if (stop.signal.aborted) return
-      const edited = decodePng(made.png)
-      if (edited.width !== take.width || edited.height !== take.height) {
+      const part = decodePng(made.png)
+      if (part.width !== window.width || part.height !== window.height) {
         throw new Error(
-          `The edited picture came back at ${edited.width} × ${edited.height} instead of ${take.width} × ${take.height}.`,
+          `The edited picture came back at ${part.width} × ${part.height} instead of ${window.width} × ${window.height}.`,
         )
       }
-      const around = decodePng(new Uint8Array(await Bun.file(take.path).arrayBuffer()))
+      const edited = pastePixels(around, part, window)
       const png = encodeTransparentPng(
         keepArea(matchToTake(edited, around, entry.area), entry.area),
       )
@@ -366,6 +373,8 @@ export function createImagePatches({
       failedModels.set(found.key, failed)
       entry.message = describeFailure(error)
       entry.state = 'failed'
+    } finally {
+      await rm(resolveInRoot(found.root, cropFile), { force: true })
     }
   }
 

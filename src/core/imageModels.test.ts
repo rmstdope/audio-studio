@@ -161,18 +161,18 @@ describe('edit models', () => {
 
   it('reads the time and the menu entries', () => {
     const whole = { download: 'whole', failed: false } as const
-    expect(editPerTake('qwen-edit')).toBe('about 6 min a take')
+    expect(editPerTake('qwen-edit')).toBe('about 8 min a take')
     expect(editPerTake('klein')).toBe('about 20 s a take')
     expect(editShortEntry('klein')).toBe('FLUX.2 klein — about 20 s a take')
     expect(editMenuEntry('klein', whole)).toBe('FLUX.2 klein 4B — about 20 s a take')
     expect(editMenuEntry('qwen-edit', { download: 'absent', failed: false })).toBe(
-      'Qwen Image Edit — about 6 min a take — not on this computer',
+      'Qwen Image Edit — about 8 min a take — not on this computer',
     )
     expect(editMenuEntry('qwen-edit', { download: 'partial', failed: true })).toBe(
-      'Qwen Image Edit — about 6 min a take — download incomplete',
+      'Qwen Image Edit — about 8 min a take — download incomplete',
     )
     expect(editMenuEntry('qwen-edit', { download: 'whole', failed: true })).toBe(
-      'Qwen Image Edit — about 6 min a take — last take failed',
+      'Qwen Image Edit — about 8 min a take — last take failed',
     )
   })
 

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'bun:test'
 import { lookOf, type Look } from './imageLook'
 import { StyleSchema } from './images'
-import { bringToLook, cropWindow, fitToSize, isCropped, type Pixels } from './imagePixels'
+import {
+  bringToLook,
+  cropPixels,
+  cropWindow,
+  editWindow,
+  fitToSize,
+  isCropped,
+  pastePixels,
+  type Pixels,
+} from './imagePixels'
 
 /** A picture made of `colour(x, y)`. */
 function picture(
@@ -174,5 +183,66 @@ describe('cropWindow', () => {
       width: 1024,
       height: 640,
     })
+  })
+})
+
+describe('editWindow', () => {
+  const picture = { width: 1024, height: 640 }
+  it('holds the area with context around it, inside the picture, in multiples of 16', () => {
+    const area = { x: 485, y: 100, width: 170, height: 165 }
+    const w = editWindow(area, picture)
+    expect(w.x).toBeLessThanOrEqual(area.x)
+    expect(w.y).toBeLessThanOrEqual(area.y)
+    expect(w.x + w.width).toBeGreaterThanOrEqual(area.x + area.width)
+    expect(w.y + w.height).toBeGreaterThanOrEqual(area.y + area.height)
+    expect(w.x).toBeGreaterThanOrEqual(0)
+    expect(w.x + w.width).toBeLessThanOrEqual(picture.width)
+    expect(w.y + w.height).toBeLessThanOrEqual(picture.height)
+    expect(w.width % 16).toBe(0)
+    expect(w.height % 16).toBe(0)
+    expect(w.width * w.height).toBeLessThan(picture.width * picture.height)
+  })
+  it('is the whole picture when the area and its context fill it', () => {
+    expect(editWindow({ x: 10, y: 10, width: 1000, height: 600 }, picture)).toEqual({
+      x: 0,
+      y: 0,
+      ...picture,
+    })
+  })
+  it('keeps a side that lies on the picture edge on the edge', () => {
+    const w = editWindow({ x: 0, y: 0, width: 100, height: 100 }, picture)
+    expect([w.x, w.y]).toEqual([0, 0])
+    expect(w.width % 16).toBe(0)
+  })
+  it('uses the whole side of a picture that is not a multiple of 16', () => {
+    const w = editWindow({ x: 600, y: 10, width: 60, height: 60 }, { width: 700, height: 410 })
+    expect(w.x + w.width).toBe(700)
+  })
+})
+
+describe('cropPixels and pastePixels', () => {
+  const gradient = (width: number, height: number): Pixels => {
+    const data = new Uint8Array(width * height * 4)
+    for (let i = 0; i < width * height; i++) {
+      data[i * 4] = i % 251
+      data[i * 4 + 1] = (i * 7) % 253
+      data[i * 4 + 2] = 9
+      data[i * 4 + 3] = 255
+    }
+    return { width, height, data }
+  }
+  it('pasting a crop back unchanged is the identity', () => {
+    const p = gradient(40, 30)
+    const window = { x: 7, y: 5, width: 16, height: 12 }
+    expect(pastePixels(p, cropPixels(p, window), window)).toEqual(p)
+  })
+  it('pastes an edit only inside the window', () => {
+    const p = gradient(20, 20)
+    const window = { x: 4, y: 4, width: 8, height: 8 }
+    const edit = { width: 8, height: 8, data: new Uint8Array(8 * 8 * 4).fill(1) }
+    const out = pastePixels(p, edit, window)
+    expect(out.data[(4 * 20 + 4) * 4]).toBe(1)
+    expect(out.data[0]).toBe(p.data[0]!)
+    expect(out.data[(12 * 20 + 12) * 4]).toBe(p.data[(12 * 20 + 12) * 4]!)
   })
 })

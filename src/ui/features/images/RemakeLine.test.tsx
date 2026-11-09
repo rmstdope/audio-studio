@@ -371,7 +371,7 @@ describe('the model of the remake', () => {
   it('has its own menu on its line, with the two models, starting on the stronger one', async () => {
     const { host } = await render()
     expect([...menu(host).options].map((o) => text(o))).toEqual([
-      'Qwen Image Edit — about 6 min a take',
+      'Qwen Image Edit — about 8 min a take',
       'FLUX.2 klein 4B — about 20 s a take',
     ])
     expect(menu(host).value).toBe('qwen-edit')

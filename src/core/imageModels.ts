@@ -99,7 +99,7 @@ export const EDIT_MODELS: Record<EditModelId, EditModel> = {
     // Unquantized it does not fit a 48 GB Mac; 8 bits peaks near 38 GB.
     quantize: 8,
     steps: 30,
-    seconds: 360,
+    seconds: 480,
   },
   klein: {
     id: 'klein',
@@ -123,7 +123,7 @@ export function isEditModel(id: string): id is EditModelId {
   return (EDIT_MODEL_IDS as readonly string[]).includes(id)
 }
 
-/** How long an edit take takes, as a person reads it: "about 6 min a take". */
+/** How long an edit take takes, as a person reads it: "about 8 min a take". */
 export function editPerTake(id: EditModelId): string {
   const { seconds } = EDIT_MODELS[id]
   return `about ${seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`} a take`
