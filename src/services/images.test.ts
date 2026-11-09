@@ -656,6 +656,39 @@ describe('imageModelDownload', () => {
     })
   })
 
+  describe('with more than one snapshot', () => {
+    /** A second snapshot beside `whole`'s, and `refs/main` naming the one the model loads from. */
+    const secondSnapshot = (dir: string, current: string) => {
+      const snapshot = join(dir, KLEIN, 'snapshots', 'old')
+      mkdirSync(snapshot)
+      mkdirSync(join(dir, KLEIN, 'refs'))
+      writeFileSync(join(dir, KLEIN, 'refs', 'main'), `${current}\n`)
+      return snapshot
+    }
+
+    it('is whole when only a snapshot the model no longer loads from has a part waiting', () => {
+      const dir = hub()
+      whole(dir)
+      part(secondSnapshot(dir, 'abc'), 'vae', ['config.json'])
+      expect(imageModelDownload(dir, 'klein')).toBe('whole')
+    })
+
+    it('is partial when the snapshot the model loads from has a part waiting, beside a whole one', () => {
+      const dir = hub()
+      const { snapshot } = whole(dir)
+      part(snapshot, 'vae', ['config.json'])
+      writeFileSync(join(secondSnapshot(dir, 'abc'), 'model.safetensors'), '{}')
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    })
+
+    it('is partial when the snapshot the model loads from has not been made yet', () => {
+      const dir = hub()
+      whole(dir)
+      secondSnapshot(dir, 'newer')
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    })
+  })
+
   it('only a whole download counts as installed', () => {
     const dir = hub()
     mkdirSync(join(dir, KLEIN, 'blobs'), { recursive: true })

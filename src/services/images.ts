@@ -196,8 +196,21 @@ function hasUnfinishedBlob(dir: string): boolean {
 }
 
 /**
+ * The folder to judge a download by: the snapshot `refs/main` names, the one the model loads from
+ * (an older one a retry left behind says nothing about it), or every snapshot when there is no ref.
+ */
+function currentSnapshots(folder: string): string {
+  const snapshots = join(folder, 'snapshots')
+  try {
+    return join(snapshots, readFileSync(join(folder, 'refs', 'main'), 'utf8').trim())
+  } catch {
+    return snapshots
+  }
+}
+
+/**
  * How much of a repository's download is in the Hugging Face cache `hubDir`: `absent` with no folder
- * for it, `whole` when a snapshot holds weights and nothing is unfinished (no link to a missing blob,
+ * for it, `whole` when its current snapshot holds weights and nothing is unfinished (no link to a missing blob,
  * every shard an index names, no part still waiting, and no `.incomplete` blob unless its finished
  * blob is beside it or an index vouches for the snapshot, for then it is a leftover), `partial`
  * otherwise.
@@ -205,7 +218,7 @@ function hasUnfinishedBlob(dir: string): boolean {
 export function hubDownload(hubDir: string, repo: string): ImageDownload {
   const folder = join(hubDir, `models--${repo.replace('/', '--')}`)
   if (!existsSync(folder)) return 'absent'
-  const { weights, broken, waiting, vouched } = inspectSnapshots(join(folder, 'snapshots'))
+  const { weights, broken, waiting, vouched } = inspectSnapshots(currentSnapshots(folder))
   return weights && !broken && !waiting && (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
     ? 'whole'
     : 'partial'
