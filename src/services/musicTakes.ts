@@ -159,7 +159,7 @@ interface Entry {
   state: 'waiting' | 'making' | 'failed'
   startedAt: number
   message: string
-  /** The hash of the inputs it is made for; the page shows only the current inputs'. */
+  /** The hash of the inputs it is made for; Try again files it under the brief as it is then. */
   hash: string
   /** Ends the take while it is being made (Stop). */
   stop?: AbortController
@@ -567,8 +567,9 @@ export function createMusicTakes({
           expected: musicModel(entry.model).seconds,
           paid: musicModel(entry.model).perMinute !== null,
         }))
+      // Whatever brief they failed on: Try again makes them from the brief as it is now.
       const failed: FailedView[] = entries
-        .filter((entry) => entry.state === 'failed' && entry.hash === hash)
+        .filter((entry) => entry.state === 'failed')
         .map((entry) => ({
           n: entry.n,
           message: entry.message,
@@ -638,13 +639,15 @@ export function createMusicTakes({
       const queued: Entry[] = []
       if ('retry' in request) {
         const failed = entries.get(request.retry)
-        if (!failed || failed.state !== 'failed' || failed.hash !== hash) {
+        if (!failed || failed.state !== 'failed') {
           return {
             ok: false,
             message: `Take ${request.retry} did not fail, so it is not made again.`,
           }
         }
         failed.state = 'waiting'
+        // The brief may have changed since it failed: it is made from it, so it is filed under it.
+        failed.hash = hash
         queued.push(failed)
       } else {
         // The numbers are reserved on the board at once, so none is used twice, even by a take

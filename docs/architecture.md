@@ -952,7 +952,7 @@ expected, a guess) and its time left, then a card with play (a loop take comes r
 sample for sample on Web Audio, with the take fade at its start and stop only), its waveform (a loop's seam
 marked, and a line where it plays while it plays), its length and, for a loop, **Hear the seam** (`GET …/takes/<file>?seam=1` is the last 4 seconds
 followed by the first 4, one WAV). A take that fails is kept as "could not be made" with the
-generator's reason and **Try again** (remakes that number); the other takes stay. A worker the
+generator's reason and **Try again** (remakes that number, from the brief as it is then, under its hash); the other takes stay, and every failed take stays shown with its Try again when the brief changes (as-cgl). A worker the
 computer killed (exit code 137, most often memory running out) says so in plain words, never its
 log: "The music generator was stopped by the computer, most likely because it ran out of memory.
 Close other music jobs, then Try again." The making state is
