@@ -125,7 +125,7 @@ interface Entry {
   state: 'waiting' | 'making' | 'failed'
   startedAt: number
   message: string
-  /** The hash of the inputs it is made for; the page shows only the current inputs'. */
+  /** The hash of the inputs it is made for; Try again files it under the words as they are then. */
   hash: string
   /** The model it is made with. */
   model: EffectModelId
@@ -509,7 +509,7 @@ export function createEffectTakes({
     async view(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      const { root, hash, folder } = found
+      const { root, folder } = found
       // The entries first: one is dropped only after the board has it, so a take is then in the
       // board read after, never in neither.
       const entries = entriesOf(projectFile, id)
@@ -558,8 +558,9 @@ export function createEffectTakes({
         model: modelName(entry.model),
         ...(entry === first ? { chip: { using: gpuInUse() } } : {}),
       }))
+      // Whatever words they failed on: Try again makes them from the words as they are now.
       const failed: EffectFailedView[] = entries
-        .filter((entry) => entry.state === 'failed' && entry.hash === hash)
+        .filter((entry) => entry.state === 'failed')
         .map((entry) => ({ n: entry.n, message: entry.message }))
       const modelsView = await modelsOf(projectFile, found.projectModel)
       return {
