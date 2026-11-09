@@ -562,8 +562,8 @@ describe('imageModelDownload', () => {
     expect(imageModelDownload(dir, 'klein')).toBe('partial')
   })
 
-  /** The `model_index.json` of a pipeline with these parts, a part with `[null, null]` being one it does without. */
-  const modelIndex = (snapshot: string, parts: Record<string, (string | null)[]>) =>
+  /** The `model_index.json` of a pipeline with these parts, a part with `[null, null]` being one it does without and a value that is no list a setting. */
+  const modelIndex = (snapshot: string, parts: Record<string, (string | null)[] | boolean>) =>
     writeFileSync(
       join(snapshot, 'model_index.json'),
       JSON.stringify({ _class_name: 'QwenImageEditPipeline', ...parts }),
@@ -574,6 +574,15 @@ describe('imageModelDownload', () => {
     const dir = hub()
     const snapshot = modelOfParts(dir)
     shardedPart(snapshot, 'transformer')
+    modelIndex(snapshot, { text_encoder: USED, transformer: USED, vae: USED })
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+  })
+
+  it('stays partial when the folder of a part model_index.json lists is still empty', () => {
+    const dir = hub()
+    const snapshot = modelOfParts(dir)
+    shardedPart(snapshot, 'transformer')
+    part(snapshot, 'vae', [])
     modelIndex(snapshot, { text_encoder: USED, transformer: USED, vae: USED })
     expect(imageModelDownload(dir, 'klein')).toBe('partial')
   })
@@ -590,7 +599,7 @@ describe('imageModelDownload', () => {
   it('does not wait for a part model_index.json says the model does without', () => {
     const dir = hub()
     const snapshot = modelOfParts(dir)
-    modelIndex(snapshot, { text_encoder: USED, safety_checker: [null, null] })
+    modelIndex(snapshot, { text_encoder: USED, safety_checker: [null, null], is_distilled: true })
     expect(imageModelDownload(dir, 'klein')).toBe('whole')
   })
 
