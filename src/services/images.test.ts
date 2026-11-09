@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createGpuWorkers, gpuInUse, GPU } from './gpu'
@@ -512,6 +512,43 @@ describe('imageModelDownload', () => {
     expect(imageModelDownload(dir, 'klein')).toBe('partial')
     writeFileSync(join(snapshot, 'model-2.safetensors'), 'x')
     expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('is whole when an index vouches for every shard, whatever .incomplete files are left in blobs', () => {
+    const dir = hub()
+    const { blobs, snapshot } = whole(dir)
+    writeFileSync(
+      join(snapshot, 'model.safetensors.index.json'),
+      JSON.stringify({ weight_map: { a: 'model.safetensors', b: 'model-2.safetensors' } }),
+    )
+    writeFileSync(join(snapshot, 'model-2.safetensors'), 'x')
+    writeFileSync(join(blobs, 'stale.incomplete'), 'from an earlier interrupted download')
+    expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('stays partial while a part after a whole one is still coming', () => {
+    const dir = hub()
+    const { blobs, snapshot } = whole(dir)
+    rmSync(join(snapshot, 'model.safetensors'))
+    const part = (name: string, files: string[]) => {
+      mkdirSync(join(snapshot, name))
+      for (const file of files) writeFileSync(join(snapshot, name, file), '{}')
+    }
+    part('text_encoder', ['config.json', 'model-00001-of-00001.safetensors'])
+    writeFileSync(
+      join(snapshot, 'text_encoder', 'model.safetensors.index.json'),
+      JSON.stringify({ weight_map: { a: 'model-00001-of-00001.safetensors' } }),
+    )
+    writeFileSync(join(blobs, 'h2.incomplete'), 'half')
+
+    // Its shards are arriving, and the index comes last.
+    part('transformer', ['config.json', 'model-00001-of-00002.safetensors'])
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+
+    // Its weights have not begun.
+    part('vae', ['config.json'])
+    rmSync(join(snapshot, 'transformer'), { recursive: true })
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
   })
 
   it('only a whole download counts as installed', () => {

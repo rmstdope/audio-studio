@@ -2338,7 +2338,7 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   steps: accept the licence, make a read token, download), with an `images` section the image models
   (**Image models**: mflux, and for FLUX.2 klein 4B and Z-Image-Turbo whether the whole download is in the Hugging Face cache,
   `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub` (`imageModelDownload`: `absent` with no folder; `whole` when a snapshot holds a
-  `.safetensors` file, no blob is still `.incomplete`, no snapshot link points at a missing blob and every shard a `*.safetensors.index.json` names is there;
+  `.safetensors` file, no snapshot link points at a missing blob, every shard a `*.safetensors.index.json` names is there and no blob is `.incomplete` (a leftover from an interrupted download does not count once an index vouches for the snapshot: an index is there and no folder with a `config.json` or shards still lacks its index or single weights file);
   else `partial`), and whether the model's last take failed (the studio's own memory, `content-studio/cache/image-model-health.json`, one entry per model with the
   image, take and the last line of the image tool's error, written when a take fails and removed when a take with that model works; a stopped take is no failure;
   it survives a restart). "Ready" with both whole and no failed take; for a model that is partly downloaded, not on the computer or failed: "Not set up" (Optional)
