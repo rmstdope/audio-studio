@@ -697,8 +697,8 @@ export function PatchWorkbench({
           )}
           {items.length === 0 ? (
             <div className="takes-empty">
-              No takes yet. Each take is a new try at this change, painted with the whole picture in
-              view.
+              No takes yet. Each take is a new try at this change, painted with the part of the
+              picture around the mark in view.
             </div>
           ) : (
             <>
