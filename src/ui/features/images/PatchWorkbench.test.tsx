@@ -273,7 +273,11 @@ describe('an open patch with no takes', () => {
     await open(host)
     await drag(stageOf(host), [900, 500], [2000, 2000])
     await act(async () => button(host, 'Make 2 takes')!.click())
-    expect(sent[0]!.body).toEqual({ count: 2, area: { x: 900, y: 500, width: 124, height: 76 } })
+    expect(sent[0]!.body).toEqual({
+      count: 2,
+      area: { x: 900, y: 500, width: 124, height: 76 },
+      model: 'qwen-edit',
+    })
   })
 
   it('asks for the chosen number of takes of the marked area', async () => {
@@ -295,7 +299,11 @@ describe('an open patch with no takes', () => {
     })
     await act(async () => button(host, 'Make 3 takes')!.click())
     expect(sent).toEqual([
-      { method: 'POST', path: '/api/images/inn/patches/a/takes', body: { count: 3, area } },
+      {
+        method: 'POST',
+        path: '/api/images/inn/patches/a/takes',
+        body: { count: 3, area, model: 'qwen-edit' },
+      },
     ])
   })
 
@@ -339,7 +347,7 @@ describe('an open patch with takes', () => {
   it('opens on the chosen take, else the newest, with the heading and the chip', async () => {
     const { host } = await render([patchRow('a')], made())
     await open(host)
-    expect(heading(host)).toBe('Looking at Take 2 Chosen')
+    expect(heading(host)).toBe('Looking at Take 2 FLUX.2 klein Chosen')
     expect(host.querySelector('img.patch-over')!.getAttribute('src')).toStartWith(
       '/api/images/inn/patches/a/takes/2/game',
     )
@@ -347,7 +355,7 @@ describe('an open patch with takes', () => {
       view([work('a', { takes: [takeOf(1), takeOf(2)] })]),
     )
     await open(none.host)
-    expect(heading(none.host)).toBe('Looking at Take 2')
+    expect(heading(none.host)).toBe('Looking at Take 2 FLUX.2 klein')
   })
 
   it('heads the takes with their count and explains how to look at one', async () => {
@@ -355,7 +363,11 @@ describe('an open patch with takes', () => {
     await open(host)
     expect(text(host)).toContain('Takes · 3')
     expect(text(host)).toContain('Press a take, or use ← →, to lay it over the picture.')
-    expect(thumbs(host).map((t) => text(t))).toEqual(['Take 1', 'Take 2 Chosen', 'Take 3'])
+    expect(thumbs(host).map((t) => text(t))).toEqual([
+      'Take 1 FLUX.2 klein',
+      'Take 2 Chosen FLUX.2 klein',
+      'Take 3 FLUX.2 klein',
+    ])
     expect(text(host)).not.toContain('No takes yet.')
   })
 
@@ -363,7 +375,7 @@ describe('an open patch with takes', () => {
     const { host } = await render([patchRow('a')], made())
     await open(host)
     await act(async () => thumbs(host)[2]!.click())
-    expect(heading(host)).toBe('Looking at Take 3')
+    expect(heading(host)).toBe('Looking at Take 3 FLUX.2 klein')
     expect(host.querySelector('.patch-mark')).toBeNull()
     await drag(stageOf(host), [10, 10], [200, 200])
     expect(host.querySelector('.patch-mark')).not.toBeNull()
@@ -381,7 +393,7 @@ describe('an open patch with takes', () => {
     await act(async () => switchBox.click())
     expect(host.querySelector('img.patch-over')).toBeNull()
     expect(host.querySelector('.patch-mark')).not.toBeNull()
-    expect(heading(host)).toBe('Looking at Take 1')
+    expect(heading(host)).toBe('Looking at Take 1 FLUX.2 klein')
     await act(async () => switchBox.click())
     expect(host.querySelector('img.patch-over')).not.toBeNull()
     expect(host.querySelector('.patch-mark')).toBeNull()
@@ -467,9 +479,9 @@ describe('an open patch with takes', () => {
     await open(host)
     // Opens on the newest take, which is looked at; take 2 is not.
     expect(thumbs(host).map((t) => text(t))).toEqual([
-      'Take 1 earlier words',
-      'Take 2 new',
-      'Take 3',
+      'Take 1 earlier words FLUX.2 klein',
+      'Take 2 new FLUX.2 klein',
+      'Take 3 FLUX.2 klein',
     ])
   })
 
@@ -494,13 +506,13 @@ describe('an open patch with takes', () => {
     let takes = [takeOf(1), takeOf(2)]
     const { host } = await render([patchRow('a')], () => view([work('a', { takes })]))
     await open(host)
-    expect(heading(host)).toBe('Looking at Take 2')
+    expect(heading(host)).toBe('Looking at Take 2 FLUX.2 klein')
     await act(async () => thumbs(host)[0]!.click())
     takes = [...takes, takeOf(3, { isNew: true })]
     // The page asks for the patches again when it makes or changes something.
     await act(async () => button(host, 'Drop')!.click())
     await settle()
-    expect(heading(host)).toBe('Looking at Take 2')
+    expect(heading(host)).toBe('Looking at Take 2 FLUX.2 klein')
   })
 })
 
@@ -516,13 +528,13 @@ describe('keys inside a patch', () => {
     const focus = thumbs(host)[1]!
     focus.focus()
     await key(focus, 'ArrowRight')
-    expect(heading(host)).toBe('Looking at Take 3')
+    expect(heading(host)).toBe('Looking at Take 3 FLUX.2 klein')
     await key(focus, 'ArrowRight')
-    expect(heading(host)).toBe('Looking at Take 3')
+    expect(heading(host)).toBe('Looking at Take 3 FLUX.2 klein')
     await key(focus, 'ArrowLeft')
     await key(focus, 'ArrowLeft')
     await key(focus, 'ArrowLeft')
-    expect(heading(host)).toBe('Looking at Take 1')
+    expect(heading(host)).toBe('Looking at Take 1 FLUX.2 klein')
   })
 
   it('choose with C, drop with D, and turn the patch off and on with S', async () => {
@@ -549,7 +561,7 @@ describe('keys inside a patch', () => {
     await key(field, 'ArrowLeft')
     await key(field, 'd')
     await key(field, 's')
-    expect(heading(host)).toBe('Looking at Take 2 Chosen')
+    expect(heading(host)).toBe('Looking at Take 2 FLUX.2 klein Chosen')
     expect(host.querySelector('img.patch-over')).not.toBeNull()
     expect(sent).toEqual([])
   })
@@ -645,8 +657,8 @@ describe('takes being made and failed', () => {
     expect(text(host)).toContain('Takes · 1')
     const waiting = host.querySelectorAll('.patch-thumb-making')
     expect([...waiting].map((w) => text(w).replace(/ making.*$/, ''))).toEqual([
-      'Take 2 waiting',
-      'Take 3',
+      'Take 2 FLUX.2 klein waiting',
+      'Take 3 FLUX.2 klein',
     ])
     expect(host.querySelectorAll('[role="progressbar"]').length).toBe(2)
     expect(button(host, 'Make 2 more takes')!.disabled).toBe(true)
@@ -736,7 +748,11 @@ describe('a patch tied to a named area', () => {
     const { host, sent } = await render(tied(), none, undefined, { areas: [bucket] })
     await open(host)
     await act(async () => button(host, 'Make 2 takes')!.click())
-    expect(sent[0]!.body).toEqual({ count: 2, area: { x: 76, y: 76, width: 248, height: 198 } })
+    expect(sent[0]!.body).toEqual({
+      count: 2,
+      area: { x: 76, y: 76, width: 248, height: 198 },
+      model: 'qwen-edit',
+    })
   })
 
   it('puts the line and the button before the number menu, so Tab reaches them first', async () => {
@@ -876,7 +892,11 @@ describe('a patch tied to a named area', () => {
     const { host, sent } = await render(tied(), none, undefined, { areas: [edge] })
     await open(host)
     await act(async () => button(host, 'Make 2 takes')!.click())
-    expect(sent[0]!.body).toEqual({ count: 2, area: { x: 0, y: 0, width: 124, height: 124 } })
+    expect(sent[0]!.body).toEqual({
+      count: 2,
+      area: { x: 0, y: 0, width: 124, height: 124 },
+      model: 'qwen-edit',
+    })
   })
 
   it('puts focus on the heading when Back is pressed with Make off', async () => {
@@ -1041,7 +1061,7 @@ describe('what the game gets', () => {
     )
     expect(text(rows(host)[0])).toContain('Take 1 chosen Old look')
     await open(host)
-    expect(heading(host)).toBe('Looking at Take 1 Chosen Old look')
+    expect(heading(host)).toBe('Looking at Take 1 FLUX.2 klein Chosen Old look')
   })
 })
 
@@ -1139,5 +1159,190 @@ describe('Make pressed straight after typing the words (as-d3b)', () => {
     await settle()
     expect(madeIn(sent)).toEqual([])
     expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+  })
+})
+
+describe('the model of new takes', () => {
+  const MODEL = 'select[aria-label="Model for new takes"]'
+  const COUNT = 'select[aria-label="Number of new takes"]'
+  const both = { 'qwen-edit': 'whole', klein: 'whole' } as const
+  const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
+  const menuOf = (host: Element, at = 0) =>
+    host.querySelectorAll<HTMLSelectElement>(MODEL)[at] as HTMLSelectElement
+  const pick = (menu: HTMLSelectElement, value: string) =>
+    act(async () => {
+      set.call(menu, value)
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+  const withModels = (
+    patches: PatchWorkView[],
+    models: ImagePatchesView['models'] = both,
+    over: Partial<ImagePatchesView> = {},
+  ) => view(patches, { models, ...over })
+
+  it('has one menu above the count, offering the two models, on the stronger one', async () => {
+    const { host } = await render([patchRow('a')], () => withModels([work('a')]))
+    await open(host)
+    const menu = menuOf(host)
+    expect([...menu.options].map((o) => o.textContent)).toEqual([
+      'Qwen Image Edit — about 6 min a take',
+      'FLUX.2 klein 4B — about 20 s a take',
+    ])
+    expect(menu.value).toBe('qwen-edit')
+    // Closed, the menu shows the chosen entry's short form.
+    expect(menu.options[0]!.getAttribute('label')).toBe('Qwen Image Edit — about 6 min a take')
+    expect(menu.options[1]!.getAttribute('label')).toBeNull()
+    const count = host.querySelector(COUNT)!
+    expect(menu.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // On a line of its own: not inside the row of the count, Make and Stop.
+    expect(menu.closest('.patch-make')).toBeNull()
+  })
+
+  it('makes the takes with the model it is on', async () => {
+    const { host, sent } = await render([patchRow('a')], () => withModels([work('a')]))
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    await act(async () => button(host, 'Make 2 takes')!.click())
+    await pick(menuOf(host), 'klein')
+    await act(async () => button(host, 'Make 2 takes')!.click())
+    expect(sent.map((s) => (s.body as { model: string }).model)).toEqual(['qwen-edit', 'klein'])
+  })
+
+  it('keeps one pick per patch, across closing and opening its row', async () => {
+    const { host } = await render([patchRow('a'), patchRow('b')], () =>
+      withModels([work('a'), work('b')]),
+    )
+    await open(host, 0)
+    await pick(menuOf(host), 'klein')
+    await open(host, 1)
+    expect(menuOf(host, 0).value).toBe('klein')
+    expect(menuOf(host, 1).value).toBe('qwen-edit')
+    await open(host, 0)
+    expect(host.querySelectorAll(MODEL)).toHaveLength(1)
+    await open(host, 0)
+    expect(menuOf(host, 0).value).toBe('klein')
+  })
+
+  it('starts on klein with a faint line under the Make row when the stronger model is absent', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      withModels([work('a')], { 'qwen-edit': 'absent', klein: 'whole' }),
+    )
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    expect(menuOf(host).value).toBe('klein')
+    expect(text(host)).toContain(
+      'Qwen Image Edit is not on this computer, so these takes use FLUX.2 klein. Setup says how to download it.',
+    )
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+  })
+
+  it('says a picked model is not on this computer, turns Make off and points to Setup', async () => {
+    const { host, sent } = await render([patchRow('a')], () =>
+      withModels([work('a')], { 'qwen-edit': 'absent', klein: 'whole' }),
+    )
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    await pick(menuOf(host), 'qwen-edit')
+    expect(text(menuOf(host).closest('.edit-model'))).toContain('not on this computer')
+    expect(text(host)).toContain('Setup says how to download it.')
+    expect(text(host)).not.toContain('so these takes use FLUX.2 klein')
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(sent).toEqual([])
+  })
+
+  it('says a download is incomplete', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      withModels([work('a')], { 'qwen-edit': 'partial', klein: 'whole' }),
+    )
+    await open(host)
+    await pick(menuOf(host), 'qwen-edit')
+    expect(text(menuOf(host).closest('.edit-model'))).toContain('download incomplete')
+  })
+
+  it('warns that the last take failed, under the menu and in the open list', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      withModels([work('a', { failedModels: ['qwen-edit'] })]),
+    )
+    await open(host)
+    expect(text(menuOf(host).closest('.edit-model'))).toContain('last take failed')
+    expect(menuOf(host).options[0]!.textContent).toBe(
+      'Qwen Image Edit — about 6 min a take — last take failed',
+    )
+    expect(menuOf(host).options[1]!.textContent).toBe('FLUX.2 klein 4B — about 20 s a take')
+  })
+
+  it('turns the menu, count and Make off while takes are made, and names the model of each', async () => {
+    const { host } = await render([patchRow('a'), patchRow('b')], () =>
+      withModels([
+        work('a', {
+          takes: [takeOf(1)],
+          making: [
+            { n: 2, state: 'making', elapsed: 60, expected: 360, area, model: 'qwen-edit' },
+            { n: 3, state: 'waiting', elapsed: 0, expected: 360, area, model: 'qwen-edit' },
+          ],
+        }),
+        work('b'),
+      ]),
+    )
+    await open(host, 0)
+    await open(host, 1)
+    expect(menuOf(host, 0).disabled).toBe(true)
+    expect(menuOf(host, 1).disabled).toBe(false)
+    const making = host.querySelectorAll('.patch-thumb-making')
+    expect(text(making[0])).toContain('Take 2 Qwen Image Edit making · about 5 min left')
+    expect(text(making[1])).toContain('Take 3 Qwen Image Edit waiting')
+    expect(button(host, 'Stop')).not.toBeUndefined()
+  })
+
+  it('names the model under each take and beside Looking at; an old take reads FLUX.2 klein', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      withModels([
+        work('a', { takes: [takeOf(1), takeOf(2, { model: 'qwen-edit', chosen: true })] }),
+      ]),
+    )
+    await open(host)
+    const [first, second] = thumbs(host)
+    expect(text(first)).toBe('Take 1 FLUX.2 klein')
+    expect(text(second)).toContain('Take 2 Chosen Qwen Image Edit')
+    expect(heading(host)).toContain('Take 2')
+    expect(heading(host)).toContain('Qwen Image Edit')
+    // Pressing a take lays it over the picture and leaves the menu alone.
+    await act(async () => first!.click())
+    expect(heading(host)).toContain('FLUX.2 klein')
+    expect(menuOf(host).value).toBe('qwen-edit')
+  })
+
+  it('makes a failed take again with the model that failed, and is off when it is no longer here', async () => {
+    const failed = [{ n: 4, message: 'out of memory.', area, model: 'qwen-edit' as const }]
+    const here = await render([patchRow('a')], () => withModels([work('a', { failed })]))
+    await open(here.host)
+    await pick(menuOf(here.host), 'klein')
+    await act(async () => button(here.host, 'Try again')!.click())
+    expect(here.sent).toEqual([
+      { method: 'POST', path: '/api/images/inn/patches/a/takes', body: { retry: 4 } },
+    ])
+    const gone = await render([patchRow('a')], () =>
+      withModels([work('a', { failed })], { 'qwen-edit': 'absent', klein: 'whole' }),
+    )
+    await open(gone.host)
+    expect(button(gone.host, 'Try again')!.disabled).toBe(true)
+  })
+
+  it('does not hear the patch keys typed in the menu', async () => {
+    const { host, sent } = await render([patchRow('a')], () =>
+      withModels([work('a', { takes: [takeOf(1), takeOf(2)] })]),
+    )
+    await open(host)
+    await key(menuOf(host), 'c')
+    await key(menuOf(host), 'ArrowLeft')
+    expect(sent).toEqual([])
+  })
+
+  it('has no menu with no chosen take of the image', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      withModels([work('a')], both, { take: null }),
+    )
+    await open(host)
+    expect(host.querySelector(MODEL)).toBeNull()
   })
 })

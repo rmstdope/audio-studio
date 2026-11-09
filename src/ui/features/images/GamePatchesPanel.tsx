@@ -18,6 +18,7 @@ import {
 } from '../../../core/imagePatches'
 import { progressOf } from '../../musicTakesText'
 import { useImagePatchCompare, useImagePatches, useSetImagePatchWords } from '../../api'
+import { startEditModel, type EditModelId } from '../../../core/imageModels'
 import { patchRowId, RemakeLine } from './RemakeLine'
 import { rowFailed, rowMaking } from '../../remakeText'
 import { PatchWorkbench } from './PatchWorkbench'
@@ -39,6 +40,8 @@ function PatchBody({
   imageSize,
   game,
   onGame,
+  model,
+  onModel,
   onSaved,
   onEdit,
   makeAgainLine,
@@ -62,6 +65,9 @@ function PatchBody({
   imageSize: { width: number; height: number }
   game: boolean
   onGame: (on: boolean) => void
+  /** The model new takes are made with, and its change; the page keeps the pick. */
+  model: EditModelId
+  onModel: (model: EditModelId) => void
   onSaved: () => void
   onEdit: () => void
 }) {
@@ -157,6 +163,8 @@ function PatchBody({
           imageSize={imageSize}
           game={game}
           onGame={onGame}
+          model={model}
+          onModel={onModel}
         />
       ) : (
         words
@@ -177,6 +185,9 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [marks, setMarks] = useState<Record<string, PatchArea>>({})
   // The box "What the game gets" of each patch lives here too; every box is ticked when the page opens.
   const [games, setGames] = useState<Record<string, boolean>>({})
+  // The model picked in each patch's menu: not remembered past the page, so each starts on the stronger model.
+  const [picks, setPicks] = useState<Record<string, EditModelId>>({})
+  const [remakePick, setRemakePick] = useState<EditModelId | null>(null)
   const view = query.data && 'patches' in query.data ? query.data : null
   const again = new Set(makeAgainOf(row).map((patch) => patch.id))
   const [open, setOpen] = useState(
@@ -237,6 +248,8 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
           row={row}
           view={view}
           marks={marks}
+          model={remakePick ?? startEditModel(view.models)}
+          onModel={setRemakePick}
           onOpen={(id) => {
             setOpen((now) => new Set(now).add(id))
             setReveal(id)
@@ -308,6 +321,8 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   imageSize={row}
                   game={games[patch.id] ?? true}
                   onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
+                  model={picks[patch.id] ?? startEditModel(view?.models ?? {})}
+                  onModel={(model) => setPicks((now) => ({ ...now, [patch.id]: model }))}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
                   overlapLine={overlapLineOf(patch.id)}

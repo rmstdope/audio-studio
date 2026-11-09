@@ -66,6 +66,8 @@ async function render({
   maker = { ok: true } as ImagePatchesView['maker'],
   pictureGone = false,
   post = { status: 200, body: { ok: true } },
+  models = { 'qwen-edit': 'whole', klein: 'whole' } as ImagePatchesView['models'],
+  failedModels = [] as ImagePatchesView['remake']['failedModels'],
 }: {
   patches?: PatchRow[]
   work?: PatchWorkView[]
@@ -75,6 +77,8 @@ async function render({
   maker?: ImagePatchesView['maker']
   pictureGone?: boolean
   post?: { status: number; body: unknown }
+  models?: ImagePatchesView['models']
+  failedModels?: ImagePatchesView['remake']['failedModels']
 } = {}) {
   const sent: { path: string; body: unknown }[] = []
   let current = pressed
@@ -90,9 +94,9 @@ async function render({
         lockUnread: false,
         pictureGone,
         maker,
-        models: { 'qwen-edit': 'whole', klein: 'whole' },
+        models,
         patches: work,
-        remake: { earlier, press: current, failedModels: [] },
+        remake: { earlier, press: current, failedModels },
       })
     }
     if (path.endsWith('/remake/close')) current = null
@@ -138,9 +142,13 @@ describe('the Remake patches line', () => {
   it('counts the covered patches, with the menu, the press and what it uses', async () => {
     const { host } = await render()
     expect(lines(host)).toContain('3 patches to make again on take 4')
-    const options = [...host.querySelectorAll('select option')].map((o) => text(o))
+    const options = [
+      ...host.querySelectorAll('select[aria-label="Takes of each patch"] option'),
+    ].map((o) => text(o))
     expect(options).toEqual(['1 take each', '2 takes each', '3 takes each', '4 takes each'])
-    expect((host.querySelector('select') as HTMLSelectElement).value).toBe('2')
+    expect(
+      (host.querySelector('select[aria-label="Takes of each patch"]') as HTMLSelectElement).value,
+    ).toBe('2')
     expect(button(host, 'Remake patches on this take')).toBeTruthy()
     expect(lines(host)).toContain(
       'Each from the area and words it was chosen with. You still choose each one: the new picture may have moved what the area covered.',
@@ -165,7 +173,9 @@ describe('the Remake patches line', () => {
   it('presses with the chosen number and the marks, and moves focus to Stop', async () => {
     const { host, sent } = await render({ patches: [patch('door')] })
     await act(async () => {
-      const select = host.querySelector('select') as HTMLSelectElement
+      const select = host.querySelector(
+        'select[aria-label="Takes of each patch"]',
+      ) as HTMLSelectElement
       const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
       set.call(select, '3')
       select.dispatchEvent(new Event('change', { bubbles: true }))
@@ -173,7 +183,7 @@ describe('the Remake patches line', () => {
     await act(async () => button(host, 'Remake patches on this take').click())
     expect(sent[0]).toEqual({
       path: '/api/images/inn/patches/remake',
-      body: { count: 3, marks: {} },
+      body: { count: 3, marks: {}, model: 'qwen-edit' },
     })
   })
 
@@ -248,7 +258,9 @@ describe('the press while it runs and after', () => {
 
   it('says seconds when under a minute is left', async () => {
     const { host } = await render({ pressed: press({ running: true, left: 40 }) })
-    expect(lines(host)).toContain('Making 6 takes for 3 patches · about 40 s left')
+    expect(lines(host)).toContain(
+      'Making 6 takes for 3 patches with FLUX.2 klein · about 40 s left',
+    )
   })
 
   it('becomes a progress line with Stop, and rows say how far each has come', async () => {
@@ -260,7 +272,9 @@ describe('the press while it runs and after', () => {
         idle('lamp', { making: waiting }),
       ],
     })
-    expect(lines(host)).toBe('Making 6 takes for 3 patches · about 2 min leftStop')
+    expect(lines(host)).toBe(
+      'Making 6 takes for 3 patches with FLUX.2 klein · about 2 min leftStop',
+    )
     expect(host.querySelector('select')).toBeNull()
     const rows = [...host.querySelectorAll('button.game-patch-row')].map((r) => text(r))
     expect(rows[0]).toContain('Making 2 takes')
@@ -340,6 +354,65 @@ describe('the press while it runs and after', () => {
     })
     expect(lines(host)).toContain(
       'Made 0 of 6 takes. 6 could not be made — Bread taken, Door open, Lamp lit say why.',
+    )
+  })
+})
+
+describe('the model of the remake', () => {
+  const MODEL = 'select[aria-label="Model for the new takes of each patch"]'
+  const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
+  const menu = (host: Element) => host.querySelector(MODEL) as HTMLSelectElement
+  const pick = (m: HTMLSelectElement, value: string) =>
+    act(async () => {
+      set.call(m, value)
+      m.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+  it('has its own menu on its line, with the two models, starting on the stronger one', async () => {
+    const { host } = await render()
+    expect([...menu(host).options].map((o) => text(o))).toEqual([
+      'Qwen Image Edit — about 6 min a take',
+      'FLUX.2 klein 4B — about 20 s a take',
+    ])
+    expect(menu(host).value).toBe('qwen-edit')
+    expect(menu(host).closest('.remake-line')).not.toBeNull()
+  })
+
+  it('makes every take with the model picked', async () => {
+    const { host, sent } = await render({ patches: [patch('door')] })
+    await pick(menu(host), 'klein')
+    await act(async () => button(host, 'Remake patches on this take').click())
+    expect(sent[0]!.body).toEqual({ count: 2, marks: {}, model: 'klein' })
+  })
+
+  it('starts on klein with the faint line when the stronger model is absent', async () => {
+    const { host } = await render({ models: { 'qwen-edit': 'absent', klein: 'whole' } })
+    expect(menu(host).value).toBe('klein')
+    expect(text(host)).toContain(
+      'Qwen Image Edit is not on this computer, so these takes use FLUX.2 klein. Setup says how to download it.',
+    )
+    expect(button(host, 'Remake patches on this take').disabled).toBe(false)
+  })
+
+  it('turns the button off and points to Setup when the model picked is not here', async () => {
+    const { host } = await render({ models: { 'qwen-edit': 'absent', klein: 'whole' } })
+    await pick(menu(host), 'qwen-edit')
+    expect(text(menu(host).closest('.edit-model'))).toContain('not on this computer')
+    expect(text(host)).toContain('Setup says how to download it.')
+    expect(button(host, 'Remake patches on this take').disabled).toBe(true)
+  })
+
+  it('warns that the last take failed', async () => {
+    const { host } = await render({ failedModels: ['qwen-edit'] })
+    expect(text(menu(host).closest('.edit-model'))).toContain('last take failed')
+  })
+
+  it('names the model of the press while it runs', async () => {
+    const { host } = await render({
+      pressed: press({ running: true, left: 720, model: 'qwen-edit' }),
+    })
+    expect(lines(host)).toContain(
+      'Making 6 takes for 3 patches with Qwen Image Edit · about 12 min left',
     )
   })
 })

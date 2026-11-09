@@ -153,6 +153,9 @@ export function editAbsentLine(): string {
   return `${EDIT_MODELS[DEFAULT_EDIT_MODEL].name} is not on this computer, so these takes use ${EDIT_MODELS.klein.short}. Setup says how to download it.`
 }
 
+/** The line under the Make row when a model that is not on this computer is picked. */
+export const EDIT_SETUP_LINE = 'Setup says how to download it.'
+
 /** Why a patch take failed, as one plain sentence naming the model and the cause. */
 export function editFailureReason(id: EditModelId, code: number, stderr: string): string {
   const { name, repo } = EDIT_MODELS[id]

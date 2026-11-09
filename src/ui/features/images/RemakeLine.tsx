@@ -1,3 +1,10 @@
+import { EditModelMenu } from './EditModelMenu'
+import {
+  EDIT_SETUP_LINE,
+  editAbsentLine,
+  DEFAULT_EDIT_MODEL,
+  type EditModelId,
+} from '../../../core/imageModels'
 import { useEffect, useRef, useState } from 'react'
 import { planRemake, remakeCovered, tieOf, type ImagePatchesView } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
@@ -24,12 +31,17 @@ export function RemakeLine({
   row,
   view,
   marks,
+  model,
+  onModel,
   onOpen,
 }: {
   row: ImageRow
   view: ImagePatchesView
   /** The marks the person drew, by patch id. */
   marks: Record<string, PatchArea>
+  /** The model the press makes its takes with, picked in its own menu (the page keeps the pick). */
+  model: EditModelId
+  onModel: (model: EditModelId) => void
   /** Opens a patch's row and scrolls to it. */
   onOpen: (id: string) => void
 }) {
@@ -60,7 +72,7 @@ export function RemakeLine({
       return (
         <div className="remake-line">
           <span className="remake-grow" role="status">
-            {remakeProgress(press.total, press.ids.length, press.left)}
+            {remakeProgress(press.total, press.ids.length, press.left, press.model)}
           </span>
           <button
             ref={stopButton}
@@ -134,6 +146,7 @@ export function RemakeLine({
         view.take,
       )
     : { make: covered.map((p) => ({ id: p.id, title: p.title })), leftOut: [] }
+  const modelHere = view.models[model] === 'whole'
   const off = view.pictureGone
     ? "The chosen take's picture is missing or cannot be read, so it cannot be patched."
     : view.maker.ok
@@ -149,7 +162,7 @@ export function RemakeLine({
   const remake = () => {
     setFailed(false)
     make.mutate(
-      { count, marks },
+      { count, marks, model },
       {
         onSuccess: (answer) => (answer.ok ? setLand('stop') : setFailed(true)),
         onError: () => setFailed(true),
@@ -160,6 +173,14 @@ export function RemakeLine({
     <div className="remake">
       <div className="remake-line">
         <span className="remake-grow">{remakeSentence(plan.make.length, row.chosenTake!)}</span>
+        <EditModelMenu
+          value={model}
+          onChange={onModel}
+          downloads={view.models}
+          failed={view.remake.failedModels}
+          label="Model for the new takes of each patch"
+          disabled={false}
+        />
         <select
           aria-label="Takes of each patch"
           value={count}
@@ -174,13 +195,19 @@ export function RemakeLine({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={off !== null || make.isPending}
+          disabled={off !== null || make.isPending || !modelHere}
           onClick={remake}
         >
           Remake patches on this take
         </button>
       </div>
       {off && <span className="muted small">{off}</span>}
+      {!modelHere ? (
+        <span className="faint small">{EDIT_SETUP_LINE}</span>
+      ) : (
+        view.models[DEFAULT_EDIT_MODEL] !== 'whole' &&
+        model === 'klein' && <span className="faint small">{editAbsentLine()}</span>
+      )}
       <span className="faint small">{REMAKE_USES}</span>
       {plan.leftOut.length > 0 && <span className="faint small">{left}</span>}
       {failed && (

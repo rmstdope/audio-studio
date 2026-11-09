@@ -21,6 +21,7 @@ import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
 import type { ImagePatchesView, PatchArea } from '../core/imagePatches'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
+import type { EditModelId } from '../core/imageModels'
 import type { ImagePatchAnswer, PatchMakeRequest } from '../services/imagePatches'
 import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
@@ -1729,7 +1730,11 @@ export function useMakePatchTakes(imageId: string, patchId: string) {
 export function useRemakePatches(imageId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (body: { count: number; marks: Record<string, PatchArea> }) => {
+    mutationFn: async (body: {
+      count: number
+      marks: Record<string, PatchArea>
+      model: EditModelId
+    }) => {
       const response = await fetch(`/api/images/${encodeURIComponent(imageId)}/patches/remake`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
