@@ -649,6 +649,27 @@ describe('two models', () => {
     expect(made.takes[0]!.file.split('.')[0]).toBe(made.takes[1]!.file.split('.')[0]!)
   })
 
+  it('still shows every failed take after the words change, each one with Try again', async () => {
+    const { file, takes, requests, settled } = setup(undefined, [
+      { id: 'coins', text: 'fail once', seconds: 0.5 },
+    ])
+    await takes.make(file, 'coins', { count: 2 })
+    await settled('coins')
+    expect(await setEffectDescription(file, 'coins', 'Coins on glass')).toEqual({ ok: true })
+    expect(await takes.view(file, 'coins')).toMatchObject({ failed: [{ n: 1 }, { n: 2 }] })
+
+    expect(await takes.make(file, 'coins', { retry: 1 })).toEqual({ ok: true })
+    const first = await settled('coins')
+    expect(first.takes.map((t) => t.n)).toEqual([1])
+    expect(first.failed.map((f) => f.n)).toEqual([2])
+
+    expect(await takes.make(file, 'coins', { retry: 2 })).toEqual({ ok: true })
+    const second = await settled('coins')
+    expect(second.takes.map((t) => t.n)).toEqual([1, 2])
+    expect(second.failed).toEqual([])
+    expect(requests.map((r) => r.prompt).slice(-2)).toEqual(['Coins on glass', 'Coins on glass'])
+  })
+
   it('remakes a failed take with the model it was asked with, and records the failure per model', async () => {
     const { file, takes, requests, calls, settled } = setup(undefined, [
       { id: 'coins', text: 'fail once', seconds: 0.5 },
