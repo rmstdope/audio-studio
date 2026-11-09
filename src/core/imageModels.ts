@@ -52,6 +52,120 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
 /** The mflux command that changes an existing picture from an instruction; FLUX.2 klein's own. */
 export const IMAGE_EDIT_COMMAND = 'mflux-generate-flux2-edit'
 
+/** The ids of the models a patch's takes are made with, the stronger one first. */
+export const EDIT_MODEL_IDS = ['qwen-edit', 'klein'] as const
+
+/** One of the models that change a picture from an instruction (patches, §8.7). */
+export type EditModelId = (typeof EDIT_MODEL_IDS)[number]
+
+/** The model patches start on when it is on this computer. */
+export const DEFAULT_EDIT_MODEL: EditModelId = 'qwen-edit'
+
+/** An edit model: its names, its weights and how mflux runs it to change a picture. */
+export interface EditModel {
+  id: EditModelId
+  name: string
+  /** A shorter name, for a menu when closed. */
+  short: string
+  /** The Hugging Face repository the weights are downloaded from. */
+  repo: string
+  /** About how many GB the weights take on disk. */
+  gigabytes: number
+  /** The `--model` value of the model's mflux command. */
+  mflux: string
+  /** The built-in model mflux should treat `mflux` as, when `mflux` is a repository name. */
+  base?: string
+  /** The mflux command that edits a picture with this model. */
+  command: string
+  /** Quantization bits and steps, when the model needs them to fit and to do the job. */
+  quantize?: number
+  steps?: number
+  /** About how long one take takes, in seconds (measured on a 48 GB Mac). */
+  seconds: number
+}
+
+/** The edit models, by id. */
+export const EDIT_MODELS: Record<EditModelId, EditModel> = {
+  'qwen-edit': {
+    id: 'qwen-edit',
+    name: 'Qwen Image Edit',
+    short: 'Qwen Image Edit',
+    repo: 'Qwen/Qwen-Image-Edit',
+    gigabytes: 53,
+    // mflux's own alias `qwen-image-edit` is the 2509 weights, which are not the ones downloaded.
+    mflux: 'Qwen/Qwen-Image-Edit',
+    base: 'qwen-image-edit',
+    command: 'mflux-generate-qwen-edit',
+    // Unquantized it does not fit a 48 GB Mac; 8 bits peaks near 38 GB.
+    quantize: 8,
+    steps: 30,
+    seconds: 360,
+  },
+  klein: {
+    id: 'klein',
+    name: IMAGE_MODELS.klein.name,
+    short: IMAGE_MODELS.klein.short,
+    repo: IMAGE_MODELS.klein.repo,
+    gigabytes: IMAGE_MODELS.klein.gigabytes,
+    mflux: IMAGE_MODELS.klein.mflux,
+    command: IMAGE_EDIT_COMMAND,
+    seconds: 20,
+  },
+}
+
+/** The edit model with this id. */
+export function editModel(id: EditModelId): EditModel {
+  return EDIT_MODELS[id]
+}
+
+/** Whether an id names an edit model. */
+export function isEditModel(id: string): id is EditModelId {
+  return (EDIT_MODEL_IDS as readonly string[]).includes(id)
+}
+
+/** How long an edit take takes, as a person reads it: "about 6 min a take". */
+export function editPerTake(id: EditModelId): string {
+  const { seconds } = EDIT_MODELS[id]
+  return `about ${seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`} a take`
+}
+
+/** An edit model's entry in an open menu: name and time, then what is wrong with it, if anything. */
+export function editMenuEntry(id: EditModelId, state: ImageModelState): string {
+  const entry = `${EDIT_MODELS[id].name} — ${editPerTake(id)}`
+  const warning = imageWarning(state)
+  return warning ? `${entry} — ${warning}` : entry
+}
+
+/** An edit model's entry in a closed menu: its short name and time. */
+export function editShortEntry(id: EditModelId): string {
+  return `${EDIT_MODELS[id].short} — ${editPerTake(id)}`
+}
+
+/** The model new patch takes start on: the stronger one when it is whole, else klein. */
+export function startEditModel(
+  downloads: Partial<Record<EditModelId, ImageDownload>>,
+): EditModelId {
+  return downloads[DEFAULT_EDIT_MODEL] === 'whole' ? DEFAULT_EDIT_MODEL : 'klein'
+}
+
+/** The faint line under the Make row when the stronger model is not on this computer. */
+export function editAbsentLine(): string {
+  return `${EDIT_MODELS[DEFAULT_EDIT_MODEL].name} is not on this computer, so these takes use ${EDIT_MODELS.klein.short}. Setup says how to download it.`
+}
+
+/** Why a patch take failed, as one plain sentence naming the model and the cause. */
+export function editFailureReason(id: EditModelId, code: number, stderr: string): string {
+  const { name, repo } = EDIT_MODELS[id]
+  const last = stderr.trim().split('\n').at(-1) ?? ''
+  if (/safetensors|huggingface|snapshots/i.test(last)) {
+    return `${name} could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download ${repo}, then try again.`
+  }
+  if (/invalid choice|unrecognized arguments|error: argument/i.test(stderr)) {
+    return `The installed mflux cannot make ${name} takes; update it with uv tool install --upgrade mflux, then try again.`
+  }
+  return `${name} could not make the take (mflux stopped with exit code ${code}); the details are in the studio's log.`
+}
+
 /** The image model with this id. */
 export function imageModel(id: ImageModelId): ImageModel {
   return IMAGE_MODELS[id]

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import {
   DEFAULT_IMAGE_MODEL,
+  EDIT_MODEL_IDS,
+  editAbsentLine,
+  editFailureReason,
+  editMenuEntry,
+  editModel,
+  editPerTake,
+  editShortEntry,
+  startEditModel,
   IMAGE_MODEL_IDS,
   checkImageRequest,
   defaultTakeModel,
@@ -140,6 +148,57 @@ describe('imageFailureReason', () => {
     const reason = imageFailureReason('klein', 1, 'Traceback ...\nValueError: something odd')
     expect(reason).toBe(
       "FLUX.2 klein 4B could not make the image (mflux stopped with exit code 1); the details are in the studio's log.",
+    )
+  })
+})
+
+describe('edit models', () => {
+  it('knows qwen-edit and klein, qwen first', () => {
+    expect([...EDIT_MODEL_IDS]).toEqual(['qwen-edit', 'klein'])
+    expect(editModel('qwen-edit').repo).toBe('Qwen/Qwen-Image-Edit')
+    expect(editModel('klein').command).toBe('mflux-generate-flux2-edit')
+  })
+
+  it('reads the time and the menu entries', () => {
+    const whole = { download: 'whole', failed: false } as const
+    expect(editPerTake('qwen-edit')).toBe('about 6 min a take')
+    expect(editPerTake('klein')).toBe('about 20 s a take')
+    expect(editShortEntry('klein')).toBe('FLUX.2 klein — about 20 s a take')
+    expect(editMenuEntry('klein', whole)).toBe('FLUX.2 klein 4B — about 20 s a take')
+    expect(editMenuEntry('qwen-edit', { download: 'absent', failed: false })).toBe(
+      'Qwen Image Edit — about 6 min a take — not on this computer',
+    )
+    expect(editMenuEntry('qwen-edit', { download: 'partial', failed: true })).toBe(
+      'Qwen Image Edit — about 6 min a take — download incomplete',
+    )
+    expect(editMenuEntry('qwen-edit', { download: 'whole', failed: true })).toBe(
+      'Qwen Image Edit — about 6 min a take — last take failed',
+    )
+  })
+
+  it('starts on qwen when it is whole, else on klein', () => {
+    expect(startEditModel({ 'qwen-edit': 'whole' })).toBe('qwen-edit')
+    expect(startEditModel({ 'qwen-edit': 'partial' })).toBe('klein')
+    expect(startEditModel({ 'qwen-edit': 'absent' })).toBe('klein')
+  })
+
+  it('says why a take failed, naming the model', () => {
+    expect(editFailureReason('qwen-edit', 143, 'killed')).toBe(
+      "Qwen Image Edit could not make the take (mflux stopped with exit code 143); the details are in the studio's log.",
+    )
+    expect(
+      editFailureReason('qwen-edit', 1, 'FileNotFoundError: x/snapshots/y/model.safetensors'),
+    ).toBe(
+      'Qwen Image Edit could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit, then try again.',
+    )
+    expect(editFailureReason('klein', 1, 'error: unrecognized arguments: x')).toMatch(
+      /update it with uv tool install --upgrade mflux/,
+    )
+  })
+
+  it('has the lines for an absent model', () => {
+    expect(editAbsentLine()).toBe(
+      'Qwen Image Edit is not on this computer, so these takes use FLUX.2 klein. Setup says how to download it.',
     )
   })
 })
