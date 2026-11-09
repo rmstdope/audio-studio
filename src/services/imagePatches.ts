@@ -333,10 +333,16 @@ export function createImagePatches({
           `The edited picture came back at ${part.width} × ${part.height} instead of ${window.width} × ${window.height}.`,
         )
       }
-      const edited = pastePixels(around, part, window)
-      const png = encodeTransparentPng(
-        keepArea(matchToTake(edited, around, entry.area), entry.area),
-      )
+      // The colours are matched in the window, where the model's drift is all there is to see:
+      // laid into the whole take, everything outside the window would read as no drift at all.
+      const inside = { ...entry.area, x: entry.area.x - window.x, y: entry.area.y - window.y }
+      const kept = keepArea(matchToTake(part, cropPixels(around, window), inside), inside)
+      const blank = {
+        width: take.width,
+        height: take.height,
+        data: new Uint8Array(take.width * take.height * 4),
+      }
+      const png = encodeTransparentPng(pastePixels(blank, kept, window))
       const saved: PatchTake = {
         n: entry.n,
         base: entry.base,
