@@ -1,4 +1,4 @@
-import type { MakingSummary } from '../core/musicTake'
+import type { ImageMakingSummary } from '../core/imageTakes'
 import { timeText } from '../core/takeTimes'
 
 /**
@@ -17,6 +17,9 @@ export function imageTimeLeftText(making: {
 }
 
 /** An image's status on the act's list while takes are made: how many, and about how long is left. */
-export function imageMakingStatusText({ takes, left }: MakingSummary): string {
+export function imageMakingStatusText({
+  takes,
+  left,
+}: Pick<ImageMakingSummary, 'takes' | 'left'>): string {
   return `making ${takes} ${takes === 1 ? 'take' : 'takes'} · about ${timeText(left, 'up')}`
 }
