@@ -40,6 +40,7 @@ import type {
   StopResult,
 } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
+import { figuresOf, TIME_KEYS, type Figures } from '../core/takeTimes'
 import type { AreaBox, StyleField } from '../core/images'
 import type { ImageEditResult } from '../services/imageEdits'
 import type { RemoveResult } from '../services/musicOrphans'
@@ -1526,6 +1527,30 @@ export function useImageMaking() {
     refetchInterval: (query) =>
       Object.values(query.state.data ?? {}).some((m) => m.takes > 0) ? 3000 : false,
   })
+}
+
+/**
+ * The time each image model takes for a take on this computer (a guess until one is timed); read
+ * again while takes are being made, so the next menu drawn after a finished take is new.
+ */
+export function useTakeTimes() {
+  const client = useQueryClient()
+  return useQuery({
+    queryKey: ['image-take-times'],
+    queryFn: () => getJson<Figures>('/api/images/take-times'),
+    refetchInterval: () =>
+      Object.values(
+        client.getQueryData<Record<string, ImageMakingSummary>>(['image-making']) ?? {},
+      ).some((m) => m.takes > 0)
+        ? 3000
+        : false,
+  })
+}
+
+/** The image time figures to draw with now: the saved ones, or guesses while they load or cannot be had. */
+export function useFigures(): Figures {
+  const { data } = useTakeTimes()
+  return data && TIME_KEYS.every((key) => data[key]) ? data : figuresOf({})
 }
 
 /** Setup's image model, how each model stands, and whether images can be made now. */

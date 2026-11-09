@@ -1,14 +1,9 @@
 import { EDIT_MODELS, type EditModelId } from '../core/imageModels'
+import { timeText } from '../core/takeTimes'
 import { joined } from './imagesText'
 
 const patches = (n: number) => (n === 1 ? 'patch' : 'patches')
 const takes = (n: number) => (n === 1 ? 'take' : 'takes')
-
-/** How long is left: "about 2 min" (rounded up), or "about 40 s" under a minute. */
-const timeLeft = (seconds: number) =>
-  seconds < 60
-    ? `about ${Math.max(1, Math.round(seconds))} s`
-    : `about ${Math.ceil(seconds / 60)} min`
 
 /** The line's sentence: how many patches the press would remake, on which take of the image. */
 export function remakeSentence(count: number, take: number): string {
@@ -38,7 +33,7 @@ export function remakeProgress(
   left: number,
   model: EditModelId,
 ): string {
-  return `Making ${total} ${takes(total)} for ${patchCount} ${patches(patchCount)} with ${EDIT_MODELS[model].short} · ${timeLeft(left)} left`
+  return `Making ${total} ${takes(total)} for ${patchCount} ${patches(patchCount)} with ${EDIT_MODELS[model].short} · about ${timeText(left, 'up')} left`
 }
 
 /** What the summary says besides the names of the patches with a failed take. */

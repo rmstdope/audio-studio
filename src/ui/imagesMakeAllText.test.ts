@@ -23,24 +23,86 @@ describe('the words of make-all on the Images page', () => {
 
   it('says the model and the time, rounded up to whole minutes', () => {
     expect(
-      makeAllLine({ model: 'FLUX.2 klein', main: 'FLUX.2 klein', why: null, seconds: 96 }),
+      makeAllLine({
+        model: 'FLUX.2 klein',
+        main: 'FLUX.2 klein',
+        why: null,
+        seconds: 96,
+        guess: false,
+      }),
     ).toBe(
       'Four takes each, on FLUX.2 klein, the image model on Setup. About 2 min in all — they are made one after another, and you can leave the page.',
     )
     expect(
-      makeAllLine({ model: 'Z-Image-Turbo', main: 'FLUX.2 klein', why: 'absent', seconds: 720 }),
+      makeAllLine({
+        model: 'Z-Image-Turbo',
+        main: 'FLUX.2 klein',
+        why: 'absent',
+        seconds: 720,
+        guess: false,
+      }),
     ).toBe(
       "Four takes each, on Z-Image-Turbo: FLUX.2 klein, the image model on Setup, isn't on this computer. About 12 min in all — they are made one after another, and you can leave the page.",
     )
     expect(
-      makeAllLine({ model: 'Z-Image-Turbo', main: 'FLUX.2 klein', why: 'partial', seconds: 720 }),
+      makeAllLine({
+        model: 'Z-Image-Turbo',
+        main: 'FLUX.2 klein',
+        why: 'partial',
+        seconds: 720,
+        guess: false,
+      }),
     ).toContain('is only partly downloaded. About 12 min')
     expect(
-      makeAllLine({ model: 'Z-Image-Turbo', main: 'FLUX.2 klein', why: 'failed', seconds: 720 }),
+      makeAllLine({
+        model: 'Z-Image-Turbo',
+        main: 'FLUX.2 klein',
+        why: 'failed',
+        seconds: 720,
+        guess: false,
+      }),
     ).toContain('failed on its last take. About 12 min')
     expect(
-      makeAllLine({ model: 'FLUX.2 klein', main: 'FLUX.2 klein', why: null, seconds: 8 }),
-    ).toContain('About 1 min in all')
+      makeAllLine({
+        model: 'FLUX.2 klein',
+        main: 'FLUX.2 klein',
+        why: null,
+        seconds: 8,
+        guess: false,
+      }),
+    ).toContain('About 10 s in all')
+  })
+
+  it('leads an untimed model\'s time with "A guess:"', () => {
+    expect(
+      makeAllLine({
+        model: 'FLUX.2 klein 4B',
+        main: 'FLUX.2 klein 4B',
+        why: null,
+        seconds: 720,
+        guess: true,
+      }),
+    ).toBe(
+      'Four takes each, on FLUX.2 klein 4B, the image model on Setup. A guess: about 12 min in all — they are made one after another, and you can leave the page.',
+    )
+    expect(
+      makeAllLine({
+        model: 'FLUX.2 klein 4B',
+        main: 'FLUX.2 klein 4B',
+        why: null,
+        seconds: 40,
+        guess: true,
+      }),
+    ).toContain('A guess: about 40 s in all')
+    expect(
+      makeAllLine({
+        model: 'FLUX.2 klein 4B',
+        main: 'FLUX.2 klein 4B',
+        why: null,
+        seconds: 40,
+        guess: false,
+      }),
+    ).toContain('About 40 s in all')
   })
 
   it('names the images left out, one reason a line', () => {
@@ -66,8 +128,8 @@ describe('the words of make-all on the Images page', () => {
     expect(runningLine({ takes: 12, images: 3, left: 100 })).toBe(
       'Making 12 takes for 3 images · about 2 min left',
     )
-    expect(runningLine({ takes: 4, images: 1, left: 1 })).toBe(
-      'Making 4 takes for 1 image · about 1 min left',
+    expect(runningLine({ takes: 4, images: 1, left: 11 })).toBe(
+      'Making 4 takes for 1 image · about 15 s left',
     )
     expect(summaryLead(12, 12)).toBe('Made 12 of 12 takes.')
     expect(summaryFailed(2, ['Lighthouse'])).toEqual({

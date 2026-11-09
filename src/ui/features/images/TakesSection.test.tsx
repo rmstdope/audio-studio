@@ -734,7 +734,7 @@ describe('making takes', () => {
 
   it('shows each take in the strip at once, with Stop, and the menus wait', async () => {
     const s = await show(view({ takes: [take(1), take(2)], making }))
-    expect(s.text()).toContain('making · about 1 min left')
+    expect(s.text()).toContain('making · about 50 s left')
     expect(s.text()).toContain('waiting')
     expect(s.container.querySelectorAll('[role="progressbar"]')).toHaveLength(2)
     expect(s.button('Stop').disabled).toBe(false)
@@ -916,11 +916,13 @@ describe('the Takes section’s model menu', () => {
     expect(menus).toEqual(['Model for new takes', 'Number of new takes'])
     expect(modelMenu(s).value).toBe('klein')
     expect([...modelMenu(s).options].map((o) => o.textContent)).toEqual([
-      'FLUX.2 klein 4B — about 8 s a take',
-      'Z-Image-Turbo — about 1 min a take',
+      'FLUX.2 klein 4B — a guess: about 20 s a take',
+      'Z-Image-Turbo — a guess: about 1 min a take',
     ])
     // Closed, it shows the short name and the time.
-    expect(modelMenu(s).options[0]!.getAttribute('label')).toBe('FLUX.2 klein — about 8 s a take')
+    expect(modelMenu(s).options[0]!.getAttribute('label')).toBe(
+      'FLUX.2 klein — a guess: about 20 s a take',
+    )
   })
 
   it('starts on Setup’s model when that is the other one', async () => {
@@ -941,7 +943,7 @@ describe('the Takes section’s model menu', () => {
   it('lists a model that is not here as such, and cannot be picked', async () => {
     const s = await show(view({ takes: three, models: only('klein') }))
     const z = modelMenu(s).options[1]!
-    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — not on this computer')
+    expect(z.textContent).toBe('Z-Image-Turbo — a guess: about 1 min a take — not on this computer')
     expect(z.disabled).toBe(true)
     expect(s.text()).not.toContain("isn't on this computer")
   })
@@ -964,7 +966,7 @@ describe('the Takes section’s model menu', () => {
       }),
     )
     const z = modelMenu(s).options[1]!
-    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — last take failed')
+    expect(z.textContent).toBe('Z-Image-Turbo — a guess: about 1 min a take — last take failed')
     expect(z.disabled).toBe(false)
     expect(modelMenu(s).value).toBe('klein')
   })
@@ -974,7 +976,7 @@ describe('the Takes section’s model menu', () => {
       view({ takes: three, models: [model('klein', 'whole'), model('z-image-turbo', 'partial')] }),
     )
     const z = modelMenu(s).options[1]!
-    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — download incomplete')
+    expect(z.textContent).toBe('Z-Image-Turbo — a guess: about 1 min a take — download incomplete')
     expect(z.disabled).toBe(true)
   })
 

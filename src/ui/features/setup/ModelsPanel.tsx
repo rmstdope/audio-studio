@@ -55,6 +55,7 @@ import {
   useSetEffectModel,
   useSetImageModel,
   useSetElevenModel,
+  useFigures,
   useSetElevenTts,
   useSetMusicModel,
   useSetStageModel,
@@ -268,6 +269,7 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
  */
 function ImagesRow({ file, images }: { file: string; images: NonNullable<View['images']> }) {
   const save = useSetImageModel()
+  const figures = useFigures()
   return (
     <LocalModelRow
       file={file}
@@ -277,7 +279,7 @@ function ImagesRow({ file, images }: { file: string; images: NonNullable<View['i
       ids={IMAGE_MODEL_IDS}
       current={images.model}
       states={images.states}
-      entry={imageMenuEntry}
+      entry={(id, state) => imageMenuEntry(id, state, figures)}
       warning={imageWarning}
       nameOf={(id) => imageModel(id as ImageModelId).name}
       failureHeading={(id) => imageSaveFailureHeading(id as ImageModelId)}

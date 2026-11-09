@@ -3,6 +3,7 @@ import { imageModel } from '../../../core/imageModels'
 import type { ImagesAct } from '../../../core/images'
 import { planImagesMakeAll, TAKES_EACH } from '../../../core/imagesMakeAll'
 import {
+  useFigures,
   useImageMaking,
   useImageModelState,
   useImagesBatch,
@@ -38,6 +39,7 @@ type Focus = 'button' | 'make' | 'stop' | 'close' | null
 export function MakeAllPanel({ act, children }: { act: ImagesAct; children: ReactNode }) {
   const making = useImageMaking().data ?? {}
   const state = useImageModelState().data
+  const figures = useFigures()
   const make = useImagesMakeAll(act.id)
   const stop = useImagesStopAll(act.id)
   const [open, setOpen] = useState(false)
@@ -87,6 +89,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
           main: state.main,
           states: state.states,
           ready: state.ready,
+          figures,
         })
       : null
   const setup = (
@@ -223,6 +226,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
             main: imageModel(state.main).short,
             why: plan.why,
             seconds: plan.seconds,
+            guess: plan.guess,
           })}
         </span>
         <ul>

@@ -25,6 +25,7 @@ import {
 import {
   useChooseImageTake,
   useDropImageTake,
+  useFigures,
   useImageTakes,
   useMakeImageTakes,
   useMarkImageTakeSeen,
@@ -45,7 +46,8 @@ import {
   takeCountText,
   unchooseNote,
 } from '../../imagesText'
-import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
+import { failureLine, progressOf } from '../../musicTakesText'
+import { imageTimeLeftText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 
@@ -155,6 +157,7 @@ export function TakesSection({
 }) {
   const id = row.id
   const query = useImageTakes(id)
+  const figures = useFigures()
   const make = useMakeImageTakes(id)
   const stop = useStopImageTakes(id)
   const choose = useChooseImageTake(id)
@@ -454,10 +457,10 @@ export function TakesSection({
           <option
             key={id}
             value={id}
-            label={id === model && !modelOpen ? imageShortEntry(id) : undefined}
+            label={id === model && !modelOpen ? imageShortEntry(id, figures) : undefined}
             disabled={!installed[id]}
           >
-            {imageMenuEntry(id, states[id])}
+            {imageMenuEntry(id, states[id], figures)}
           </option>
         ))}
       </select>
@@ -944,7 +947,7 @@ function MakingThumb({
       <span className="image-thumb-label">
         <span className="grow">Take {making.n}</span>
       </span>
-      <span className="faint small">{timeLeftText(making)}</span>
+      <span className="faint small">{imageTimeLeftText(making)}</span>
       <div className="bar" role="progressbar" aria-label={`Take ${making.n}`}>
         <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
       </div>

@@ -177,6 +177,8 @@ import {
 import { MakeAllBody } from '../core/effectsMakeAll'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
+import { figuresOf } from '../core/takeTimes'
+import { readTakeTimes } from '../services/takeTimes'
 import { createImageHealth } from '../services/imageHealth'
 import {
   createImageTakes,
@@ -1685,6 +1687,9 @@ export function startServer({
       },
       '/api/images/making': {
         GET: guard(async () => Response.json(await imageTakes.making(projectFile))),
+      },
+      '/api/images/take-times': {
+        GET: guard(async () => Response.json(figuresOf(await readTakeTimes(projectFile)))),
       },
       '/api/images/model-state': {
         GET: guard(async () => Response.json(await imageTakes.modelState(projectFile))),

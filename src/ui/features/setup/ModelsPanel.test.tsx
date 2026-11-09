@@ -259,8 +259,8 @@ describe('the Images row of the Models panel', () => {
       'Which model records each stage of the voices, which makes the music, and which makes the images.',
     )
     expect([...menuOf(page.container).options].map((o) => o.textContent)).toEqual([
-      'FLUX.2 klein 4B — about 8 s a take',
-      'Z-Image-Turbo — about 1 min a take',
+      'FLUX.2 klein 4B — a guess: about 20 s a take',
+      'Z-Image-Turbo — a guess: about 1 min a take',
     ])
     expect(menuOf(page.container).value).toBe('klein')
     expect(page.container.textContent).not.toContain('not on this computer')
@@ -273,7 +273,9 @@ describe('the Images row of the Models panel', () => {
   it('lists a missing model as such, which cannot be picked, and warns when it is the chosen one', () => {
     const page = render(answer(null, images('klein', { klein: absent, 'z-image-turbo': whole })))
     const [klein, z] = [...menuOf(page.container).options]
-    expect(klein!.textContent).toBe('FLUX.2 klein 4B — about 8 s a take — not on this computer')
+    expect(klein!.textContent).toBe(
+      'FLUX.2 klein 4B — a guess: about 20 s a take — not on this computer',
+    )
     expect(klein!.disabled).toBe(true)
     expect(z!.disabled).toBe(false)
     expect(page.container.querySelector('.warnline')!.textContent).toBe('not on this computer')
@@ -285,7 +287,9 @@ describe('the Images row of the Models panel', () => {
     const failed = { download: 'whole', failed: true } as const
     const page = render(answer(null, images('klein', { klein: failed, 'z-image-turbo': whole })))
     const [klein] = [...menuOf(page.container).options]
-    expect(klein!.textContent).toBe('FLUX.2 klein 4B — about 8 s a take — last take failed')
+    expect(klein!.textContent).toBe(
+      'FLUX.2 klein 4B — a guess: about 20 s a take — last take failed',
+    )
     expect(klein!.disabled).toBe(false)
     expect(page.container.querySelector('.warnline')!.textContent).toBe('last take failed')
   })
@@ -294,7 +298,7 @@ describe('the Images row of the Models panel', () => {
     const partial = { download: 'partial', failed: false } as const
     const page = render(answer(null, images('klein', { klein: whole, 'z-image-turbo': partial })))
     const z = [...menuOf(page.container).options][1]!
-    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — download incomplete')
+    expect(z.textContent).toBe('Z-Image-Turbo — a guess: about 1 min a take — download incomplete')
     expect(z.disabled).toBe(true)
   })
 

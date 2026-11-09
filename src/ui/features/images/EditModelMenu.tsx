@@ -7,6 +7,7 @@ import {
   type EditModelId,
   type ImageDownload,
 } from '../../../core/imageModels'
+import { useFigures } from '../../api'
 import { openTracking } from '../../components/openTracking'
 
 /**
@@ -33,6 +34,7 @@ export function EditModelMenu({
   disabled: boolean
 }) {
   const [listOpen, setListOpen] = useState(false)
+  const figures = useFigures()
   const stateOf = (id: EditModelId) => ({ download: downloads[id], failed: failed.includes(id) })
   const warning = imageWarning(stateOf(value))
   return (
@@ -53,9 +55,9 @@ export function EditModelMenu({
           <option
             key={id}
             value={id}
-            label={id === value && !listOpen ? editShortEntry(id) : undefined}
+            label={id === value && !listOpen ? editShortEntry(id, figures) : undefined}
           >
-            {editMenuEntry(id, stateOf(id))}
+            {editMenuEntry(id, stateOf(id), figures)}
           </option>
         ))}
       </select>

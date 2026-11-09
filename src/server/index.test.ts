@@ -5477,6 +5477,15 @@ describe('the image takes routes', () => {
     expect(await (await fetch(new URL('/api/images/making', studio.url))).json()).toEqual({})
   })
 
+  it('tells every image time figure as a guess until a take has been timed here', async () => {
+    const figures = await (await fetch(new URL('/api/images/take-times', studio.url))).json()
+    expect(figures.klein).toEqual({ seconds: 20, guess: true })
+    expect(figures['z-image-turbo']).toEqual({ seconds: 60, guess: true })
+    expect(figures['qwen-edit']).toEqual({ seconds: 480, guess: true })
+    expect(figures['klein-edit']).toEqual({ seconds: 20, guess: true })
+    expect((await send('POST', '/api/images/take-times')).status).not.toBe(200)
+  })
+
   it('has nothing to bring to a new look while every picture is up to date', async () => {
     expect(await (await fetch(new URL('/api/images/bring-all', studio.url))).json()).toBeNull()
     expect(await (await send('POST', '/api/images/bring-all')).json()).toEqual({ ok: true })

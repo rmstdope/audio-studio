@@ -1,4 +1,6 @@
 import { rm } from 'node:fs/promises'
+import { figuresOf, timeKeyOfEdit } from '../core/takeTimes'
+import { readTakeTimes, recordTakeTime } from './takeTimes'
 import { dirname, join } from 'node:path'
 import {
   EDIT_MODEL_IDS,
@@ -310,6 +312,7 @@ export function createImagePatches({
       // The model gets the marked area with some context, not the whole picture: faster, and the
       // thing to change is larger in its view.
       await writeAtomic(found.root, cropFile, encodePng(cropPixels(around, window)))
+      let began: number | null = null
       const made = await makeImageTake(
         { generator, queue, free },
         {
@@ -324,9 +327,14 @@ export function createImagePatches({
         () => {
           entry.state = 'making'
           entry.startedAt = now()
+          began = entry.startedAt
         },
       )
       if (stop.signal.aborted) return
+      // Timed from when the take started making, so its wait for the GPU is not counted.
+      if (began !== null) {
+        await recordTakeTime(found.projectFile, timeKeyOfEdit(entry.model), (now() - began) / 1000)
+      }
       const part = decodePng(made.png)
       if (part.width !== window.width || part.height !== window.height) {
         throw new Error(
@@ -462,6 +470,7 @@ export function createImagePatches({
 
   /** Each patch's takes on the chosen take, and the area of its earlier choice; a failure when a board cannot be read. */
   async function workOf(image: Image) {
+    const figures = figuresOf(await readTakeTimes(image.projectFile))
     const patches: PatchWorkView[] = []
     const earlier: Record<string, PatchArea> = {}
     for (const patch of image.row.patches) {
@@ -514,7 +523,7 @@ export function createImagePatches({
             n: e.n,
             state: e.state as 'waiting' | 'making',
             elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
-            expected: editModel(e.model).seconds,
+            expected: figures[timeKeyOfEdit(e.model)].seconds,
             area: e.area,
             model: e.model,
           })),
@@ -533,6 +542,7 @@ export function createImagePatches({
   ): Promise<RemakePressView | ProjectFailure | null> {
     const press = presses.get(`${image.projectFile}\0${image.id}`)
     if (!press) return null
+    const figures = figuresOf(await readTakeTimes(image.projectFile))
     let total = 0
     let made = 0
     let running = 0
@@ -551,7 +561,7 @@ export function createImagePatches({
           if (!failed.includes(patch)) failed.push(patch)
         } else if (entry) {
           running++
-          const seconds = editModel(entry.model).seconds
+          const { seconds } = figures[timeKeyOfEdit(entry.model)]
           left +=
             entry.state === 'making'
               ? Math.max(0, seconds - (now() - entry.startedAt) / 1000)
