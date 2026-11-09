@@ -495,6 +495,27 @@ describe('imageModelDownload', () => {
     expect(imageModelDownload(dir, 'klein')).toBe('partial')
   })
 
+  describe('with no shard index, and .incomplete files in blobs', () => {
+    const SFX_REPO = 'stabilityai/stable-audio-3-small-sfx'
+    const SFX = 'models--stabilityai--stable-audio-3-small-sfx'
+
+    it('is whole when each .incomplete is a leftover of a blob that finished', () => {
+      const dir = hub()
+      const { blobs } = whole(dir, SFX)
+      writeFileSync(join(blobs, 'h1.6fc64d0e.incomplete'), 'half')
+      writeFileSync(join(blobs, 'h1.incomplete'), 'half')
+      expect(hubDownload(dir, SFX_REPO)).toBe('whole')
+    })
+
+    it('stays partial while a blob with no finished file is still coming, beside a leftover', () => {
+      const dir = hub()
+      const { blobs } = whole(dir, SFX)
+      writeFileSync(join(blobs, 'h1.6fc64d0e.incomplete'), 'half')
+      writeFileSync(join(blobs, 'h2.a829cf6b.incomplete'), 'half')
+      expect(hubDownload(dir, SFX_REPO)).toBe('partial')
+    })
+  })
+
   it('is partial when a snapshot link points at nothing', () => {
     const dir = hub()
     const { snapshot } = whole(dir)

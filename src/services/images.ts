@@ -175,10 +175,17 @@ function inspectSnapshots(dir: string): { weights: boolean; broken: boolean; vou
   return { ...found, vouched: found.vouched && !waiting }
 }
 
-/** Whether a folder holds a file ending `.incomplete` (Hugging Face's mark on a blob not finished, still coming or left by an interrupted download). */
+/**
+ * Whether a folder holds a blob not finished, still coming or stopped: a file ending `.incomplete`
+ * (Hugging Face writes each attempt at `<blob>.incomplete` or `<blob>.<random>.incomplete`) whose
+ * `<blob>` is not there. One whose `<blob>` is there is a leftover of an attempt that was interrupted
+ * before a later one finished.
+ */
 function hasUnfinishedBlob(dir: string): boolean {
   try {
-    return readdirSync(dir).some((name) => name.endsWith('.incomplete'))
+    return readdirSync(dir).some(
+      (name) => name.endsWith('.incomplete') && !existsSync(join(dir, name.split('.')[0]!)),
+    )
   } catch {
     return false
   }
@@ -187,8 +194,8 @@ function hasUnfinishedBlob(dir: string): boolean {
 /**
  * How much of a repository's download is in the Hugging Face cache `hubDir`: `absent` with no folder
  * for it, `whole` when a snapshot holds weights and nothing is unfinished (no link to a missing blob,
- * every shard an index names, and no `.incomplete` blob unless an index vouches for the snapshot, for
- * then it is a leftover), `partial` otherwise.
+ * every shard an index names, and no `.incomplete` blob unless its finished blob is beside it or an
+ * index vouches for the snapshot, for then it is a leftover), `partial` otherwise.
  */
 export function hubDownload(hubDir: string, repo: string): ImageDownload {
   const folder = join(hubDir, `models--${repo.replace('/', '--')}`)
