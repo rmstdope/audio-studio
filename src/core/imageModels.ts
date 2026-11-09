@@ -1,4 +1,4 @@
-import { perTakeText, timeKeyOfEdit, type Figure, type Figures } from './takeTimes'
+import { perTakeText, timeKeyOfEdit, type Figures } from './takeTimes'
 
 /** The ids of the image models the studio makes takes with. */
 export const IMAGE_MODEL_IDS = ['klein', 'z-image-turbo'] as const
@@ -117,14 +117,9 @@ export function isEditModel(id: string): id is EditModelId {
   return (EDIT_MODEL_IDS as readonly string[]).includes(id)
 }
 
-/** What an edit model's figure is timed as: klein's patches are timed apart from its takes. */
-export function editFigure(figures: Figures, id: EditModelId): Figure {
-  return figures[timeKeyOfEdit(id)]
-}
-
 /** How long an edit take takes, as a person reads it: "about 8 min a take", "a guess: …". */
 export function editPerTake(id: EditModelId, figures: Figures): string {
-  return perTakeText(editFigure(figures, id))
+  return perTakeText(figures[timeKeyOfEdit(id)])
 }
 
 /** An edit model's entry in an open menu: name and time, then what is wrong with it, if anything. */

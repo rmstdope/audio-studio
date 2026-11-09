@@ -1479,10 +1479,17 @@ export function useStopAll(listId: string) {
 
 /** An image's takes as its page shows them; polled while any is being made. */
 export function useImageTakes(imageId: string) {
+  const client = useQueryClient()
   return useQuery({
     queryKey: ['image-takes', imageId],
-    queryFn: () =>
-      getJson<ImageTakesView | ProjectFailure>(`/api/images/${encodeURIComponent(imageId)}/takes`),
+    queryFn: async () => {
+      const view = await getJson<ImageTakesView | ProjectFailure>(
+        `/api/images/${encodeURIComponent(imageId)}/takes`,
+      )
+      // Every read of the takes may carry a take just finished, which is a new time figure.
+      void client.invalidateQueries({ queryKey: ['image-take-times'] })
+      return view
+    },
     refetchInterval: (query) => {
       const view = query.state.data
       if (view && 'takes' in view && view.takes.some((t) => t.look === 'bringing')) return 1000
@@ -1680,15 +1687,18 @@ const loadedPatches = new Set<string>()
 
 /** The patches the game asks for on an image, with their takes on its chosen take; polled while any is being made. */
 export function useImagePatches(imageId: string) {
+  const client = useQueryClient()
   return useQuery({
     queryKey: ['image-patches', imageId],
-    queryFn: () => {
+    queryFn: async () => {
       // The first read after the page loads says so, so a finished press's summary is not shown again.
       const fresh = !loadedPatches.has(imageId)
       loadedPatches.add(imageId)
-      return getJson<ImagePatchesView | ProjectFailure>(
+      const view = await getJson<ImagePatchesView | ProjectFailure>(
         `/api/images/${encodeURIComponent(imageId)}/patches${fresh ? '?fresh=1' : ''}`,
       )
+      void client.invalidateQueries({ queryKey: ['image-take-times'] })
+      return view
     },
     refetchInterval: (query) => {
       const view = query.state.data

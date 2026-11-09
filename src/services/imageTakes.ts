@@ -499,9 +499,7 @@ export function createImageTakes({
       })
       if (stop.signal.aborted) return
       // Timed from when the take started making, so its wait for the GPU is not counted.
-      if (began !== null) {
-        await recordTakeTime(found.projectFile, entry.model, (now() - began) / 1000)
-      }
+      const took = began === null ? null : (now() - began) / 1000
       const take: ImageBoardTake = {
         n: entry.n,
         seed: made.seed,
@@ -529,6 +527,7 @@ export function createImageTakes({
         throw new Error(`${saved.file} cannot be used`)
       }
       entries.delete(entry.n)
+      if (took !== null) await recordTakeTime(found.projectFile, entry.model, took)
       await health.clear(found.projectFile, entry.model).catch(() => {})
       await bringTake(found, take.n)
     } catch (error) {

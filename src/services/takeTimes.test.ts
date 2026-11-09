@@ -24,6 +24,16 @@ describe('the take timings', () => {
     expect(existsSync(timesFile(root))).toBe(true)
   })
 
+  it('drop one bad value and keep the rest', async () => {
+    const root = repo()
+    mkdirSync(join(root, 'content-studio/cache'), { recursive: true })
+    writeFileSync(
+      timesFile(root),
+      JSON.stringify({ klein: [10, 'x', null, -1, 12], 'qwen-edit': [400] }),
+    )
+    expect(await readTakeTimes(fileOf(root))).toEqual({ klein: [10, 12], 'qwen-edit': [400] })
+  })
+
   it('lose no time when two takes finish together', async () => {
     const root = repo()
     await Promise.all([10, 20, 30].map((s) => recordTakeTime(fileOf(root), 'qwen-edit', s)))

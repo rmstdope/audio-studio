@@ -332,9 +332,7 @@ export function createImagePatches({
       )
       if (stop.signal.aborted) return
       // Timed from when the take started making, so its wait for the GPU is not counted.
-      if (began !== null) {
-        await recordTakeTime(found.projectFile, timeKeyOfEdit(entry.model), (now() - began) / 1000)
-      }
+      const took = began === null ? null : (now() - began) / 1000
       const part = decodePng(made.png)
       if (part.width !== window.width || part.height !== window.height) {
         throw new Error(
@@ -378,6 +376,7 @@ export function createImagePatches({
       }
       entries.delete(entry.n)
       failedModels.get(found.key)?.delete(entry.model)
+      if (took !== null) await recordTakeTime(found.projectFile, timeKeyOfEdit(entry.model), took)
       await bringTake(found, entry.n, entry.base)
     } catch (error) {
       if (stop.signal.aborted) return

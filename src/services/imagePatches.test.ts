@@ -382,6 +382,14 @@ describe('takes of a declared patch', () => {
     })
   })
 
+  it('does not time a patch take that came back wrong or was stopped', async () => {
+    let clock = 0
+    const wrong = setup({ makes: () => fakePng(128, 128, 1), now: () => (clock += 3000) })
+    await wrong.patches.make(wrong.file, 'inn', 'door', { count: 1, area })
+    await wrong.work()
+    expect(existsSync(join(wrong.root, 'content-studio/cache/take-times.json'))).toBe(false)
+  })
+
   it('reports a patch board that cannot be read, and fails the take rather than writing over it', async () => {
     const { root, file, patches } = setup()
     mkdirSync(dirname(join(root, BOARD)), { recursive: true })

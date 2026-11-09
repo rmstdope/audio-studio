@@ -20,11 +20,14 @@ export const STARTING_SECONDS: Record<TimeKey, number> = {
 /** How many of a model's last finished takes its figure is the middle of. */
 export const TIMED_TAKES = 5
 
-/** The seconds of the last finished takes on this computer, for each thing timed (oldest first). */
-export const TakeTimesSchema = z.partialRecord(z.enum(TIME_KEYS), z.array(z.number()))
+/**
+ * The file of the seconds of the last finished takes on this computer, for each thing timed
+ * (oldest first). A value that is not a number is read, and dropped by `cleanTimes`.
+ */
+export const TakeTimesSchema = z.partialRecord(z.enum(TIME_KEYS), z.array(z.unknown()))
 
 /** The saved timings. */
-export type TakeTimes = z.infer<typeof TakeTimesSchema>
+export type TakeTimes = Partial<Record<TimeKey, number[]>>
 
 /** A figure: the seconds a take is said to take, and whether it is still only a guess. */
 export interface Figure {
@@ -39,12 +42,12 @@ export type Figures = Record<TimeKey, Figure>
 export function recordTime(times: TakeTimes, key: TimeKey, seconds: number): TakeTimes {
   if (!Number.isFinite(seconds) || seconds <= 0) return times
   const rounded = Math.round(seconds * 10) / 10
-  return { ...times, [key]: [...(times[key] ?? []), rounded].slice(-TIMED_TAKES) }
+  return cleanTimes({ ...times, [key]: [...(times[key] ?? []), rounded] })
 }
 
 /** The middle (median) of the last five finished takes, or the starting guess when there are none. */
 export function figureOf(times: TakeTimes, key: TimeKey): Figure {
-  const taken = (times[key] ?? []).slice(-TIMED_TAKES)
+  const taken = times[key] ?? []
   if (taken.length === 0) return { seconds: STARTING_SECONDS[key], guess: true }
   const sorted = [...taken].sort((a, b) => a - b)
   const mid = sorted.length >> 1
@@ -79,11 +82,16 @@ export function perTakeText(figure: Figure): string {
   return `${figure.guess ? 'a guess: ' : ''}about ${timeText(figure.seconds, 'nearest')} a take`
 }
 
-/** The saved timings without anything that is not a positive number, and only the last five of each. */
-export function cleanTimes(times: TakeTimes): TakeTimes {
+/**
+ * The saved timings as read: only positive numbers, only the last five of each, the keys in a
+ * fixed order.
+ */
+export function cleanTimes(file: z.infer<typeof TakeTimesSchema>): TakeTimes {
   const clean: TakeTimes = {}
   for (const key of TIME_KEYS) {
-    const taken = (times[key] ?? []).filter((s) => Number.isFinite(s) && s > 0)
+    const taken = (file[key] ?? []).filter(
+      (s): s is number => typeof s === 'number' && Number.isFinite(s) && s > 0,
+    )
     if (taken.length) clean[key] = taken.slice(-TIMED_TAKES)
   }
   return clean

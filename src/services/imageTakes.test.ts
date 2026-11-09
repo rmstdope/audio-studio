@@ -163,6 +163,29 @@ describe('making takes', () => {
     expect(view.making[0]!.expected).toBe(25)
   })
 
+  it('does not count the wait for its turn, and not a stopped take', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { takes, file, settled, read, clock } = setup(undefined, {}, gate)
+    await takes.make(file, 'inn', { count: 2 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    clock.now = 30_000
+    release()
+    await settled('inn')
+    expect(JSON.parse(read('content-studio/cache/take-times.json'))).toEqual({ klein: [30] })
+  })
+
+  it('does not time a take that was stopped', async () => {
+    const gate = new Promise<void>(() => {})
+    const { takes, file, root, clock } = setup(undefined, {}, gate)
+    await takes.make(file, 'inn', { count: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    clock.now = 30_000
+    await takes.stop(file, 'inn')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(existsSync(join(root, 'content-studio/cache/take-times.json'))).toBe(false)
+  })
+
   it('does not time a take that failed', async () => {
     const { takes, file, settled, root } = setup(undefined, {
       [EDITS]: { style: STYLE, images: { inn: { text: 'fail now', gameWas: 'a low inn' } } },

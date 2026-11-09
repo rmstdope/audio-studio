@@ -42,6 +42,10 @@ describe('recordTime', () => {
     for (const s of [1, 2, 3, 4, 5, 6, 7]) t = recordTime(t, 'klein', s)
     expect(t).toEqual({ klein: [3, 4, 5, 6, 7] })
   })
+  it('keeps the keys in one order, whichever was timed first', () => {
+    const t = recordTime(recordTime({}, 'klein-edit', 9), 'klein', 8)
+    expect(Object.keys(t)).toEqual(['klein', 'klein-edit'])
+  })
   it('ignores a time that is not a positive number', () => {
     expect(recordTime({}, 'klein', Number.NaN)).toEqual({})
     expect(recordTime({}, 'klein', 0)).toEqual({})

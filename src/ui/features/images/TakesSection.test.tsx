@@ -925,6 +925,24 @@ describe('the Takes section’s model menu', () => {
     )
   })
 
+  it('reads each model for itself: timed here loses the word guess, the other keeps it', async () => {
+    const s = await show(view({ takes: three }))
+    await act(async () => {
+      s.client.setQueryData(['image-take-times'], {
+        klein: { seconds: 23, guess: false },
+        'z-image-turbo': { seconds: 60, guess: true },
+        'qwen-edit': { seconds: 480, guess: true },
+        'klein-edit': { seconds: 20, guess: true },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    })
+    expect([...modelMenu(s).options].map((o) => o.textContent)).toEqual([
+      'FLUX.2 klein 4B — about 25 s a take',
+      'Z-Image-Turbo — a guess: about 1 min a take',
+    ])
+    expect(modelMenu(s).options[0]!.getAttribute('label')).toBe('FLUX.2 klein — about 25 s a take')
+  })
+
   it('starts on Setup’s model when that is the other one', async () => {
     const s = await show(view({ takes: three, projectModel: 'z-image-turbo' }))
     expect(modelMenu(s).value).toBe('z-image-turbo')
