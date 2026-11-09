@@ -221,8 +221,9 @@ function hasContents(folder: string): boolean {
 
 /**
  * Whether `trees/<revision>.json`, the listing of the repository Hugging Face writes before it fetches
- * anything, names a part that has nothing in the revision's snapshot. It is how a part is missed in
- * a snapshot with no `model_index.json`, which mflux does not fetch. The listing also names what mflux
+ * anything, names a part that has nothing in the revision's snapshot. It applies to any snapshot with
+ * a listing, and is what catches a missing part where there is no `model_index.json`, which mflux does
+ * not fetch. The listing also names what mflux
  * never fetches, so a part is a folder holding weights, or a tokenizer's. A repository with no listing,
  * or one that cannot be read, says nothing.
  */
@@ -237,10 +238,7 @@ function lacksPartOfListing(folder: string, revision: string): boolean {
     return false
   }
   const parts = paths
-    .filter(
-      (path) =>
-        path.includes('/') && (path.endsWith('.safetensors') || path.startsWith('tokenizer')),
-    )
+    .filter((path) => path.endsWith('.safetensors') || path.startsWith('tokenizer'))
     .map(dirname)
   return parts.some((part) => !hasContents(join(folder, 'snapshots', revision, part)))
 }
