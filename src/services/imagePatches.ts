@@ -1,6 +1,11 @@
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { imageModel } from '../core/imageModels'
+import {
+  EDIT_MODEL_IDS,
+  editModel,
+  type EditModelId,
+  type ImageDownload,
+} from '../core/imageModels'
 import { isCropped } from '../core/imagePixels'
 import { ImageLockSchema } from '../core/images'
 import { ImageManifestSchema, type ImageManifest } from '../core/imageTakes'
@@ -33,7 +38,7 @@ import {
   readPatchBoard,
   renderPatchGame,
 } from './imagePatchGame'
-import { makeImageTake, type ImageGenerator } from './images'
+import { downloadOf, makeImageTake, type ImageGenerator } from './images'
 import { describeFailure } from './imageTakes'
 import { choices, sorted } from './musicClips'
 import { isSafeId } from './musicTakes'
@@ -41,14 +46,19 @@ import { decodePng, encodeTransparentPng, pngSize } from './png'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
-/** The model patches are made with, the one mflux can edit a picture with. */
-const EDIT_MODEL = 'klein'
+/** The model new takes are made with when the request names none: the one patches began with. */
+const DEFAULT_MODEL: EditModelId = 'klein'
+
+/** The sentence saying a model's weights are not on this computer. */
+const notHere = (model: EditModelId) =>
+  `${editModel(model).name} is not on this computer, and patches are made with it.`
 
 /** What a change to a patch's takes answered: done, refused with a reason, or a file that cannot be used. */
 export type ImagePatchAnswer = { ok: true } | { ok: false; message: string } | ProjectFailure | null
 
 /** What to make: this many new takes of an area, or the failed take with this number again. */
-export type PatchMakeRequest = { count: number; area: PatchArea } | { retry: number }
+export type PatchMakeRequest =
+  { count: number; area: PatchArea; model?: EditModelId } | { retry: number }
 
 /** What a press of "Remake patches on this take" answered: the patches and takes queued, or why not. */
 export type RemakeAnswer =
@@ -85,7 +95,7 @@ export interface ImagePatches {
   remake(
     projectFile: string,
     id: string,
-    request: { count: number; marks: Record<string, PatchArea> },
+    request: { count: number; marks: Record<string, PatchArea>; model?: EditModelId },
   ): Promise<RemakeAnswer>
   /** Stops the takes of the latest press that are waiting or being made; those made stay. */
   stopRemake(
@@ -116,6 +126,8 @@ interface Entry {
   message: string
   /** The image's take it is painted on, and that take's picture. */
   base: number
+  /** The edit model it is made with, kept for making it again. */
+  model: EditModelId
   /** The area and words it is made with, kept for making it again. */
   area: PatchArea
   words: string
@@ -155,9 +167,16 @@ export function createImagePatches({
   // The latest press of each image (`<project file>\0<image>`): the takes it queued, by patch.
   const presses = ((
     globalThis as {
-      contentStudioPatchRemakes?: Map<string, { base: number; takes: Map<string, number[]> }>
+      contentStudioPatchRemakes?: Map<
+        string,
+        { base: number; model: EditModelId; takes: Map<string, number[]> }
+      >
     }
   ).contentStudioPatchRemakes ??= new Map())
+  // The edit models whose last take of a patch failed (`<patch key>`), until one of theirs works.
+  const failedModels = ((
+    globalThis as { contentStudioPatchFailedModels?: Map<string, Set<EditModelId>> }
+  ).contentStudioPatchFailedModels ??= new Map())
   /** Patches whose new takes are being checked and queued, so a second press at once is refused. */
   const starting = new Set<string>()
 
@@ -236,13 +255,11 @@ export function createImagePatches({
   }
 
   /** Why takes cannot be made on this computer, or null when they can. */
-  async function makerProblem(): Promise<string | null> {
+  async function makerProblem(model?: EditModelId): Promise<string | null> {
     const ready = await generator.ready()
     if (!ready.ok) return ready.message
-    if (!(await generator.installed(EDIT_MODEL))) {
-      return `${imageModel(EDIT_MODEL).name} is not on this computer, and patches are made with it.`
-    }
-    if (generator.canEdit && !(await generator.canEdit())) {
+    if (model && !(await generator.installed(model))) return notHere(model)
+    if (generator.canEdit && !(await generator.canEdit(model))) {
       return 'This mflux cannot edit pictures. Update it with uv tool install --upgrade mflux, then start the studio again.'
     }
     return null
@@ -290,7 +307,7 @@ export function createImagePatches({
           width: take.width,
           height: take.height,
           seed: newSeed(),
-          model: EDIT_MODEL,
+          model: entry.model,
           editing: take.path,
         },
         stop.signal,
@@ -317,6 +334,7 @@ export function createImagePatches({
         words: entry.words,
         area: entry.area,
         seen: false,
+        model: entry.model,
       }
       // The picture first: a take is on the board only once its file is there.
       await writeAtomic(found.root, `${found.folder}/${entry.n}.png`, png)
@@ -335,11 +353,16 @@ export function createImagePatches({
         return
       }
       entries.delete(entry.n)
+      failedModels.get(found.key)?.delete(entry.model)
       await bringTake(found, entry.n, entry.base)
     } catch (error) {
       if (stop.signal.aborted) return
-      entry.state = 'failed'
+      // The model is marked first, so a view never shows the failed take without its model's warning.
+      const failed = failedModels.get(found.key) ?? new Set<EditModelId>()
+      failed.add(entry.model)
+      failedModels.set(found.key, failed)
       entry.message = describeFailure(error)
+      entry.state = 'failed'
     }
   }
 
@@ -380,7 +403,12 @@ export function createImagePatches({
       const problem = checkPatchArea(request.area, picture)
       if (problem) return { ok: false, message: problem }
     }
-    const problem = await makerProblem()
+    const model = failed
+      ? failed.model
+      : 'model' in request && request.model
+        ? request.model
+        : DEFAULT_MODEL
+    const problem = await makerProblem(model)
     if (problem) return { ok: false, message: problem }
     const queued: Entry[] = []
     if (failed) {
@@ -402,6 +430,7 @@ export function createImagePatches({
           startedAt: 0,
           message: '',
           base: found.chosen,
+          model,
           area: request.area,
           words: found.patch.words,
         }
@@ -441,6 +470,7 @@ export function createImagePatches({
           earlier: t.words !== patch.words,
           chosen: t.n === chosen,
           isNew: !t.seen,
+          model: t.model ?? DEFAULT_MODEL,
           look: bringing.has(`${found.key}\0${t.n}`)
             ? 'bringing'
             : !(await Bun.file(
@@ -466,12 +496,14 @@ export function createImagePatches({
             n: e.n,
             state: e.state as 'waiting' | 'making',
             elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
-            expected: imageModel(EDIT_MODEL).seconds,
+            expected: editModel(e.model).seconds,
             area: e.area,
+            model: e.model,
           })),
         failed: entries
           .filter((e) => e.state === 'failed')
-          .map((e) => ({ n: e.n, message: e.message, area: e.area })),
+          .map((e) => ({ n: e.n, message: e.message, area: e.area, model: e.model })),
+        failedModels: EDIT_MODEL_IDS.filter((m) => failedModels.get(found.key)?.has(m)),
       })
     }
     return { work: patches, earlier }
@@ -501,7 +533,7 @@ export function createImagePatches({
           if (!failed.includes(patch)) failed.push(patch)
         } else if (entry) {
           running++
-          const seconds = imageModel(EDIT_MODEL).seconds
+          const seconds = editModel(entry.model).seconds
           left +=
             entry.state === 'making'
               ? Math.max(0, seconds - (now() - entry.startedAt) / 1000)
@@ -518,6 +550,7 @@ export function createImagePatches({
       failed,
       running: running > 0,
       left: Math.round(left),
+      model: press.model,
     }
   }
 
@@ -535,6 +568,11 @@ export function createImagePatches({
       const press = await pressOf(image)
       if (press && 'ok' in press) return press
       const problem = await makerProblem()
+      const downloads = Object.fromEntries(
+        await Promise.all(
+          EDIT_MODEL_IDS.map(async (id) => [id, await downloadOf(generator, id)] as const),
+        ),
+      ) as Record<EditModelId, ImageDownload>
       const lock = await readResource(image.root, IMAGES_LOCK_FILE, ImageLockSchema, [])
       return {
         ok: true,
@@ -550,8 +588,15 @@ export function createImagePatches({
         lockUnread: lock === 'invalid',
         pictureGone: image.chosen !== null && picture === null,
         maker: problem === null ? { ok: true } : { ok: false, message: problem },
+        models: downloads,
         patches: got.work,
-        remake: { earlier: got.earlier, press },
+        remake: {
+          earlier: got.earlier,
+          press,
+          failedModels: EDIT_MODEL_IDS.filter((m) =>
+            got.work.some((p) => p.failedModels.includes(m)),
+          ),
+        },
       }
     },
 
@@ -587,6 +632,7 @@ export function createImagePatches({
         return { ok: false, message: 'None of the patches has an area to make it from.' }
       }
       const base = image.chosen!
+      const model = request.model ?? DEFAULT_MODEL
       const takes = new Map<string, number[]>()
       const undo = () => {
         for (const [patch, ns] of takes) {
@@ -614,7 +660,7 @@ export function createImagePatches({
         starting.add(found.key)
         const before = new Set(entries.keys())
         try {
-          const answer = await start(found, entries, { count: request.count, area })
+          const answer = await start(found, entries, { count: request.count, area, model })
           if (!answer || !answer.ok) {
             undo()
             return answer
@@ -631,7 +677,7 @@ export function createImagePatches({
           [...entries.keys()].filter((n) => !before.has(n)),
         )
       }
-      presses.set(`${projectFile}\0${id}`, { base, takes })
+      presses.set(`${projectFile}\0${id}`, { base, model, takes })
       return {
         ok: true,
         patches: plan.make.map((m) => m.id),

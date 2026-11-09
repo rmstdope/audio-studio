@@ -5,6 +5,8 @@ import {
   ChoosePatchTakeBody,
   keepArea,
   MakePatchTakesBody,
+  PatchTakeSchema,
+  RemakePatchesBody,
   markFromArea,
   matchToTake,
   PATCH_FEATHER,
@@ -439,6 +441,18 @@ describe('the patch board and what is asked of it', () => {
     expect(MakePatchTakesBody.safeParse({ count: 5, area }).success).toBe(false)
     expect(MakePatchTakesBody.safeParse({ count: 0, area }).success).toBe(false)
     expect(MakePatchTakesBody.safeParse({ retry: 4 }).success).toBe(true)
+    expect(MakePatchTakesBody.safeParse({ count: 2, area, model: 'qwen-edit' }).success).toBe(true)
+    expect(MakePatchTakesBody.safeParse({ count: 2, area, model: 'z-image-turbo' }).success).toBe(
+      false,
+    )
+    expect(RemakePatchesBody.safeParse({ count: 2, marks: {}, model: 'klein' }).success).toBe(true)
+    expect(RemakePatchesBody.safeParse({ count: 2, marks: {}, model: 'nope' }).success).toBe(false)
+    expect(
+      PatchTakeSchema.parse({ n: 1, base: 1, seed: 1, words: 'w', area, model: 'qwen-edit' }).model,
+    ).toBe('qwen-edit')
+    expect(
+      PatchTakeSchema.parse({ n: 1, base: 1, seed: 1, words: 'w', area }).model,
+    ).toBeUndefined()
     expect(MakePatchTakesBody.safeParse({ count: 2 }).success).toBe(false)
   })
 
