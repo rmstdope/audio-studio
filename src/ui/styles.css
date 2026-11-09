@@ -5310,6 +5310,12 @@ button.cue-chip[aria-expanded='true'] {
     padding: 12px 0 8px;
     background: var(--panel);
   }
+  /* Held in front of the list, the picture must leave room for the rows, however tall its image. */
+  .named-area-stage,
+  .named-area-empty {
+    width: min(100%, calc(50vh * var(--picture-ratio)));
+    margin-inline: auto;
+  }
 }
 /* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */
 .chip-attention {

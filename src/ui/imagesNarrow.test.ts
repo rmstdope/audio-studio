@@ -76,6 +76,16 @@ describe('the named areas picture in a narrow window (as-5v0)', () => {
   })
 })
 
+describe('a named areas picture taller than a narrow window (as-e39)', () => {
+  it('is capped by the window’s height, keeping its shape, or it hides every row held in front of them', () => {
+    const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
+    const block = narrow.slice(0, narrow.indexOf('\n}\n'))
+    expect(block).toMatch(
+      /\.named-area-stage,\s*\.named-area-empty\s*\{[^}]*width:\s*min\(100%, calc\(50vh \* var\(--picture-ratio\)\)\)/,
+    )
+  })
+})
+
 describe('the Place again line above the named areas list (as-7dz)', () => {
   it('stays at the list, the picture’s spare height going to the list’s row', () => {
     expect(rule('.named-areas-body.has-place-again')).toMatch(/grid-template-rows:\s*auto 1fr/)

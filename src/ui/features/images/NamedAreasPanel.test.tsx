@@ -233,6 +233,11 @@ describe('the named areas panel', () => {
       )
       expect(stage!.style.aspectRatio).toBe('320 / 200')
     })
+
+    it('tells the stylesheet the picture’s shape, so a narrow window can cap it keeping that shape (as-e39)', async () => {
+      const { stage } = await render([area('a')])
+      expect(stage!.style.getPropertyValue('--picture-ratio')).toBe('1.6')
+    })
   })
 
   describe('without a picture to mark on', () => {
@@ -285,6 +290,11 @@ describe('the named areas panel', () => {
     it('keeps the picture’s place empty while it loads, with the list as usual', async () => {
       const { host } = await render([area('a')], { answer: () => new Promise<Response>(() => {}) })
       expect(host.querySelector('.named-area-empty')!.textContent).toBe('')
+      expect(
+        host
+          .querySelector<HTMLElement>('.named-area-empty')!
+          .style.getPropertyValue('--picture-ratio'),
+      ).toBe('1.6')
       expect(host.querySelector('.named-area-line')).toBeNull()
       expect(rows(host).length).toBe(1)
     })
