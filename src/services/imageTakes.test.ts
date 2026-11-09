@@ -5,7 +5,7 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import { setImageAreaBox, setImageWords } from './imageEdits'
 import { readImages } from './imageLists'
 import { createImageTakes } from './imageTakes'
-import type { ImageModelId } from '../core/imageModels'
+import type { EditModelId, ImageModelId } from '../core/imageModels'
 import { ImageToolError, type ImageGenerator, type ImageReady, type ImageRequest } from './images'
 import { createImageHealth } from './imageHealth'
 import { decodePng } from './png'
@@ -36,7 +36,7 @@ function writeStyle(root: string, style: object) {
 function fakeGenerator(
   ready: ImageReady = { ok: true },
   gate?: Promise<void>,
-  here: Partial<Record<ImageModelId, boolean>> = {},
+  here: Partial<Record<ImageModelId | EditModelId, boolean>> = {},
 ) {
   const requests: ImageRequest[] = []
   const generator: ImageGenerator = {
