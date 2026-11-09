@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Patch empty line</title
+  ><style>
+    :root {
+      --bg: #06070c;
+      --panel: #10121a;
+      --raised: #171a24;
+      --line: #262a36;
+      --strong: #3a3f4e;
+      --text: #eceef3;
+      --soft: #c7ccd6;
+      --muted: #a9b0bd;
+      --faint: #8a91a0;
+      --accent: #ff6b2c;
+      --grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+      --softink: #ff9a6b;
+      --warn: #ffc46b;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font:
+        15px/1.5 -apple-system,
+        system-ui,
+        sans-serif;
+      padding: 28px 16px 60px;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+    .lede {
+      color: var(--soft);
+      margin: 6px 0 0;
+      max-width: 70ch;
+    }
+    .cap {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--softink);
+      margin: 0 0 10px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-weight: 600;
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .faint {
+      color: var(--faint);
+      font-size: 13px;
+    }
+    .missing {
+      color: var(--warn);
+      font-size: 13px;
+    }
+    .pic {
+      position: relative;
+      height: 210px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #39506f 0 45%, #6b5138 45% 100%);
+      overflow: hidden;
+    }
+    .mark {
+      position: absolute;
+      left: 38%;
+      top: 22%;
+      width: 24%;
+      height: 40%;
+      border: 2px dashed #fff;
+    }
+    .field {
+      background: var(--raised);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--soft);
+      font-size: 14px;
+    }
+    .sel {
+      background: var(--raised);
+      border: 1px solid var(--strong);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+    .btn {
+      background: var(--grad);
+      color: #1a0a02;
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 14px;
+    }
+    .btn.off {
+      opacity: 0.4;
+    }
+    h3 {
+      font-size: 14px;
+      margin: 0;
+      flex: 1;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .empty {
+      border: 1px dashed var(--strong);
+      border-radius: 10px;
+      padding: 18px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .new {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+    .note {
+      color: var(--faint);
+      font-size: 13px;
+      margin: 8px 0 0;
+    }
+    .narrow {
+      max-width: 360px;
+    }
+    .two {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+  </style>
+  <main>
+    <div>
+      <h1>The line on a patch with no takes yet</h1>
+      <p class="lede">
+        The empty line under Takes, on a patch with no takes yet. Only the outlined line changes;
+        everything else on the panel is as it is today.
+      </p>
+    </div>
+    <section>
+      <p class="cap">A marked patch, no takes yet</p>
+      <div class="panel">
+        <div class="row"><span class="title">The sign is gone</span></div>
+        <div class="pic"><div class="mark"></div></div>
+        <div class="field">The sign is gone, only plain timber wall there.</div>
+        <div class="row">
+          <span class="faint">Model for new takes</span><span class="sel">Qwen Image Edit ▾</span
+          ><span class="sel">2 ▾</span><span class="btn">Make 2 takes</span>
+        </div>
+        <div class="head">
+          <h3>Takes</h3>
+          <label class="muted">☑ What the game gets</label>
+        </div>
+        <div class="empty new">
+          No takes yet. Each take is a new try at this change, painted with the part of the picture
+          around the mark in view.
+        </div>
+      </div>
+    </section>
+    <section class="two">
+      <div>
+        <p class="cap">Nothing marked yet</p>
+        <div class="panel">
+          <div class="row"><span class="title">The sign is gone</span></div>
+          <div class="pic"></div>
+          <div class="field">The sign is gone, only plain timber wall there.</div>
+          <div class="row">
+            <span class="faint">Model for new takes</span><span class="sel">Qwen Image Edit ▾</span
+            ><span class="sel">2 ▾</span><span class="btn off">Make 2 takes</span>
+          </div>
+          <span class="muted">Drag over the picture to mark what should change.</span>
+          <div class="head">
+            <h3>Takes</h3>
+            <label class="muted">☑ What the game gets</label>
+          </div>
+          <div class="empty new">
+            No takes yet. Each take is a new try at this change, painted with the part of the
+            picture around the mark in view.
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap">The model is not on this computer</p>
+        <div class="panel">
+          <div class="row"><span class="title">The sign is gone</span></div>
+          <div class="pic"><div class="mark"></div></div>
+          <div class="field">The sign is gone, only plain timber wall there.</div>
+          <div class="row">
+            <span class="faint">Model for new takes</span><span class="sel">Qwen Image Edit ▾</span
+            ><span class="sel">2 ▾</span><span class="btn off">Make 2 takes</span>
+          </div>
+          <span class="missing">not on this computer</span>
+          <div class="head">
+            <h3>Takes</h3>
+            <label class="muted">☑ What the game gets</label>
+          </div>
+          <div class="empty new">
+            No takes yet. Each take is a new try at this change, painted with the part of the
+            picture around the mark in view.
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="narrow">
+      <p class="cap">A narrow window</p>
+      <div class="panel">
+        <div class="row"><span class="title">The sign is gone</span></div>
+        <div class="pic"><div class="mark"></div></div>
+        <div class="field">The sign is gone, only plain timber wall there.</div>
+        <div class="row">
+          <span class="faint">Model for new takes</span><span class="sel">Qwen Image Edit ▾</span
+          ><span class="sel">2 ▾</span><span class="btn">Make 2 takes</span>
+        </div>
+        <div class="head">
+          <h3>Takes</h3>
+          <label class="muted">☑ What the game gets</label>
+        </div>
+        <div class="empty new">
+          No takes yet. Each take is a new try at this change, painted with the part of the picture
+          around the mark in view.
+        </div>
+      </div>
+    </section>
+    <section>
+      <p class="cap">For comparison: the line today, which is no longer true</p>
+      <div class="empty" style="color: var(--faint)">
+        No takes yet. Each take is a new try at this change, painted with the whole picture in view.
+      </div>
+      <p class="note">
+        Once a take exists or one is being made, the line goes away, as it does today.
+      </p>
+    </section>
+  </main>
+</html>
