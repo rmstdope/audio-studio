@@ -562,6 +562,45 @@ describe('imageModelDownload', () => {
     expect(imageModelDownload(dir, 'klein')).toBe('partial')
   })
 
+  /** The `model_index.json` of a pipeline with these parts, a part with `[null, null]` being one it does without. */
+  const modelIndex = (snapshot: string, parts: Record<string, (string | null)[]>) =>
+    writeFileSync(
+      join(snapshot, 'model_index.json'),
+      JSON.stringify({ _class_name: 'QwenImageEditPipeline', ...parts }),
+    )
+  const USED = ['diffusers', 'SomeClass']
+
+  it('stays partial when a part model_index.json lists has no folder yet', () => {
+    const dir = hub()
+    const snapshot = modelOfParts(dir)
+    shardedPart(snapshot, 'transformer')
+    modelIndex(snapshot, { text_encoder: USED, transformer: USED, vae: USED })
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+  })
+
+  it('is whole with a leftover when every part model_index.json lists is there', () => {
+    const dir = hub()
+    const snapshot = modelOfParts(dir)
+    shardedPart(snapshot, 'transformer')
+    part(snapshot, 'vae', ['config.json', 'diffusion_pytorch_model.safetensors'])
+    modelIndex(snapshot, { text_encoder: USED, transformer: USED, vae: USED })
+    expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('does not wait for a part model_index.json says the model does without', () => {
+    const dir = hub()
+    const snapshot = modelOfParts(dir)
+    modelIndex(snapshot, { text_encoder: USED, safety_checker: [null, null] })
+    expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('stays partial with a leftover when model_index.json cannot be read', () => {
+    const dir = hub()
+    const snapshot = modelOfParts(dir)
+    writeFileSync(join(snapshot, 'model_index.json'), '{ not json')
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+  })
+
   it('only a whole download counts as installed', () => {
     const dir = hub()
     mkdirSync(join(dir, KLEIN, 'blobs'), { recursive: true })

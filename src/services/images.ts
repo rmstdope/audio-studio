@@ -101,9 +101,27 @@ export const HUB_DIR = hubDirOf(process.env, homedir())
 const SHARD_FILE = /-\d+-of-\d+\.safetensors$/
 
 /**
+ * Whether a folder's `model_index.json` lists a part the folder (whose entries are `names`) does not
+ * hold, or cannot be read. A part is listed as `[library, class]`; `[null, null]` is one the model
+ * does without, and the other keys are settings.
+ */
+function lacksListedPart(folder: string, names: string[]): boolean {
+  try {
+    const index = JSON.parse(readFileSync(join(folder, 'model_index.json'), 'utf8')) as object
+    return Object.entries(index).some(
+      ([key, value]) =>
+        !key.startsWith('_') && Array.isArray(value) && value[0] !== null && !names.includes(key),
+    )
+  } catch {
+    return true
+  }
+}
+
+/**
  * What a folder's snapshot holds: whether there is a weights file, whether anything in it is
- * unfinished, and whether an index vouches for it: a shard index is there, and no part of the model
- * (a folder with a `config.json` or shards) is still without its index or single weights file.
+ * unfinished, and whether an index vouches for it: a shard index is there, no part of the model
+ * (a folder with a `config.json` or shards) is still without its index or single weights file, and
+ * every part a `model_index.json` lists, where the model has one, has its folder.
  */
 function inspectSnapshots(dir: string): { weights: boolean; broken: boolean; vouched: boolean } {
   const found = { weights: false, broken: false, vouched: false }
@@ -119,6 +137,7 @@ function inspectSnapshots(dir: string): { weights: boolean; broken: boolean; vou
       !single
     )
       waiting = true
+    if (names.includes('model_index.json') && lacksListedPart(folder, names)) waiting = true
     for (const name of names) {
       const path = join(folder, name)
       // A link to a blob that is not there (a download stopped) cannot be followed.
