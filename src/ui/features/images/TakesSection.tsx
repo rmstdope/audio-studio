@@ -143,7 +143,16 @@ function SetAsideLists({ ask, question }: { ask: SetAsideAsk; question: SetAside
  * what the model made and what the game gets. Which take is on the right, and what the box says,
  * are this page's, never saved; after a reload it is the newest, and what the game gets.
  */
-export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNode }) {
+export function TakesSection({
+  row,
+  prompt,
+  saveWords,
+}: {
+  row: ImageRow
+  prompt?: ReactNode
+  /** Sees the prompt's words saved: whether they were, or null with nothing to save. */
+  saveWords?: () => Promise<boolean> | null
+}) {
   const id = row.id
   const query = useImageTakes(id)
   const make = useMakeImageTakes(id)
@@ -169,6 +178,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   })
   const [saved, setSaved] = useState(0)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
+  const [waitingForWords, setWaitingForWords] = useState(false)
   const [showing, setShowing] = useState<Showing>('game')
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(0)
@@ -282,7 +292,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   const rightTake = takes.find((t) => t.n === onRight)
   const none = takes.length === 0 && making.length === 0
   const busy = making.length > 0
-  const canMake = generator.ok && !busy && !make.isPending
+  const canMake = generator.ok && !busy && !make.isPending && !waitingForWords
   const size = { width: row.width, height: row.height }
   // The two sides sit side by side at the largest whole size at which both fit, else shrunk side by
   // side down to half the game's size, else one above the other (lookZoom).
@@ -421,7 +431,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
         className="takes-model"
         aria-label="Model for new takes"
         value={model}
-        disabled={busy || make.isPending || !generator.ok}
+        disabled={busy || make.isPending || waitingForWords || !generator.ok}
         onChange={(event) => {
           setPicked(event.target.value as ImageModelId)
           setModelOpen(false)
@@ -444,7 +454,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
         className="takes-count"
         aria-label="Number of new takes"
         value={count}
-        disabled={busy || make.isPending || !generator.ok}
+        disabled={busy || make.isPending || waitingForWords || !generator.ok}
         onChange={(event) => setCount(Number(event.target.value))}
       >
         {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
@@ -462,7 +472,14 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
           // goes to the take on the right in the grid, so ← and → keep stepping it.
           focusQuietly.current = true
           setPendingFocus(onRight ?? 'right')
-          make.mutate({ count, model })
+          const saving = saveWords?.() ?? null
+          if (saving === null) return make.mutate({ count, model })
+          // The takes are made from the saved words, so they must be the words in the field.
+          setWaitingForWords(true)
+          void saving.then((saved) => {
+            setWaitingForWords(false)
+            if (saved) make.mutate({ count, model })
+          })
         }}
       >
         {makeTakesText(count, !none)}
