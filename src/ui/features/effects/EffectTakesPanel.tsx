@@ -38,6 +38,7 @@ import { useClipPlayer } from '../../components/useClipPlayer'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { compareClips, takePlayId } from '../../effectsPlay'
+import type { SaveWordsNow } from '../images/WordsField'
 import { EffectFadesEditor } from './EffectFadesEditor'
 import { EffectTrimmedTag, useEffectTrimControl } from './effectTrim'
 import { EffectInTheGame, HearTheSeam, KindChip, Playback, type Player } from './EffectInTheGame'
@@ -54,7 +55,7 @@ export function EffectTakesPanel({
 }: {
   row: EffectRow
   /** Sees the description's words saved: whether they were, or null with nothing to save. */
-  saveWords?: () => Promise<boolean> | null
+  saveWords?: SaveWordsNow
 }) {
   const id = row.id
   const takes = useEffectTakes(id)

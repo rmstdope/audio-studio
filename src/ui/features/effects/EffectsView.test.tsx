@@ -642,6 +642,18 @@ describe("an effect's page", () => {
       expect(button('Make 4 takes').disabled).toBe(false)
     })
 
+    it('saves the words again on another press after a failed save, then asks for the takes', async () => {
+      let answers = 0
+      const { button, asked, takesAsked, finish, settle } = await typedAndPressed(() =>
+        answers++ === 0 ? new Response('', { status: 500 }) : Response.json({ ok: true }),
+      )
+      await finish()
+      expect(takesAsked()).toEqual([])
+      await act(async () => button('Make 4 takes').click())
+      await settle()
+      expect(asked()).toEqual(['PATCH', 'PATCH', 'POST'])
+    })
+
     it('waits the same way for Try again on a failed take', async () => {
       const { asked, takesAsked, finish } = await typedAndPressed(
         () => Response.json({ ok: true }),
