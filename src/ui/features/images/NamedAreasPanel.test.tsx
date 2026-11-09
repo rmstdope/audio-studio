@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { AreaBox, AreaRow, ImageRow } from '../../../core/images'
 import type { ImagePatchesView } from '../../../core/imagePatches'
+import { valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register({ url: 'http://localhost/' })
@@ -689,6 +690,15 @@ describe('the named areas panel', () => {
         patches: [{ id: 'p1', title: 'Bread taken', takes: [{ n: 7, chosen: true }] }],
       })
       expect(host.querySelector('input[type=checkbox]')).toBeNull()
+    })
+
+    it('keeps the switches in the sticky picture, or it slides over them on scrolling (as-7dz)', async () => {
+      const { host } = await render([area('a')], { patches })
+      const picture = host.querySelector<HTMLElement>('.named-areas-picture')!
+      const switches = host.querySelector('.named-area-switches')!
+      expect(valuesInEveryWindow(picture, 'position')).toContain('.named-areas-picture: sticky')
+      expect(switches.parentElement).toBe(picture)
+      expect(picture.lastElementChild).toBe(switches)
     })
 
     it('has a switch per patch, all off, that lays the patch over the picture', async () => {

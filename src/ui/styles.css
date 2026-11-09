@@ -5079,9 +5079,7 @@ button.cue-chip[aria-expanded='true'] {
 .named-areas-body {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  grid-template-areas:
-    'picture list'
-    'switches list';
+  grid-template-areas: 'picture list';
   gap: 8px 24px;
   align-items: start;
 }
@@ -5091,14 +5089,11 @@ button.cue-chip[aria-expanded='true'] {
 .named-area-list {
   grid-area: list;
 }
-.named-area-switches {
-  grid-area: switches;
-}
 .named-areas-body.has-place-again {
   grid-template-areas:
     'picture again'
-    'picture list'
-    'switches list';
+    'picture list';
+  grid-template-rows: auto 1fr;
 }
 .place-again-line {
   grid-area: again;
@@ -5298,15 +5293,14 @@ button.cue-chip[aria-expanded='true'] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'picture'
-      'switches'
       'list';
   }
   .named-areas-body.has-place-again {
     grid-template-areas:
       'picture'
-      'switches'
       'again'
       'list';
+    grid-template-rows: none;
   }
 }
 /* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */
