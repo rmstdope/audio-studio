@@ -33,7 +33,7 @@ import {
   useUnchooseImageTake,
 } from '../../api'
 import { Confirm } from '../../components/Confirm'
-import { openTracking } from '../../components/openTracking'
+import { MenuFace } from '../../components/MenuFace'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import {
   lookZoom,
@@ -170,7 +170,6 @@ export function TakesSection({
   const [wasChosen, setWasChosen] = useState<number | null>(null)
   const [count, setCount] = useState(2)
   const [picked, setPicked] = useState<ImageModelId | null>(null)
-  const [modelOpen, setModelOpen] = useState(false)
   // The question open: choosing, un-choosing or dropping a take with chosen patches asks first.
   const [asking, setAsking] = useState<SetAsideAsk | null>(null)
   const open = asking !== null
@@ -441,29 +440,21 @@ export function TakesSection({
 
   const controls = (
     <>
-      <select
-        className="takes-model"
-        aria-label="Model for new takes"
-        value={model}
-        disabled={busy || make.isPending || waitingForWords || !generator.ok}
-        onChange={(event) => {
-          setPicked(event.target.value as ImageModelId)
-          setModelOpen(false)
-        }}
-        {...openTracking(setModelOpen)}
-      >
-        {IMAGE_MODEL_IDS.map((id) => (
-          // The closed menu shows the label; the open list shows each entry in full.
-          <option
-            key={id}
-            value={id}
-            label={id === model && !modelOpen ? imageShortEntry(id, figures) : undefined}
-            disabled={!installed[id]}
-          >
-            {imageMenuEntry(id, states[id], figures)}
-          </option>
-        ))}
-      </select>
+      <MenuFace text={imageShortEntry(model, figures)}>
+        <select
+          className="takes-model"
+          aria-label="Model for new takes"
+          value={model}
+          disabled={busy || make.isPending || waitingForWords || !generator.ok}
+          onChange={(event) => setPicked(event.target.value as ImageModelId)}
+        >
+          {IMAGE_MODEL_IDS.map((id) => (
+            <option key={id} value={id} disabled={!installed[id]}>
+              {imageMenuEntry(id, states[id], figures)}
+            </option>
+          ))}
+        </select>
+      </MenuFace>
       <select
         className="takes-count"
         aria-label="Number of new takes"

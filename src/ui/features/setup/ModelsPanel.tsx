@@ -1,3 +1,4 @@
+import { MenuFace } from '../../components/MenuFace'
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import {
   busyWords,
@@ -274,6 +275,7 @@ function ImagesRow({ file, images }: { file: string; images: NonNullable<View['i
     <LocalModelRow
       file={file}
       label="Images"
+      wrap
       blurb="The game's images, made on this computer. An image's takes can use the other model."
       menuLabel="Image model"
       ids={IMAGE_MODEL_IDS}
@@ -321,6 +323,7 @@ function EffectsRow({ file, effects }: { file: string; effects: NonNullable<View
 function LocalModelRow<Id extends string>({
   file,
   label,
+  wrap,
   blurb,
   menuLabel,
   ids,
@@ -334,6 +337,8 @@ function LocalModelRow<Id extends string>({
 }: {
   file: string
   label: string
+  /** The closed menu wraps onto as many lines as it needs (the Images row). */
+  wrap?: boolean
   blurb: string
   menuLabel: string
   ids: readonly Id[]
@@ -376,27 +381,30 @@ function LocalModelRow<Id extends string>({
   }, [state])
 
   const shown = (state.phase === 'saving' ? state.to : current) as Id
+  const select = (
+    <select
+      ref={menu}
+      aria-label={menuLabel}
+      value={shown}
+      disabled={pending}
+      onChange={(event) =>
+        dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
+      }
+    >
+      {ids.map((id) => (
+        <option key={id} value={id} disabled={states[id].download !== 'whole'}>
+          {entry(id, states[id])}
+        </option>
+      ))}
+    </select>
+  )
   return (
     <div className="mrow">
       <div className="mname">{label}</div>
       <div className="mtx">
         <span className="muted">{blurb}</span>
         <div className="mmenu">
-          <select
-            ref={menu}
-            aria-label={menuLabel}
-            value={shown}
-            disabled={pending}
-            onChange={(event) =>
-              dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
-            }
-          >
-            {ids.map((id) => (
-              <option key={id} value={id} disabled={states[id].download !== 'whole'}>
-                {entry(id, states[id])}
-              </option>
-            ))}
-          </select>
+          {wrap ? <MenuFace text={entry(shown, states[shown])}>{select}</MenuFace> : select}
           <span className="free">Free</span>
           {warning(states[shown]) && <span className="warnline">{warning(states[shown])}</span>}
           {pending && <span className="muted">Saving…</span>}

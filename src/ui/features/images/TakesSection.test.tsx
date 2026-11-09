@@ -902,6 +902,9 @@ describe('the Takes section’s model menu', () => {
   ) => ({ id, installed: download === 'whole', download, failed })
   const modelMenu = (s: { container: HTMLElement }) =>
     s.container.querySelector<HTMLSelectElement>('select[aria-label="Model for new takes"]')!
+  /** The text of the closed menu's face, which wraps in a narrow window. */
+  const faceOf = (s: { container: HTMLElement }) =>
+    modelMenu(s).closest('.menu-face')!.firstChild!.textContent
   const pick = (s: { container: HTMLElement }, value: string) =>
     act(async () => {
       modelMenu(s).value = value
@@ -919,10 +922,9 @@ describe('the Takes section’s model menu', () => {
       'FLUX.2 klein 4B — a guess: about 20 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
     ])
-    // Closed, it shows the short name and the time.
-    expect(modelMenu(s).options[0]!.getAttribute('label')).toBe(
-      'FLUX.2 klein — a guess: about 20 s a take',
-    )
+    // Closed, a face that can wrap shows the short name and the time; the list keeps full entries.
+    expect(faceOf(s)).toBe('FLUX.2 klein — a guess: about 20 s a take')
+    expect(modelMenu(s).options[0]!.hasAttribute('label')).toBe(false)
   })
 
   it('reads each model for itself: timed here loses the word guess, the other keeps it', async () => {
@@ -940,7 +942,7 @@ describe('the Takes section’s model menu', () => {
       'FLUX.2 klein 4B — about 25 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
     ])
-    expect(modelMenu(s).options[0]!.getAttribute('label')).toBe('FLUX.2 klein — about 25 s a take')
+    expect(faceOf(s)).toBe('FLUX.2 klein — about 25 s a take')
   })
 
   it('starts on Setup’s model when that is the other one', async () => {

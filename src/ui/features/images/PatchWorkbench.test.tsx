@@ -1209,11 +1209,11 @@ describe('the model of new takes', () => {
       'FLUX.2 klein 4B — a guess: about 20 s a take',
     ])
     expect(menu.value).toBe('qwen-edit')
-    // Closed, the menu shows the chosen entry's short form.
-    expect(menu.options[0]!.getAttribute('label')).toBe(
+    // Closed, a face that can wrap shows the chosen entry's short form.
+    expect(menu.closest('.menu-face')!.firstChild!.textContent).toBe(
       'Qwen Image Edit — a guess: about 8 min a take',
     )
-    expect(menu.options[1]!.getAttribute('label')).toBeNull()
+    expect(menu.options[0]!.hasAttribute('label')).toBe(false)
     const count = host.querySelector(COUNT)!
     expect(menu.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // On a line of its own: not inside the row of the count, Make and Stop.
