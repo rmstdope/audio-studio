@@ -5302,6 +5302,10 @@ button.cue-chip[aria-expanded='true'] {
       'list';
     grid-template-rows: none;
   }
+  /* Stacked, the list is below the picture: held in view, it would be drawn over the list. */
+  .named-areas-picture {
+    position: static;
+  }
 }
 /* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */
 .chip-attention {
