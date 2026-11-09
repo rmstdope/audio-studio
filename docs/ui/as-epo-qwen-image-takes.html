@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Qwen-Image for an image’s takes</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --softbg: #2a1b12;
+        --softink: #ff9a6b;
+        --ok: #3ddc97;
+        --okbg: #10291f;
+        --warn: #ffc24b;
+        --warnbg: #2d2412;
+        --danger: #ff94a8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      h1 {
+        font-size: 21px;
+        margin: 0;
+      }
+      .lede {
+        color: var(--muted);
+        margin: 0 0 8px;
+      }
+      .state {
+        margin: 18px 0 0;
+        color: var(--soft);
+      }
+      .state b {
+        color: var(--text);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      .head b {
+        font-size: 15px;
+      }
+      .tag {
+        font-size: 12px;
+        border-radius: 999px;
+        padding: 1px 9px;
+        white-space: nowrap;
+      }
+      .ready {
+        background: var(--okbg);
+        color: var(--ok);
+      }
+      .off {
+        background: var(--raised);
+        color: var(--muted);
+      }
+      .warn {
+        background: var(--warnbg);
+        color: var(--warn);
+      }
+      .detail {
+        color: var(--soft);
+      }
+      .opt {
+        color: var(--muted);
+      }
+      ol {
+        margin: 2px 0 0;
+        padding-left: 20px;
+        color: var(--soft);
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      code {
+        display: block;
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 5px 8px;
+        font:
+          12px ui-monospace,
+          Menlo,
+          monospace;
+        margin-top: 3px;
+        overflow-wrap: anywhere;
+      }
+      .then {
+        color: var(--muted);
+      }
+      a {
+        color: var(--softink);
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .grow {
+        flex: 1;
+        min-width: 220px;
+      }
+      .faint {
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .sel {
+        background: var(--raised);
+        border: 1px solid var(--strong);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 13px;
+        display: inline-flex;
+        gap: 12px;
+        justify-content: space-between;
+      }
+      .menu {
+        background: var(--inset);
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 13px;
+        max-width: 520px;
+      }
+      .menu div {
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .menu div:last-child {
+        border: 0;
+      }
+      .menu .cur {
+        background: var(--softbg);
+      }
+      .menu .dis {
+        color: var(--faint);
+      }
+      .btn {
+        background: linear-gradient(135deg, #ff8a3c, #ff6b2c);
+        color: #1a0a02;
+        border: 0;
+        border-radius: 8px;
+        padding: 6px 14px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .sides {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .pic {
+        aspect-ratio: 16/9;
+        border-radius: 6px;
+        background: linear-gradient(#49607a, #7b5733);
+      }
+      .pic.b {
+        background: linear-gradient(#35506a, #a8743f);
+      }
+      .lab {
+        font-size: 13px;
+        margin-top: 4px;
+      }
+      .chip {
+        font-size: 11px;
+        border-radius: 999px;
+        padding: 0 7px;
+        background: #12352a;
+        color: var(--ok);
+      }
+      .note {
+        border-left: 3px solid var(--accent);
+        padding: 3px 12px;
+        color: var(--soft);
+      }
+      @media (max-width: 560px) {
+        .sides {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Qwen-Image for an image’s takes</h1>
+      <p class="lede">
+        A third model for an image’s own takes, offered on Setup as an optional extra. The 57 GB and
+        “about 3 min a take” are stand-ins: the real figures come from trying the model on this
+        computer.
+      </p>
+      <p class="state"><b>1.</b> <b>All three downloaded.</b></p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag ready">✓ Ready</span></div>
+        <div class="detail">
+          FLUX.2 klein 4B, Z-Image-Turbo and Qwen-Image are fully downloaded on this computer; a
+          model loads on its first take.
+        </div>
+      </section>
+      <p class="state"><b>2.</b> <b>Qwen-Image not downloaded, the other two here.</b></p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag ready">✓ Ready</span></div>
+        <div class="detail">
+          FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model loads on
+          its first take.
+        </div>
+        <div class="opt">Optional: for an image’s takes. Qwen-Image is not on this computer.</div>
+        <ol>
+          <li>
+            Download it, once (about 57 GB):<code
+              >uvx --from huggingface_hub hf download Qwen/Qwen-Image</code
+            >
+          </li>
+        </ol>
+        <div class="then">Then press Check again.</div>
+      </section>
+      <p class="state"><b>3.</b> <b>Qwen-Image’s download stopped part way.</b></p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag ready">✓ Ready</span></div>
+        <div class="detail">
+          FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model loads on
+          its first take.
+        </div>
+        <div class="opt">Optional: for an image’s takes. Qwen-Image’s download is incomplete.</div>
+        <ol>
+          <li>
+            Finish the download (it picks up where it stopped):<code
+              >uvx --from huggingface_hub hf download Qwen/Qwen-Image</code
+            >
+          </li>
+        </ol>
+        <div class="then">Then press Check again.</div>
+      </section>
+      <p class="state"><b>3b.</b> <b>Both big optional downloads are missing.</b></p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag ready">✓ Ready</span></div>
+        <div class="detail">
+          FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model loads on
+          its first take.
+        </div>
+        <div class="opt">Optional: for an image’s takes. Qwen-Image is not on this computer.</div>
+        <div class="opt">Optional: for patches. Qwen Image Edit is not on this computer.</div>
+        <ol>
+          <li>
+            Download it, once (about 57 GB):<code
+              >uvx --from huggingface_hub hf download Qwen/Qwen-Image</code
+            >
+          </li>
+          <li>
+            Download it, once (about 53 GB):<code
+              >uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit</code
+            >
+          </li>
+        </ol>
+        <div class="then">Then press Check again.</div>
+      </section>
+      <p class="state">
+        <b>4.</b> <b>Qwen-Image is the project’s own model and is not downloaded.</b> This one needs
+        fixing, so it is no longer optional.
+      </p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag warn">⚠ Needs attention</span></div>
+        <div class="detail">
+          The project’s image model, Qwen-Image, is not on this computer. FLUX.2 klein 4B and
+          Z-Image-Turbo are in place: an image’s takes can use them meanwhile.
+        </div>
+        <ol>
+          <li>
+            Download it, once (about 57 GB):<code
+              >uvx --from huggingface_hub hf download Qwen/Qwen-Image</code
+            >
+          </li>
+        </ol>
+        <div class="then">Then press Check again.</div>
+      </section>
+      <p class="state">
+        <b>5.</b>
+        <b>Qwen-Image’s last take failed, and it is not the project’s own model.</b> Something went
+        wrong, so it is worth a look.
+      </p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag off">Not set up</span></div>
+        <div class="detail">
+          Optional: the last take with Qwen-Image failed on The inn at dusk. FLUX.2 klein 4B and
+          Z-Image-Turbo are in place.
+        </div>
+        <code>RuntimeError: [metal::malloc] Attempting to allocate 41234567168 bytes</code
+        ><a href="#">Open The inn at dusk</a>
+        <div class="then">This clears when a take with Qwen-Image works.</div>
+      </section>
+      <p class="state">
+        <b>6.</b> <b>Another model is missing, Qwen-Image is here.</b> Qwen-Image now counts as in
+        place.
+      </p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag off">Not set up</span></div>
+        <div class="detail">
+          Optional: Z-Image-Turbo is not on this computer. FLUX.2 klein 4B and Qwen-Image are in
+          place.
+        </div>
+        <ol>
+          <li>
+            Download it, once (about 31 GB):<code
+              >uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo</code
+            >
+          </li>
+        </ol>
+        <div class="then">Then press Check again.</div>
+      </section>
+      <p class="state">
+        <b>7.</b> <b>The two usual models are missing, Qwen-Image is here.</b> Images can still be
+        made, so this does not say they can’t.
+      </p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag warn">⚠ Needs attention</span></div>
+        <div class="detail">
+          The project’s image model, FLUX.2 klein 4B, is not on this computer. Z-Image-Turbo is not
+          on this computer. Qwen-Image is in place: an image’s takes can use it meanwhile.
+        </div>
+        <ol>
+          <li>
+            Download the models, once (about 15 GB and 31 GB):<code
+              >uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B</code
+            ><code>uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo</code>
+          </li>
+        </ol>
+        <div class="then">Then press Check again.</div>
+      </section>
+      <p class="state">
+        <b>8.</b> <b>No model can run.</b> Changed since the last drawing: the steps ask only for
+        the two usual models, and Qwen-Image stays an optional line. Someone setting up a new
+        computer isn’t told they need the biggest download.
+      </p>
+      <section class="panel">
+        <div class="head"><b>Image models</b><span class="tag warn">⚠ Needs attention</span></div>
+        <div class="detail">Images can’t be made: no image model is on this computer.</div>
+        <ol>
+          <li>
+            Download the models, once (about 15 GB and 31 GB):<code
+              >uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B</code
+            ><code>uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo</code>
+          </li>
+          <li>
+            Optional: for an image’s takes. Qwen-Image is not on this computer. Download it, once
+            (about 57 GB):<code>uvx --from huggingface_hub hf download Qwen/Qwen-Image</code>
+          </li>
+        </ol>
+        <div class="then">Then press Check again.</div>
+      </section>
+      <p class="state"><b>9.</b> <b>An image’s page when no model can run.</b></p>
+      <section class="panel">
+        <b>Images can’t be made yet.</b>
+        <div class="detail">
+          No image model can run on this computer. Setup says what is missing.
+        </div>
+        <div><button class="btn">Open Setup</button></div>
+      </section>
+      <p class="state">
+        <b>10.</b>
+        <b>An image’s page when the project’s model is missing and two others are here.</b> It
+        starts on the faster one; Qwen-Image stays in the menu.
+      </p>
+      <section class="panel">
+        <div class="row">
+          <b class="grow">Takes</b
+          ><span class="sel"><span>Z-Image-Turbo — about 1 min a take</span><span>▾</span></span
+          ><span class="sel"><span>2 takes</span><span>▾</span></span
+          ><button class="btn">Make</button>
+        </div>
+        <div class="faint">
+          FLUX.2 klein, the project’s image model, isn’t on this computer, so these takes use
+          Z-Image-Turbo. Setup says how to download it.
+        </div>
+      </section>
+      <p class="state">
+        <b>Setup — the Images row, its menu open.</b> Qwen-Image joins the list as the third model
+        and can be saved as the project’s main model.
+      </p>
+      <section class="panel">
+        <div class="row">
+          <div class="grow">
+            <b>Images</b>
+            <div class="faint">
+              The game’s images, made on this computer. An image’s takes can use another model.
+            </div>
+          </div>
+          <span class="faint">Free</span>
+        </div>
+        <div class="menu">
+          <div class="cur">FLUX.2 klein 4B — about 8 s a take</div>
+          <div>Z-Image-Turbo — about 1 min a take</div>
+          <div>Qwen-Image — about 3 min a take</div>
+        </div>
+      </section>
+      <p class="state">
+        <b>An image’s Takes — “Model for new takes” open, with Qwen-Image downloaded.</b> Picked
+        here, it holds while the page is open, as the others do.
+      </p>
+      <section class="panel">
+        <div class="row">
+          <b class="grow">Takes</b
+          ><span class="sel"><span>Qwen-Image — about 3 min a take</span><span>▾</span></span
+          ><span class="sel"><span>2 takes</span><span>▾</span></span
+          ><button class="btn">Make</button>
+        </div>
+        <div class="menu">
+          <div>FLUX.2 klein 4B — about 8 s a take</div>
+          <div>Z-Image-Turbo — about 1 min a take</div>
+          <div class="cur">Qwen-Image — about 3 min a take</div>
+        </div>
+      </section>
+      <p class="state">
+        <b>The same menu, Qwen-Image not downloaded.</b> Listed, marked, and can’t be picked, as any
+        missing model is today.
+      </p>
+      <section class="panel">
+        <div class="menu">
+          <div class="cur">FLUX.2 klein 4B — about 8 s a take</div>
+          <div>Z-Image-Turbo — about 1 min a take</div>
+          <div class="dis">Qwen-Image — about 3 min a take — not on this computer</div>
+        </div>
+      </section>
+      <p class="state">
+        <b>A take made with it.</b> Named after the take in faint text, as takes by the other two
+        are.
+      </p>
+      <section class="panel">
+        <div class="sides">
+          <div>
+            <div class="pic"></div>
+            <div class="lab">
+              Take 4 <span class="chip">chosen</span> <span class="faint">· FLUX.2 klein</span>
+            </div>
+          </div>
+          <div>
+            <div class="pic b"></div>
+            <div class="lab">Take 5 <span class="faint">· Qwen-Image</span></div>
+          </div>
+        </div>
+      </section>
+      <p class="state">
+        <b>.</b> <b>Make all, with Qwen-Image as the project’s main model, 12 images.</b> Past an
+        hour the time reads in hours and minutes; under an hour it stays as it is.
+      </p>
+      <section class="panel">
+        <b>Images up to date</b>
+        <div class="detail">
+          Four takes each, on Qwen-Image, the image model on Setup. About 2 h 24 min in all — they
+          are made one after another, and you can leave the page.
+        </div>
+        <div class="row"><button class="btn">Make 4 takes each</button></div>
+      </section>
+      <section class="panel">
+        <div class="row">
+          <span class="grow">Making 48 takes for 12 images · about 2 h 24 min left</span
+          ><span class="sel">Stop all</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
