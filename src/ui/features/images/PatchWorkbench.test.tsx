@@ -1205,12 +1205,12 @@ describe('the model of new takes', () => {
     await open(host)
     const menu = menuOf(host)
     expect([...menu.options].map((o) => o.textContent)).toEqual([
-      'Qwen Image Edit — about 6 min a take',
+      'Qwen Image Edit — about 8 min a take',
       'FLUX.2 klein 4B — about 20 s a take',
     ])
     expect(menu.value).toBe('qwen-edit')
     // Closed, the menu shows the chosen entry's short form.
-    expect(menu.options[0]!.getAttribute('label')).toBe('Qwen Image Edit — about 6 min a take')
+    expect(menu.options[0]!.getAttribute('label')).toBe('Qwen Image Edit — about 8 min a take')
     expect(menu.options[1]!.getAttribute('label')).toBeNull()
     const count = host.querySelector(COUNT)!
     expect(menu.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -1297,7 +1297,7 @@ describe('the model of new takes', () => {
     await open(host)
     expect(text(menuOf(host).closest('.edit-model'))).toContain('last take failed')
     expect(menuOf(host).options[0]!.textContent).toBe(
-      'Qwen Image Edit — about 6 min a take — last take failed',
+      'Qwen Image Edit — about 8 min a take — last take failed',
     )
     expect(menuOf(host).options[1]!.textContent).toBe('FLUX.2 klein 4B — about 20 s a take')
   })

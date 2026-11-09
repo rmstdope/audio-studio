@@ -7,7 +7,8 @@ import { matchToTake, type ImagePatchesView, type PatchWorkView } from '../core/
 import { createImagePatches } from './imagePatches'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
-import { decodePng } from './png'
+import { cropPixels, editWindow } from '../core/imagePixels'
+import { decodePng, encodePng } from './png'
 import { createSerial, type Serial } from './serial'
 
 const images = {
@@ -117,7 +118,7 @@ function setup({
 }
 
 describe('takes of a declared patch', () => {
-  it("edits the chosen take's whole picture with the patch's words, at its size, with klein", async () => {
+  it("edits the chosen take with the patch's words, at its size when the area fills it, with klein", async () => {
     const { root, file, patches, requests, work } = setup()
     expect(await patches.make(file, 'inn', 'door', { count: 1, area })).toEqual({ ok: true })
     await work()
@@ -128,9 +129,67 @@ describe('takes of a declared patch', () => {
         height: 256,
         seed: 11,
         model: 'klein',
-        editing: join(root, TAKE),
+        editing: join(root, FOLDER, 'editing-1.png'),
       },
     ])
+  })
+
+  it('gives the model only a window around the marked area of a big take, and keeps the take whole', async () => {
+    const { root, file, patches, requests, work } = setup({ picture: false })
+    mkdirSync(dirname(join(root, TAKE)), { recursive: true })
+    writeFileSync(join(root, TAKE), fakePng(1024, 640, 9))
+    const small = { x: 600, y: 300, width: 100, height: 100 }
+    await patches.make(file, 'inn', 'door', { count: 1, area: small })
+    await work()
+    expect(requests).toHaveLength(1)
+    expect([requests[0]!.width, requests[0]!.height]).toEqual([304, 304])
+    expect(requests[0]!.editing).not.toBe(join(root, TAKE))
+    expect(existsSync(requests[0]!.editing!)).toBe(false)
+    const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
+    expect([png.width, png.height]).toEqual([1024, 640])
+    const at = (x: number, y: number) => png.data[(y * 1024 + x) * 4 + 3]
+    expect(at(650, 350)).toBe(255)
+    expect(at(100, 100)).toBe(0)
+  })
+
+  it("hands the model the take's own pixels at the window, and corrects a colour drift of the whole window", async () => {
+    const { root, file, patches, requests, work } = setup({
+      picture: false,
+      makes: (request) => {
+        const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
+        // The model shifts every colour of its window by 30, as a model can.
+        return encodePng({
+          ...sent,
+          data: sent.data.map((v, i) => (i % 4 === 3 ? v : Math.min(255, v + 30))),
+        })
+      },
+    })
+    mkdirSync(dirname(join(root, TAKE)), { recursive: true })
+    writeFileSync(join(root, TAKE), fakePng(1024, 640, 9))
+    const take = decodePng(new Uint8Array(readFileSync(join(root, TAKE))))
+    const small = { x: 600, y: 300, width: 100, height: 100 }
+    let sentPixels: Uint8Array | undefined
+    const original = requests.push.bind(requests)
+    requests.push = (...r) => {
+      sentPixels = new Uint8Array(readFileSync(r[0]!.editing!))
+      return original(...r)
+    }
+    await patches.make(file, 'inn', 'door', { count: 1, area: small })
+    await work()
+    const window = editWindow(small, take)
+    expect(decodePng(sentPixels!).data).toEqual(cropPixels(take, window).data)
+    const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
+    for (const [x, y] of [
+      [602, 350],
+      [650, 302],
+      [697, 350],
+    ] as const) {
+      for (let c = 0; c < 3; c++) {
+        expect(
+          Math.abs(png.data[(y * 1024 + x) * 4 + c]! - take.data[(y * 1024 + x) * 4 + c]!),
+        ).toBeLessThan(8)
+      }
+    }
   })
 
   it('keeps only the marked area of the edit, with its area and the words it was made from', async () => {
@@ -450,7 +509,7 @@ describe('the model of a take of a patch', () => {
     await patches.make(file, 'inn', 'door', { count: 1, area, model: 'qwen-edit' })
     const view = (await patches.view(file, 'inn')) as ImagePatchesView
     expect(view.patches[0]!.making).toEqual([
-      { n: 1, state: 'waiting', elapsed: 0, expected: 360, area, model: 'qwen-edit' },
+      { n: 1, state: 'waiting', elapsed: 0, expected: 480, area, model: 'qwen-edit' },
     ])
     release()
     await work()
@@ -886,7 +945,7 @@ describe('remaking patches with a model', () => {
     const view = (await patches.view(file, 'inn')) as ImagePatchesView
     expect(view.remake.press).toMatchObject({ model: 'qwen-edit', total: 2 })
     // two takes on the model's time, not klein's
-    expect(view.remake.press!.left).toBe(720)
+    expect(view.remake.press!.left).toBe(960)
     release()
     await settled('door')
     await settled('sign')

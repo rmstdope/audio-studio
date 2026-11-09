@@ -53,6 +53,58 @@ export function cropWindow(
   }
 }
 
+/** A rectangle of a picture, in pixels. */
+export interface Window {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** The context an edit is given around the marked area: at least this many pixels, or half the area's side. */
+const EDIT_CONTEXT = 96
+
+/**
+ * The part of a picture an edit model is given for a marked area: the area with context around it,
+ * inside the picture, its sides in multiples of 16 (what the model takes) except where it is the
+ * picture's own whole side. A smaller picture for the model is faster and shows what is marked larger.
+ */
+export function editWindow(area: Window, size: LookSize): Window {
+  const side = (start: number, length: number, whole: number) => {
+    const pad = Math.max(EDIT_CONTEXT, Math.ceil(length / 2))
+    const from = Math.max(0, start - pad)
+    const to = Math.min(whole, start + length + pad)
+    const wanted = Math.ceil((to - from) / 16) * 16
+    if (wanted >= whole) return { at: 0, length: whole }
+    // Grow towards whichever edge has room, so the area stays inside.
+    const at = Math.max(0, Math.min(from, whole - wanted))
+    return { at, length: wanted }
+  }
+  const h = side(area.x, area.width, size.width)
+  const v = side(area.y, area.height, size.height)
+  return { x: h.at, y: v.at, width: h.length, height: v.length }
+}
+
+/** The pixels of `window`, as a picture of its own. */
+export function cropPixels(src: Pixels, window: Window): Pixels {
+  const data = new Uint8Array(window.width * window.height * 4)
+  for (let y = 0; y < window.height; y++) {
+    const from = ((window.y + y) * src.width + window.x) * 4
+    data.set(src.data.subarray(from, from + window.width * 4), y * window.width * 4)
+  }
+  return { width: window.width, height: window.height, data }
+}
+
+/** A copy of `base` with `part` laid in at `window`. */
+export function pastePixels(base: Pixels, part: Pixels, window: Window): Pixels {
+  const data = base.data.slice()
+  for (let y = 0; y < window.height; y++) {
+    const to = ((window.y + y) * base.width + window.x) * 4
+    data.set(part.data.subarray(y * part.width * 4, (y + 1) * part.width * 4), to)
+  }
+  return { width: base.width, height: base.height, data }
+}
+
 /**
  * The picture cropped to the target's shape (the middle kept) and scaled to exactly `size`: each
  * new pixel is the average of the source area it covers, so the result never depends on the machine.
