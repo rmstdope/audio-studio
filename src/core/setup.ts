@@ -466,15 +466,26 @@ function stableAudio(facts: SetupFacts): SetupCheck {
   return { id: 'stableAudio', title, state: 'off', label: 'Not set up', detail, steps }
 }
 
+/** Words joined as a sentence lists them: "a", "a and b", "a, b and c". */
+function listed(words: string[]): string {
+  return words.length < 2
+    ? (words[0] ?? '')
+    : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
+}
+
+/** The command that downloads an image model's weights. */
+function downloadCommand(id: ImageModelId): string {
+  return `uvx --from huggingface_hub hf download ${imageModel(id).repo}`
+}
+
 /** The step that downloads some image models, once, from Hugging Face. */
 function downloadStep(ids: ImageModelId[]): SetupStep {
-  const sizes = ids.map((id) => `${imageModel(id).gigabytes} GB`)
-  const about = `about ${sizes.join(' and ')}`
+  const about = `about ${listed(ids.map((id) => `${imageModel(id).gigabytes} GB`))}`
   return {
     parts: [
       ids.length > 1 ? `Download the models, once (${about}):` : `Download it, once (${about}):`,
     ],
-    commands: ids.map((id) => `uvx --from huggingface_hub hf download ${imageModel(id).repo}`),
+    commands: ids.map(downloadCommand),
   }
 }
 
@@ -482,33 +493,75 @@ function downloadStep(ids: ImageModelId[]): SetupStep {
 function finishStep(id: ImageModelId): SetupStep {
   return {
     parts: ['Finish the download (it picks up where it stopped):'],
-    commands: [`uvx --from huggingface_hub hf download ${imageModel(id).repo}`],
+    commands: [downloadCommand(id)],
   }
 }
 
-/** The image models check, with the optional patch model's line and download step after the rest. */
+/** The model that is an optional extra for an image's takes unless it is the project's own. */
+const EXTRA_IMAGE_MODEL: ImageModelId = 'qwen-image'
+
+/**
+ * The image models check, with the optional extras' lines and download steps after the rest:
+ * Qwen-Image for an image's takes (while it is not the project's model and not whole), then the
+ * patch model for patches.
+ */
 function imageModels(facts: SetupFacts): SetupCheck {
   const check = mainImageModels(facts)
-  if (!facts.images?.mflux.ok || facts.images.patchModel === 'whole') return check
-  const { name, repo, gigabytes } = EDIT_MODELS['qwen-edit']
-  const partial = facts.images.patchModel === 'partial'
-  const command = `uvx --from huggingface_hub hf download ${repo}`
-  const step: SetupStep = partial
-    ? { parts: ['Finish the download (it picks up where it stopped):'], commands: [command] }
-    : { parts: [`Download it, once (about ${gigabytes} GB):`], commands: [command] }
-  return {
-    ...check,
-    notes: [
-      ...(check.notes ?? []),
+  if (!facts.images?.mflux.ok) return check
+  const notes: string[] = []
+  const steps: SetupStep[] = []
+  const extra = extraDownload(facts.images)
+  if (extra && extra !== 'none-run') {
+    const { name } = imageModel(EXTRA_IMAGE_MODEL)
+    notes.push(
+      extra === 'partial'
+        ? `Optional: for an image's takes. ${name}'s download is incomplete.`
+        : `Optional: for an image's takes. ${name} is not on this computer.`,
+    )
+    steps.push(
+      extra === 'partial' ? finishStep(EXTRA_IMAGE_MODEL) : downloadStep([EXTRA_IMAGE_MODEL]),
+    )
+  }
+  if (facts.images.patchModel !== 'whole') {
+    const { name, repo, gigabytes } = EDIT_MODELS['qwen-edit']
+    const partial = facts.images.patchModel === 'partial'
+    const command = `uvx --from huggingface_hub hf download ${repo}`
+    notes.push(
       partial
         ? `Optional: for patches. ${name}'s download is incomplete.`
         : `Optional: for patches. ${name} is not on this computer.`,
-    ],
+    )
+    steps.push(
+      partial
+        ? { parts: ['Finish the download (it picks up where it stopped):'], commands: [command] }
+        : { parts: [`Download it, once (about ${gigabytes} GB):`], commands: [command] },
+    )
+  }
+  if (!notes.length && !extra) return check
+  return {
+    ...check,
+    ...(notes.length ? { notes: [...(check.notes ?? []), ...notes] } : {}),
     steps: {
-      list: [...(check.steps?.list ?? []), step],
+      list: [...(check.steps?.list ?? []), ...steps],
       note: check.steps?.note ?? 'Then press Check again.',
     },
   }
+}
+
+/**
+ * What the optional extra, Qwen-Image, needs: `absent` or `partial` while it is not the project's
+ * model and not whole; `none-run` when it is in that state but no model at all can run (its step
+ * then carries the Optional sentence itself, after the usual models'); null otherwise.
+ */
+function extraDownload(
+  images: NonNullable<SetupFacts['images']>,
+): ImageDownload | 'none-run' | null {
+  if (images.model === EXTRA_IMAGE_MODEL) return null
+  const { download } = images.models[EXTRA_IMAGE_MODEL]
+  if (download === 'whole') return null
+  return IMAGE_MODEL_IDS.some((id) => images.models[id].download === 'whole')
+    ? download
+    : 'none-run'
 }
 
 function mainImageModels(facts: SetupFacts): SetupCheck {
@@ -525,9 +578,11 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
   const { mflux, model, models } = facts.images
   const name = (id: ImageModelId) => imageModel(id).name
   const noteSteps = (list: SetupStep[]) => ({ list, note: 'Then press Check again.' })
+  /** Qwen-Image is an optional extra, kept out of the usual logic, until it is the project's model. */
+  const extra = (id: ImageModelId) => id === EXTRA_IMAGE_MODEL && id !== model
   // A download that is not whole beats a failed take: it is the thing to fix.
-  const absent = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'absent')
-  const partial = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'partial')
+  const absent = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'absent' && !extra(id))
+  const partial = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'partial' && !extra(id))
   const failed = IMAGE_MODEL_IDS.filter(
     (id) => models[id].download === 'whole' && models[id].failure,
   )
@@ -553,35 +608,49 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
         : { fix: mflux.fix }),
     }
   }
-  const broken = absent.length + partial.length
-  if (!broken && !failed.length) {
-    return {
-      id: 'imageModels',
-      title,
-      state: 'ok',
-      detail: `${name('klein')} and ${name('z-image-turbo')} are fully downloaded on this computer; a model loads on its first take.`,
-    }
-  }
-  const cannot = (id: ImageModelId) =>
-    models[id].download === 'absent'
-      ? `${name(id)} is not on this computer`
-      : `${name(id)}'s download is incomplete`
-  if (broken === IMAGE_MODEL_IDS.length) {
+  const whole = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'whole')
+  if (!whole.length) {
+    const cannot = (id: ImageModelId) =>
+      models[id].download === 'absent'
+        ? `${name(id)} is not on this computer`
+        : `${name(id)}'s download is incomplete`
+    const extraStep = extraDownload(facts.images)
+    const optional = extraStep
+      ? [
+          {
+            parts: [
+              `Optional: for an image's takes. ${
+                models[EXTRA_IMAGE_MODEL].download === 'partial'
+                  ? `${name(EXTRA_IMAGE_MODEL)}'s download is incomplete. ${finishStep(EXTRA_IMAGE_MODEL).parts[0]}`
+                  : `${name(EXTRA_IMAGE_MODEL)} is not on this computer. ${downloadStep([EXTRA_IMAGE_MODEL]).parts[0]}`
+              }`,
+            ],
+            commands: [downloadCommand(EXTRA_IMAGE_MODEL)],
+          },
+        ]
+      : []
     return {
       id: 'imageModels',
       title,
       state: 'problem',
-      detail:
-        absent.length === IMAGE_MODEL_IDS.length
-          ? "Images can't be made: neither image model is on this computer."
-          : `Images can't be made: ${IMAGE_MODEL_IDS.map(cannot).join(' and ')}.`,
-      steps: noteSteps(downloadSteps),
+      detail: IMAGE_MODEL_IDS.every((id) => models[id].download === 'absent')
+        ? "Images can't be made: no image model is on this computer."
+        : `Images can't be made: ${listed(IMAGE_MODEL_IDS.map(cannot))}.`,
+      steps: noteSteps([...downloadSteps, ...optional]),
     }
   }
-  // One model or both are affected, and at least one can still run.
   const affected = IMAGE_MODEL_IDS.filter(
-    (id) => models[id].download !== 'whole' || models[id].failure,
+    (id) => (!extra(id) && models[id].download !== 'whole') || models[id].failure,
   )
+  if (!affected.length) {
+    const together = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'whole')
+    return {
+      id: 'imageModels',
+      title,
+      state: 'ok',
+      detail: `${listed(together.map(name))} ${together.length > 1 ? 'are' : 'is'} fully downloaded on this computer; a model loads on its first take.`,
+    }
+  }
   const single = affected.length === 1
   const mainAffected = affected.includes(model)
   const link = (failure: NonNullable<typeof models.klein.failure>) =>
@@ -591,13 +660,17 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
           href: `#/images/items/${encodeURIComponent(failure.image.id)}`,
         }
       : undefined
-  /** The model that is in place, to close a sentence about the only affected one. */
-  const tail = (id: ImageModelId) => {
-    const other = IMAGE_MODEL_IDS.find((o) => o !== id)!
-    return id === model
-      ? ` ${name(other)} is in place: an image's takes can use it meanwhile.`
-      : ` ${name(other)} is in place.`
-  }
+  /** The models that are in place, to close what is said about the affected ones. */
+  const inPlace = IMAGE_MODEL_IDS.filter(
+    (id) => models[id].download === 'whole' && !models[id].failure,
+  )
+  const tail = inPlace.length
+    ? ` ${listed(inPlace.map(name))} ${inPlace.length > 1 ? 'are' : 'is'} in place${
+        mainAffected
+          ? `: an image's takes can use ${inPlace.length > 1 ? 'them' : 'it'} meanwhile.`
+          : '.'
+      }`
+    : ''
   /** What is wrong with a model's download, in a sentence. */
   const downloadSentence = (id: ImageModelId) => {
     const main = id === model
@@ -610,24 +683,27 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
       ? `The project's image model, ${name(id)}, is only partly downloaded, so it can't run.`
       : `${optional}${name(id)}'s download is incomplete, so it can't run.`
   }
-  const detail = affected
+  const downloadSentences = affected
     .filter((id) => models[id].download !== 'whole')
-    .map((id) => downloadSentence(id) + (single ? tail(id) : ''))
-    .join(' ')
-  const failures = failed.map((id) => {
-    const failure = models[id].failure!
-    const on = failure.image ? ` on ${failure.image.title}` : ''
-    const head =
-      id === model
-        ? `The last take with ${name(id)}, the project's image model, failed${on}.`
-        : `${single ? 'Optional: the' : 'The'} last take with ${name(id)} failed${on}.`
-    return {
-      sentence: head + (single ? tail(id) : ''),
-      error: failure.error,
-      ...(link(failure) ? { link: link(failure) } : {}),
-      clears: `This clears when a take with ${name(id)} works.`,
-    }
-  })
+    .map(downloadSentence)
+  // The models in place close what is said once: after the downloads, else after a single failure.
+  const detail = downloadSentences.join(' ') + (downloadSentences.length ? tail : '')
+  const failures = failed
+    .filter((id) => !extra(id) || models[id].failure)
+    .map((id) => {
+      const failure = models[id].failure!
+      const on = failure.image ? ` on ${failure.image.title}` : ''
+      const head =
+        id === model
+          ? `The last take with ${name(id)}, the project's image model, failed${on}.`
+          : `${single ? 'Optional: the' : 'The'} last take with ${name(id)} failed${on}.`
+      return {
+        sentence: head + (single && !downloadSentences.length ? tail : ''),
+        error: failure.error,
+        ...(link(failure) ? { link: link(failure) } : {}),
+        clears: `This clears when a take with ${name(id)} works.`,
+      }
+    })
   return {
     id: 'imageModels',
     title,

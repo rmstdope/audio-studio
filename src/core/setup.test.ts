@@ -1,3 +1,4 @@
+import { imageModel } from './imageModels'
 import { describe, expect, it } from 'bun:test'
 import { setupChecks, type ElevenAccount, type SetupFacts } from './setup'
 
@@ -56,9 +57,10 @@ function effectFacts(change: {
 /** The image facts of a project whose models are whole and well, with these changes. */
 function imageFacts(change: {
   mflux?: NonNullable<SetupFacts['images']>['mflux']
-  model?: 'klein' | 'z-image-turbo'
+  model?: 'klein' | 'z-image-turbo' | 'qwen-image'
   klein?: Partial<NonNullable<SetupFacts['images']>['models']['klein']>
   'z-image-turbo'?: Partial<NonNullable<SetupFacts['images']>['models']['z-image-turbo']>
+  'qwen-image'?: Partial<NonNullable<SetupFacts['images']>['models']['qwen-image']>
   patchModel?: NonNullable<SetupFacts['images']>['patchModel']
 }): NonNullable<SetupFacts['images']> {
   return {
@@ -68,6 +70,7 @@ function imageFacts(change: {
     models: {
       klein: { download: 'whole', failure: null, ...change.klein },
       'z-image-turbo': { download: 'whole', failure: null, ...change['z-image-turbo'] },
+      'qwen-image': { download: 'whole', failure: null, ...change['qwen-image'] },
     },
   }
 }
@@ -454,11 +457,11 @@ describe('the image models check', () => {
     })
   })
 
-  it('is ready with both models whole and no failed take', () => {
+  it('is ready with all three models whole and no failed take', () => {
     expect(row(imageFacts({}))).toMatchObject({
       state: 'ok',
       detail:
-        'FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model loads on its first take.',
+        'FLUX.2 klein 4B, Z-Image-Turbo and Qwen-Image are fully downloaded on this computer; a model loads on its first take.',
     })
   })
 
@@ -503,7 +506,8 @@ describe('the image models check', () => {
     expect(missing).toMatchObject({
       state: 'off',
       label: 'Not set up',
-      detail: 'Optional: Z-Image-Turbo is not on this computer. FLUX.2 klein 4B is in place.',
+      detail:
+        'Optional: Z-Image-Turbo is not on this computer. FLUX.2 klein 4B and Qwen-Image are in place.',
       steps: { note: 'Then press Check again.' },
     })
     expect(missing.steps!.list).toEqual([
@@ -514,7 +518,7 @@ describe('the image models check', () => {
       state: 'off',
       label: 'Not set up',
       detail:
-        "Optional: Z-Image-Turbo's download is incomplete, so it can't run. FLUX.2 klein 4B is in place.",
+        "Optional: Z-Image-Turbo's download is incomplete, so it can't run. FLUX.2 klein 4B and Qwen-Image are in place.",
     })
     expect(partial.steps!.list).toEqual([
       { parts: ['Finish the download (it picks up where it stopped):'], commands: [ZIMAGE] },
@@ -523,7 +527,8 @@ describe('the image models check', () => {
       row(imageFacts({ klein: { download: 'absent' }, model: 'z-image-turbo' })),
     ).toMatchObject({
       state: 'off',
-      detail: 'Optional: FLUX.2 klein 4B is not on this computer. Z-Image-Turbo is in place.',
+      detail:
+        'Optional: FLUX.2 klein 4B is not on this computer. Z-Image-Turbo and Qwen-Image are in place.',
     })
   })
 
@@ -532,7 +537,7 @@ describe('the image models check', () => {
     expect(missing).toMatchObject({
       state: 'problem',
       detail:
-        "The project's image model, FLUX.2 klein 4B, is not on this computer. Z-Image-Turbo is in place: an image's takes can use it meanwhile.",
+        "The project's image model, FLUX.2 klein 4B, is not on this computer. Z-Image-Turbo and Qwen-Image are in place: an image's takes can use them meanwhile.",
     })
     expect(missing.steps!.list[0]).toEqual({
       parts: ['Download it, once (about 15 GB):'],
@@ -542,39 +547,200 @@ describe('the image models check', () => {
     expect(partial).toMatchObject({
       state: 'problem',
       detail:
-        "The project's image model, FLUX.2 klein 4B, is only partly downloaded, so it can't run. Z-Image-Turbo is in place: an image's takes can use it meanwhile.",
+        "The project's image model, FLUX.2 klein 4B, is only partly downloaded, so it can't run. Z-Image-Turbo and Qwen-Image are in place: an image's takes can use them meanwhile.",
     })
     expect(partial.steps!.list).toEqual([
       { parts: ['Finish the download (it picks up where it stopped):'], commands: [KLEIN] },
     ])
   })
 
-  it('says images can’t be made when neither model can run, one step per model', () => {
+  const noQwen = { download: 'absent' } as const
+  const QWEN_IMAGE = 'uvx --from huggingface_hub hf download Qwen/Qwen-Image'
+  const qwenGb = imageModel('qwen-image').gigabytes
+
+  it('says images can’t be made when no model can run, naming each, with a step for the usual models and an Optional one for Qwen-Image', () => {
     const found = row(
-      imageFacts({ klein: { download: 'partial' }, 'z-image-turbo': { download: 'absent' } }),
+      imageFacts({
+        klein: { download: 'partial' },
+        'z-image-turbo': { download: 'absent' },
+        'qwen-image': noQwen,
+      }),
     )
     expect(found).toMatchObject({
       state: 'problem',
       detail:
-        "Images can't be made: FLUX.2 klein 4B's download is incomplete and Z-Image-Turbo is not on this computer.",
+        "Images can't be made: FLUX.2 klein 4B's download is incomplete, Z-Image-Turbo is not on this computer and Qwen-Image is not on this computer.",
     })
     expect(found.steps!.list).toEqual([
       { parts: ['Finish the download (it picks up where it stopped):'], commands: [KLEIN] },
       { parts: ['Download it, once (about 31 GB):'], commands: [ZIMAGE] },
+      {
+        parts: [
+          `Optional: for an image's takes. Qwen-Image is not on this computer. Download it, once (about ${qwenGb} GB):`,
+        ],
+        commands: [QWEN_IMAGE],
+      },
     ])
     expect(
-      row(imageFacts({ klein: { download: 'partial' }, 'z-image-turbo': { download: 'partial' } }))
-        .detail,
+      row(
+        imageFacts({
+          klein: { download: 'partial' },
+          'z-image-turbo': { download: 'partial' },
+          'qwen-image': { download: 'partial' },
+        }),
+      ).detail,
     ).toBe(
-      "Images can't be made: FLUX.2 klein 4B's download is incomplete and Z-Image-Turbo's download is incomplete.",
+      "Images can't be made: FLUX.2 klein 4B's download is incomplete, Z-Image-Turbo's download is incomplete and Qwen-Image's download is incomplete.",
     )
-    expect(
-      row(imageFacts({ klein: { download: 'absent' }, 'z-image-turbo': { download: 'absent' } })),
-    ).toMatchObject({
+    const none = row(
+      imageFacts({
+        klein: { download: 'absent' },
+        'z-image-turbo': { download: 'absent' },
+        'qwen-image': noQwen,
+      }),
+    )
+    expect(none).toMatchObject({
       state: 'problem',
-      detail: "Images can't be made: neither image model is on this computer.",
-      steps: { list: [{ parts: ['Download the models, once (about 15 GB and 31 GB):'] }] },
+      detail: "Images can't be made: no image model is on this computer.",
     })
+    expect(none.steps!.list[0]).toEqual({
+      parts: ['Download the models, once (about 15 GB and 31 GB):'],
+      commands: [KLEIN, ZIMAGE],
+    })
+    expect(none.steps!.list).toHaveLength(2)
+    expect(none).not.toHaveProperty('notes')
+  })
+
+  it('puts Qwen-Image in the main download step when it is the project’s model and nothing can run', () => {
+    const none = row(
+      imageFacts({
+        model: 'qwen-image',
+        klein: { download: 'absent' },
+        'z-image-turbo': { download: 'absent' },
+        'qwen-image': noQwen,
+      }),
+    )
+    expect(none.detail).toBe("Images can't be made: no image model is on this computer.")
+    expect(none.steps!.list).toEqual([
+      {
+        parts: [`Download the models, once (about 15 GB, 31 GB and ${qwenGb} GB):`],
+        commands: [KLEIN, ZIMAGE, QWEN_IMAGE],
+      },
+    ])
+  })
+
+  it('does not say images can’t be made while Qwen-Image alone is whole', () => {
+    const found = row(
+      imageFacts({ klein: { download: 'absent' }, 'z-image-turbo': { download: 'absent' } }),
+    )
+    expect(found).toMatchObject({
+      state: 'problem',
+      detail:
+        "The project's image model, FLUX.2 klein 4B, is not on this computer. Z-Image-Turbo is not on this computer. Qwen-Image is in place: an image's takes can use it meanwhile.",
+    })
+    expect(found.steps!.list).toEqual([
+      {
+        parts: ['Download the models, once (about 15 GB and 31 GB):'],
+        commands: [KLEIN, ZIMAGE],
+      },
+    ])
+    expect(found).not.toHaveProperty('notes')
+  })
+
+  it('offers Qwen-Image as optional while it is not the project’s model and not whole, without changing the state', () => {
+    const absent = row(imageFacts({ 'qwen-image': noQwen }))
+    expect(absent).toMatchObject({
+      state: 'ok',
+      detail:
+        'FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model loads on its first take.',
+      notes: ["Optional: for an image's takes. Qwen-Image is not on this computer."],
+      steps: {
+        list: [{ parts: [`Download it, once (about ${qwenGb} GB):`], commands: [QWEN_IMAGE] }],
+        note: 'Then press Check again.',
+      },
+    })
+    const partial = row(imageFacts({ 'qwen-image': { download: 'partial' } }))
+    expect(partial).toMatchObject({
+      state: 'ok',
+      notes: ["Optional: for an image's takes. Qwen-Image's download is incomplete."],
+      steps: {
+        list: [
+          {
+            parts: ['Finish the download (it picks up where it stopped):'],
+            commands: [QWEN_IMAGE],
+          },
+        ],
+      },
+    })
+  })
+
+  it('puts Qwen-Image’s Optional line above Qwen Image Edit’s, a step each', () => {
+    const both = row(imageFacts({ 'qwen-image': noQwen, patchModel: 'absent' }))
+    expect(both.notes).toEqual([
+      "Optional: for an image's takes. Qwen-Image is not on this computer.",
+      'Optional: for patches. Qwen Image Edit is not on this computer.',
+    ])
+    expect(both.steps!.list.map((step) => step.commands)).toEqual([[QWEN_IMAGE], [QWEN]])
+  })
+
+  it('keeps Qwen-Image’s Optional line beside another model’s trouble, after its step', () => {
+    const found = row(imageFacts({ 'z-image-turbo': { download: 'absent' }, 'qwen-image': noQwen }))
+    expect(found).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail: 'Optional: Z-Image-Turbo is not on this computer. FLUX.2 klein 4B is in place.',
+      notes: ["Optional: for an image's takes. Qwen-Image is not on this computer."],
+    })
+    expect(found.steps!.list.map((step) => step.commands)).toEqual([[ZIMAGE], [QWEN_IMAGE]])
+  })
+
+  it('does not offer Qwen-Image when mflux cannot run', () => {
+    expect(row(imageFacts({ mflux: noMflux, 'qwen-image': noQwen }))).not.toHaveProperty('notes')
+  })
+
+  it('needs attention when Qwen-Image is the project’s model and is missing or incomplete', () => {
+    const missing = row(imageFacts({ model: 'qwen-image', 'qwen-image': noQwen }))
+    expect(missing).toMatchObject({
+      state: 'problem',
+      detail:
+        "The project's image model, Qwen-Image, is not on this computer. FLUX.2 klein 4B and Z-Image-Turbo are in place: an image's takes can use them meanwhile.",
+    })
+    expect(missing).not.toHaveProperty('notes')
+    expect(missing.steps!.list).toEqual([
+      { parts: [`Download it, once (about ${qwenGb} GB):`], commands: [QWEN_IMAGE] },
+    ])
+    expect(
+      row(imageFacts({ model: 'qwen-image', 'qwen-image': { download: 'partial' } })).detail,
+    ).toBe(
+      "The project's image model, Qwen-Image, is only partly downloaded, so it can't run. FLUX.2 klein 4B and Z-Image-Turbo are in place: an image's takes can use them meanwhile.",
+    )
+  })
+
+  it('treats Qwen-Image’s failed last take like another model’s', () => {
+    const other = row(imageFacts({ 'qwen-image': { failure } }))
+    expect(other).toMatchObject({ state: 'off', label: 'Not set up', detail: '' })
+    expect(other.failures).toEqual([
+      {
+        sentence:
+          'Optional: the last take with Qwen-Image failed on Bridge at dusk. FLUX.2 klein 4B and Z-Image-Turbo are in place.',
+        error: 'FileNotFoundError: No safetensors',
+        link: { text: 'Open Bridge at dusk', href: '#/images/items/bridge' },
+        clears: 'This clears when a take with Qwen-Image works.',
+      },
+    ])
+    const main = row(imageFacts({ model: 'qwen-image', 'qwen-image': { failure } }))
+    expect(main.state).toBe('problem')
+    expect(main.failures![0]!.sentence).toBe(
+      "The last take with Qwen-Image, the project's image model, failed on Bridge at dusk. FLUX.2 klein 4B and Z-Image-Turbo are in place: an image's takes can use them meanwhile.",
+    )
+  })
+
+  it('says the incomplete download of Qwen-Image, not its failure', () => {
+    const found = row(
+      imageFacts({ model: 'qwen-image', 'qwen-image': { download: 'partial', failure } }),
+    )
+    expect(found.detail).toContain('only partly downloaded')
+    expect(found.failures).toBeUndefined()
   })
 
   it('says the other model’s failed last take is optional, with the error, the link and what clears it', () => {
@@ -583,7 +749,7 @@ describe('the image models check', () => {
     expect(found.failures).toEqual([
       {
         sentence:
-          'Optional: the last take with Z-Image-Turbo failed on Bridge at dusk. FLUX.2 klein 4B is in place.',
+          'Optional: the last take with Z-Image-Turbo failed on Bridge at dusk. FLUX.2 klein 4B and Qwen-Image are in place.',
         error: 'FileNotFoundError: No safetensors',
         link: { text: 'Open Bridge at dusk', href: '#/images/items/bridge' },
         clears: 'This clears when a take with Z-Image-Turbo works.',
@@ -598,7 +764,7 @@ describe('the image models check', () => {
     expect(found.failures).toEqual([
       {
         sentence:
-          "The last take with FLUX.2 klein 4B, the project's image model, failed on Bridge at dusk. Z-Image-Turbo is in place: an image's takes can use it meanwhile.",
+          "The last take with FLUX.2 klein 4B, the project's image model, failed on Bridge at dusk. Z-Image-Turbo and Qwen-Image are in place: an image's takes can use them meanwhile.",
         error: 'FileNotFoundError: No safetensors',
         link: { text: 'Open Bridge at dusk', href: '#/images/items/bridge' },
         clears: 'This clears when a take with FLUX.2 klein 4B works.',
@@ -625,7 +791,8 @@ describe('the image models check', () => {
   it('leaves out the image’s name and link once the image is gone', () => {
     const found = row(imageFacts({ 'z-image-turbo': { failure: { ...failure, image: null } } }))
     expect(found.failures![0]).toMatchObject({
-      sentence: 'Optional: the last take with Z-Image-Turbo failed. FLUX.2 klein 4B is in place.',
+      sentence:
+        'Optional: the last take with Z-Image-Turbo failed. FLUX.2 klein 4B and Qwen-Image are in place.',
       error: 'FileNotFoundError: No safetensors',
     })
     expect(found.failures![0]!.link).toBeUndefined()
@@ -641,7 +808,7 @@ describe('the image models check', () => {
     const found = row(imageFacts({ klein: { download: 'partial' }, 'z-image-turbo': { failure } }))
     expect(found.state).toBe('problem')
     expect(found.detail).toBe(
-      "The project's image model, FLUX.2 klein 4B, is only partly downloaded, so it can't run.",
+      "The project's image model, FLUX.2 klein 4B, is only partly downloaded, so it can't run. Qwen-Image is in place: an image's takes can use it meanwhile.",
     )
     expect(found.failures!.map((f) => f.sentence)).toEqual([
       'The last take with Z-Image-Turbo failed on Bridge at dusk.',

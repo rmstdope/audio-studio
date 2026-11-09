@@ -1,6 +1,18 @@
 import type { OtherModelReason } from '../core/imagesMakeAll'
-import { timeText } from '../core/takeTimes'
+import { roundedSeconds, timeText } from '../core/takeTimes'
 import { joined } from './imagesText'
+
+/**
+ * A wait as a person reads it: the pages' rounding under an hour, then hours and minutes
+ * ("2 h 24 min", "2 h" when exact).
+ */
+function waitText(seconds: number): string {
+  const rounded = roundedSeconds(seconds, 'up')
+  if (rounded < 3600) return timeText(seconds, 'up')
+  const minutes = rounded / 60
+  const rest = minutes % 60
+  return rest ? `${Math.floor(minutes / 60)} h ${rest} min` : `${minutes / 60} h`
+}
 
 const images = (n: number) => `${n} ${n === 1 ? 'image' : 'images'}`
 
@@ -42,7 +54,7 @@ export function makeAllLine({
   const lead = why
     ? `Four takes each, on ${model}: ${main}, the image model on Setup, ${WHY[why]}.`
     : `Four takes each, on ${model}, the image model on Setup.`
-  const time = `${timeText(seconds, 'up')} in all`
+  const time = `${waitText(seconds)} in all`
   return `${lead} ${guess ? `A guess: about ${time}` : `About ${time}`} — they are made one after another, and you can leave the page.`
 }
 
@@ -79,7 +91,7 @@ export function runningLine({
   images: number
   left: number
 }): string {
-  return `Making ${takes} ${takes === 1 ? 'take' : 'takes'} for ${images(imageCount)} · about ${timeText(left, 'up')} left`
+  return `Making ${takes} ${takes === 1 ? 'take' : 'takes'} for ${images(imageCount)} · about ${waitText(left)} left`
 }
 
 /** The summary's first sentence: how many of the takes asked for were made. */

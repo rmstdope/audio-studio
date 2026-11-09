@@ -1,7 +1,7 @@
 import { perTakeText, timeKeyOfEdit, type Figures } from './takeTimes'
 
 /** The ids of the image models the studio makes takes with. */
-export const IMAGE_MODEL_IDS = ['klein', 'z-image-turbo'] as const
+export const IMAGE_MODEL_IDS = ['klein', 'z-image-turbo', 'qwen-image'] as const
 
 /** One of the local image models (§13, decision 8). */
 export type ImageModelId = (typeof IMAGE_MODEL_IDS)[number]
@@ -23,6 +23,11 @@ export interface ImageModel {
   mflux: string
   /** The mflux command that makes this model's images (mflux has one per model family). */
   command: string
+  /** The built-in model mflux should treat `mflux` as, when `mflux` is a repository name. */
+  base?: string
+  /** Quantization bits and steps, when the model needs them to fit a 48 GB Mac and to do the job. */
+  quantize?: number
+  steps?: number
 }
 
 /** The image models, by id. */
@@ -44,6 +49,18 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     gigabytes: 31,
     mflux: 'z-image-turbo',
     command: 'mflux-generate-z-image-turbo',
+  },
+  'qwen-image': {
+    id: 'qwen-image',
+    name: 'Qwen-Image',
+    short: 'Qwen-Image',
+    repo: 'Qwen/Qwen-Image',
+    gigabytes: 58,
+    // mflux's own alias `qwen-image` is the 2512 weights, which are not the ones downloaded.
+    mflux: 'Qwen/Qwen-Image',
+    base: 'qwen-image',
+    command: 'mflux-generate-qwen',
+    quantize: 8,
   },
 }
 

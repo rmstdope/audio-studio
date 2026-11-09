@@ -9,7 +9,7 @@ const image = (id: string, status: MakeAllImage['status'] = 'none yet'): MakeAll
   status,
 })
 const whole: ImageModelState = { download: 'whole', failed: false }
-const states = { klein: whole, 'z-image-turbo': whole }
+const states = { klein: whole, 'z-image-turbo': whole, 'qwen-image': whole }
 const base = {
   rows: [image('a'), image('b'), image('c', 'chosen')],
   conflicts: [] as { id: string; title: string }[],
@@ -84,6 +84,7 @@ describe('planImagesMakeAll', () => {
       states: {
         klein: { download: 'whole', failed: true },
         'z-image-turbo': { download: 'absent', failed: false },
+        'qwen-image': { download: 'absent', failed: false },
       },
     })
     expect(plan).toMatchObject({ kind: 'ready', model: 'klein', why: null })
@@ -92,7 +93,12 @@ describe('planImagesMakeAll', () => {
   it('cannot make images when the generator is not ready or neither model is whole', () => {
     expect(planImagesMakeAll({ ...base, ready: false })).toEqual({ kind: 'not-ready' })
     const none = { download: 'absent', failed: false } as const
-    expect(planImagesMakeAll({ ...base, states: { klein: none, 'z-image-turbo': none } })).toEqual({
+    expect(
+      planImagesMakeAll({
+        ...base,
+        states: { klein: none, 'z-image-turbo': none, 'qwen-image': none },
+      }),
+    ).toEqual({
       kind: 'not-ready',
     })
   })

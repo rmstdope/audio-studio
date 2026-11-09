@@ -1415,7 +1415,7 @@ the manifest. This section says how the studio uses them. The acts are the narra
 `{language}` in any path: images are the same in every language. Refresh from the game on an act's
 page runs `refresh.part`, as on Music's act pages.
 
-`model` is optional (`klein`, the default, or `z-image-turbo`): the image model an image's new takes
+`model` is optional (`klein`, the default, `z-image-turbo` or `qwen-image`): the image model an image's new takes
 start on. It is saved from the Images row of Setup's Models panel (`PUT /api/image-model`,
 `{ model, was }`, as `music.model` is), at once and with nothing asked, over a stale `was` refused.
 
@@ -1548,8 +1548,8 @@ There is no notice for a changed style: the style is the studio's, so the images
 one are marked out of date, each saying "the style".
 
 **Takes** (`services/imageTakes.ts`, `core/imageTakes.ts`). A take is the image's whole prompt made
-with the model asked for (`ImageModelId`, `core/imageModels.ts`: `klein` or `z-image-turbo`; a request
-that names none starts on `defaultTakeModel`: the project's `images.model`, else the other model when that
+with the model asked for (`ImageModelId`, `core/imageModels.ts`: `klein`, `z-image-turbo` or `qwen-image`; a request
+that names none starts on `defaultTakeModel`: the project's `images.model`, else the first whole model in menu order when that
 one is not on this computer) at the take size (`takeSize`: the listed shape with the longer side 1024,
 each side a multiple of 16; the listed sizes are not, so a take is then brought to them, below)
 and a new seed, on the GPU queue (`makeImageTake`). The board is
@@ -2338,7 +2338,7 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   optional Stable Audio Open models in `~/.cache/stable-audio` ("Not set up" until they are there,
   "Needs attention" only when the project's music model is one that is missing, with three numbered
   steps: accept the licence, make a read token, download), with an `images` section the image models
-  (**Image models**: mflux, and for FLUX.2 klein 4B and Z-Image-Turbo whether the whole download is in the Hugging Face cache,
+  (**Image models**: mflux, and for FLUX.2 klein 4B, Z-Image-Turbo and Qwen-Image whether the whole download is in the Hugging Face cache,
   `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub` (`imageModelDownload`: `absent` with no folder; `whole` when the snapshot `refs/main` names, the revision last set out for (every snapshot when there is no ref; an update that stopped reads as unfinished even beside a whole older revision), holds a
   `.safetensors` file, no link in it points at a missing blob, every shard a `*.safetensors.index.json` names is there, no part is still waiting (no folder with a `config.json` or shards lacks its index or single weights file, and every part a `model_index.json` lists has something in its folder, where the snapshot has that file: one mflux fetched by pattern does not, and then a part whose folder has not appeared cannot be told) and no blob is `.incomplete` (a leftover from an interrupted download does not count when the finished blob it was an attempt at is beside it, Hugging Face naming each attempt `<blob>.<random>.incomplete`, nor once a shard index vouches for the snapshot);
   else `partial`), and whether the model's last take failed (the studio's own memory, `content-studio/cache/image-model-health.json`, one entry per model with the

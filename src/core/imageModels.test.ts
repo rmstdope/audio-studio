@@ -25,9 +25,14 @@ import {
 
 const ok = { prompt: 'a room', width: 1024, height: 576, seed: 42 }
 
+type ModelState = { download: 'whole' | 'partial' | 'absent'; failed: boolean }
+
 describe('imageModels', () => {
-  it('knows the two models, klein by default', () => {
-    expect([...IMAGE_MODEL_IDS]).toEqual(['klein', 'z-image-turbo'])
+  it('knows the three models in menu order, klein by default', () => {
+    expect([...IMAGE_MODEL_IDS]).toEqual(['klein', 'z-image-turbo', 'qwen-image'])
+    expect(imageModel('qwen-image').name).toBe('Qwen-Image')
+    expect(imageModel('qwen-image').short).toBe('Qwen-Image')
+    expect(imageModel('qwen-image').command).toBe('mflux-generate-qwen')
     expect(DEFAULT_IMAGE_MODEL).toBe('klein')
     expect(imageModel('klein').mflux).toBe('flux2-klein-4b')
     expect(imageModel('z-image-turbo').mflux).toBe('z-image-turbo')
@@ -84,22 +89,30 @@ describe('imageModels', () => {
     expect(imageByMflux('flux1-schnell')).toBeNull()
   })
 
-  it('starts takes on the main model, else on the other that is whole and has not failed', () => {
+  it('starts takes on the main model, else the first model in menu order that is whole and has not failed', () => {
     const ok = { download: 'whole', failed: false } as const
     const failed = { download: 'whole', failed: true } as const
     const partial = { download: 'partial', failed: false } as const
     const absent = { download: 'absent', failed: false } as const
-    expect(defaultTakeModel('klein', { klein: ok, 'z-image-turbo': ok })).toBe('klein')
-    expect(defaultTakeModel('z-image-turbo', { klein: ok, 'z-image-turbo': ok })).toBe(
-      'z-image-turbo',
-    )
-    expect(defaultTakeModel('klein', { klein: absent, 'z-image-turbo': ok })).toBe('z-image-turbo')
-    expect(defaultTakeModel('klein', { klein: partial, 'z-image-turbo': ok })).toBe('z-image-turbo')
-    expect(defaultTakeModel('klein', { klein: failed, 'z-image-turbo': ok })).toBe('z-image-turbo')
-    // The other is not in place: the main model stays, failed or not.
-    expect(defaultTakeModel('klein', { klein: failed, 'z-image-turbo': partial })).toBe('klein')
-    expect(defaultTakeModel('klein', { klein: failed, 'z-image-turbo': failed })).toBe('klein')
-    expect(defaultTakeModel('klein', { klein: absent, 'z-image-turbo': absent })).toBe('klein')
+    const all = (klein: ModelState, z: ModelState, qwen: ModelState) => ({
+      klein,
+      'z-image-turbo': z,
+      'qwen-image': qwen,
+    })
+    expect(defaultTakeModel('klein', all(ok, ok, ok))).toBe('klein')
+    expect(defaultTakeModel('qwen-image', all(ok, ok, ok))).toBe('qwen-image')
+    expect(defaultTakeModel('klein', all(absent, ok, ok))).toBe('z-image-turbo')
+    expect(defaultTakeModel('klein', all(partial, ok, ok))).toBe('z-image-turbo')
+    expect(defaultTakeModel('klein', all(failed, ok, ok))).toBe('z-image-turbo')
+    expect(defaultTakeModel('qwen-image', all(ok, ok, absent))).toBe('klein')
+    expect(defaultTakeModel('qwen-image', all(absent, ok, partial))).toBe('z-image-turbo')
+    expect(defaultTakeModel('qwen-image', all(absent, absent, failed))).toBe('qwen-image')
+    expect(defaultTakeModel('klein', all(absent, absent, ok))).toBe('qwen-image')
+    // Nothing else in place: a whole model even if its last take failed, else the main model.
+    expect(defaultTakeModel('klein', all(failed, partial, absent))).toBe('klein')
+    expect(defaultTakeModel('klein', all(failed, failed, failed))).toBe('klein')
+    expect(defaultTakeModel('klein', all(absent, absent, absent))).toBe('klein')
+    expect(defaultTakeModel('klein', all(partial, absent, failed))).toBe('qwen-image')
   })
 
   it('words the faint line of an image whose main model failed', () => {

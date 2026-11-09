@@ -153,6 +153,7 @@ describe('modelsView, with images', () => {
       states: {
         klein: { download: 'partial', failed: false },
         'z-image-turbo': { download: 'whole', failed: true },
+        'qwen-image': { download: 'whole', failed: false },
       },
     })
   })

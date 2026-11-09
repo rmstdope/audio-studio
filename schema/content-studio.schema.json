@@ -415,7 +415,8 @@
           "type": "string",
           "enum": [
             "klein",
-            "z-image-turbo"
+            "z-image-turbo",
+            "qwen-image"
           ]
         },
         "clips": {

@@ -499,7 +499,7 @@ export function TakesSection({
           <div className="errbox-text">
             <strong>Images can&apos;t be made yet.</strong>
             <span className="muted small">
-              Neither image model can run on this computer. Setup says what is missing.
+              No image model can run on this computer. Setup says what is missing.
             </span>
           </div>
           <a className="btn" href={routeHref({ view: 'setup' })}>

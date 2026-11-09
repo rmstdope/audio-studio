@@ -276,7 +276,7 @@ function ImagesRow({ file, images }: { file: string; images: NonNullable<View['i
       file={file}
       label="Images"
       wrap
-      blurb="The game's images, made on this computer. An image's takes can use the other model."
+      blurb="The game's images, made on this computer. An image's takes can use another model."
       menuLabel="Image model"
       ids={IMAGE_MODEL_IDS}
       current={images.model}

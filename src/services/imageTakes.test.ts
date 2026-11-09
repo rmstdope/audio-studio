@@ -613,16 +613,26 @@ describe('image models', () => {
       models: [
         { id: 'klein', installed: false },
         { id: 'z-image-turbo', installed: true },
+        { id: 'qwen-image', installed: true },
       ],
       generator: { ok: true },
     })
   })
 
-  it('cannot make images only when neither model can run', async () => {
+  it('cannot make images only when none of the three models can run', async () => {
     const none = setup(undefined, {}, undefined, {
-      here: { klein: false, 'z-image-turbo': false },
+      here: { klein: false, 'z-image-turbo': false, 'qwen-image': false },
     })
     expect(await viewOf(none)).toMatchObject({ generator: { ok: false } })
+    const onlyQwen = setup(undefined, {}, undefined, {
+      here: { klein: false, 'z-image-turbo': false },
+    })
+    expect(await viewOf(onlyQwen)).toMatchObject({ generator: { ok: true } })
+    expect(await onlyQwen.takes.make(onlyQwen.file, 'inn', { count: 1 })).toMatchObject({
+      ok: true,
+    })
+    await onlyQwen.settled('inn')
+    expect(onlyQwen.requests[0]!.model).toBe('qwen-image')
     const noMflux = setup({
       ok: false,
       reason: 'mflux',
@@ -708,6 +718,7 @@ describe('making for a whole act', () => {
       states: {
         klein: { download: 'absent', failed: false },
         'z-image-turbo': { download: 'whole', failed: false },
+        'qwen-image': { download: 'whole', failed: false },
       },
     })
   })
@@ -756,7 +767,9 @@ describe('making for a whole act', () => {
   })
 
   it('makes nothing and says so when images cannot be made', async () => {
-    const s = setup(undefined, {}, undefined, { here: { klein: false, 'z-image-turbo': false } })
+    const s = setup(undefined, {}, undefined, {
+      here: { klein: false, 'z-image-turbo': false, 'qwen-image': false },
+    })
     expect(await s.takes.makeAll(s.file, 'act1')).toMatchObject({ ok: false })
     expect(await s.takes.making(s.file)).toEqual({})
   })

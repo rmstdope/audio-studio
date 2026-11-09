@@ -200,11 +200,11 @@ effects and scenes are the same in every language, so their paths never do.
 
 ### `images`
 
-| Field               | What it is                                                                                            | Default  |
-| ------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
-| `from.part`         | Each part's images. An image several parts list is one image.                                         | required |
-| `model`             | The image model takes are made with: `klein` or `z-image-turbo`; a take can be made with the other.   | `klein`  |
-| `clips`, `manifest` | Where the chosen pictures go, one `<id>.png` each, and a chosen patch's `<id>.<patch>.png` beside it. | required |
+| Field               | What it is                                                                                             | Default  |
+| ------------------- | ------------------------------------------------------------------------------------------------------ | -------- |
+| `from.part`         | Each part's images. An image several parts list is one image.                                          | required |
+| `model`             | The image model takes are made with: `klein`, `z-image-turbo` or `qwen-image`; a take can use another. | `klein`  |
+| `clips`, `manifest` | Where the chosen pictures go, one `<id>.png` each, and a chosen patch's `<id>.<patch>.png` beside it.  | required |
 
 The look every image shares is the studio's own, in the images edits (below).
 

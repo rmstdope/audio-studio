@@ -72,6 +72,7 @@ const view = (over: Partial<ImageTakesView> = {}): ImageTakesView => ({
   models: [
     { id: 'klein', installed: true, download: 'whole', failed: false },
     { id: 'z-image-turbo', installed: true, download: 'whole', failed: false },
+    { id: 'qwen-image', installed: true, download: 'whole', failed: false },
   ],
   takes: [],
   making: [],
@@ -836,7 +837,7 @@ describe('what can go wrong', () => {
     )
     expect(s.text()).toContain('Images can’t be made yet.'.replace('’', "'"))
     expect(s.text()).toContain(
-      'Neither image model can run on this computer. Setup says what is missing.',
+      'No image model can run on this computer. Setup says what is missing.',
     )
     expect(s.container.querySelector('a')?.getAttribute('href')).toBe('#/setup')
     expect(s.button('Make 2 more takes').disabled).toBe(true)
@@ -891,15 +892,19 @@ describe('what can go wrong', () => {
 })
 
 describe('the Takes section’s model menu', () => {
-  const only = (id: 'klein' | 'z-image-turbo') => [
+  type Id = 'klein' | 'z-image-turbo' | 'qwen-image'
+  /** Only this model is here; the other two are not downloaded. */
+  const only = (id: Id) => [
     model('klein', id === 'klein' ? 'whole' : 'absent'),
     model('z-image-turbo', id === 'z-image-turbo' ? 'whole' : 'absent'),
+    model('qwen-image', id === 'qwen-image' ? 'whole' : 'absent'),
   ]
-  const model = (
-    id: 'klein' | 'z-image-turbo',
-    download: 'whole' | 'partial' | 'absent',
-    failed = false,
-  ) => ({ id, installed: download === 'whole', download, failed })
+  const model = (id: Id, download: 'whole' | 'partial' | 'absent', failed = false) => ({
+    id,
+    installed: download === 'whole',
+    download,
+    failed,
+  })
   const modelMenu = (s: { container: HTMLElement }) =>
     s.container.querySelector<HTMLSelectElement>('select[aria-label="Model for new takes"]')!
   /** The text of the closed menu's face, which wraps in a narrow window. */
@@ -911,7 +916,7 @@ describe('the Takes section’s model menu', () => {
       modelMenu(s).dispatchEvent(new Event('change', { bubbles: true }))
     })
 
-  it('comes before the count menu, starts on the project’s model, and lists both with their times', async () => {
+  it('comes before the count menu, starts on the project’s model, and lists the three with their times', async () => {
     const s = await show(view({ takes: three }))
     const menus = [...s.container.querySelectorAll('select')].map((m) =>
       m.getAttribute('aria-label'),
@@ -921,6 +926,7 @@ describe('the Takes section’s model menu', () => {
     expect([...modelMenu(s).options].map((o) => o.textContent)).toEqual([
       'FLUX.2 klein 4B — a guess: about 20 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
+      'Qwen-Image — a guess: about 3 min a take',
     ])
     // Closed, a face that can wrap shows the short name and the time; the list keeps full entries.
     expect(faceOf(s)).toBe('FLUX.2 klein — a guess: about 20 s a take')
@@ -933,6 +939,7 @@ describe('the Takes section’s model menu', () => {
       s.client.setQueryData(['image-take-times'], {
         klein: { seconds: 23, guess: false },
         'z-image-turbo': { seconds: 60, guess: true },
+        'qwen-image': { seconds: 180, guess: true },
         'qwen-edit': { seconds: 480, guess: true },
         'klein-edit': { seconds: 20, guess: true },
       })
@@ -941,6 +948,7 @@ describe('the Takes section’s model menu', () => {
     expect([...modelMenu(s).options].map((o) => o.textContent)).toEqual([
       'FLUX.2 klein 4B — about 25 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
+      'Qwen-Image — a guess: about 3 min a take',
     ])
     expect(faceOf(s)).toBe('FLUX.2 klein — about 25 s a take')
   })
@@ -954,6 +962,46 @@ describe('the Takes section’s model menu', () => {
   it('starts on Setup’s model when that is the other one', async () => {
     const s = await show(view({ takes: three, projectModel: 'z-image-turbo' }))
     expect(modelMenu(s).value).toBe('z-image-turbo')
+  })
+
+  it('makes takes with Qwen-Image when it is picked, and a missing Qwen-Image is listed but cannot be picked', async () => {
+    const s = await show(view({ takes: three }))
+    await pick(s, 'qwen-image')
+    expect(modelMenu(s).value).toBe('qwen-image')
+    expect(faceOf(s)).toBe('Qwen-Image — a guess: about 3 min a take')
+    await s.click(s.button('Make 2 more takes'))
+    expect(s.calls.at(-1)).toMatchObject({ body: { count: 2, model: 'qwen-image' } })
+    const absent = await show(
+      view({
+        takes: three,
+        models: [
+          model('klein', 'whole'),
+          model('z-image-turbo', 'whole'),
+          model('qwen-image', 'absent'),
+        ],
+      }),
+    )
+    const q = modelMenu(absent).options[2]!
+    expect(q.textContent).toContain(' — not on this computer')
+    expect(q.disabled).toBe(true)
+  })
+
+  it('starts on the fastest model in place, in menu order, when Qwen-Image is the project’s and is missing', async () => {
+    const s = await show(
+      view({
+        takes: three,
+        projectModel: 'qwen-image',
+        models: [
+          model('klein', 'whole'),
+          model('z-image-turbo', 'whole'),
+          model('qwen-image', 'absent'),
+        ],
+      }),
+    )
+    expect(modelMenu(s).value).toBe('klein')
+    expect(s.text()).toContain(
+      "Qwen-Image, the project's image model, isn't on this computer, so these takes use FLUX.2 klein. Setup says how to download it.",
+    )
   })
 
   it('makes takes with the model picked', async () => {
@@ -988,7 +1036,11 @@ describe('the Takes section’s model menu', () => {
     const s = await show(
       view({
         takes: three,
-        models: [model('klein', 'whole'), model('z-image-turbo', 'whole', true)],
+        models: [
+          model('klein', 'whole'),
+          model('z-image-turbo', 'whole', true),
+          model('qwen-image', 'whole'),
+        ],
       }),
     )
     const z = modelMenu(s).options[1]!
@@ -999,7 +1051,14 @@ describe('the Takes section’s model menu', () => {
 
   it('marks a partly downloaded model, which cannot be picked', async () => {
     const s = await show(
-      view({ takes: three, models: [model('klein', 'whole'), model('z-image-turbo', 'partial')] }),
+      view({
+        takes: three,
+        models: [
+          model('klein', 'whole'),
+          model('z-image-turbo', 'partial'),
+          model('qwen-image', 'whole'),
+        ],
+      }),
     )
     const z = modelMenu(s).options[1]!
     expect(z.textContent).toBe('Z-Image-Turbo — a guess: about 1 min a take — download incomplete')
@@ -1010,7 +1069,11 @@ describe('the Takes section’s model menu', () => {
     const s = await show(
       view({
         takes: three,
-        models: [model('klein', 'whole', true), model('z-image-turbo', 'whole')],
+        models: [
+          model('klein', 'whole', true),
+          model('z-image-turbo', 'whole'),
+          model('qwen-image', 'whole'),
+        ],
       }),
     )
     expect(modelMenu(s).value).toBe('z-image-turbo')
@@ -1028,7 +1091,11 @@ describe('the Takes section’s model menu', () => {
     const s = await show(
       view({
         takes: three,
-        models: [model('klein', 'whole', true), model('z-image-turbo', 'partial')],
+        models: [
+          model('klein', 'whole', true),
+          model('z-image-turbo', 'partial'),
+          model('qwen-image', 'absent'),
+        ],
       }),
     )
     expect(modelMenu(s).value).toBe('klein')
@@ -1065,17 +1132,21 @@ describe('the Takes section’s model menu', () => {
     expect(thumbs.join(' ')).not.toContain('FLUX')
   })
 
-  it('says images can’t be made yet when neither model can run, and waits', async () => {
+  it('says images can’t be made yet when no model can run, and waits', async () => {
     const s = await show(
       view({
         takes: three,
-        generator: { ok: false, message: 'Neither image model is on this computer.', fix: 'x' },
-        models: [model('klein', 'absent'), model('z-image-turbo', 'absent')],
+        generator: { ok: false, message: 'No image model is on this computer.', fix: 'x' },
+        models: [
+          model('klein', 'absent'),
+          model('z-image-turbo', 'absent'),
+          model('qwen-image', 'absent'),
+        ],
       }),
     )
     expect(s.text()).toContain("Images can't be made yet.")
     expect(s.text()).toContain(
-      'Neither image model can run on this computer. Setup says what is missing.',
+      'No image model can run on this computer. Setup says what is missing.',
     )
     expect(s.text()).toContain('Open Setup')
     expect(modelMenu(s).disabled).toBe(true)

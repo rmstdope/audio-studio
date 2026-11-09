@@ -217,10 +217,10 @@ describe('the Music row of the Models panel', () => {
 
 describe('the Images row of the Models panel', () => {
   const whole = { download: 'whole', failed: false } as const
-  const both = { klein: whole, 'z-image-turbo': whole }
+  const both = { klein: whole, 'z-image-turbo': whole, 'qwen-image': whole }
   const absent = { download: 'absent', failed: false } as const
   const images = (
-    model: 'klein' | 'z-image-turbo',
+    model: 'klein' | 'z-image-turbo' | 'qwen-image',
     states: NonNullable<Images>['states'] = both,
   ): Images => ({
     model,
@@ -246,13 +246,13 @@ describe('the Images row of the Models panel', () => {
       menuOf(container).dispatchEvent(new Event('change', { bubbles: true }))
     })
 
-  it('is a row after Music with its purpose, a menu of both models with their times, and Free', () => {
+  it('is a row after Music with its purpose, a menu of the three models with their times, and Free', () => {
     const page = render(answer(null, images('klein')))
     const rows = [...page.container.querySelectorAll('.mrow .mname')].map((n) => n.textContent)
     expect(rows).toEqual(['Audition', 'Draft', 'Final', 'Images'])
     const text = page.container.textContent!
     expect(text).toContain(
-      "The game's images, made on this computer. An image's takes can use the other model.",
+      "The game's images, made on this computer. An image's takes can use another model.",
     )
     expect(text).toContain('Free')
     expect(text).toContain(
@@ -261,6 +261,7 @@ describe('the Images row of the Models panel', () => {
     expect([...menuOf(page.container).options].map((o) => o.textContent)).toEqual([
       'FLUX.2 klein 4B — a guess: about 20 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
+      'Qwen-Image — a guess: about 3 min a take',
     ])
     expect(menuOf(page.container).value).toBe('klein')
     // The closed menu is a face that wraps, with the same words as the open list.
@@ -277,7 +278,9 @@ describe('the Images row of the Models panel', () => {
   })
 
   it('lists a missing model as such, which cannot be picked, and warns when it is the chosen one', () => {
-    const page = render(answer(null, images('klein', { klein: absent, 'z-image-turbo': whole })))
+    const page = render(
+      answer(null, images('klein', { klein: absent, 'z-image-turbo': whole, 'qwen-image': whole })),
+    )
     const [klein, z] = [...menuOf(page.container).options]
     expect(klein!.textContent).toBe(
       'FLUX.2 klein 4B — a guess: about 20 s a take — not on this computer',
@@ -285,13 +288,17 @@ describe('the Images row of the Models panel', () => {
     expect(klein!.disabled).toBe(true)
     expect(z!.disabled).toBe(false)
     expect(page.container.querySelector('.warnline')!.textContent).toBe('not on this computer')
-    const fine = render(answer(null, images('klein', { klein: whole, 'z-image-turbo': absent })))
+    const fine = render(
+      answer(null, images('klein', { klein: whole, 'z-image-turbo': absent, 'qwen-image': whole })),
+    )
     expect(fine.container.querySelector('.warnline')).toBeNull()
   })
 
   it('marks a model whose last take failed, which can be picked, and warns when it is the chosen one', () => {
     const failed = { download: 'whole', failed: true } as const
-    const page = render(answer(null, images('klein', { klein: failed, 'z-image-turbo': whole })))
+    const page = render(
+      answer(null, images('klein', { klein: failed, 'z-image-turbo': whole, 'qwen-image': whole })),
+    )
     const [klein] = [...menuOf(page.container).options]
     expect(klein!.textContent).toBe(
       'FLUX.2 klein 4B — a guess: about 20 s a take — last take failed',
@@ -302,10 +309,28 @@ describe('the Images row of the Models panel', () => {
 
   it('marks a partly downloaded model, which cannot be picked', () => {
     const partial = { download: 'partial', failed: false } as const
-    const page = render(answer(null, images('klein', { klein: whole, 'z-image-turbo': partial })))
+    const page = render(
+      answer(
+        null,
+        images('klein', { klein: whole, 'z-image-turbo': partial, 'qwen-image': whole }),
+      ),
+    )
     const z = [...menuOf(page.container).options][1]!
     expect(z.textContent).toBe('Z-Image-Turbo — a guess: about 1 min a take — download incomplete')
     expect(z.disabled).toBe(true)
+  })
+
+  it('lists Qwen-Image missing as such, and saves it as the project’s model when it is whole', async () => {
+    const missing = render(
+      answer(null, images('klein', { klein: whole, 'z-image-turbo': whole, 'qwen-image': absent })),
+    )
+    const qwen = [...menuOf(missing.container).options][2]!
+    expect(qwen.textContent).toContain('Qwen-Image — a guess: about')
+    expect(qwen.textContent).toContain(' — not on this computer')
+    expect(qwen.disabled).toBe(true)
+    const page = render(answer(null, images('klein')))
+    await pickImage(page.container, 'qwen-image')
+    expect(imagePuts).toEqual([{ model: 'qwen-image', was: 'klein' }])
   })
 
   it('saves a pick at once, with no question, and says Saving… while it does', async () => {
@@ -349,6 +374,7 @@ describe('the Images row of the Models panel', () => {
 const imageStates = {
   klein: { download: 'whole', failed: false },
   'z-image-turbo': { download: 'whole', failed: false },
+  'qwen-image': { download: 'whole', failed: false },
 } as const
 
 describe('the Sound effects row of the Models panel', () => {

@@ -105,6 +105,23 @@ describe('the words of make-all on the Images page', () => {
     ).toContain('About 40 s in all')
   })
 
+  it('reads a wait of an hour or more in hours and minutes', () => {
+    const line = (seconds: number) =>
+      makeAllLine({ model: 'Qwen-Image', main: 'Qwen-Image', why: null, seconds, guess: false })
+    expect(line(59 * 60)).toContain('About 59 min in all')
+    expect(line(60 * 60)).toContain('About 1 h in all')
+    expect(line(61 * 60 - 30)).toContain('About 1 h 1 min in all')
+    expect(line(144 * 60)).toBe(
+      'Four takes each, on Qwen-Image, the image model on Setup. About 2 h 24 min in all — they are made one after another, and you can leave the page.',
+    )
+    expect(line(120 * 60)).toContain('About 2 h in all')
+    expect(runningLine({ takes: 48, images: 12, left: 144 * 60 })).toBe(
+      'Making 48 takes for 12 images · about 2 h 24 min left',
+    )
+    expect(runningLine({ takes: 4, images: 1, left: 120 * 60 })).toContain('about 2 h left')
+    expect(runningLine({ takes: 4, images: 1, left: 45 * 60 })).toContain('about 45 min left')
+  })
+
   it('names the images left out, one reason a line', () => {
     expect(chosenLine(['Fish market', "Captain's cabin"])).toBe(
       "Fish market and Captain's cabin have a chosen take and get none.",

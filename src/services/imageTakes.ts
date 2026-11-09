@@ -788,7 +788,7 @@ export function createImageTakes({
             ? mflux
             : {
                 ok: false,
-                message: 'Neither image model is on this computer.',
+                message: 'No image model is on this computer.',
                 fix: 'See Setup for how to download them.',
               },
         projectModel: found.config.model ?? DEFAULT_IMAGE_MODEL,
