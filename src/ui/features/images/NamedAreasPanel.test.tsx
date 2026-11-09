@@ -42,8 +42,9 @@ const view = (over: Partial<ImagePatchesView> = {}): ImagePatchesView => ({
   lookKey: 'k',
   lockUnread: false,
   pictureGone: false,
-  remake: { earlier: {}, press: null },
+  remake: { earlier: {}, press: null, failedModels: [] },
   maker: { ok: true },
+  models: { 'qwen-edit': 'whole', klein: 'whole' },
   patches: [],
   ...over,
 })
@@ -65,10 +66,12 @@ const patchView = (patch: ListedPatch): ImagePatchesView['patches'][number] => (
     earlier: false,
     isNew: false,
     look: 'ready' as const,
+    model: 'klein' as const,
   })),
   making: [],
   failed: [],
   oldLook: false,
+  failedModels: [],
 })
 
 interface Options {

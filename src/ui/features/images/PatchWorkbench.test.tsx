@@ -44,6 +44,7 @@ const takeOf = (n: number, over: Partial<PatchWorkView['takes'][number]> = {}) =
   chosen: false,
   isNew: false,
   look: 'ready' as const,
+  model: 'klein' as const,
   ...over,
 })
 
@@ -53,6 +54,7 @@ const work = (id: string, over: Partial<PatchWorkView> = {}): PatchWorkView => (
   making: [],
   failed: [],
   oldLook: false,
+  failedModels: [],
   ...over,
 })
 
@@ -67,8 +69,9 @@ const view = (
   lookKey: 'k',
   lockUnread: false,
   pictureGone: false,
-  remake: { earlier: {}, press: null },
+  remake: { earlier: {}, press: null, failedModels: [] },
   maker: { ok: true },
+  models: { 'qwen-edit': 'whole', klein: 'whole' },
   patches,
   ...over,
 })
@@ -632,8 +635,8 @@ describe('takes being made and failed', () => {
         work('a', {
           takes: [takeOf(1)],
           making: [
-            { n: 2, state: 'waiting', elapsed: 0, expected: 15, area },
-            { n: 3, state: 'making', elapsed: 5, expected: 15, area },
+            { n: 2, state: 'waiting', elapsed: 0, expected: 15, area, model: 'klein' },
+            { n: 3, state: 'making', elapsed: 5, expected: 15, area, model: 'klein' },
           ],
         }),
       ]),
@@ -658,7 +661,9 @@ describe('takes being made and failed', () => {
       view([
         work('a', {
           takes: [takeOf(1)],
-          failed: [{ n: 4, message: 'The image generator ran out of memory.', area }],
+          failed: [
+            { n: 4, message: 'The image generator ran out of memory.', area, model: 'klein' },
+          ],
         }),
       ]),
     )
@@ -674,7 +679,7 @@ describe('takes being made and failed', () => {
 
   it('does not promise other takes when there are none', async () => {
     const { host } = await render([patchRow('a')], () =>
-      view([work('a', { failed: [{ n: 1, message: 'Out of memory.', area }] })]),
+      view([work('a', { failed: [{ n: 1, message: 'Out of memory.', area, model: 'klein' }] })]),
     )
     await open(host)
     expect(text(host.querySelector('.errbox'))).not.toContain('Your other takes are kept.')

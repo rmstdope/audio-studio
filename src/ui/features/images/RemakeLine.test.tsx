@@ -40,6 +40,7 @@ const idle = (id: string, over: Partial<PatchWorkView> = {}): PatchWorkView => (
   making: [],
   failed: [],
   oldLook: false,
+  failedModels: [],
   ...over,
 })
 const press = (over: Partial<RemakePressView> = {}): RemakePressView => ({
@@ -51,6 +52,7 @@ const press = (over: Partial<RemakePressView> = {}): RemakePressView => ({
   failed: [],
   running: false,
   left: 120,
+  model: 'klein',
   ...over,
 })
 
@@ -88,8 +90,9 @@ async function render({
         lockUnread: false,
         pictureGone,
         maker,
+        models: { 'qwen-edit': 'whole', klein: 'whole' },
         patches: work,
-        remake: { earlier, press: current },
+        remake: { earlier, press: current, failedModels: [] },
       })
     }
     if (path.endsWith('/remake/close')) current = null
@@ -236,9 +239,12 @@ describe('the press while it runs and after', () => {
       elapsed: 5,
       expected: 15,
       area,
+      model: 'klein',
     })) as never
 
-  const waiting = [{ n: 1, state: 'waiting', elapsed: 0, expected: 15, area }] as never
+  const waiting = [
+    { n: 1, state: 'waiting', elapsed: 0, expected: 15, area, model: 'klein' },
+  ] as never
 
   it('says seconds when under a minute is left', async () => {
     const { host } = await render({ pressed: press({ running: true, left: 40 }) })
@@ -300,7 +306,7 @@ describe('the press while it runs and after', () => {
       pressed: press({ made: 5, failedTakes: 1, failed: ['door'] }),
       work: [
         idle('bread'),
-        idle('door', { failed: [{ n: 1, message: 'boom', area }] }),
+        idle('door', { failed: [{ n: 1, message: 'boom', area, model: 'klein' }] }),
         idle('lamp'),
       ],
     })
@@ -316,7 +322,7 @@ describe('the press while it runs and after', () => {
       pressed: press({ made: 5, failedTakes: 1, failed: ['door'] }),
       work: [
         idle('bread'),
-        idle('door', { failed: [{ n: 1, message: 'boom', area }] }),
+        idle('door', { failed: [{ n: 1, message: 'boom', area, model: 'klein' }] }),
         idle('lamp'),
       ],
     })
