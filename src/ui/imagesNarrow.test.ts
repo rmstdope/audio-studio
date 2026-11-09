@@ -67,11 +67,11 @@ describe('the named areas picture in a narrow window (as-5v0)', () => {
   })
 
   it('is drawn in front of the list, and reaches the window’s top so no row shows above it', () => {
-    expect(stacked()).toMatch(/z-index:\s*1/)
-    expect(stacked()).toMatch(/top:\s*0/)
+    expect(stacked()).toMatch(/z-index:\s*1;/)
+    expect(stacked()).toMatch(/top:\s*0;/)
   })
 
-  it('stays held in view, as agreed for marking an area', () => {
+  it('leaves the picture’s position alone once stacked, so it stays held in view as agreed', () => {
     expect(stacked()).not.toMatch(/position:/)
   })
 })
