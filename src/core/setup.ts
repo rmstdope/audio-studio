@@ -1,6 +1,12 @@
 import type { z } from 'zod'
 import { EFFECT_MODEL_IDS, effectModel, type EffectModelId } from './effectModels'
-import { IMAGE_MODEL_IDS, imageModel, type ImageDownload, type ImageModelId } from './imageModels'
+import {
+  EDIT_MODELS,
+  IMAGE_MODEL_IDS,
+  imageModel,
+  type ImageDownload,
+  type ImageModelId,
+} from './imageModels'
 import { MUSIC_MODELS, musicModel, type MusicModelId } from './musicModels'
 import type { FishTierSchema } from './project'
 
@@ -86,6 +92,8 @@ export interface SetupFacts {
     mflux: { ok: true } | { ok: false; reason: 'platform' | 'mflux'; message: string; fix: string }
     /** The project's main image model. */
     model: ImageModelId
+    /** How much of the stronger patch model, Qwen Image Edit, is here: optional, it only makes patches. */
+    patchModel: ImageDownload
     /** Each image model: how much of its download is here, and its last take if that failed. */
     models: Record<
       ImageModelId,
@@ -478,7 +486,32 @@ function finishStep(id: ImageModelId): SetupStep {
   }
 }
 
+/** The image models check, with the optional patch model's line and download step after the rest. */
 function imageModels(facts: SetupFacts): SetupCheck {
+  const check = mainImageModels(facts)
+  if (!facts.images?.mflux.ok || facts.images.patchModel === 'whole') return check
+  const { name, repo, gigabytes } = EDIT_MODELS['qwen-edit']
+  const partial = facts.images.patchModel === 'partial'
+  const command = `uvx --from huggingface_hub hf download ${repo}`
+  const step: SetupStep = partial
+    ? { parts: ['Finish the download (it picks up where it stopped):'], commands: [command] }
+    : { parts: [`Download it, once (about ${gigabytes} GB):`], commands: [command] }
+  return {
+    ...check,
+    notes: [
+      ...(check.notes ?? []),
+      partial
+        ? `Optional: for patches. ${name}'s download is incomplete.`
+        : `Optional: for patches. ${name} is not on this computer.`,
+    ],
+    steps: {
+      list: [...(check.steps?.list ?? []), step],
+      note: check.steps?.note ?? 'Then press Check again.',
+    },
+  }
+}
+
+function mainImageModels(facts: SetupFacts): SetupCheck {
   const title = 'Image models'
   if (!facts.images) {
     return {

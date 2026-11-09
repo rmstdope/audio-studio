@@ -1729,7 +1729,7 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = RemakePatchesBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
-            return Response.json({ error: 'expected { count, marks }' }, { status: 400 })
+            return Response.json({ error: 'expected { count, marks, model? }' }, { status: 400 })
           }
           return imageAnswer(await imagePatches.remake(projectFile, request.params.id, body.data))
         }),
@@ -1750,7 +1750,7 @@ export function startServer({
           const body = MakePatchTakesBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
             return Response.json(
-              { error: 'expected { count, area } or { retry }' },
+              { error: 'expected { count, area, model? } or { retry }' },
               { status: 400 },
             )
           }

@@ -72,7 +72,58 @@ describe('mfluxArguments of an edit', () => {
   })
 })
 
+describe('mfluxArguments of a Qwen Image Edit take', () => {
+  it('names the repository, its base, 8 bits and 30 steps, with its own command', () => {
+    const edit = mfluxArguments(
+      { ...request, model: 'qwen-edit', editing: '/repo/25.png' },
+      '/tmp/x.png',
+    )
+    expect(edit.program).toBe('mflux-generate-qwen-edit')
+    expect(edit.args).toEqual([
+      '--model', 'Qwen/Qwen-Image-Edit',
+      '--base-model', 'qwen-image-edit',
+      '--quantize', '8',
+      '--steps', '30',
+      '--image-paths', '/repo/25.png',
+      '--prompt', 'a room',
+      '--width', '1024',
+      '--height', '576',
+      '--seed', '42',
+      '--output', '/tmp/x.png',
+    ]) // prettier-ignore
+  })
+
+  it('finds the Qwen weights in the hub by their repository', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hub-'))
+    expect(imageModelDownload(dir, 'qwen-edit')).toBe('absent')
+    const snapshot = join(dir, 'models--Qwen--Qwen-Image-Edit', 'snapshots', 'abc')
+    mkdirSync(snapshot, { recursive: true })
+    writeFileSync(join(snapshot, 'model.safetensors'), '{}')
+    expect(imageModelDownload(dir, 'qwen-edit')).toBe('whole')
+    expect(imageModelInstalled(dir, 'qwen-edit')).toBe(true)
+  })
+
+  it('says a failed Qwen take could not make the take', async () => {
+    const generator = createMfluxGenerator({
+      machine: mac,
+      log: () => {},
+      build: fake('console.error("boom"); process.exit(3)'),
+    })
+    await expect(
+      generator.generate({ ...request, model: 'qwen-edit', editing: '/repo/25.png' }),
+    ).rejects.toThrow('Qwen Image Edit could not make the take (mflux stopped with exit code 3)')
+  })
+})
+
 describe('canEdit', () => {
+  it('asks for the command of the model given', async () => {
+    const onlyKlein = createMfluxGenerator({
+      machine: { ...mac, which: (c) => c !== 'mflux-generate-qwen-edit' },
+    })
+    expect(await onlyKlein.canEdit?.('klein')).toBe(true)
+    expect(await onlyKlein.canEdit?.('qwen-edit')).toBe(false)
+  })
+
   it('asks whether the installed mflux has the edit command', async () => {
     const has = createMfluxGenerator({ machine: mac })
     const lacks = createMfluxGenerator({

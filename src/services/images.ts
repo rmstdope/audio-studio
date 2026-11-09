@@ -5,10 +5,14 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   checkImageRequest,
+  EDIT_MODELS,
   IMAGE_EDIT_COMMAND,
   IMAGE_MODEL_IDS,
+  editFailureReason,
   imageFailureReason,
   imageModel,
+  isEditModel,
+  type EditModelId,
   type ImageDownload,
   type ImageModelId,
 } from '../core/imageModels'
@@ -25,8 +29,8 @@ export interface ImageRequest {
   width: number
   height: number
   seed: number
-  /** The model to make it with. */
-  model: ImageModelId
+  /** The model to make it with; an edit model changes the picture in `editing`. */
+  model: ImageModelId | EditModelId
   /** The path of a picture to change, the prompt then being the instruction; none makes a new one. */
   editing?: string
 }
@@ -53,11 +57,11 @@ export interface ImageGenerator {
   /** Whether a take can be made now: Apple silicon and mflux are there. */
   ready(): ImageReady | Promise<ImageReady>
   /** Whether this model's weights are on this computer. */
-  installed(model: ImageModelId): boolean | Promise<boolean>
+  installed(model: ImageModelId | EditModelId): boolean | Promise<boolean>
   /** How much of this model's download is here; a generator without it is whole or absent by `installed`. */
-  download?(model: ImageModelId): ImageDownload | Promise<ImageDownload>
-  /** Whether a picture can be edited here; a generator without it can. */
-  canEdit?(): boolean | Promise<boolean>
+  download?(model: ImageModelId | EditModelId): ImageDownload | Promise<ImageDownload>
+  /** Whether a picture can be edited here with this edit model (klein by default); a generator without it can. */
+  canEdit?(model?: EditModelId): boolean | Promise<boolean>
   /** One take; the model loads for it and leaves memory when it is made. Aborting ends it, and it rejects. */
   generate(request: ImageRequest, signal?: AbortSignal): Promise<GeneratedImage>
 }
@@ -65,7 +69,7 @@ export interface ImageGenerator {
 /** How much of a model's download the generator says is here. */
 export async function downloadOf(
   generator: Pick<ImageGenerator, 'installed' | 'download'>,
-  model: ImageModelId,
+  model: ImageModelId | EditModelId,
 ): Promise<ImageDownload> {
   if (generator.download) return generator.download(model)
   return (await generator.installed(model)) ? 'whole' : 'absent'
@@ -150,12 +154,18 @@ export function hubDownload(hubDir: string, repo: string): ImageDownload {
 }
 
 /** How much of an image model's download is in the Hugging Face cache `hubDir` (see `hubDownload`). */
-export function imageModelDownload(hubDir: string, model: ImageModelId): ImageDownload {
-  return hubDownload(hubDir, imageModel(model).repo)
+export function imageModelDownload(
+  hubDir: string,
+  model: ImageModelId | EditModelId,
+): ImageDownload {
+  return hubDownload(
+    hubDir,
+    (isEditModel(model) ? EDIT_MODELS[model] : imageModel(model as ImageModelId)).repo,
+  )
 }
 
 /** Whether a model's whole download is in the Hugging Face cache `hubDir`. */
-export function imageModelInstalled(hubDir: string, model: ImageModelId): boolean {
+export function imageModelInstalled(hubDir: string, model: ImageModelId | EditModelId): boolean {
   return imageModelDownload(hubDir, model) === 'whole'
 }
 
@@ -194,7 +204,26 @@ export interface MfluxCommand {
 
 /** The command and arguments of mflux for a take written to `out`; steps are the model's own. */
 export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand {
-  const model = imageModel(request.model)
+  if (request.editing && isEditModel(request.model)) {
+    const edit = EDIT_MODELS[request.model]
+    return {
+      program: edit.command,
+      args: [
+        '--model', edit.mflux,
+        ...(edit.base ? ['--base-model', edit.base] : []),
+        ...(edit.quantize ? ['--quantize', String(edit.quantize)] : []),
+        ...(edit.steps ? ['--steps', String(edit.steps)] : []),
+        '--image-paths', request.editing,
+        '--prompt', request.prompt,
+        '--width', String(request.width),
+        '--height', String(request.height),
+        '--seed', String(request.seed),
+        '--output', out,
+      ], // prettier-ignore
+      out,
+    }
+  }
+  const model = imageModel(request.model as ImageModelId)
   return {
     program: request.editing ? IMAGE_EDIT_COMMAND : model.command,
     args: [
@@ -238,7 +267,7 @@ export function createMfluxGenerator({
   return {
     ready: () => mfluxReady(machine),
     installed: (model) => imageModelInstalled(hubDir, model),
-    canEdit: () => machine.which(IMAGE_EDIT_COMMAND),
+    canEdit: (model = 'klein') => machine.which(EDIT_MODELS[model].command),
     download: (model) => imageModelDownload(hubDir, model),
     async generate(request, signal) {
       const problem = checkImageRequest(request)
@@ -277,7 +306,9 @@ export function createMfluxGenerator({
             const output = quietLines(stderr).trim()
             log(`Content Studio: ${command[0]} failed (exit code ${code}):\n${output}`)
             throw new ImageToolError(
-              imageFailureReason(request.model, code, output),
+              request.editing && isEditModel(request.model)
+                ? editFailureReason(request.model, code, output)
+                : imageFailureReason(request.model as ImageModelId, code, output),
               output.split('\n').at(-1) ?? '',
             )
           }

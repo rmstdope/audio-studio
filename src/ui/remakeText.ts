@@ -1,3 +1,4 @@
+import { EDIT_MODELS, type EditModelId } from '../core/imageModels'
 import { joined } from './imagesText'
 
 const patches = (n: number) => (n === 1 ? 'patch' : 'patches')
@@ -31,8 +32,13 @@ export function leftOutLine(titles: readonly string[], all: boolean): string {
 }
 
 /** The progress line while the press runs. */
-export function remakeProgress(total: number, patchCount: number, left: number): string {
-  return `Making ${total} ${takes(total)} for ${patchCount} ${patches(patchCount)} · ${timeLeft(left)} left`
+export function remakeProgress(
+  total: number,
+  patchCount: number,
+  left: number,
+  model: EditModelId,
+): string {
+  return `Making ${total} ${takes(total)} for ${patchCount} ${patches(patchCount)} with ${EDIT_MODELS[model].short} · ${timeLeft(left)} left`
 }
 
 /** What the summary says besides the names of the patches with a failed take. */

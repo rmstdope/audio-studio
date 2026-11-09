@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { EDIT_MODEL_IDS, type EditModelId, type ImageDownload } from './imageModels'
 import type { AreaBox, AreaRow, ImageRow, PatchRow } from './images'
 import type { Look, LookSize } from './imageLook'
 import { bringToLook, type Pixels } from './imagePixels'
@@ -35,6 +36,8 @@ export const PatchTakeSchema = z.strictObject({
   seen: z.boolean().default(false),
   /** What its game version (`<n>.game.png`) was brought to (`lookKey`); absent until it is. */
   look: z.string().optional(),
+  /** The edit model that made it; absent on a take made before there was a choice, which klein made. */
+  model: z.enum(EDIT_MODEL_IDS).optional(),
 })
 
 /** One take of a patch. */
@@ -60,7 +63,12 @@ export type PatchBoard = z.infer<typeof PatchBoardSchema>
 
 /** The body of asking for takes of a patch: this many new ones (1 to 4) of an area, or a failed take again. */
 export const MakePatchTakesBody = z.union([
-  z.strictObject({ count: z.number().int().min(1).max(4), area: PatchAreaSchema }),
+  z.strictObject({
+    count: z.number().int().min(1).max(4),
+    area: PatchAreaSchema,
+    /** The edit model for the new takes; klein when left out. */
+    model: z.enum(EDIT_MODEL_IDS).optional(),
+  }),
   z.strictObject({ retry: z.number().int().positive() }),
 ])
 
@@ -81,6 +89,8 @@ export interface PatchTakeView {
    * there (never brought, or its file is gone).
    */
   look: 'ready' | 'bringing' | 'old' | 'missing'
+  /** The edit model that made it (klein for a take made before there was a choice). */
+  model: EditModelId
 }
 
 /** A take of a patch waiting or being made. */
@@ -92,6 +102,8 @@ export interface PatchMakingView {
   /** Seconds an edit is expected to take (a guess). */
   expected: number
   area: PatchArea
+  /** The edit model making it. */
+  model: EditModelId
 }
 
 /** A take of a patch that failed, kept until it is made again. */
@@ -99,6 +111,8 @@ export interface PatchFailedView {
   n: number
   message: string
   area: PatchArea
+  /** The edit model that failed. */
+  model: EditModelId
 }
 
 /** One patch of an image with its takes on the image's chosen take. */
@@ -109,6 +123,8 @@ export interface PatchWorkView {
   failed: PatchFailedView[]
   /** The patch is in the game, in another look than the style asks for now. */
   oldLook: boolean
+  /** The edit models whose last take of this patch failed, until one of theirs works. */
+  failedModels: EditModelId[]
 }
 
 /** The patches of an image as the page shows them: those made on the take the game shows. */
@@ -128,6 +144,8 @@ export interface ImagePatchesView {
   pictureGone: boolean
   /** Whether takes of patches can be made on this computer, and why not if they cannot. */
   maker: { ok: true } | { ok: false; message: string }
+  /** How much of each edit model's download is on this computer. */
+  models: Record<EditModelId, ImageDownload>
   /** The image's patches the game lists, each with its takes. */
   patches: PatchWorkView[]
   /** What the press "Remake patches on this take" needs to know and has done. */
@@ -149,6 +167,8 @@ export interface RemakePressView {
   running: boolean
   /** Seconds the takes still to make are expected to take (a guess). */
   left: number
+  /** The edit model every take of the press is made with. */
+  model: EditModelId
 }
 
 /** What the page needs for the press: the area of the earlier choice of each patch, and the latest press. */
@@ -156,12 +176,16 @@ export interface RemakeView {
   /** By patch id: the area of the take chosen on the newest earlier take of the image. */
   earlier: Record<string, PatchArea>
   press: RemakePressView | null
+  /** The edit models whose last take of any patch of the image failed. */
+  failedModels: EditModelId[]
 }
 
 /** The body of the press: how many takes of each patch, and the marks the person drew (by patch id). */
 export const RemakePatchesBody = z.strictObject({
   count: z.number().int().min(1).max(4),
   marks: z.record(z.string(), PatchAreaSchema),
+  /** The edit model for every take of the press; klein when left out. */
+  model: z.enum(EDIT_MODEL_IDS).optional(),
 })
 
 /** The named area the game ties a patch to, with the place it has now; null for a patch with no tie. */

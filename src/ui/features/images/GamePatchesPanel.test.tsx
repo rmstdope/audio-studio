@@ -49,8 +49,9 @@ async function render(
         ok: true,
         take: null,
         pictureGone: false,
-        remake: { earlier: {}, press: null },
+        remake: { earlier: {}, press: null, failedModels: [] },
         maker: { ok: true },
+        models: { 'qwen-edit': 'whole', klein: 'whole' },
         patches: [],
         ...view,
       })

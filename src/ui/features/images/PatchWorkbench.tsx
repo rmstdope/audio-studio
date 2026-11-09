@@ -16,6 +16,14 @@ import {
   type PatchTakeView,
   type PatchWorkView,
 } from '../../../core/imagePatches'
+import {
+  EDIT_SETUP_LINE,
+  editAbsentLine,
+  editModel,
+  type EditModelId,
+  DEFAULT_EDIT_MODEL,
+} from '../../../core/imageModels'
+import { EditModelMenu } from './EditModelMenu'
 import { rightAfterDrop, stepRight } from '../../../core/imageTakes'
 import {
   useChoosePatchTake,
@@ -140,6 +148,7 @@ function MakingThumb({
       <span className="patch-thumb-label">
         <span className="grow">Take {making.n}</span>
       </span>
+      <span className="faint small patch-thumb-model">{editModel(making.model).short}</span>
       <span className="faint small">{timeLeftText(making)}</span>
       <div
         className="bar"
@@ -172,6 +181,8 @@ export function PatchWorkbench({
   imageSize,
   game,
   onGame,
+  model,
+  onModel,
 }: {
   imageId: string
   patchId: string
@@ -192,6 +203,9 @@ export function PatchWorkbench({
   /** Whether the game's version is shown (the box "What the game gets"), kept by the page. */
   game: boolean
   onGame: (on: boolean) => void
+  /** The model new takes are made with, picked in the menu (the page keeps the pick). */
+  model: EditModelId
+  onModel: (model: EditModelId) => void
 }) {
   const make = useMakePatchTakes(imageId, patchId)
   const stop = useStopPatchTakes(imageId, patchId)
@@ -205,6 +219,8 @@ export function PatchWorkbench({
   const [asking, setAsking] = useState(false)
   const [pendingFocus, setPendingFocus] = useState<number | 'heading' | null>(null)
   const [waitingForWords, setWaitingForWords] = useState(false)
+  // Focus goes to Make once a stopped press has left it free again.
+  const [landOnMake, setLandOnMake] = useState(false)
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
   // Focus asked for by a press of Make does not scroll: a mouse press stays where it was.
@@ -240,6 +256,12 @@ export function PatchWorkbench({
   useEffect(() => {
     if (lookingAt !== null) thumbs.current.get(lookingAt)?.scrollIntoView?.({ block: 'nearest' })
   }, [lookingAt])
+  useEffect(() => {
+    if (landOnMake && work.making.length === 0) {
+      makeButton.current?.focus()
+      setLandOnMake(false)
+    }
+  })
   useEffect(() => {
     if (pendingFocus === null) return
     const target = pendingFocus === 'heading' ? heading.current : thumbs.current.get(pendingFocus)
@@ -284,7 +306,14 @@ export function PatchWorkbench({
   const atArea = marked !== null && fromArea !== null && sameArea(marked, fromArea)
   const busy = making.length > 0
   const hasTakes = takes.length > 0 || busy
-  const canMake = marked !== null && !busy && !make.isPending && !waitingForWords && view.maker.ok
+  const modelHere = view.models[model] === 'whole'
+  const canMake =
+    marked !== null && !busy && !make.isPending && !waitingForWords && view.maker.ok && modelHere
+  const absentLine = !modelHere
+    ? EDIT_SETUP_LINE
+    : view.models[DEFAULT_EDIT_MODEL] !== 'whole' && model === 'klein'
+      ? editAbsentLine(view.models[DEFAULT_EDIT_MODEL])
+      : null
   const canChange = !lockUnread && !choose.isPending && !drop.isPending
   const canChoose = canChange && lookError === null && shown !== null && shown.look !== 'bringing'
   const overlaid = showing ? shown : null
@@ -411,6 +440,7 @@ export function PatchWorkbench({
                 Looking at
               </span>
               <b>Take {shown.n}</b>
+              <span className="faint small">{editModel(shown.model).short}</span>
               {shown.chosen && <span className="chip chip-ok">Chosen</span>}
               {shown.chosen && work.oldLook && <span className="chip chip-warn">Old look</span>}
             </>
@@ -563,6 +593,14 @@ export function PatchWorkbench({
           ) : (
             !marked && <span className="muted small">{areaNoPlaceText(tie.title)}</span>
           ))}
+        <EditModelMenu
+          value={model}
+          onChange={onModel}
+          downloads={view.models}
+          failed={work.failedModels}
+          label="Model for new takes"
+          disabled={busy || make.isPending || waitingForWords || !view.maker.ok}
+        />
         <div className="patch-make">
           <select
             className="takes-count"
@@ -589,12 +627,12 @@ export function PatchWorkbench({
               focusQuietly.current = true
               setPendingFocus(lookingAt ?? 'heading')
               const saving = saveWords()
-              if (saving === null) return make.mutate({ count, area: marked })
+              if (saving === null) return make.mutate({ count, area: marked, model })
               // The takes are made from the saved words, so they must be the words in the field.
               setWaitingForWords(true)
               void saving.then((saved) => {
                 setWaitingForWords(false)
-                if (saved) make.mutate({ count, area: marked })
+                if (saved) make.mutate({ count, area: marked, model })
               })
             }}
           >
@@ -605,12 +643,13 @@ export function PatchWorkbench({
               type="button"
               className="btn btn-ghost"
               disabled={stop.isPending}
-              onClick={() => stop.mutate()}
+              onClick={() => stop.mutate(undefined, { onSuccess: () => setLandOnMake(true) })}
             >
               Stop
             </button>
           )}
         </div>
+        {absentLine && <span className="faint small">{absentLine}</span>}
         {!view.maker.ok ? (
           <span className="takes-missing small" role="status">
             {view.maker.message}
@@ -630,7 +669,7 @@ export function PatchWorkbench({
             <button
               type="button"
               className="btn"
-              disabled={make.isPending || !view.maker.ok}
+              disabled={make.isPending || !view.maker.ok || view.models[f.model] !== 'whole'}
               onClick={() => make.mutate({ retry: f.n })}
             >
               Try again
@@ -682,6 +721,9 @@ export function PatchWorkbench({
                         {t.chosen && <span className="chip chip-ok">Chosen</span>}
                         {t.isNew && <span className="chip chip-new">new</span>}
                         {t.earlier && <span className="faint small">earlier words</span>}
+                      </span>
+                      <span className="faint small patch-thumb-model">
+                        {editModel(t.model).short}
                       </span>
                     </button>
                   ) : (

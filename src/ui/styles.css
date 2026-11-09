@@ -5521,3 +5521,20 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--text-soft);
   font-size: 12px;
 }
+
+/* The model menu of a patch's takes: a line of its own, the warning for its model under it. */
+.edit-model {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.edit-model .takes-model {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+.patch-thumb-model {
+  overflow-wrap: anywhere;
+}

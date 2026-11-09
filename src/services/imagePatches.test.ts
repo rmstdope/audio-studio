@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import type { EditModelId } from '../core/imageModels'
 import { matchToTake, type ImagePatchesView, type PatchWorkView } from '../core/imagePatches'
 import { createImagePatches } from './imagePatches'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
@@ -54,6 +55,7 @@ function setup({
   picture = true,
   ready = { ok: true },
   installed = true,
+  here = {},
   canEdit,
   makes = (request: ImageRequest) => fakePng(request.width, request.height, 1),
   queue = createSerial(),
@@ -64,6 +66,8 @@ function setup({
   picture?: boolean
   ready?: ImageReady
   installed?: boolean
+  /** Which edit models are whole, for the ones that differ from `installed`. */
+  here?: Partial<Record<EditModelId, boolean>>
   canEdit?: boolean
   makes?: (request: ImageRequest) => Uint8Array
   queue?: Serial
@@ -82,7 +86,7 @@ function setup({
   const requests: ImageRequest[] = []
   const generator: ImageGenerator = {
     ready: () => ready,
-    installed: () => installed,
+    installed: (model) => here[model as EditModelId] ?? installed,
     ...(canEdit === undefined ? {} : { canEdit: () => canEdit }),
     async generate(request) {
       requests.push(request)
@@ -134,10 +138,13 @@ describe('takes of a declared patch', () => {
     await patches.make(file, 'inn', 'door', { count: 1, area })
     expect(await work()).toEqual({
       id: 'door',
-      takes: [{ n: 1, area, earlier: false, chosen: false, isNew: true, look: 'ready' }],
+      takes: [
+        { n: 1, area, earlier: false, chosen: false, isNew: true, look: 'ready', model: 'klein' },
+      ],
       making: [],
       failed: [],
       oldLook: false,
+      failedModels: [],
     })
     expect(JSON.parse(readFileSync(join(root, BOARD), 'utf8'))).toEqual({
       next: 2,
@@ -150,6 +157,7 @@ describe('takes of a declared patch', () => {
           area,
           seen: false,
           look: expect.any(String),
+          model: 'klein',
         },
       ],
       chosen: {},
@@ -199,8 +207,8 @@ describe('takes of a declared patch', () => {
     const view = (await patches.view(file, 'inn')) as ImagePatchesView
     const door = view.patches.find((p) => p.id === 'door')!
     expect(door.making).toEqual([
-      { n: 1, state: 'waiting', elapsed: 0, expected: expect.any(Number), area },
-      { n: 2, state: 'waiting', elapsed: 0, expected: expect.any(Number), area },
+      { n: 1, state: 'waiting', elapsed: 0, expected: 20, area, model: 'klein' },
+      { n: 2, state: 'waiting', elapsed: 0, expected: 20, area, model: 'klein' },
     ])
     release()
     expect((await work()).takes).toHaveLength(2)
@@ -368,8 +376,10 @@ describe('takes of a declared patch', () => {
     })
     const absent = setup({ installed: false })
     const missing = 'FLUX.2 klein 4B is not on this computer, and patches are made with it.'
+    // The weights are the model's business, not the machine's: the view says so per model.
     expect(await absent.patches.view(absent.file, 'inn')).toMatchObject({
-      maker: { ok: false, message: missing },
+      maker: { ok: true },
+      models: { klein: 'absent', 'qwen-edit': 'absent' },
     })
     expect(await absent.patches.make(absent.file, 'inn', 'door', { count: 1, area })).toEqual({
       ok: false,
@@ -408,6 +418,100 @@ describe('takes of a declared patch', () => {
       patches: [{ takes: [] }, { takes: [] }],
     })
     expect(existsSync(join(root, old))).toBe(true)
+  })
+})
+
+describe('the model of a take of a patch', () => {
+  it('makes new takes with the model asked for, and keeps it with each take', async () => {
+    const { root, file, patches, requests, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area, model: 'qwen-edit' })
+    const view = await work()
+    expect(requests[0]!.model).toBe('qwen-edit')
+    expect(view.takes[0]!.model).toBe('qwen-edit')
+    expect(JSON.parse(readFileSync(join(root, BOARD), 'utf8')).takes[0].model).toBe('qwen-edit')
+  })
+
+  it('reads a take made before the choice as klein, and makes klein takes when no model is named', async () => {
+    const { file, patches, requests, work, root } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    expect(requests[0]!.model).toBe('klein')
+    const board = JSON.parse(readFileSync(join(root, BOARD), 'utf8'))
+    delete board.takes[0].model
+    writeFileSync(join(root, BOARD), JSON.stringify(board))
+    expect((await work()).takes[0]!.model).toBe('klein')
+  })
+
+  it('shows each take being made with its model and the time of that model', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { file, patches, work } = setup({ queue })
+    await patches.make(file, 'inn', 'door', { count: 1, area, model: 'qwen-edit' })
+    const view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.patches[0]!.making).toEqual([
+      { n: 1, state: 'waiting', elapsed: 0, expected: 360, area, model: 'qwen-edit' },
+    ])
+    release()
+    await work()
+  })
+
+  it('refuses a model that is not on this computer, naming it', async () => {
+    const { file, patches } = setup({ here: { 'qwen-edit': false } })
+    expect(await patches.make(file, 'inn', 'door', { count: 1, area, model: 'qwen-edit' })).toEqual(
+      {
+        ok: false,
+        message: 'Qwen Image Edit is not on this computer, and patches are made with it.',
+      },
+    )
+    expect(await patches.make(file, 'inn', 'door', { count: 1, area })).toEqual({ ok: true })
+  })
+
+  it('says how much of each model is on this computer', async () => {
+    const { file, patches } = setup({ here: { 'qwen-edit': false } })
+    expect(await patches.view(file, 'inn')).toMatchObject({
+      models: { 'qwen-edit': 'absent', klein: 'whole' },
+    })
+  })
+
+  it('makes a failed take again with the model that failed, whatever the body says', async () => {
+    let fail = true
+    const { file, patches, work, requests } = setup({
+      makes: (r) => {
+        if (fail) throw new Error('out of memory')
+        return fakePng(r.width, r.height, 1)
+      },
+    })
+    await patches.make(file, 'inn', 'door', { count: 1, area, model: 'qwen-edit' })
+    expect(await work()).toMatchObject({
+      failed: [{ n: 1, model: 'qwen-edit' }],
+      failedModels: ['qwen-edit'],
+    })
+    fail = false
+    await patches.make(file, 'inn', 'door', { retry: 1 })
+    const view = await work()
+    expect(requests.at(-1)!.model).toBe('qwen-edit')
+    expect(view.takes[0]!.model).toBe('qwen-edit')
+    expect(view.failedModels).toEqual([])
+  })
+
+  it('remembers a model that failed until a take of its own works, and not for the other', async () => {
+    let fail = true
+    const { file, patches, work } = setup({
+      makes: (r) => {
+        if (fail && r.model === 'qwen-edit') throw new Error('out of memory')
+        return fakePng(r.width, r.height, 1)
+      },
+    })
+    await patches.make(file, 'inn', 'door', { count: 1, area, model: 'qwen-edit' })
+    expect((await work()).failedModels).toEqual(['qwen-edit'])
+    const failedView = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(failedView.remake.failedModels).toEqual(['qwen-edit'])
+    await patches.make(file, 'inn', 'door', { count: 1, area, model: 'klein' })
+    expect((await work()).failedModels).toEqual(['qwen-edit'])
+    fail = false
+    await patches.make(file, 'inn', 'door', { count: 1, area, model: 'qwen-edit' })
+    expect((await work()).failedModels).toEqual([])
   })
 })
 
@@ -770,6 +874,34 @@ function chosenEarlier(root: string, patches: string[] = ['door', 'sign'], at = 
     )
   }
 }
+
+describe('remaking patches with a model', () => {
+  it('makes every take of the press with the model, and the press names it', async () => {
+    let release = () => {}
+    const queue = createSerial()
+    void queue.run('gpu', () => new Promise<void>((resolve) => (release = resolve)))
+    const { root, file, patches, requests, settled } = setup({ queue })
+    chosenEarlier(root)
+    await patches.remake(file, 'inn', { count: 1, marks: {}, model: 'qwen-edit' })
+    const view = (await patches.view(file, 'inn')) as ImagePatchesView
+    expect(view.remake.press).toMatchObject({ model: 'qwen-edit', total: 2 })
+    // two takes on the model's time, not klein's
+    expect(view.remake.press!.left).toBe(720)
+    release()
+    await settled('door')
+    await settled('sign')
+    expect(requests.map((r) => r.model)).toEqual(['qwen-edit', 'qwen-edit'])
+  })
+
+  it('refuses a model that is not on this computer', async () => {
+    const { root, file, patches } = setup({ here: { 'qwen-edit': false } })
+    chosenEarlier(root)
+    expect(await patches.remake(file, 'inn', { count: 1, marks: {}, model: 'qwen-edit' })).toEqual({
+      ok: false,
+      message: 'Qwen Image Edit is not on this computer, and patches are made with it.',
+    })
+  })
+})
 
 describe('remaking patches on a new take', () => {
   it('makes the chosen number of takes for each covered patch, in the game order, from the area they were chosen with and their words now', async () => {
