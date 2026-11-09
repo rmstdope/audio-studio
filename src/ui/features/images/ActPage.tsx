@@ -10,7 +10,7 @@ import {
   overlapActLine,
 } from '../../imagesText'
 import { ActLinks } from './ActLinks'
-import { makingStatusText } from '../../musicTakesText'
+import { imageMakingStatusText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { showingAttentionText } from '../../status'
 import { MakeAllPanel } from './MakeAllPanel'
@@ -224,7 +224,7 @@ export function ActPage({
                       <td className="images-status">
                         {(making[row.id]?.takes ?? 0) > 0 ? (
                           <span className="chip chip-warn">
-                            {makingStatusText(making[row.id]!)}
+                            {imageMakingStatusText(making[row.id]!)}
                           </span>
                         ) : (
                           <span className={STATUS_CHIP[row.status]}>{row.status}</span>

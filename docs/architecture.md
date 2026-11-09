@@ -1658,8 +1658,8 @@ step through the grid, which scrolls to keep the compared take in view, **C** ch
 take and **D** drops it, each only when its button is on, once per press (a held key does not
 repeat) and not while the last choice or drop is still being saved. Pressing Make N takes puts focus on the compared take in the
 grid (on the Comparing label when there is none yet), so the switched-off button does not lose it
-(as-99s). The status of an image on its act's list says "making 2 takes · about 1 min" while takes
-are made. The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.html`.
+(as-99s). The status of an image on its act's list says "making 2 takes · about 50 s" while takes
+are made, the time left rounded up like every image time (as-l00). The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.html`.
 
 **Make takes for the whole act (as-23x.3).** The "Images up to date" panel on an act's page has a
 button, "Make 4 takes each", beside the count. `planImagesMakeAll` (`src/core/imagesMakeAll.ts`)
