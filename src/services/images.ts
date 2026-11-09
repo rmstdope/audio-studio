@@ -97,11 +97,29 @@ export function hubDirOf(env: Record<string, string | undefined>, home: string):
 /** Where the Hugging Face downloads are on this computer. */
 export const HUB_DIR = hubDirOf(process.env, homedir())
 
-/** What a folder's snapshot holds: whether there is a weights file, and whether anything in it is unfinished. */
-function inspectSnapshots(dir: string): { weights: boolean; broken: boolean } {
-  const found = { weights: false, broken: false }
+/** A weights file that is one shard of several, as in `model-00001-of-00004.safetensors`. */
+const SHARD_FILE = /-\d+-of-\d+\.safetensors$/
+
+/**
+ * What a folder's snapshot holds: whether there is a weights file, whether anything in it is
+ * unfinished, and whether an index vouches for it: a shard index is there, and no part of the model
+ * (a folder with a `config.json` or shards) is still without its index or single weights file.
+ */
+function inspectSnapshots(dir: string): { weights: boolean; broken: boolean; vouched: boolean } {
+  const found = { weights: false, broken: false, vouched: false }
+  let waiting = false
   const visit = (folder: string) => {
-    for (const name of readdirSync(folder)) {
+    const names = readdirSync(folder)
+    const indexed = names.some((name) => name.endsWith('.safetensors.index.json'))
+    const single = names.some((name) => name.endsWith('.safetensors') && !SHARD_FILE.test(name))
+    if (indexed) found.vouched = true
+    if (
+      (names.includes('config.json') || names.some((n) => SHARD_FILE.test(n))) &&
+      !indexed &&
+      !single
+    )
+      waiting = true
+    for (const name of names) {
       const path = join(folder, name)
       // A link to a blob that is not there (a download stopped) cannot be followed.
       if (!existsSync(path)) {
@@ -129,10 +147,10 @@ function inspectSnapshots(dir: string): { weights: boolean; broken: boolean } {
   } catch {
     // Unreadable counts as having nothing.
   }
-  return found
+  return { ...found, vouched: found.vouched && !waiting }
 }
 
-/** Whether a folder holds a file ending `.incomplete` (Hugging Face's mark on a blob still downloading). */
+/** Whether a folder holds a file ending `.incomplete` (Hugging Face's mark on a blob not finished, still coming or left by an interrupted download). */
 function hasUnfinishedBlob(dir: string): boolean {
   try {
     return readdirSync(dir).some((name) => name.endsWith('.incomplete'))
@@ -143,14 +161,17 @@ function hasUnfinishedBlob(dir: string): boolean {
 
 /**
  * How much of a repository's download is in the Hugging Face cache `hubDir`: `absent` with no folder
- * for it, `whole` when a snapshot holds weights and nothing is unfinished (no `.incomplete` blob, no
- * link to a missing blob, every shard an index names), `partial` otherwise.
+ * for it, `whole` when a snapshot holds weights and nothing is unfinished (no link to a missing blob,
+ * every shard an index names, and no `.incomplete` blob unless an index vouches for the snapshot, for
+ * then it is a leftover), `partial` otherwise.
  */
 export function hubDownload(hubDir: string, repo: string): ImageDownload {
   const folder = join(hubDir, `models--${repo.replace('/', '--')}`)
   if (!existsSync(folder)) return 'absent'
-  const { weights, broken } = inspectSnapshots(join(folder, 'snapshots'))
-  return weights && !broken && !hasUnfinishedBlob(join(folder, 'blobs')) ? 'whole' : 'partial'
+  const { weights, broken, vouched } = inspectSnapshots(join(folder, 'snapshots'))
+  return weights && !broken && (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
+    ? 'whole'
+    : 'partial'
 }
 
 /** How much of an image model's download is in the Hugging Face cache `hubDir` (see `hubDownload`). */

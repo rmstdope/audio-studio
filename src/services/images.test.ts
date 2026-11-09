@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createGpuWorkers, gpuInUse, GPU } from './gpu'
@@ -512,6 +512,54 @@ describe('imageModelDownload', () => {
     expect(imageModelDownload(dir, 'klein')).toBe('partial')
     writeFileSync(join(snapshot, 'model-2.safetensors'), 'x')
     expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  /** A part of a model: a folder in the snapshot holding these files. */
+  const part = (snapshot: string, name: string, files: string[]) => {
+    mkdirSync(join(snapshot, name))
+    for (const file of files) writeFileSync(join(snapshot, name, file), '{}')
+  }
+  /** A finished part whose weights are in shards: config, shards and the index naming them. */
+  const shardedPart = (snapshot: string, name: string) => {
+    part(snapshot, name, ['config.json', 'model-00001-of-00001.safetensors'])
+    writeFileSync(
+      join(snapshot, name, 'model.safetensors.index.json'),
+      JSON.stringify({ weight_map: { a: 'model-00001-of-00001.safetensors' } }),
+    )
+  }
+  /** A snapshot laid out like Qwen Image Edit's, with its text encoder finished and a blob unfinished. */
+  const modelOfParts = (dir: string) => {
+    const { blobs, snapshot } = whole(dir)
+    rmSync(join(snapshot, 'model.safetensors'))
+    shardedPart(snapshot, 'text_encoder')
+    writeFileSync(join(blobs, 'h2.incomplete'), 'half')
+    return snapshot
+  }
+
+  it('is whole when every part is finished, whatever .incomplete files are left in blobs', () => {
+    const dir = hub()
+    const snapshot = modelOfParts(dir)
+    shardedPart(snapshot, 'transformer')
+    part(snapshot, 'vae', ['config.json', 'diffusion_pytorch_model.safetensors'])
+    expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('stays partial while a part after a finished one has shards but no index yet', () => {
+    const dir = hub()
+    part(modelOfParts(dir), 'transformer', ['config.json', 'model-00001-of-00002.safetensors'])
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+  })
+
+  it('stays partial while a part after a finished one has only its config', () => {
+    const dir = hub()
+    part(modelOfParts(dir), 'vae', ['config.json'])
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+  })
+
+  it('stays partial while a folder has shards but no index, even with no config', () => {
+    const dir = hub()
+    part(modelOfParts(dir), 'transformer', ['model-00001-of-00002.safetensors'])
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
   })
 
   it('only a whole download counts as installed', () => {
