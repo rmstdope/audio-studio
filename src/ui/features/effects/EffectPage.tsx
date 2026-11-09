@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import { useKeepMineEffect, useSetEffectDescription } from '../../api'
 import { Failure } from '../../components/Failure'
 import { Pager, type PagerProps } from '../../components/Pager'
 import { pagerFor } from '../../pager'
-import { WordsField } from '../images/WordsField'
+import { WordsField, type SaveWordsNow } from '../images/WordsField'
 import { effectLengthLine } from '../../effectsText'
 import { routeHref } from '../../route'
 import { EffectTakesPanel } from './EffectTakesPanel'
@@ -47,6 +47,7 @@ function Found({ row, pager }: { row: EffectRow; pager: PagerProps | null }) {
   const save = useSetEffectDescription(row.id)
   const keep = useKeepMineEffect(row.id)
   const [saved, setSaved] = useState(false)
+  const saveNow = useRef<SaveWordsNow>(null)
   return (
     <>
       <header className="page-header">
@@ -103,6 +104,7 @@ function Found({ row, pager }: { row: EffectRow; pager: PagerProps | null }) {
           failTitle="The description could not be saved"
           onEdit={() => setSaved(false)}
           onSaved={() => setSaved(true)}
+          saveNow={saveNow}
         />
         {row.changedHere && <span className="muted">The game&apos;s: {row.gameDescription}</span>}
         <div className="effects-length-line">
@@ -110,7 +112,11 @@ function Found({ row, pager }: { row: EffectRow; pager: PagerProps | null }) {
           <span>{effectLengthLine(row.seconds, row.loops)}</span>
         </div>
       </section>
-      <EffectTakesPanel key={`takes-${row.id}`} row={row} />
+      <EffectTakesPanel
+        key={`takes-${row.id}`}
+        row={row}
+        saveWords={() => saveNow.current?.() ?? null}
+      />
     </>
   )
 }

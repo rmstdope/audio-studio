@@ -14,6 +14,7 @@ import { wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import { createEffectTakes, effectTakeHash } from './effectTakes'
+import { setEffectDescription } from './effectWords'
 import type { EffectGenerator, EffectReady, EffectRequest } from './effects'
 import type { EffectModelId } from '../core/effectModels'
 import type { ImageDownload } from '../core/imageModels'
@@ -628,6 +629,24 @@ describe('two models', () => {
     const no = { ok: false as const, message: 'nope' }
     const { file, takes } = setup(no)
     expect(await takes.view(file, 'coins')).toMatchObject({ canMake: false })
+  })
+
+  it('remakes a failed take from the words as they are now, when they changed since it failed', async () => {
+    const { file, takes, requests, settled } = setup(undefined, [
+      { id: 'coins', text: 'fail once', seconds: 0.5 },
+    ])
+    await takes.make(file, 'coins', { count: 1 })
+    await settled('coins')
+    expect(await setEffectDescription(file, 'coins', 'Coins on glass')).toEqual({ ok: true })
+    expect(await takes.make(file, 'coins', { retry: 1 })).toEqual({ ok: true })
+    await settled('coins')
+    expect(requests.map((r) => r.prompt)).toEqual(['fail once', 'Coins on glass'])
+    await takes.make(file, 'coins', { count: 1 })
+    const made = await settled('coins')
+    expect(made.failed).toEqual([])
+    expect(made.takes.map((t) => t.n)).toEqual([1, 2])
+    // The take is filed under the words it was made from, as one asked for now is.
+    expect(made.takes[0]!.file.split('.')[0]).toBe(made.takes[1]!.file.split('.')[0]!)
   })
 
   it('remakes a failed take with the model it was asked with, and records the failure per model', async () => {

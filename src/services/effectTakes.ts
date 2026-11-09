@@ -580,7 +580,7 @@ export function createEffectTakes({
       let model: EffectModelId
       if ('retry' in request) {
         const failed = entries0?.get(request.retry)
-        if (!failed || failed.state !== 'failed' || failed.hash !== hash) {
+        if (!failed || failed.state !== 'failed') {
           return {
             ok: false,
             message: `Take ${request.retry} did not fail, so it is not made again.`,
@@ -605,6 +605,8 @@ export function createEffectTakes({
       if ('retry' in request) {
         const failed = entries.get(request.retry)!
         failed.state = 'waiting'
+        // The words may have changed since it failed: it is made from them, so it is filed under them.
+        failed.hash = hash
         queued.push(failed)
       } else {
         // The numbers are reserved on the board at once, so none is used twice, even by a take

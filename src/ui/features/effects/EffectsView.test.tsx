@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { EffectRow, EffectsSummary } from '../../../core/effects'
+import type { EffectTakesView } from '../../../core/effectTakes'
 import type { ProjectSummary } from '../../../core/summary'
 import type { EffectsRoute } from '../../route'
 import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
@@ -535,6 +536,163 @@ describe("an effect's page", () => {
     act(() => box.blur())
     await settle()
     expect(calls).toHaveLength(0)
+  })
+
+  describe('Make pressed straight after typing the words', () => {
+    const noTakes: EffectTakesView = {
+      ok: true,
+      canMake: true,
+      projectModel: 'small-sfx',
+      uv: true,
+      models: [
+        { id: 'small-sfx', download: 'whole', failed: false },
+        { id: 'open-1', download: 'whole', failed: false },
+      ],
+      takes: [],
+      making: [],
+      failed: [],
+      lockUnread: false,
+    }
+    const oneFailed = { failed: [{ n: 1, message: 'It broke.' }] }
+
+    /** The page with new words typed and `press` pressed at once, whose save waits for `release`. */
+    async function typedAndPressed(
+      answer: () => Response,
+      press = 'Make 4 takes',
+      takes: Partial<EffectTakesView> = {},
+    ) {
+      let release = () => {}
+      const held = new Promise<void>((resolve) => (release = resolve))
+      const shown = render(
+        page('door-creak'),
+        effects(),
+        async (call) => {
+          if (call.method !== 'PATCH') return Response.json({ ok: true })
+          await held
+          return answer()
+        },
+        [[['effect-takes', 'door-creak'], { ...noTakes, ...takes }]],
+      )
+      const box = shown.container.querySelector('textarea')!
+      act(() => {
+        const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+        set.call(box, 'A heavy creak')
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      // The press of the mouse leaves the field; the click comes before anything has rendered.
+      await act(async () => {
+        box.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+        shown.button(press).click()
+      })
+      await shown.settle()
+      const asked = () => shown.calls.filter((c) => c.method !== 'GET').map((c) => c.method)
+      const takesAsked = () =>
+        shown.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/door-creak/takes'))
+      const finish = async () => {
+        await act(async () => release())
+        await shown.settle()
+      }
+      return { ...shown, asked, takesAsked, finish }
+    }
+
+    it('asks for the takes only once the words are saved', async () => {
+      const { asked, takesAsked, finish } = await typedAndPressed(() => Response.json({ ok: true }))
+      expect(asked()).toEqual(['PATCH'])
+      await finish()
+      expect(asked()).toEqual(['PATCH', 'POST'])
+      expect(JSON.parse(takesAsked()[0]!.body!)).toEqual({ count: 4, model: 'small-sfx' })
+    })
+
+    it('keeps Make off while it waits, so a second press asks for nothing more', async () => {
+      const { button, takesAsked, finish } = await typedAndPressed(() =>
+        Response.json({ ok: true }),
+      )
+      expect(button('Make 4 takes').disabled).toBe(true)
+      await act(async () => button('Make 4 takes').click())
+      await finish()
+      expect(takesAsked()).toHaveLength(1)
+    })
+
+    it('keeps the menus still while it waits, so the press makes what it showed', async () => {
+      const { container, finish } = await typedAndPressed(() => Response.json({ ok: true }))
+      const menus = [...container.querySelectorAll('select')]
+      expect(menus.map((m) => m.disabled)).toEqual([true, true])
+      await finish()
+    })
+
+    it('makes nothing when the words could not be saved, and says why', async () => {
+      const { button, text, takesAsked, finish } = await typedAndPressed(() =>
+        Response.json({
+          ok: false,
+          problems: [{ file: 'edits.json', path: 'description', message: 'Too long' }],
+        }),
+      )
+      await finish()
+      expect(takesAsked()).toEqual([])
+      expect(text()).toContain('Too long')
+      expect(button('Make 4 takes').disabled).toBe(false)
+    })
+
+    it('makes nothing when the save itself failed', async () => {
+      const { button, takesAsked, finish } = await typedAndPressed(
+        () => new Response('', { status: 500 }),
+      )
+      await finish()
+      expect(takesAsked()).toEqual([])
+      expect(button('Make 4 takes').disabled).toBe(false)
+    })
+
+    it('saves the words again on another press after a failed save, then asks for the takes', async () => {
+      let answers = 0
+      const { button, asked, takesAsked, finish, settle } = await typedAndPressed(() =>
+        answers++ === 0 ? new Response('', { status: 500 }) : Response.json({ ok: true }),
+      )
+      await finish()
+      expect(takesAsked()).toEqual([])
+      await act(async () => button('Make 4 takes').click())
+      await settle()
+      expect(asked()).toEqual(['PATCH', 'PATCH', 'POST'])
+    })
+
+    it('waits the same way for Try again on a failed take', async () => {
+      const { asked, takesAsked, finish } = await typedAndPressed(
+        () => Response.json({ ok: true }),
+        'Try again',
+        oneFailed,
+      )
+      expect(asked()).toEqual(['PATCH'])
+      await finish()
+      expect(JSON.parse(takesAsked()[0]!.body!)).toEqual({ retry: 1 })
+    })
+
+    it('makes nothing on Try again when the words could not be saved', async () => {
+      const { takesAsked, finish } = await typedAndPressed(
+        () => new Response('', { status: 500 }),
+        'Try again',
+        oneFailed,
+      )
+      await finish()
+      expect(takesAsked()).toEqual([])
+    })
+
+    it('keeps Try again off while a press of Make waits for the words', async () => {
+      const { button, finish } = await typedAndPressed(
+        () => Response.json({ ok: true }),
+        'Make 4 takes',
+        oneFailed,
+      )
+      expect(button('Try again').disabled).toBe(true)
+      await finish()
+    })
+
+    it('asks for the takes at once when nothing was typed', async () => {
+      const { calls, button, settle } = render(page('door-creak'), effects(), undefined, [
+        [['effect-takes', 'door-creak'], noTakes],
+      ])
+      await act(async () => button('Make 4 takes').click())
+      await settle()
+      expect(calls.filter((c) => c.method !== 'GET').map((c) => c.method)).toEqual(['POST'])
+    })
   })
 
   it('shows changed words with the game’s beneath, and use the game’s', async () => {
