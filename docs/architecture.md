@@ -2719,6 +2719,8 @@ Small, independently useful increments:
         again that has none on the take in the game; nothing is chosen.
     22. **Named areas set aside** (as-qg4.4, done: §8.7): each take keeps its own boxes; choosing, un-choosing or dropping a take whose
         placed areas would stop being used asks first, with the patches; areas to place again are marked in the Named areas panel.
+    23. **Patch models** (as-ilw, done: §8.7): a menu of two edit models on each patch and on Remake, Qwen Image Edit and FLUX.2 klein;
+        each take names its model.
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.

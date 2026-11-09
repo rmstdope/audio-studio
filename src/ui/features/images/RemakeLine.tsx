@@ -206,7 +206,9 @@ export function RemakeLine({
         <span className="faint small">{EDIT_SETUP_LINE}</span>
       ) : (
         view.models[DEFAULT_EDIT_MODEL] !== 'whole' &&
-        model === 'klein' && <span className="faint small">{editAbsentLine()}</span>
+        model === 'klein' && (
+          <span className="faint small">{editAbsentLine(view.models[DEFAULT_EDIT_MODEL])}</span>
+        )
       )}
       <span className="faint small">{REMAKE_USES}</span>
       {plan.leftOut.length > 0 && <span className="faint small">{left}</span>}

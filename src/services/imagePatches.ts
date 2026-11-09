@@ -46,7 +46,10 @@ import { decodePng, encodeTransparentPng, pngSize } from './png'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
-/** The model new takes are made with when the request names none: the one patches began with. */
+/**
+ * The model new takes are made with when the request names none, and the one that made every take
+ * before there was a choice (so a board take without `model` reads as this). Both are klein.
+ */
 const DEFAULT_MODEL: EditModelId = 'klein'
 
 /** The sentence saying a model's weights are not on this computer. */

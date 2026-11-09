@@ -312,7 +312,7 @@ export function PatchWorkbench({
   const absentLine = !modelHere
     ? EDIT_SETUP_LINE
     : view.models[DEFAULT_EDIT_MODEL] !== 'whole' && model === 'klein'
-      ? editAbsentLine()
+      ? editAbsentLine(view.models[DEFAULT_EDIT_MODEL])
       : null
   const canChange = !lockUnread && !choose.isPending && !drop.isPending
   const canChoose = canChange && lookError === null && shown !== null && shown.look !== 'bringing'

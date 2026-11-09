@@ -197,7 +197,10 @@ describe('edit models', () => {
   })
 
   it('has the lines for an absent model', () => {
-    expect(editAbsentLine()).toBe(
+    expect(editAbsentLine('partial')).toBe(
+      "Qwen Image Edit's download is incomplete, so these takes use FLUX.2 klein. Setup says how to finish it.",
+    )
+    expect(editAbsentLine('absent')).toBe(
       'Qwen Image Edit is not on this computer, so these takes use FLUX.2 klein. Setup says how to download it.',
     )
   })

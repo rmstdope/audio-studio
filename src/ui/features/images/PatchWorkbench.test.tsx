@@ -1256,6 +1256,17 @@ describe('the model of new takes', () => {
     expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
   })
 
+  it('says the stronger model is incomplete, not absent, when it is partly downloaded', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      withModels([work('a')], { 'qwen-edit': 'partial', klein: 'whole' }),
+    )
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    expect(text(host)).toContain(
+      "Qwen Image Edit's download is incomplete, so these takes use FLUX.2 klein. Setup says how to finish it.",
+    )
+  })
+
   it('says a picked model is not on this computer, turns Make off and points to Setup', async () => {
     const { host, sent } = await render([patchRow('a')], () =>
       withModels([work('a')], { 'qwen-edit': 'absent', klein: 'whole' }),
@@ -1356,6 +1367,24 @@ describe('the model of new takes', () => {
     await key(menuOf(host), 'c')
     await key(menuOf(host), 'ArrowLeft')
     expect(sent).toEqual([])
+  })
+
+  it('leaves the Remake menu on the stronger model whatever a patch is picked on', async () => {
+    const { host } = await render([patchRow('a', { chosenOn: [3] })], () =>
+      withModels([work('a')], both, {
+        remake: { earlier: { a: area }, press: null, failedModels: [] },
+      }),
+    )
+    await open(host)
+    await pick(menuOf(host), 'klein')
+    const remake = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Model for the new takes of each patch"]',
+    )!
+    expect(remake.value).toBe('qwen-edit')
+    await pick(remake, 'klein')
+    expect(menuOf(host).value).toBe('klein')
+    await pick(menuOf(host), 'qwen-edit')
+    expect(remake.value).toBe('klein')
   })
 
   it('has no menu with no chosen take of the image', async () => {

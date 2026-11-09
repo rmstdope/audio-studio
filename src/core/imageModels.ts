@@ -148,9 +148,13 @@ export function startEditModel(
   return downloads[DEFAULT_EDIT_MODEL] === 'whole' ? DEFAULT_EDIT_MODEL : 'klein'
 }
 
-/** The faint line under the Make row when the stronger model is not on this computer. */
-export function editAbsentLine(): string {
-  return `${EDIT_MODELS[DEFAULT_EDIT_MODEL].name} is not on this computer, so these takes use ${EDIT_MODELS.klein.short}. Setup says how to download it.`
+/** The faint line under the Make row when the stronger model is not whole, so new takes use klein. */
+export function editAbsentLine(download: ImageDownload): string {
+  const { name } = EDIT_MODELS[DEFAULT_EDIT_MODEL]
+  const klein = EDIT_MODELS.klein.short
+  return download === 'partial'
+    ? `${name}'s download is incomplete, so these takes use ${klein}. Setup says how to finish it.`
+    : `${name} is not on this computer, so these takes use ${klein}. Setup says how to download it.`
 }
 
 /** The line under the Make row when a model that is not on this computer is picked. */
