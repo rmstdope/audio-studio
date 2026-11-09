@@ -5418,6 +5418,26 @@ describe('the image takes routes', () => {
     expect((await send('POST', '/api/images/inn/patches/remake/close')).status).toBe(200)
   })
 
+  it('answers 400 to a model that is not an edit model, in a make or a remake', async () => {
+    const area = { x: 0, y: 0, width: 64, height: 64 }
+    for (const [path, body] of [
+      ['/api/images/inn/patches/door/takes', { count: 1, area, model: 'z-image-turbo' }],
+      ['/api/images/inn/patches/remake', { count: 1, marks: {}, model: 'nope' }],
+    ] as const) {
+      expect((await send('POST', path, body)).status).toBe(400)
+    }
+    // A known model passes the body check; the remake then finds nothing to make again.
+    expect(
+      (
+        await send('POST', '/api/images/inn/patches/remake', {
+          count: 1,
+          marks: {},
+          model: 'qwen-edit',
+        })
+      ).status,
+    ).toBe(409)
+  })
+
   it('makes takes, serves their pictures, chooses one and shows it as the current image', async () => {
     expect((await send('POST', '/api/images/inn/takes', { count: 2 })).status).toBe(200)
     const made = await settled()
