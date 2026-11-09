@@ -1625,9 +1625,9 @@ starts on the project's model, or on the model that is here when that one is mis
 line saying so, a pick holding only while the page is open; closed it reads "FLUX.2 klein — about 8 s
 a take"; then the count menu, which keeps its pick after a press while the page is open, and Make N takes, and Stop while takes are made), then **Takes · N**:
 the other takes as a grid of thumbs that scrolls on its own, takes being made among them with their
-progress. Takes are made from the words on disk, so a press of Make first sees the prompt saved, as
-a patch's does: it waits for a save under way, or saves words a failed save left in the field, with
-Make and its menus off meanwhile, and asks for no takes if the words could not be saved (as-95q).
+progress. Takes are made from the words on disk, so a press of Make or of a failed take's Try again first sees the prompt saved, as
+a patch's Make does: it waits for a save under way, or saves words a failed save left in the field, with
+both buttons and Make's menus off meanwhile, and asks for no takes if the words could not be saved (as-95q).
 The second column holds the image the game uses beside one other take. Both columns stay
 in view while the page scrolls (sticky, the first at most the window's height); below 1000 px they
 stand one above the other. A box in the Takes heading, "What the game gets" (ticked when the page

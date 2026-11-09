@@ -395,9 +395,13 @@ describe('an image’s page', () => {
   })
 
   describe('Make pressed straight after typing the prompt (as-95q)', () => {
-    /** The page with a new prompt typed and Make pressed at once, whose save waits for `release`. */
-    async function typedAndPressed(answer: () => Response) {
-      const page = render(route, summary(), {}, null, false, {})
+    /** The page with a new prompt typed and `press` pressed at once, whose save waits for `release`. */
+    async function typedAndPressed(
+      answer: () => Response,
+      press = 'Make 2 takes',
+      takes: Partial<ImageTakesView> = {},
+    ) {
+      const page = render(route, summary(), {}, null, false, takes)
       const served = globalThis.fetch
       let release = () => {}
       const held = new Promise<void>((resolve) => (release = resolve))
@@ -416,7 +420,7 @@ describe('an image’s page', () => {
       // The press of the mouse leaves the field; the click comes before anything has rendered.
       await act(async () => {
         field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
-        button(page, 'Make 2 takes').click()
+        button(page, press).click()
       })
       await settle()
       return { page, release }
@@ -467,6 +471,45 @@ describe('an image’s page', () => {
       await settle()
       expect(takesAsked()).toEqual([])
       expect(button(page, 'Make 2 takes').disabled).toBe(false)
+    })
+
+    describe('Try again on a failed take, which is made from the prompt as it stands', () => {
+      const oneFailed = { failed: [{ n: 1, message: 'It broke.' }] }
+
+      it('asks for the take only once the prompt is saved', async () => {
+        const { release } = await typedAndPressed(
+          () => Response.json({ ok: true }),
+          'Try again',
+          oneFailed,
+        )
+        expect(asked()).toEqual(['PATCH'])
+        await act(async () => release())
+        await settle()
+        expect(asked()).toEqual(['PATCH', 'POST'])
+        expect(takesAsked()[0]!.body).toEqual({ retry: 1 })
+      })
+
+      it('makes nothing when the prompt could not be saved', async () => {
+        const { release } = await typedAndPressed(
+          () => new Response('', { status: 500 }),
+          'Try again',
+          oneFailed,
+        )
+        await act(async () => release())
+        await settle()
+        expect(takesAsked()).toEqual([])
+      })
+
+      it('is off while a press of Make waits for the prompt', async () => {
+        const { page, release } = await typedAndPressed(
+          () => Response.json({ ok: true }),
+          'Make 2 takes',
+          oneFailed,
+        )
+        expect(button(page, 'Try again').disabled).toBe(true)
+        await act(async () => release())
+        await settle()
+      })
     })
 
     it('asks for the takes at once when nothing was typed', async () => {

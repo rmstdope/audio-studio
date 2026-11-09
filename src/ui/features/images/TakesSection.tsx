@@ -425,6 +425,17 @@ export function TakesSection({
     }
   }
 
+  /** Takes are made from the saved words, so `ask` waits until they are the words in the field. */
+  const afterWordsSaved = (ask: () => void) => {
+    const saving = saveWords?.() ?? null
+    if (saving === null) return ask()
+    setWaitingForWords(true)
+    void saving.then((wordsSaved) => {
+      setWaitingForWords(false)
+      if (wordsSaved) ask()
+    })
+  }
+
   const controls = (
     <>
       <select
@@ -472,14 +483,7 @@ export function TakesSection({
           // goes to the take on the right in the grid, so ← and → keep stepping it.
           focusQuietly.current = true
           setPendingFocus(onRight ?? 'right')
-          const saving = saveWords?.() ?? null
-          if (saving === null) return make.mutate({ count, model })
-          // The takes are made from the saved words, so they must be the words in the field.
-          setWaitingForWords(true)
-          void saving.then((saved) => {
-            setWaitingForWords(false)
-            if (saved) make.mutate({ count, model })
-          })
+          afterWordsSaved(() => make.mutate({ count, model }))
         }}
       >
         {makeTakesText(count, !none)}
@@ -518,8 +522,8 @@ export function TakesSection({
           <button
             type="button"
             className="btn"
-            disabled={make.isPending || !generator.ok}
-            onClick={() => make.mutate({ retry: f.n })}
+            disabled={make.isPending || waitingForWords || !generator.ok}
+            onClick={() => afterWordsSaved(() => make.mutate({ retry: f.n }))}
           >
             Try again
           </button>
