@@ -1810,7 +1810,7 @@ the **Takes** panel (the others as cards, two to a row in take-number order). Th
 `seconds` the game asks, with a new seed, by `EffectGenerator` (§8.8) one at a time: Small SFX's takes on their own queue
 (the CPU), Open 1.0's on the GPU queue (§8.8). The model stops when its sound does, so a take ends where its sound
 ends (the trailing silence already trimmed) and its **real length** is what the card shows and the
-manifest keeps; the length the game asked for stays in the Description panel. The menu is 1 to 8
+manifest keeps; the length the game asked for stays in the Description panel. Takes are made from the words on disk, so a press of Make or of a failed take's Try again first sees the description saved, as an image's does (§8.7): both buttons and Make's menus are off meanwhile, and no takes are asked for if the words could not be saved (as-ams). The menu is 1 to 8
 takes (starts on 4, page state); a batch goes on when the page is left or reloaded and survives a
 `--dev` reload, not a restart. The board is `content-studio/cache/effect-boards/<effect>.json`
 (`{ next, takes: [{ n, hash, seed, model, seconds, peaks, inputs }] }`; numbers never reused, reserved

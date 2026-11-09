@@ -48,7 +48,14 @@ import { EffectInTheGame, HearTheSeam, KindChip, Playback, type Player } from '.
  * plays in the game. A take that failed says why, with Try again; when no effect can be made, it
  * says why and links Setup.
  */
-export function EffectTakesPanel({ row }: { row: EffectRow }) {
+export function EffectTakesPanel({
+  row,
+  saveWords,
+}: {
+  row: EffectRow
+  /** Sees the description's words saved: whether they were, or null with nothing to save. */
+  saveWords?: () => Promise<boolean> | null
+}) {
   const id = row.id
   const takes = useEffectTakes(id)
   const make = useMakeEffectTakes(id)
@@ -84,6 +91,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
   const [count, setCount] = useState(4)
   // The model the next press uses: Setup's, until a pick, which lasts while the page stays open.
   const [picked, setPicked] = useState<EffectModelId | null>(null)
+  const [waitingForWords, setWaitingForWords] = useState(false)
   const view = takes.data
   if (!view) {
     return (
@@ -116,14 +124,24 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
   const none = !others.length && !view.making.length
   const busy = view.making.length > 0
   const canMake = view.canMake
-  const makeBatch = () => make.mutate({ count, model })
+  /** Takes are made from the saved words, so `ask` waits until they are the words in the field. */
+  const afterWordsSaved = (ask: () => void) => {
+    const saving = saveWords?.() ?? null
+    if (saving === null) return ask()
+    setWaitingForWords(true)
+    void saving.then((wordsSaved) => {
+      setWaitingForWords(false)
+      if (wordsSaved) ask()
+    })
+  }
+  const makeBatch = () => afterWordsSaved(() => make.mutate({ count, model }))
   const menu = (
     <>
       <select
         className="takes-model"
         aria-label="Model for new takes"
         value={model}
-        disabled={busy || make.isPending || !canMake}
+        disabled={busy || make.isPending || waitingForWords || !canMake}
         onChange={(event) => setPicked(event.target.value as EffectModelId)}
       >
         {EFFECT_MODEL_IDS.map((id) => (
@@ -136,7 +154,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
         className="takes-count"
         aria-label="Number of new takes"
         value={count}
-        disabled={busy || !canMake}
+        disabled={busy || waitingForWords || !canMake}
         onChange={(event) => setCount(Number(event.target.value))}
       >
         {Array.from({ length: MAX_EFFECT_TAKES }, (_, i) => i + 1).map((n) => (
@@ -151,7 +169,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
     <button
       type="button"
       className="btn btn-primary"
-      disabled={!canMake || make.isPending || busy}
+      disabled={!canMake || make.isPending || busy || waitingForWords}
       onClick={makeBatch}
     >
       {makeEffectTakesLabel(count, hasTakes)}
@@ -193,8 +211,8 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
           <button
             type="button"
             className="btn"
-            disabled={make.isPending || !canMake}
-            onClick={() => make.mutate({ retry: failed.n })}
+            disabled={make.isPending || waitingForWords || !canMake}
+            onClick={() => afterWordsSaved(() => make.mutate({ retry: failed.n }))}
           >
             Try again
           </button>
