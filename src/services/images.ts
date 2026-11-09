@@ -125,13 +125,17 @@ function lacksListedPart(folder: string): boolean {
 
 /**
  * What a folder's snapshot holds: whether there is a weights file, whether anything in it is
- * unfinished, and whether an index vouches for it: a shard index is there, no part of the model
- * (a folder with a `config.json` or shards) is still without its index or single weights file, and
- * every part a `model_index.json` lists, where the snapshot has one, has something in its folder.
+ * unfinished, whether a part is still waiting (a folder with a `config.json` or shards has no index
+ * or single weights file, or a part a `model_index.json` lists, where the snapshot has one, has
+ * nothing in its folder), and whether a shard index is there to vouch for it.
  */
-function inspectSnapshots(dir: string): { weights: boolean; broken: boolean; vouched: boolean } {
-  const found = { weights: false, broken: false, vouched: false }
-  let waiting = false
+function inspectSnapshots(dir: string): {
+  weights: boolean
+  broken: boolean
+  waiting: boolean
+  vouched: boolean
+} {
+  const found = { weights: false, broken: false, waiting: false, vouched: false }
   const visit = (folder: string) => {
     const names = readdirSync(folder)
     const indexed = names.some((name) => name.endsWith('.safetensors.index.json'))
@@ -142,8 +146,8 @@ function inspectSnapshots(dir: string): { weights: boolean; broken: boolean; vou
       !indexed &&
       !single
     )
-      waiting = true
-    if (names.includes('model_index.json') && lacksListedPart(folder)) waiting = true
+      found.waiting = true
+    if (names.includes('model_index.json') && lacksListedPart(folder)) found.waiting = true
     for (const name of names) {
       const path = join(folder, name)
       // A link to a blob that is not there (a download stopped) cannot be followed.
@@ -172,7 +176,7 @@ function inspectSnapshots(dir: string): { weights: boolean; broken: boolean; vou
   } catch {
     // Unreadable counts as having nothing.
   }
-  return { ...found, vouched: found.vouched && !waiting }
+  return found
 }
 
 /**
@@ -194,14 +198,15 @@ function hasUnfinishedBlob(dir: string): boolean {
 /**
  * How much of a repository's download is in the Hugging Face cache `hubDir`: `absent` with no folder
  * for it, `whole` when a snapshot holds weights and nothing is unfinished (no link to a missing blob,
- * every shard an index names, and no `.incomplete` blob unless its finished blob is beside it or an
- * index vouches for the snapshot, for then it is a leftover), `partial` otherwise.
+ * every shard an index names, no part still waiting, and no `.incomplete` blob unless its finished
+ * blob is beside it or an index vouches for the snapshot, for then it is a leftover), `partial`
+ * otherwise.
  */
 export function hubDownload(hubDir: string, repo: string): ImageDownload {
   const folder = join(hubDir, `models--${repo.replace('/', '--')}`)
   if (!existsSync(folder)) return 'absent'
-  const { weights, broken, vouched } = inspectSnapshots(join(folder, 'snapshots'))
-  return weights && !broken && (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
+  const { weights, broken, waiting, vouched } = inspectSnapshots(join(folder, 'snapshots'))
+  return weights && !broken && !waiting && (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
     ? 'whole'
     : 'partial'
 }

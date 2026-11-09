@@ -631,6 +631,31 @@ describe('imageModelDownload', () => {
     expect(imageModelDownload(dir, 'klein')).toBe('partial')
   })
 
+  describe('with nothing unfinished left in blobs', () => {
+    /** A snapshot like `modelOfParts` makes, the stopped download's leftovers cleared. */
+    const clearedModelOfParts = (dir: string) => {
+      const snapshot = modelOfParts(dir)
+      rmSync(join(dir, KLEIN, 'blobs', 'h2.incomplete'))
+      return snapshot
+    }
+
+    it('is partial while a part model_index.json lists is missing, and whole once it is back', () => {
+      const dir = hub()
+      const snapshot = clearedModelOfParts(dir)
+      shardedPart(snapshot, 'transformer')
+      modelIndex(snapshot, { text_encoder: USED, transformer: USED, vae: USED })
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+      part(snapshot, 'vae', ['config.json', 'diffusion_pytorch_model.safetensors'])
+      expect(imageModelDownload(dir, 'klein')).toBe('whole')
+    })
+
+    it('is partial while a part has only its config, the download stopped between two files', () => {
+      const dir = hub()
+      part(clearedModelOfParts(dir), 'vae', ['config.json'])
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    })
+  })
+
   it('only a whole download counts as installed', () => {
     const dir = hub()
     mkdirSync(join(dir, KLEIN, 'blobs'), { recursive: true })
