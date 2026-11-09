@@ -668,6 +668,26 @@ describe('takes being made and failed', () => {
     ])
   })
 
+  it('puts focus on Make once Stop has ended the takes', async () => {
+    let stopped = false
+    const { host } = await render([patchRow('a')], () =>
+      view([
+        work('a', {
+          takes: [takeOf(1)],
+          making: stopped
+            ? []
+            : [{ n: 2, state: 'making', elapsed: 5, expected: 15, area, model: 'klein' }],
+        }),
+      ]),
+    )
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    stopped = true
+    await act(async () => button(host, 'Stop')!.click())
+    await settle()
+    expect(document.activeElement).toBe(button(host, 'Make 2 more takes')!)
+  })
+
   it('shows a take that could not be made, with the others kept, and tries it again', async () => {
     const { host, sent } = await render([patchRow('a')], () =>
       view([

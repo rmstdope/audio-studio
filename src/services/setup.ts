@@ -153,6 +153,7 @@ async function imageFacts(
   return {
     mflux: await images.ready(),
     model: project.images?.model ?? DEFAULT_IMAGE_MODEL,
+    patchModel: await downloadOf(images, 'qwen-edit'),
     models,
   }
 }

@@ -59,10 +59,12 @@ function imageFacts(change: {
   model?: 'klein' | 'z-image-turbo'
   klein?: Partial<NonNullable<SetupFacts['images']>['models']['klein']>
   'z-image-turbo'?: Partial<NonNullable<SetupFacts['images']>['models']['z-image-turbo']>
+  patchModel?: NonNullable<SetupFacts['images']>['patchModel']
 }): NonNullable<SetupFacts['images']> {
   return {
     mflux: change.mflux ?? { ok: true },
     model: change.model ?? 'klein',
+    patchModel: change.patchModel ?? 'whole',
     models: {
       klein: { download: 'whole', failure: null, ...change.klein },
       'z-image-turbo': { download: 'whole', failure: null, ...change['z-image-turbo'] },
@@ -458,6 +460,42 @@ describe('the image models check', () => {
       detail:
         'FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model loads on its first take.',
     })
+  })
+
+  const QWEN = 'uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit'
+
+  it('says nothing of the patch model while it is whole', () => {
+    expect(row(imageFacts({}))).not.toHaveProperty('notes')
+  })
+
+  it('offers Qwen Image Edit as optional for patches, with its download command, without changing the state', () => {
+    const absent = row(imageFacts({ patchModel: 'absent' }))
+    expect(absent).toMatchObject({ state: 'ok' })
+    expect(absent.notes).toEqual([
+      'Optional: for patches. Qwen Image Edit is not on this computer.',
+    ])
+    expect(absent.steps).toEqual({
+      list: [{ parts: ['Download it, once (about 53 GB):'], commands: [QWEN] }],
+      note: 'Then press Check again.',
+    })
+    const partial = row(imageFacts({ patchModel: 'partial' }))
+    expect(partial.notes).toEqual([
+      "Optional: for patches. Qwen Image Edit's download is incomplete.",
+    ])
+    expect(partial.steps!.list[0]).toEqual({
+      parts: ['Finish the download (it picks up where it stopped):'],
+      commands: [QWEN],
+    })
+  })
+
+  it('adds the patch model after the steps another model needs', () => {
+    const both = row(imageFacts({ 'z-image-turbo': { download: 'absent' }, patchModel: 'absent' }))
+    expect(both.steps!.list).toHaveLength(2)
+    expect(both.steps!.list[1]!.commands).toEqual([QWEN])
+  })
+
+  it('does not offer it when mflux cannot run at all', () => {
+    expect(row(imageFacts({ mflux: noMflux, patchModel: 'absent' }))).not.toHaveProperty('notes')
   })
 
   it('is optional when only the other model is missing or incomplete, saying how to get it', () => {

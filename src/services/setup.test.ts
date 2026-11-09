@@ -345,6 +345,18 @@ describe('checkSetup of the image models', () => {
     })
   })
 
+  it('offers Qwen Image Edit as optional for patches when its weights are not here', async () => {
+    const without = await check(imagesSection, mac, (m) => m !== 'qwen-edit')
+    expect(without).toMatchObject({ state: 'ok' })
+    expect(without.notes).toEqual([
+      'Optional: for patches. Qwen Image Edit is not on this computer.',
+    ])
+    expect(without.steps!.list.at(-1)!.commands).toEqual([
+      'uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit',
+    ])
+    expect(await check(imagesSection, mac, () => true)).not.toHaveProperty('notes')
+  })
+
   it('says a partly downloaded model is incomplete, and a model is absent when it has no folder', async () => {
     const partly = await check(
       imagesSection,
