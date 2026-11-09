@@ -1495,7 +1495,8 @@ of date. Refresh's panel says nothing of patches. Screens: `docs/ui/as-bo8.1-ima
 **The named areas the game declares** (as-qg4.1; `ImageRow.areas`, `ui/features/images/NamedAreasPanel.tsx`).
 An image whose list carries areas gets a full-width panel, "Named areas", directly below the
 workbench and above "Patches the game asks for": its count ("1 of 5 placed"), one line of
-explanation, and below them two parts side by side (one column when narrow, the picture first): the
+explanation, and below them two parts side by side (one column when narrow, the picture first,
+staying in view with an opaque background so the list passes under it, as-5v0): the
 chosen take on the left and the list of areas on the right, a row per area in the game's order
 (title, id, the mark "Placed" or "To place", and "Clear" on the selected placed row). **Marking**
 (as-qg4.2): one area is selected at a time (on arrival the first still to place); dragging on the
