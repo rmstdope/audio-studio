@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react'
 import type { AreaBox, AreaRow, ImageRow } from '../../../core/images'
 import { useImagePatches, useSetImageAreaBox } from '../../api'
 import {
@@ -303,6 +310,11 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     ...boxes.filter((b) => b.area.id !== selected),
     ...boxes.filter((b) => b.area.id === selected),
   ]
+  // The ratio as a number too: a narrow window's stylesheet caps the picture's height through it.
+  const pictureShape = {
+    aspectRatio: `${row.width} / ${row.height}`,
+    '--picture-ratio': row.width / row.height,
+  } as CSSProperties
 
   return (
     <section className="panel named-areas" aria-label="Named areas">
@@ -378,7 +390,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
               <div
                 ref={stage}
                 className="named-area-stage"
-                style={{ aspectRatio: `${row.width} / ${row.height}` }}
+                style={pictureShape}
                 onPointerDown={down}
                 onPointerMove={move}
                 onPointerUp={up}
@@ -438,7 +450,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
           ) : (
             <div
               className={`named-area-empty${state === 'loading' ? '' : ' named-area-empty-text'}`}
-              style={{ aspectRatio: `${row.width} / ${row.height}` }}
+              style={pictureShape}
               role={state === 'loading' ? undefined : 'status'}
             >
               {state === 'none' && 'Choose a take to mark the areas on it.'}
