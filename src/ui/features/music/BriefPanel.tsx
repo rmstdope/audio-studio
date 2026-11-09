@@ -1,9 +1,10 @@
-import { useId, useState } from 'react'
+import { useId, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import { fieldSource, type BriefChange, type BriefField, type TrackRow } from '../../../core/music'
 import type { MusicListSummary } from '../../../core/music'
 import { Problems } from '../../components/Problems'
 import { useKeepMyBrief, useSetTrackBrief } from '../../api'
 import { fieldTag, fieldText, parseField } from '../../musicText'
+import type { SaveWordsNow } from '../images/WordsField'
 
 /** The change that puts a field back to the game's value. */
 function gameChange(field: BriefField, game: TrackRow['game']): BriefChange {
@@ -17,8 +18,25 @@ function gameChange(field: BriefField, game: TrackRow['game']): BriefChange {
  * A track's Brief panel: what it should sound like, its kind (set by the game), and its length,
  * tempo and key. Every field is always editable and is saved as it is left.
  */
-export function BriefPanel({ track, kind }: { track: TrackRow; kind: MusicListSummary['kind'] }) {
+export function BriefPanel({
+  track,
+  kind,
+  saveNow,
+}: {
+  track: TrackRow
+  kind: MusicListSummary['kind']
+  /** Filled with the way to see every field saved. */
+  saveNow?: Ref<SaveWordsNow>
+}) {
   const [saved, setSaved] = useState(false)
+  const fieldSaves = useRef(new Map<BriefField, SaveWordsNow>())
+  useImperativeHandle(saveNow, () => () => {
+    const saving = [...fieldSaves.current.values()]
+      .map((saveField) => saveField())
+      .filter((result) => result !== null)
+    if (!saving.length) return null
+    return Promise.all(saving).then((results) => results.every(Boolean))
+  })
   const field = (name: BriefField, label: string, extra: Partial<FieldProps> = {}) => (
     <FieldRow
       key={name}
@@ -28,6 +46,10 @@ export function BriefPanel({ track, kind }: { track: TrackRow; kind: MusicListSu
       kind={kind}
       onSaved={() => setSaved(true)}
       onEdit={() => setSaved(false)}
+      saveNow={(saveField) => {
+        if (saveField) fieldSaves.current.set(name, saveField)
+        else fieldSaves.current.delete(name)
+      }}
       {...extra}
     />
   )
@@ -111,6 +133,8 @@ interface FieldProps {
   onSaved: () => void
   /** The person began changing the field. */
   onEdit: () => void
+  /** Filled with the way to see the field saved. */
+  saveNow: Ref<SaveWordsNow>
 }
 
 /** One field of the panel: its label, where its value comes from, and its input. */
@@ -124,6 +148,7 @@ function FieldRow({
   inputMode,
   onSaved,
   onEdit,
+  saveNow,
 }: FieldProps) {
   // One save per field: a refusal or a draft belongs to the field it was typed in.
   const save = useSetTrackBrief(track.id)
@@ -137,22 +162,42 @@ function FieldRow({
     setDraft(null)
     setProblem(null)
   }
-  const send = (change: BriefChange) =>
-    save.mutate(change, {
-      onSuccess: (result) => {
-        if (!result.ok) return
-        clear()
-        onSaved()
-      },
+  // Set the moment the field is left: a press that left it comes before any render.
+  const saving = useRef<Promise<boolean> | null>(null)
+  const send = (change: BriefChange) => {
+    const sent = save
+      .mutateAsync(change, {
+        onSuccess: (result) => {
+          if (!result.ok) return
+          clear()
+          onSaved()
+        },
+      })
+      .then(
+        (result) => result.ok,
+        () => false,
+      )
+    saving.current = sent
+    void sent.then(() => {
+      if (saving.current === sent) saving.current = null
     })
-  const leave = () => {
-    if (draft === null) return
-    if (draft.trim() === shown) return clear()
-    const parsed = parseField(field, draft, kind)
-    if (!parsed.ok) return setProblem(parsed.message)
-    setProblem(null)
-    send(parsed.change)
+    return sent
   }
+  const leave = () => {
+    if (draft === null) return null
+    if (draft.trim() === shown) {
+      clear()
+      return null
+    }
+    const parsed = parseField(field, draft, kind)
+    if (!parsed.ok) {
+      setProblem(parsed.message)
+      return Promise.resolve(false)
+    }
+    setProblem(null)
+    return send(parsed.change)
+  }
+  useImperativeHandle(saveNow, () => () => saving.current ?? leave())
   const change = (value: string) => {
     onEdit()
     setProblem(null)

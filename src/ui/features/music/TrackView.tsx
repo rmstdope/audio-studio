@@ -1,8 +1,10 @@
+import { useRef } from 'react'
 import type { MusicListSummary, TrackRow } from '../../../core/music'
 import { Pager } from '../../components/Pager'
 import { shortTitle } from '../../format'
 import { pagerFor } from '../../pager'
 import { routeHref } from '../../route'
+import type { SaveWordsNow } from '../images/WordsField'
 import { BriefPanel } from './BriefPanel'
 import { TakesPanel } from './TakesPanel'
 
@@ -17,6 +19,7 @@ export function TrackView({
   lists: readonly MusicListSummary[]
   track: TrackRow
 }) {
+  const saveBrief = useRef<SaveWordsNow>(null)
   const name = list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)
   const listRoute =
     list.kind === 'stingers'
@@ -38,8 +41,13 @@ export function TrackView({
         </div>
         {pager && <Pager {...pager} />}
       </header>
-      <BriefPanel key={track.id} track={track} kind={list.kind} />
-      <TakesPanel key={`takes-${track.id}`} track={track} lists={lists} />
+      <BriefPanel key={track.id} track={track} kind={list.kind} saveNow={saveBrief} />
+      <TakesPanel
+        key={`takes-${track.id}`}
+        track={track}
+        lists={lists}
+        saveBrief={() => saveBrief.current?.() ?? null}
+      />
     </>
   )
 }

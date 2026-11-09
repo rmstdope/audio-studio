@@ -56,6 +56,7 @@ import {
   useTrimControl,
   wavePosition,
 } from './trimSilence'
+import type { SaveWordsNow } from '../images/WordsField'
 import { MoveTakeDialog } from './MoveTakeDialog'
 import { TrackActionsContext, useTrackActions, useTrackActionsState } from './trackActions'
 
@@ -67,10 +68,13 @@ import { TrackActionsContext, useTrackActions, useTrackActionsState } from './tr
 export function TakesPanel({
   track,
   lists,
+  saveBrief,
 }: {
   track: TrackRow
   /** Every list of the game's music, for where a take can move to. */
   lists: readonly MusicListSummary[]
+  /** Sees the brief saved: whether it was, or null with nothing to save. */
+  saveBrief?: SaveWordsNow
 }) {
   const trackId = track.id
   const takes = useMusicTakes(trackId)
@@ -123,6 +127,7 @@ export function TakesPanel({
   // Whether the model menu's list is probably open: then every entry reads in full.
   const [listOpen, setListOpen] = useState(false)
   const [countOpen, setCountOpen] = useState(false)
+  const [waitingForBrief, setWaitingForBrief] = useState(false)
   if (!view)
     return (
       <section className="panel">
@@ -154,7 +159,7 @@ export function TakesPanel({
       className="takes-model"
       aria-label="Model for new takes"
       value={model}
-      disabled={view.making.length > 0}
+      disabled={view.making.length > 0 || waitingForBrief}
       onChange={(event) => {
         setPicked(event.target.value as MusicModelId)
         setListOpen(false)
@@ -189,7 +194,7 @@ export function TakesPanel({
       className="takes-count"
       aria-label="Number of new takes"
       value={count}
-      disabled={view.making.length > 0}
+      disabled={view.making.length > 0 || waitingForBrief}
       onChange={(event) => {
         setCount(Number(event.target.value))
         setCountOpen(false)
@@ -204,11 +209,19 @@ export function TakesPanel({
       ))}
     </select>
   )
-  /** Starts the batch the menus say; the count stays as picked. */
-  const makeBatch = () => {
+  /** Takes are made from the saved brief, so `ask` waits until it is the brief in the fields. */
+  const afterBriefSaved = (ask: () => void) => {
     actions.press('make')
-    make.mutate({ count, model })
+    const saving = saveBrief?.() ?? null
+    if (saving === null) return ask()
+    setWaitingForBrief(true)
+    void saving.then((briefSaved) => {
+      setWaitingForBrief(false)
+      if (briefSaved) ask()
+    })
   }
+  /** Starts the batch the menus say; the count stays as picked. */
+  const makeBatch = () => afterBriefSaved(() => make.mutate({ count, model }))
   const result = make.data
   const movingTake = view.takes.find((take) => take.n === moving)
   const nowhere = hasNowhere(moveTargets(lists, { id: trackId, kind: view.kind }).groups)
@@ -239,11 +252,8 @@ export function TakesPanel({
           <button
             type="button"
             className="btn"
-            disabled={make.isPending || !generator.ok}
-            onClick={() => {
-              actions.press('make')
-              make.mutate({ retry: failed.n })
-            }}
+            disabled={make.isPending || waitingForBrief || !generator.ok}
+            onClick={() => afterBriefSaved(() => make.mutate({ retry: failed.n }))}
           >
             {takesButton('Try again', failed.modelId, length, 1)}
           </button>
@@ -323,7 +333,7 @@ export function TakesPanel({
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={!canMake || make.isPending || view.making.length > 0}
+                disabled={!canMake || make.isPending || waitingForBrief || view.making.length > 0}
                 onClick={makeBatch}
               >
                 {takesButton(makeTakesWords(count, true), model, length, count)}
@@ -388,7 +398,7 @@ export function TakesPanel({
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={!canMake || make.isPending}
+                disabled={!canMake || make.isPending || waitingForBrief}
                 onClick={makeBatch}
               >
                 {takesButton(makeTakesWords(count, false), model, length, count)}
