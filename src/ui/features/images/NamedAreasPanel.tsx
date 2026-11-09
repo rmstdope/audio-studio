@@ -319,6 +319,59 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
         </p>
       )}
       <div className={`named-areas-body${again.length > 0 ? ' has-place-again' : ''}`}>
+        {/* The list comes first so Tab reaches the switches after it; the grid puts the picture left. */}
+        {again.length > 0 && (
+          <p className="place-again-line">
+            {placeAgainLine(againTakes, row.chosenTake, again.length)}
+          </p>
+        )}
+        <ul className="named-area-list">
+          {areas.map((area) => {
+            const isSelected = ready && area.id === selected
+            return (
+              <li
+                key={area.id}
+                className={`named-area${isSelected ? ' selected' : ''}`}
+                onKeyDown={(event) => keys(event, area)}
+              >
+                <button
+                  type="button"
+                  className="named-area-main"
+                  ref={(el) => {
+                    rowButtons.current[area.id] = el
+                  }}
+                  disabled={!ready}
+                  aria-pressed={isSelected}
+                  onClick={() => select(area.id)}
+                >
+                  <span className="named-area-text">
+                    <b>{area.title}</b>
+                    <span className="mono muted">{area.id}</span>
+                  </span>
+                </button>
+                {isSelected && area.placed && (
+                  <button
+                    type="button"
+                    className="btn named-area-clear"
+                    onClick={() => {
+                      commit(area, null)
+                      focusRow(area.id)
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+                {area.placed ? (
+                  <span className="chip chip-ok">Placed</span>
+                ) : area.elsewhere.length > 0 || area.elsewhereGone ? (
+                  <span className="chip chip-attention">Place again</span>
+                ) : (
+                  <span className="chip chip-attention">To place</span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
         <div className="named-areas-picture">
           {ready && view?.take ? (
             <>
@@ -393,81 +446,29 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                 "The chosen take's picture is missing or cannot be read, so the areas cannot be marked on it."}
             </div>
           )}
+          {ready && chosenPatches.length > 0 && (
+            <div className="named-area-switches">
+              <span className="muted">Show on the picture:</span>
+              {chosenPatches.map((patch) => (
+                <label key={patch.id} className="named-area-switch">
+                  <input
+                    type="checkbox"
+                    checked={shown.has(patch.id)}
+                    onChange={(event) =>
+                      setShown((now) => {
+                        const next = new Set(now)
+                        if (event.target.checked) next.add(patch.id)
+                        else next.delete(patch.id)
+                        return next
+                      })
+                    }
+                  />
+                  {patch.title}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
-        {again.length > 0 && (
-          <p className="place-again-line">
-            {placeAgainLine(againTakes, row.chosenTake, again.length)}
-          </p>
-        )}
-        <ul className="named-area-list">
-          {areas.map((area) => {
-            const isSelected = ready && area.id === selected
-            return (
-              <li
-                key={area.id}
-                className={`named-area${isSelected ? ' selected' : ''}`}
-                onKeyDown={(event) => keys(event, area)}
-              >
-                <button
-                  type="button"
-                  className="named-area-main"
-                  ref={(el) => {
-                    rowButtons.current[area.id] = el
-                  }}
-                  disabled={!ready}
-                  aria-pressed={isSelected}
-                  onClick={() => select(area.id)}
-                >
-                  <span className="named-area-text">
-                    <b>{area.title}</b>
-                    <span className="mono muted">{area.id}</span>
-                  </span>
-                </button>
-                {isSelected && area.placed && (
-                  <button
-                    type="button"
-                    className="btn named-area-clear"
-                    onClick={() => {
-                      commit(area, null)
-                      focusRow(area.id)
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
-                {area.placed ? (
-                  <span className="chip chip-ok">Placed</span>
-                ) : area.elsewhere.length > 0 || area.elsewhereGone ? (
-                  <span className="chip chip-attention">Place again</span>
-                ) : (
-                  <span className="chip chip-attention">To place</span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-        {ready && chosenPatches.length > 0 && (
-          <div className="named-area-switches">
-            <span className="muted">Show on the picture:</span>
-            {chosenPatches.map((patch) => (
-              <label key={patch.id} className="named-area-switch">
-                <input
-                  type="checkbox"
-                  checked={shown.has(patch.id)}
-                  onChange={(event) =>
-                    setShown((now) => {
-                      const next = new Set(now)
-                      if (event.target.checked) next.add(patch.id)
-                      else next.delete(patch.id)
-                      return next
-                    })
-                  }
-                />
-                {patch.title}
-              </label>
-            ))}
-          </div>
-        )}
       </div>
     </section>
   )
