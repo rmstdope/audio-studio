@@ -255,12 +255,12 @@ describe('an act’s page', () => {
     expect(none.querySelector('.images-style-line')).toBeNull()
   })
 
-  it('shows the takes being made in an image’s status, as Music does', () => {
+  it('shows the takes being made in an image’s status, rounded like every image time', () => {
     const page = render({ view: 'images', page: 'act', part: 'act1' }, summary(), {
       inn: { takes: 2, left: 50 },
     })
     const rows = [...page.querySelectorAll('tbody tr')]
-    expect(text(rows[0]!.querySelector('.images-status'))).toBe('making 2 takes · about 1 min')
+    expect(text(rows[0]!.querySelector('.images-status'))).toBe('making 2 takes · about 50 s')
     expect(text(rows[1]!.querySelector('.images-status'))).toBe('none yet')
   })
 
