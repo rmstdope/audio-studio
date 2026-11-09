@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 export function MenuFace({ text, children }: { text: string; children: ReactNode }) {
   return (
     <span className="menu-face">
-      {text}
+      <span aria-hidden="true">{text}</span>
       {children}
     </span>
   )

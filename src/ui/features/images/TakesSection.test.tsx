@@ -904,7 +904,7 @@ describe('the Takes section’s model menu', () => {
     s.container.querySelector<HTMLSelectElement>('select[aria-label="Model for new takes"]')!
   /** The text of the closed menu's face, which wraps in a narrow window. */
   const faceOf = (s: { container: HTMLElement }) =>
-    modelMenu(s).closest('.menu-face')!.firstChild!.textContent
+    modelMenu(s).closest('.menu-face')!.firstElementChild!.textContent
   const pick = (s: { container: HTMLElement }, value: string) =>
     act(async () => {
       modelMenu(s).value = value
@@ -943,6 +943,12 @@ describe('the Takes section’s model menu', () => {
       'Z-Image-Turbo — a guess: about 1 min a take',
     ])
     expect(faceOf(s)).toBe('FLUX.2 klein — about 25 s a take')
+  })
+
+  it('has the face follow the model picked', async () => {
+    const s = await show(view({ takes: three }))
+    await pick(s, 'z-image-turbo')
+    expect(faceOf(s)).toBe('Z-Image-Turbo — a guess: about 1 min a take')
   })
 
   it('starts on Setup’s model when that is the other one', async () => {

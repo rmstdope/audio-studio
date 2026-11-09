@@ -264,7 +264,7 @@ describe('the Images row of the Models panel', () => {
     ])
     expect(menuOf(page.container).value).toBe('klein')
     // The closed menu is a face that wraps, with the same words as the open list.
-    expect(menuOf(page.container).closest('.menu-face')!.firstChild!.textContent).toBe(
+    expect(menuOf(page.container).closest('.menu-face')!.firstElementChild!.textContent).toBe(
       'FLUX.2 klein 4B — a guess: about 20 s a take',
     )
     // Only this menu wraps; the other model menus on Setup stay native.

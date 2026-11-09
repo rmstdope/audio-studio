@@ -5573,6 +5573,7 @@ button.cue-chip[aria-expanded='true'] {
   cursor: pointer;
 }
 .menu-face select:disabled {
+  opacity: 0;
   cursor: default;
 }
 .menu-face:focus-within {
@@ -5582,10 +5583,8 @@ button.cue-chip[aria-expanded='true'] {
 .menu-face:has(select:disabled) {
   opacity: 0.55;
 }
-.takes-controls .menu-face,
-.image-make .menu-face {
-  flex: 1 1 200px;
-  max-width: 360px;
+.mmenu .menu-face {
+  min-width: min(260px, 100%);
 }
 .image-make .menu-face {
   flex-basis: 100%;

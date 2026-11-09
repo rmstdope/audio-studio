@@ -1210,7 +1210,7 @@ describe('the model of new takes', () => {
     ])
     expect(menu.value).toBe('qwen-edit')
     // Closed, a face that can wrap shows the chosen entry's short form.
-    expect(menu.closest('.menu-face')!.firstChild!.textContent).toBe(
+    expect(menu.closest('.menu-face')!.firstElementChild!.textContent).toBe(
       'Qwen Image Edit — a guess: about 8 min a take',
     )
     expect(menu.options[0]!.hasAttribute('label')).toBe(false)

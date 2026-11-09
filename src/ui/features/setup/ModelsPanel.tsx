@@ -1,5 +1,5 @@
-import { MenuFace } from '../../components/MenuFace'
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
+import { MenuFace } from '../../components/MenuFace'
 import {
   busyWords,
   changeOf,
