@@ -196,8 +196,10 @@ function hasUnfinishedBlob(dir: string): boolean {
 }
 
 /**
- * The folder to judge a download by: the snapshot `refs/main` names, the one the model loads from
- * (an older one a retry left behind says nothing about it), or every snapshot when there is no ref.
+ * The folder to judge a download by: the snapshot `refs/main` names, the revision last set out for,
+ * or every snapshot when there is no ref. A part waiting in an older one a finished retry left behind
+ * says nothing, and a retry that stopped is unfinished even beside a whole older revision, though
+ * mflux, which looks for the newest complete snapshot, could still find that one for its weights.
  */
 function currentSnapshots(folder: string): string {
   const snapshots = join(folder, 'snapshots')

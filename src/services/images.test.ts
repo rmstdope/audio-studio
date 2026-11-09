@@ -657,7 +657,7 @@ describe('imageModelDownload', () => {
   })
 
   describe('with more than one snapshot', () => {
-    /** A second snapshot beside `whole`'s, and `refs/main` naming the one the model loads from. */
+    /** A second snapshot beside `whole`'s, and `refs/main` naming `current`. */
     const secondSnapshot = (dir: string, current: string) => {
       const snapshot = join(dir, KLEIN, 'snapshots', 'old')
       mkdirSync(snapshot)
@@ -666,14 +666,14 @@ describe('imageModelDownload', () => {
       return snapshot
     }
 
-    it('is whole when only a snapshot the model no longer loads from has a part waiting', () => {
+    it('is whole when only a snapshot refs/main does not name has a part waiting', () => {
       const dir = hub()
       whole(dir)
       part(secondSnapshot(dir, 'abc'), 'vae', ['config.json'])
       expect(imageModelDownload(dir, 'klein')).toBe('whole')
     })
 
-    it('is partial when the snapshot the model loads from has a part waiting, beside a whole one', () => {
+    it('is partial when the snapshot refs/main names has a part waiting, beside a whole one', () => {
       const dir = hub()
       const { snapshot } = whole(dir)
       part(snapshot, 'vae', ['config.json'])
@@ -681,7 +681,7 @@ describe('imageModelDownload', () => {
       expect(imageModelDownload(dir, 'klein')).toBe('partial')
     })
 
-    it('is partial when the snapshot the model loads from has not been made yet', () => {
+    it('is partial when the snapshot refs/main names has not been made yet', () => {
       const dir = hub()
       whole(dir)
       secondSnapshot(dir, 'newer')
