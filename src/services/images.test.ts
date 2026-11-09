@@ -689,6 +689,85 @@ describe('imageModelDownload', () => {
     })
   })
 
+  describe('with the listing Hugging Face keeps beside a snapshot, and no model_index.json', () => {
+    /** Files of the repository's listing mflux never fetches, beside the parts it does. */
+    const NEVER_FETCHED = [
+      'README.md',
+      'flux-2-klein-4b.safetensors',
+      'scheduler/scheduler_config.json',
+    ]
+    const PARTS = ['text_encoder', 'tokenizer', 'transformer', 'vae']
+    /** The files `trees/abc.json` lists for a part. */
+    const listed = (name: string) =>
+      name === 'tokenizer'
+        ? [`${name}/tokenizer.json`]
+        : [`${name}/config.json`, `${name}/diffusion_pytorch_model.safetensors`]
+    /** A snapshot like klein's: its parts, `refs/main` naming it and the listing, nothing unfinished. */
+    const listedModel = (dir: string) => {
+      const { snapshot } = whole(dir)
+      rmSync(join(snapshot, 'model.safetensors'))
+      for (const name of PARTS) restore(snapshot, name)
+      mkdirSync(join(dir, KLEIN, 'refs'))
+      writeFileSync(join(dir, KLEIN, 'refs', 'main'), 'abc\n')
+      mkdirSync(join(dir, KLEIN, 'trees'))
+      const files = Object.fromEntries(
+        [...NEVER_FETCHED, ...PARTS.flatMap(listed)].map((path) => [
+          path,
+          { size: 1, blob_id: 'b' },
+        ]),
+      )
+      writeFileSync(
+        join(dir, KLEIN, 'trees', 'abc.json'),
+        JSON.stringify({ format_version: 1, files }),
+      )
+      return snapshot
+    }
+    /** A part's folder in the snapshot, with the files the listing names. */
+    const restore = (snapshot: string, name: string) =>
+      part(
+        snapshot,
+        name,
+        listed(name).map((path) => path.split('/')[1]!),
+      )
+
+    it('is partial while a part with weights has no folder, and whole once it is back', () => {
+      const dir = hub()
+      const snapshot = listedModel(dir)
+      rmSync(join(snapshot, 'vae'), { recursive: true })
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+      restore(snapshot, 'vae')
+      expect(imageModelDownload(dir, 'klein')).toBe('whole')
+    })
+
+    it('is partial while the tokenizer, which has no weights, has no folder', () => {
+      const dir = hub()
+      rmSync(join(listedModel(dir), 'tokenizer'), { recursive: true })
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    })
+
+    it('is partial while the folder of a listed part is still empty', () => {
+      const dir = hub()
+      const snapshot = listedModel(dir)
+      rmSync(join(snapshot, 'vae'), { recursive: true })
+      part(snapshot, 'vae', [])
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    })
+
+    it('is whole without what the listing names and mflux never fetches', () => {
+      const dir = hub()
+      listedModel(dir)
+      expect(imageModelDownload(dir, 'klein')).toBe('whole')
+    })
+
+    it('says nothing about parts when the listing cannot be read', () => {
+      const dir = hub()
+      const snapshot = listedModel(dir)
+      rmSync(join(snapshot, 'vae'), { recursive: true })
+      writeFileSync(join(dir, KLEIN, 'trees', 'abc.json'), '{ not json')
+      expect(imageModelDownload(dir, 'klein')).toBe('whole')
+    })
+  })
+
   it('only a whole download counts as installed', () => {
     const dir = hub()
     mkdirSync(join(dir, KLEIN, 'blobs'), { recursive: true })

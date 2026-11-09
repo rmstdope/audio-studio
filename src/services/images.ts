@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import {
   checkImageRequest,
   EDIT_MODELS,
@@ -196,34 +196,74 @@ function hasUnfinishedBlob(dir: string): boolean {
 }
 
 /**
- * The folder to judge a download by: the snapshot `refs/main` names, the revision last set out for,
- * or every snapshot when there is no ref. A part waiting in an older one a finished retry left behind
- * says nothing, and a retry that stopped is unfinished even beside a whole older revision, though
- * mflux, which looks for the newest complete snapshot, could still find that one for its weights.
+ * The revision to judge a download by: the one `refs/main` names, the revision last set out for, or
+ * none when there is no ref, and then every snapshot is judged. A part waiting in an older snapshot a
+ * finished retry left behind says nothing, and a retry that stopped is unfinished even beside a whole
+ * older revision, though mflux, which looks for the newest complete snapshot, could still find that
+ * one for its weights.
  */
-function currentSnapshots(folder: string): string {
-  const snapshots = join(folder, 'snapshots')
+function currentRevision(folder: string): string | undefined {
   try {
-    return join(snapshots, readFileSync(join(folder, 'refs', 'main'), 'utf8').trim())
+    return readFileSync(join(folder, 'refs', 'main'), 'utf8').trim()
   } catch {
-    return snapshots
+    return undefined
   }
+}
+
+/** Whether a folder is there with something in it (it is made before its first file arrives). */
+function hasContents(folder: string): boolean {
+  try {
+    return readdirSync(folder).length > 0
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether `trees/<revision>.json`, the listing of the repository Hugging Face writes before it fetches
+ * anything, names a part that has nothing in the revision's snapshot. It applies to any snapshot with
+ * a listing, and is what catches a missing part where there is no `model_index.json`, which mflux does
+ * not fetch. The listing also names what mflux
+ * never fetches, so a part is a folder holding weights, or a tokenizer's. A repository with no listing,
+ * or one that cannot be read, says nothing.
+ */
+function lacksPartOfListing(folder: string, revision: string): boolean {
+  let paths: string[]
+  try {
+    const listing = JSON.parse(readFileSync(join(folder, 'trees', `${revision}.json`), 'utf8')) as {
+      files?: Record<string, unknown>
+    }
+    paths = Object.keys(listing.files ?? {})
+  } catch {
+    return false
+  }
+  const parts = paths
+    .filter((path) => path.endsWith('.safetensors') || path.startsWith('tokenizer'))
+    .map(dirname)
+  return parts.some((part) => !hasContents(join(folder, 'snapshots', revision, part)))
 }
 
 /**
  * How much of a repository's download is in the Hugging Face cache `hubDir`: `absent` with no folder
  * for it, `whole` when its current snapshot holds weights and nothing is unfinished (no link to a missing blob,
- * every shard an index names, no part still waiting, and no `.incomplete` blob unless its finished
- * blob is beside it or an index vouches for the snapshot, for then it is a leftover), `partial`
- * otherwise.
+ * every shard an index names, no part still waiting, none the repository's listing names missing, and
+ * no `.incomplete` blob unless its finished blob is beside it or an index vouches for the snapshot,
+ * for then it is a leftover), `partial` otherwise.
  */
 export function hubDownload(hubDir: string, repo: string): ImageDownload {
   const folder = join(hubDir, `models--${repo.replace('/', '--')}`)
   if (!existsSync(folder)) return 'absent'
-  const { weights, broken, waiting, vouched } = inspectSnapshots(currentSnapshots(folder))
-  return weights && !broken && !waiting && (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
-    ? 'whole'
-    : 'partial'
+  const revision = currentRevision(folder)
+  const { weights, broken, waiting, vouched } = inspectSnapshots(
+    join(folder, 'snapshots', revision ?? ''),
+  )
+  const finished =
+    weights &&
+    !broken &&
+    !waiting &&
+    (revision === undefined || !lacksPartOfListing(folder, revision)) &&
+    (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
+  return finished ? 'whole' : 'partial'
 }
 
 /** How much of an image model's download is in the Hugging Face cache `hubDir` (see `hubDownload`). */
