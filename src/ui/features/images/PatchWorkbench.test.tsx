@@ -240,7 +240,7 @@ describe('an open patch with no takes', () => {
     expect(text(host)).toContain('Drag over the picture to mark what should change.')
     expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
     expect(text(host)).toContain(
-      'No takes yet. Each take is a new try at this change, painted with the whole picture in view.',
+      'No takes yet. Each take is a new try at this change, painted with the part of the picture around the mark in view.',
     )
     expect(text(host)).toContain('Takes')
     expect(text(host)).not.toContain('Takes ·')
