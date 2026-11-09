@@ -5302,6 +5302,14 @@ button.cue-chip[aria-expanded='true'] {
       'list';
     grid-template-rows: none;
   }
+  /* Stacked, the list scrolls under the held picture: opaque and in front, up to the window's top. */
+  .named-areas-picture {
+    top: 0;
+    z-index: 1;
+    margin-top: -12px;
+    padding: 12px 0 8px;
+    background: var(--panel);
+  }
 }
 /* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */
 .chip-attention {

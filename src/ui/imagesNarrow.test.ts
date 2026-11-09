@@ -56,6 +56,26 @@ describe('a patch row the game asks for (as-9b8)', () => {
   })
 })
 
+describe('the named areas picture in a narrow window (as-5v0)', () => {
+  const stacked = () => {
+    const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
+    return rule('.named-areas-picture', narrow.slice(0, narrow.indexOf('\n}\n')))
+  }
+
+  it('hides the list behind an opaque background, or its text prints through the line and switches', () => {
+    expect(stacked()).toMatch(/background:\s*var\(--panel\)/)
+  })
+
+  it('is drawn in front of the list, and reaches the window’s top so no row shows above it', () => {
+    expect(stacked()).toMatch(/z-index:\s*1/)
+    expect(stacked()).toMatch(/top:\s*0/)
+  })
+
+  it('stays held in view, as agreed for marking an area', () => {
+    expect(stacked()).not.toMatch(/position:/)
+  })
+})
+
 describe('the Place again line above the named areas list (as-7dz)', () => {
   it('stays at the list, the picture’s spare height going to the list’s row', () => {
     expect(rule('.named-areas-body.has-place-again')).toMatch(/grid-template-rows:\s*auto 1fr/)
