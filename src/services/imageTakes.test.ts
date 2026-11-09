@@ -147,7 +147,7 @@ describe('making takes', () => {
     expect(await takes.making(file)).toEqual({})
   })
 
-  it('times a finished take on this computer, and the next take is expected to take that long', async () => {
+  it('times a finished take on this computer', async () => {
     let release = () => {}
     const gate = new Promise<void>((resolve) => (release = resolve))
     const { takes, file, settled, read, clock } = setup(undefined, {}, gate)
@@ -157,7 +157,15 @@ describe('making takes', () => {
     release()
     await settled('inn')
     expect(JSON.parse(read('content-studio/cache/take-times.json'))).toEqual({ klein: [25] })
+  })
+
+  it('expects a take to take as long as the timings on this computer say', async () => {
+    const gate = new Promise<void>(() => {})
+    const { takes, file, root } = setup(undefined, {}, gate)
+    mkdirSync(join(root, 'content-studio/cache'), { recursive: true })
+    writeFileSync(join(root, 'content-studio/cache/take-times.json'), '{"klein":[25]}')
     await takes.make(file, 'inn', { count: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
     const view = await takes.view(file, 'inn')
     if (!view || !('making' in view)) throw new Error('no view')
     expect(view.making[0]!.expected).toBe(25)
