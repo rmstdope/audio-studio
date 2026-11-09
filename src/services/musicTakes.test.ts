@@ -693,6 +693,32 @@ describe('createMusicTakes', () => {
     expect(requests).toHaveLength(2)
   })
 
+  it('still shows every failed take after the brief changes, each one with Try again', async () => {
+    const { file, takes, requests, settled } = setup(undefined, {
+      'tts/act1/music.json': [{ id: 'hall', title: 'Hall', text: 'fail lute', seconds: 30 }],
+    })
+    await takes.make(file, 'hall', { count: 2 })
+    await settled('hall')
+    expect(await setTrackBrief(file, 'hall', { brief: 'warm lute' })).toEqual({ ok: true })
+    expect(await takes.view(file, 'hall')).toMatchObject({ failed: [{ n: 1 }, { n: 2 }] })
+
+    expect(await takes.make(file, 'hall', { retry: 1 })).toEqual({ ok: true })
+    const first = await settled('hall')
+    if (!first || !('ok' in first) || !first.ok) throw new Error('expected a view')
+    expect(first.takes.map((t) => [t.n, t.earlier])).toEqual([[1, false]])
+    expect(first.failed.map((f) => f.n)).toEqual([2])
+
+    expect(await takes.make(file, 'hall', { retry: 2 })).toEqual({ ok: true })
+    const second = await settled('hall')
+    if (!second || !('ok' in second) || !second.ok) throw new Error('expected a view')
+    expect(second.takes.map((t) => [t.n, t.earlier])).toEqual([
+      [1, false],
+      [2, false],
+    ])
+    expect(second.failed).toEqual([])
+    expect(requests.map((r) => r.brief).slice(-2)).toEqual(['warm lute', 'warm lute'])
+  })
+
   it('keeps every take hash as it was before models were chosen', () => {
     const inputs = { brief: 'warm lute', kind: 'loop', seconds: 30, bpm: null, key: null } as const
     const before = createHash('sha256')
