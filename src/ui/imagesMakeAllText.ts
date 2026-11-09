@@ -1,10 +1,6 @@
 import type { OtherModelReason } from '../core/imagesMakeAll'
+import { timeText } from '../core/takeTimes'
 import { joined } from './imagesText'
-
-/** The minutes of a number of seconds, rounded up, never less than one. */
-function minutes(seconds: number): number {
-  return Math.max(1, Math.ceil(seconds / 60))
-}
 
 const images = (n: number) => `${n} ${n === 1 ? 'image' : 'images'}`
 
@@ -34,16 +30,20 @@ export function makeAllLine({
   main,
   why,
   seconds,
+  guess,
 }: {
   model: string
   main: string
   why: OtherModelReason | null
   seconds: number
+  /** Whether the time is still only a guess, the model having timed no take here. */
+  guess: boolean
 }): string {
   const lead = why
     ? `Four takes each, on ${model}: ${main}, the image model on Setup, ${WHY[why]}.`
     : `Four takes each, on ${model}, the image model on Setup.`
-  return `${lead} About ${minutes(seconds)} min in all — they are made one after another, and you can leave the page.`
+  const time = `${timeText(seconds, 'up')} in all`
+  return `${lead} ${guess ? `A guess: about ${time}` : `About ${time}`} — they are made one after another, and you can leave the page.`
 }
 
 /** The images left out because they have a chosen take. */
@@ -79,7 +79,7 @@ export function runningLine({
   images: number
   left: number
 }): string {
-  return `Making ${takes} ${takes === 1 ? 'take' : 'takes'} for ${images(imageCount)} · about ${minutes(left)} min left`
+  return `Making ${takes} ${takes === 1 ? 'take' : 'takes'} for ${images(imageCount)} · about ${timeText(left, 'up')} left`
 }
 
 /** The summary's first sentence: how many of the takes asked for were made. */

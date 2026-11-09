@@ -128,7 +128,7 @@ describe('Make takes for every image with no chosen take', () => {
     await page.press('Make 4 takes each')
     expect(page.text()).toContain('Make 12 takes for 3 images?')
     expect(page.text()).toContain(
-      'Four takes each, on FLUX.2 klein, the image model on Setup. About 2 min in all',
+      'Four takes each, on FLUX.2 klein, the image model on Setup. A guess: about 4 min in all',
     )
     expect(page.text()).toContain('Lighthouse')
     expect(page.text()).toContain(
@@ -153,7 +153,7 @@ describe('Make takes for every image with no chosen take', () => {
     })
     await page.press('Make 4 takes each')
     expect(page.text()).toContain(
-      'Four takes each, on Z-Image-Turbo: FLUX.2 klein, the image model on Setup, is only partly downloaded. About 12 min in all',
+      'Four takes each, on Z-Image-Turbo: FLUX.2 klein, the image model on Setup, is only partly downloaded. A guess: about 12 min in all',
     )
   })
 

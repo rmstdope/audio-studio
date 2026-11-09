@@ -40,6 +40,7 @@ import type {
   StopResult,
 } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
+import { figuresOf, TIME_KEYS, type Figures } from '../core/takeTimes'
 import type { AreaBox, StyleField } from '../core/images'
 import type { ImageEditResult } from '../services/imageEdits'
 import type { RemoveResult } from '../services/musicOrphans'
@@ -1478,10 +1479,17 @@ export function useStopAll(listId: string) {
 
 /** An image's takes as its page shows them; polled while any is being made. */
 export function useImageTakes(imageId: string) {
+  const client = useQueryClient()
   return useQuery({
     queryKey: ['image-takes', imageId],
-    queryFn: () =>
-      getJson<ImageTakesView | ProjectFailure>(`/api/images/${encodeURIComponent(imageId)}/takes`),
+    queryFn: async () => {
+      const view = await getJson<ImageTakesView | ProjectFailure>(
+        `/api/images/${encodeURIComponent(imageId)}/takes`,
+      )
+      // Every read of the takes may carry a take just finished, which is a new time figure.
+      void client.invalidateQueries({ queryKey: ['image-take-times'] })
+      return view
+    },
     refetchInterval: (query) => {
       const view = query.state.data
       if (view && 'takes' in view && view.takes.some((t) => t.look === 'bringing')) return 1000
@@ -1526,6 +1534,30 @@ export function useImageMaking() {
     refetchInterval: (query) =>
       Object.values(query.state.data ?? {}).some((m) => m.takes > 0) ? 3000 : false,
   })
+}
+
+/**
+ * The time each image model takes for a take on this computer (a guess until one is timed); read
+ * again while takes are being made, so the next menu drawn after a finished take is new.
+ */
+export function useTakeTimes() {
+  const client = useQueryClient()
+  return useQuery({
+    queryKey: ['image-take-times'],
+    queryFn: () => getJson<Figures>('/api/images/take-times'),
+    refetchInterval: () =>
+      Object.values(
+        client.getQueryData<Record<string, ImageMakingSummary>>(['image-making']) ?? {},
+      ).some((m) => m.takes > 0)
+        ? 3000
+        : false,
+  })
+}
+
+/** The image time figures to draw with now: the saved ones, or guesses while they load or cannot be had. */
+export function useFigures(): Figures {
+  const { data } = useTakeTimes()
+  return data && TIME_KEYS.every((key) => data[key]) ? data : figuresOf({})
 }
 
 /** Setup's image model, how each model stands, and whether images can be made now. */
@@ -1655,15 +1687,18 @@ const loadedPatches = new Set<string>()
 
 /** The patches the game asks for on an image, with their takes on its chosen take; polled while any is being made. */
 export function useImagePatches(imageId: string) {
+  const client = useQueryClient()
   return useQuery({
     queryKey: ['image-patches', imageId],
-    queryFn: () => {
+    queryFn: async () => {
       // The first read after the page loads says so, so a finished press's summary is not shown again.
       const fresh = !loadedPatches.has(imageId)
       loadedPatches.add(imageId)
-      return getJson<ImagePatchesView | ProjectFailure>(
+      const view = await getJson<ImagePatchesView | ProjectFailure>(
         `/api/images/${encodeURIComponent(imageId)}/patches${fresh ? '?fresh=1' : ''}`,
       )
+      void client.invalidateQueries({ queryKey: ['image-take-times'] })
+      return view
     },
     refetchInterval: (query) => {
       const view = query.state.data

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   EDIT_MODEL_IDS,
   editMenuEntry,
@@ -7,7 +6,8 @@ import {
   type EditModelId,
   type ImageDownload,
 } from '../../../core/imageModels'
-import { openTracking } from '../../components/openTracking'
+import { useFigures } from '../../api'
+import { MenuFace } from '../../components/MenuFace'
 
 /**
  * The menu choosing which model makes new patch takes, built like an image's own takes menu: no
@@ -32,33 +32,26 @@ export function EditModelMenu({
   label: string
   disabled: boolean
 }) {
-  const [listOpen, setListOpen] = useState(false)
+  const figures = useFigures()
   const stateOf = (id: EditModelId) => ({ download: downloads[id], failed: failed.includes(id) })
   const warning = imageWarning(stateOf(value))
   return (
     <div className="edit-model">
-      <select
-        className="takes-model"
-        aria-label={label}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => {
-          onChange(event.target.value as EditModelId)
-          setListOpen(false)
-        }}
-        {...openTracking(setListOpen)}
-      >
-        {EDIT_MODEL_IDS.map((id) => (
-          // The closed menu shows the label; the open list shows each entry in full.
-          <option
-            key={id}
-            value={id}
-            label={id === value && !listOpen ? editShortEntry(id) : undefined}
-          >
-            {editMenuEntry(id, stateOf(id))}
-          </option>
-        ))}
-      </select>
+      <MenuFace text={editShortEntry(value, figures)}>
+        <select
+          className="takes-model"
+          aria-label={label}
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value as EditModelId)}
+        >
+          {EDIT_MODEL_IDS.map((id) => (
+            <option key={id} value={id}>
+              {editMenuEntry(id, stateOf(id), figures)}
+            </option>
+          ))}
+        </select>
+      </MenuFace>
       {warning && <span className="faint small">{warning}</span>}
     </div>
   )

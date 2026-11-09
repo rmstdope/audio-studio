@@ -62,6 +62,7 @@ function setup({
   queue = createSerial(),
   seeds = [11, 12, 13, 14, 15, 16, 17, 18],
   manifest,
+  now,
 }: {
   chosen?: boolean
   picture?: boolean
@@ -75,6 +76,7 @@ function setup({
   seeds?: number[]
   /** The manifest as the game has it, in place of the one with the image alone. */
   manifest?: unknown
+  now?: () => number
 } = {}) {
   const root = tempRepo({
     'content-studio.json': projectJson({ images }),
@@ -100,6 +102,7 @@ function setup({
     queue,
     free: () => {},
     newSeed: () => seeds[seed++ % seeds.length]!,
+    ...(now ? { now } : {}),
   })
   /** The view, once nothing of the patch is waiting or being made. */
   async function settled(patch = 'door'): Promise<ImagePatchesView> {
@@ -257,6 +260,18 @@ describe('takes of a declared patch', () => {
     ).toEqual([11, 12, 13])
   })
 
+  it("times a finished patch take under the model's own key, klein's patches apart from its takes", async () => {
+    let clock = 0
+    const { root, file, patches, work } = setup({ now: () => (clock += 3000) })
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await work()
+    const times = JSON.parse(
+      await Bun.file(join(root, 'content-studio/cache/take-times.json')).text(),
+    )
+    expect(Object.keys(times)).toEqual(['klein-edit'])
+    expect(times['klein-edit']).toEqual([3])
+  })
+
   it('shows takes waiting and being made, each with the area it will use', async () => {
     let release = () => {}
     const queue = createSerial()
@@ -365,6 +380,14 @@ describe('takes of a declared patch', () => {
       takes: [],
       failed: [{ message: 'The edited picture came back at 128 × 128 instead of 256 × 256.' }],
     })
+  })
+
+  it('does not time a patch take that came back wrong or was stopped', async () => {
+    let clock = 0
+    const wrong = setup({ makes: () => fakePng(128, 128, 1), now: () => (clock += 3000) })
+    await wrong.patches.make(wrong.file, 'inn', 'door', { count: 1, area })
+    await wrong.work()
+    expect(existsSync(join(wrong.root, 'content-studio/cache/take-times.json'))).toBe(false)
   })
 
   it('reports a patch board that cannot be read, and fails the take rather than writing over it', async () => {

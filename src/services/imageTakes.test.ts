@@ -74,12 +74,13 @@ function setup(
   })
   const file = join(root, 'content-studio.json')
   const { generator, requests } = fakeGenerator(ready, gate, options.here)
+  const clock = { now: 0 }
   let seed = 100
   const takes = createImageTakes({
     generator,
     queue: createSerial(),
     free: () => {},
-    now: () => 0,
+    now: () => clock.now,
     newSeed: () => seed++,
   })
   async function settled(id: string) {
@@ -99,7 +100,7 @@ function setup(
     const summary = await readImages(root, project, [])
     return summary!.acts.flatMap((a) => a.rows).find((r) => r.id === id)!
   }
-  return { root, file, takes, requests, settled, read, row }
+  return { root, file, takes, requests, settled, read, row, clock }
 }
 
 describe('making takes', () => {
@@ -135,8 +136,8 @@ describe('making takes', () => {
       [1, 'making'],
       [2, 'waiting'],
     ])
-    expect(view.making[0]!.expected).toBe(8)
-    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 16, failed: 0, stopped: 0 } })
+    expect(view.making[0]!.expected).toBe(20)
+    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 40, failed: 0, stopped: 0 } })
     release()
     await settled('inn')
     await takes.make(file, 'inn', { count: 1 })
@@ -144,6 +145,62 @@ describe('making takes', () => {
     if (!again || !('takes' in again)) throw new Error('no view')
     expect(again.takes.map((t) => t.n)).toEqual([1, 2, 3])
     expect(await takes.making(file)).toEqual({})
+  })
+
+  it('times a finished take on this computer', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { takes, file, settled, read, clock } = setup(undefined, {}, gate)
+    await takes.make(file, 'inn', { count: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    clock.now = 25_000
+    release()
+    await settled('inn')
+    expect(JSON.parse(read('content-studio/cache/take-times.json'))).toEqual({ klein: [25] })
+  })
+
+  it('expects a take to take as long as the timings on this computer say', async () => {
+    const gate = new Promise<void>(() => {})
+    const { takes, file, root } = setup(undefined, {}, gate)
+    mkdirSync(join(root, 'content-studio/cache'), { recursive: true })
+    writeFileSync(join(root, 'content-studio/cache/take-times.json'), '{"klein":[25]}')
+    await takes.make(file, 'inn', { count: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    const view = await takes.view(file, 'inn')
+    if (!view || !('making' in view)) throw new Error('no view')
+    expect(view.making[0]!.expected).toBe(25)
+  })
+
+  it('does not count the wait for its turn, and not a stopped take', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { takes, file, settled, read, clock } = setup(undefined, {}, gate)
+    await takes.make(file, 'inn', { count: 2 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    clock.now = 30_000
+    release()
+    await settled('inn')
+    expect(JSON.parse(read('content-studio/cache/take-times.json'))).toEqual({ klein: [30] })
+  })
+
+  it('does not time a take that was stopped', async () => {
+    const gate = new Promise<void>(() => {})
+    const { takes, file, root, clock } = setup(undefined, {}, gate)
+    await takes.make(file, 'inn', { count: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    clock.now = 30_000
+    await takes.stop(file, 'inn')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(existsSync(join(root, 'content-studio/cache/take-times.json'))).toBe(false)
+  })
+
+  it('does not time a take that failed', async () => {
+    const { takes, file, settled, root } = setup(undefined, {
+      [EDITS]: { style: STYLE, images: { inn: { text: 'fail now', gameWas: 'a low inn' } } },
+    })
+    await takes.make(file, 'inn', { count: 1 })
+    await settled('inn')
+    expect(existsSync(join(root, 'content-studio/cache/take-times.json'))).toBe(false)
   })
 
   it('keeps a take that failed with its reason, and Try again makes the same number', async () => {

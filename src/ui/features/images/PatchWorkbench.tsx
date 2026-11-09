@@ -47,7 +47,8 @@ import {
 } from '../../imagesText'
 import { gameSpace, modelSpace, type PatchSpace } from '../../patchGameSpace'
 import { tag } from './TakePicture'
-import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
+import { failureLine, progressOf } from '../../musicTakesText'
+import { imageTimeLeftText } from '../../imageTakesText'
 import { closeUp, closeUpLayer } from '../../patchCloseUp'
 
 /** How many takes one press can make. */
@@ -149,7 +150,7 @@ function MakingThumb({
         <span className="grow">Take {making.n}</span>
       </span>
       <span className="faint small patch-thumb-model">{editModel(making.model).short}</span>
-      <span className="faint small">{timeLeftText(making)}</span>
+      <span className="faint small">{imageTimeLeftText(making)}</span>
       <div
         className="bar"
         role="progressbar"

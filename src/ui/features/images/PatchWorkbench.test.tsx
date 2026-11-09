@@ -1205,13 +1205,15 @@ describe('the model of new takes', () => {
     await open(host)
     const menu = menuOf(host)
     expect([...menu.options].map((o) => o.textContent)).toEqual([
-      'Qwen Image Edit — about 8 min a take',
-      'FLUX.2 klein 4B — about 20 s a take',
+      'Qwen Image Edit — a guess: about 8 min a take',
+      'FLUX.2 klein 4B — a guess: about 20 s a take',
     ])
     expect(menu.value).toBe('qwen-edit')
-    // Closed, the menu shows the chosen entry's short form.
-    expect(menu.options[0]!.getAttribute('label')).toBe('Qwen Image Edit — about 8 min a take')
-    expect(menu.options[1]!.getAttribute('label')).toBeNull()
+    // Closed, a face that can wrap shows the chosen entry's short form.
+    expect(menu.closest('.menu-face')!.firstElementChild!.textContent).toBe(
+      'Qwen Image Edit — a guess: about 8 min a take',
+    )
+    expect(menu.options[0]!.hasAttribute('label')).toBe(false)
     const count = host.querySelector(COUNT)!
     expect(menu.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // On a line of its own: not inside the row of the count, Make and Stop.
@@ -1297,9 +1299,11 @@ describe('the model of new takes', () => {
     await open(host)
     expect(text(menuOf(host).closest('.edit-model'))).toContain('last take failed')
     expect(menuOf(host).options[0]!.textContent).toBe(
-      'Qwen Image Edit — about 8 min a take — last take failed',
+      'Qwen Image Edit — a guess: about 8 min a take — last take failed',
     )
-    expect(menuOf(host).options[1]!.textContent).toBe('FLUX.2 klein 4B — about 20 s a take')
+    expect(menuOf(host).options[1]!.textContent).toBe(
+      'FLUX.2 klein 4B — a guess: about 20 s a take',
+    )
   })
 
   it('turns the menu, count and Make off while takes are made, and names the model of each', async () => {

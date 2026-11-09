@@ -1,12 +1,12 @@
 import {
   defaultTakeModel,
-  imageModel,
   IMAGE_MODEL_IDS,
   type ImageModelId,
   type ImageModelState,
 } from './imageModels'
 import type { ImageMakingSummary } from './imageTakes'
 import type { ImageStatus } from './images'
+import type { Figures } from './takeTimes'
 
 /** How many takes one press of Make asks for on each image. */
 export const TAKES_EACH = 4
@@ -45,6 +45,8 @@ export type ImagesMakeAllPlan =
       why: OtherModelReason | null
       /** About how long they take, one after another, in seconds. */
       seconds: number
+      /** Whether the figure behind `seconds` is still only a guess. */
+      guess: boolean
     }
 
 /**
@@ -60,6 +62,7 @@ export function planImagesMakeAll({
   main,
   states,
   ready,
+  figures,
 }: {
   rows: readonly MakeAllImage[]
   conflicts: readonly { id: string; title: string }[]
@@ -67,6 +70,7 @@ export function planImagesMakeAll({
   main: ImageModelId
   states: Readonly<Record<ImageModelId, ImageModelState>>
   ready: boolean
+  figures: Figures
 }): ImagesMakeAllPlan {
   const lacking = rows.filter((r) => r.status === 'none yet')
   const busy = lacking.filter((r) => (making[r.id]?.takes ?? 0) > 0)
@@ -95,6 +99,7 @@ export function planImagesMakeAll({
     takes,
     model,
     why,
-    seconds: takes * imageModel(model).seconds,
+    seconds: takes * figures[model].seconds,
+    guess: figures[model].guess,
   }
 }

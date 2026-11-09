@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { ImageModelState } from './imageModels'
+import { figuresOf } from './takeTimes'
 import { planImagesMakeAll, TAKES_EACH, type MakeAllImage } from './imagesMakeAll'
 
 const image = (id: string, status: MakeAllImage['status'] = 'none yet'): MakeAllImage => ({
@@ -16,6 +17,7 @@ const base = {
   main: 'klein' as const,
   states,
   ready: true,
+  figures: figuresOf({}),
 }
 
 describe('planImagesMakeAll', () => {
@@ -25,7 +27,10 @@ describe('planImagesMakeAll', () => {
     if (plan.kind !== 'ready') return
     expect(plan.images.map((i) => i.id)).toEqual(['a', 'b'])
     expect(plan.chosen.map((i) => i.id)).toEqual(['c'])
-    expect(plan.seconds).toBe(8 * 8)
+    expect(plan.seconds).toBe(8 * 20)
+    expect(plan.guess).toBe(true)
+    const timed = planImagesMakeAll({ ...base, figures: figuresOf({ klein: [30] }) })
+    expect(timed).toMatchObject({ seconds: 8 * 30, guess: false })
   })
 
   it('counts an out-of-date chosen image as chosen', () => {

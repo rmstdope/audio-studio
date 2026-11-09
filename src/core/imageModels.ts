@@ -1,3 +1,5 @@
+import { perTakeText, timeKeyOfEdit, type Figures } from './takeTimes'
+
 /** The ids of the image models the studio makes takes with. */
 export const IMAGE_MODEL_IDS = ['klein', 'z-image-turbo'] as const
 
@@ -21,8 +23,6 @@ export interface ImageModel {
   mflux: string
   /** The mflux command that makes this model's images (mflux has one per model family). */
   command: string
-  /** About how long one take takes, in seconds (a guess from the spike's timings and the model's load). */
-  seconds: number
 }
 
 /** The image models, by id. */
@@ -35,7 +35,6 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     gigabytes: 15,
     mflux: 'flux2-klein-4b',
     command: 'mflux-generate-flux2',
-    seconds: 8,
   },
   'z-image-turbo': {
     id: 'z-image-turbo',
@@ -45,7 +44,6 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     gigabytes: 31,
     mflux: 'z-image-turbo',
     command: 'mflux-generate-z-image-turbo',
-    seconds: 60,
   },
 }
 
@@ -80,8 +78,6 @@ export interface EditModel {
   /** Quantization bits and steps, when the model needs them to fit and to do the job. */
   quantize?: number
   steps?: number
-  /** About how long one take takes, in seconds (measured on a 48 GB Mac). */
-  seconds: number
 }
 
 /** The edit models, by id. */
@@ -99,7 +95,6 @@ export const EDIT_MODELS: Record<EditModelId, EditModel> = {
     // Unquantized it does not fit a 48 GB Mac; 8 bits peaks near 38 GB.
     quantize: 8,
     steps: 30,
-    seconds: 480,
   },
   klein: {
     id: 'klein',
@@ -109,7 +104,6 @@ export const EDIT_MODELS: Record<EditModelId, EditModel> = {
     gigabytes: IMAGE_MODELS.klein.gigabytes,
     mflux: IMAGE_MODELS.klein.mflux,
     command: IMAGE_EDIT_COMMAND,
-    seconds: 20,
   },
 }
 
@@ -123,22 +117,21 @@ export function isEditModel(id: string): id is EditModelId {
   return (EDIT_MODEL_IDS as readonly string[]).includes(id)
 }
 
-/** How long an edit take takes, as a person reads it: "about 8 min a take". */
-export function editPerTake(id: EditModelId): string {
-  const { seconds } = EDIT_MODELS[id]
-  return `about ${seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`} a take`
+/** How long an edit take takes, as a person reads it: "about 8 min a take", "a guess: …". */
+export function editPerTake(id: EditModelId, figures: Figures): string {
+  return perTakeText(figures[timeKeyOfEdit(id)])
 }
 
 /** An edit model's entry in an open menu: name and time, then what is wrong with it, if anything. */
-export function editMenuEntry(id: EditModelId, state: ImageModelState): string {
-  const entry = `${EDIT_MODELS[id].name} — ${editPerTake(id)}`
+export function editMenuEntry(id: EditModelId, state: ImageModelState, figures: Figures): string {
+  const entry = `${EDIT_MODELS[id].name} — ${editPerTake(id, figures)}`
   const warning = imageWarning(state)
   return warning ? `${entry} — ${warning}` : entry
 }
 
 /** An edit model's entry in a closed menu: its short name and time. */
-export function editShortEntry(id: EditModelId): string {
-  return `${EDIT_MODELS[id].short} — ${editPerTake(id)}`
+export function editShortEntry(id: EditModelId, figures: Figures): string {
+  return `${EDIT_MODELS[id].short} — ${editPerTake(id, figures)}`
 }
 
 /** The model new patch takes start on: the stronger one when it is whole, else klein. */
@@ -200,10 +193,9 @@ export function imageFailureReason(id: ImageModelId, code: number, stderr: strin
   return `${name} could not make the image (mflux stopped with exit code ${code}); the details are in the studio's log.`
 }
 
-/** How long a take takes, as a person reads it: "about 8 s a take", "about 1 min a take". */
-export function perTake(id: ImageModelId): string {
-  const { seconds } = IMAGE_MODELS[id]
-  return `about ${seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`} a take`
+/** How long a take takes, as a person reads it: "about 25 s a take", "a guess: about 1 min a take". */
+export function perTake(id: ImageModelId, figures: Figures): string {
+  return perTakeText(figures[id])
 }
 
 /** How much of a model's download is on this computer. */
@@ -220,8 +212,8 @@ export interface ImageModelState {
  * "not on this computer", "download incomplete" or "last take failed" (a model that is not whole
  * is marked by its download, not by a failure).
  */
-export function imageMenuEntry(id: ImageModelId, state: ImageModelState): string {
-  const entry = `${IMAGE_MODELS[id].name} — ${perTake(id)}`
+export function imageMenuEntry(id: ImageModelId, state: ImageModelState, figures: Figures): string {
+  const entry = `${IMAGE_MODELS[id].name} — ${perTake(id, figures)}`
   const warning = imageWarning(state)
   return warning ? `${entry} — ${warning}` : entry
 }
@@ -234,8 +226,8 @@ export function imageWarning(state: ImageModelState): string | null {
 }
 
 /** A model's entry in an image's closed menu: its short name and time. */
-export function imageShortEntry(id: ImageModelId): string {
-  return `${IMAGE_MODELS[id].short} — ${perTake(id)}`
+export function imageShortEntry(id: ImageModelId, figures: Figures): string {
+  return `${IMAGE_MODELS[id].short} — ${perTake(id, figures)}`
 }
 
 /** The heading of the box shown when saving the project's image model failed. */

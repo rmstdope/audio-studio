@@ -1,4 +1,6 @@
 import { rm } from 'node:fs/promises'
+import { figuresOf } from '../core/takeTimes'
+import { readTakeTimes, recordTakeTime } from './takeTimes'
 import { dirname, join } from 'node:path'
 import {
   DEFAULT_IMAGE_MODEL,
@@ -335,6 +337,12 @@ export function createImageTakes({
     return read === 'invalid' ? null : read === 'missing' ? {} : read
   }
 
+  /** What a take of a model is expected to take (seconds), as timed on this computer. */
+  const secondsFor = async (projectFile: string) => {
+    const figures = figuresOf(await readTakeTimes(projectFile))
+    return (model: ImageModelId) => figures[model].seconds
+  }
+
   const entriesOf = (key: string) =>
     [...(active.get(key)?.values() ?? [])].sort((a, b) => a.n - b.n)
 
@@ -464,6 +472,7 @@ export function createImageTakes({
     try {
       const size = takeSize(found.row)
       const model = imageModel(entry.model)
+      let began: number | null = null
       const made = await makeImageTake(
         { generator, queue, free },
         { prompt: request.prompt, ...size, seed: newSeed(), model: entry.model },
@@ -471,6 +480,7 @@ export function createImageTakes({
         () => {
           entry.state = 'making'
           entry.startedAt = now()
+          began = entry.startedAt
         },
       ).catch(async (error: unknown) => {
         // Only a take the model failed to make is the model's failure; saving it is not.
@@ -488,6 +498,8 @@ export function createImageTakes({
         throw error
       })
       if (stop.signal.aborted) return
+      // Timed from when the take started making, so its wait for the GPU is not counted.
+      const took = began === null ? null : (now() - began) / 1000
       const take: ImageBoardTake = {
         n: entry.n,
         seed: made.seed,
@@ -515,6 +527,7 @@ export function createImageTakes({
         throw new Error(`${saved.file} cannot be used`)
       }
       entries.delete(entry.n)
+      if (took !== null) await recordTakeTime(found.projectFile, entry.model, took)
       await health.clear(found.projectFile, entry.model).catch(() => {})
       await bringTake(found, take.n)
     } catch (error) {
@@ -665,6 +678,7 @@ export function createImageTakes({
         main: state.main,
         states: state.states,
         ready: state.ready,
+        figures: figuresOf(await readTakeTimes(projectFile)),
       })
       if (plan.kind === 'not-ready') {
         return { ok: false, message: "Images can't be made yet. Setup says what is missing." }
@@ -751,13 +765,14 @@ export function createImageTakes({
           cropped: isCropped(take, found.row),
         })
       }
+      const secondsOf = await secondsFor(projectFile)
       const making: ImageMakingView[] = entries
         .filter((e) => e.state !== 'failed' && !takes.some((t) => t.n === e.n))
         .map((e) => ({
           n: e.n,
           state: e.state as 'waiting' | 'making',
           elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
-          expected: imageModel(e.model).seconds,
+          expected: secondsOf(e.model),
         }))
       const failed: ImageFailedView[] = entries
         .filter((e) => e.state === 'failed')
@@ -1025,6 +1040,7 @@ export function createImageTakes({
 
     async making(projectFile) {
       const summary: Record<string, ImageMakingSummary> = {}
+      const secondsOf = await secondsFor(projectFile)
       const prefix = `${projectFile}\0`
       const keys = new Set([...active.keys(), ...stoppedCount.keys()])
       for (const key of keys) {
@@ -1038,7 +1054,7 @@ export function createImageTakes({
             continue
           }
           takes++
-          const { seconds } = imageModel(entry.model)
+          const seconds = secondsOf(entry.model)
           left +=
             entry.state === 'waiting'
               ? seconds

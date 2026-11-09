@@ -25,6 +25,7 @@ import {
 import {
   useChooseImageTake,
   useDropImageTake,
+  useFigures,
   useImageTakes,
   useMakeImageTakes,
   useMarkImageTakeSeen,
@@ -32,7 +33,7 @@ import {
   useUnchooseImageTake,
 } from '../../api'
 import { Confirm } from '../../components/Confirm'
-import { openTracking } from '../../components/openTracking'
+import { MenuFace } from '../../components/MenuFace'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import {
   lookZoom,
@@ -45,7 +46,8 @@ import {
   takeCountText,
   unchooseNote,
 } from '../../imagesText'
-import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
+import { failureLine, progressOf } from '../../musicTakesText'
+import { imageTimeLeftText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 
@@ -155,6 +157,7 @@ export function TakesSection({
 }) {
   const id = row.id
   const query = useImageTakes(id)
+  const figures = useFigures()
   const make = useMakeImageTakes(id)
   const stop = useStopImageTakes(id)
   const choose = useChooseImageTake(id)
@@ -167,7 +170,6 @@ export function TakesSection({
   const [wasChosen, setWasChosen] = useState<number | null>(null)
   const [count, setCount] = useState(2)
   const [picked, setPicked] = useState<ImageModelId | null>(null)
-  const [modelOpen, setModelOpen] = useState(false)
   // The question open: choosing, un-choosing or dropping a take with chosen patches asks first.
   const [asking, setAsking] = useState<SetAsideAsk | null>(null)
   const open = asking !== null
@@ -438,29 +440,21 @@ export function TakesSection({
 
   const controls = (
     <>
-      <select
-        className="takes-model"
-        aria-label="Model for new takes"
-        value={model}
-        disabled={busy || make.isPending || waitingForWords || !generator.ok}
-        onChange={(event) => {
-          setPicked(event.target.value as ImageModelId)
-          setModelOpen(false)
-        }}
-        {...openTracking(setModelOpen)}
-      >
-        {IMAGE_MODEL_IDS.map((id) => (
-          // The closed menu shows the label; the open list shows each entry in full.
-          <option
-            key={id}
-            value={id}
-            label={id === model && !modelOpen ? imageShortEntry(id) : undefined}
-            disabled={!installed[id]}
-          >
-            {imageMenuEntry(id, states[id])}
-          </option>
-        ))}
-      </select>
+      <MenuFace text={imageShortEntry(model, figures)}>
+        <select
+          className="takes-model"
+          aria-label="Model for new takes"
+          value={model}
+          disabled={busy || make.isPending || waitingForWords || !generator.ok}
+          onChange={(event) => setPicked(event.target.value as ImageModelId)}
+        >
+          {IMAGE_MODEL_IDS.map((id) => (
+            <option key={id} value={id} disabled={!installed[id]}>
+              {imageMenuEntry(id, states[id], figures)}
+            </option>
+          ))}
+        </select>
+      </MenuFace>
       <select
         className="takes-count"
         aria-label="Number of new takes"
@@ -944,7 +938,7 @@ function MakingThumb({
       <span className="image-thumb-label">
         <span className="grow">Take {making.n}</span>
       </span>
-      <span className="faint small">{timeLeftText(making)}</span>
+      <span className="faint small">{imageTimeLeftText(making)}</span>
       <div className="bar" role="progressbar" aria-label={`Take ${making.n}`}>
         <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
       </div>

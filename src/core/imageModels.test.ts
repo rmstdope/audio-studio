@@ -1,3 +1,4 @@
+import { figuresOf } from './takeTimes'
 import { describe, expect, it } from 'bun:test'
 import {
   DEFAULT_IMAGE_MODEL,
@@ -30,8 +31,6 @@ describe('imageModels', () => {
     expect(DEFAULT_IMAGE_MODEL).toBe('klein')
     expect(imageModel('klein').mflux).toBe('flux2-klein-4b')
     expect(imageModel('z-image-turbo').mflux).toBe('z-image-turbo')
-    expect(imageModel('klein').seconds).toBe(8)
-    expect(imageModel('z-image-turbo').seconds).toBe(60)
   })
 
   it('accepts a prompt, dimensions in steps of 16 and a seed', () => {
@@ -47,28 +46,33 @@ describe('imageModels', () => {
     expect(checkImageRequest({ ...ok, seed: 1.5 })).toMatch(/seed/)
   })
 
-  it('words the time of a take and the menu entries', () => {
-    expect(perTake('klein')).toBe('about 8 s a take')
-    expect(perTake('z-image-turbo')).toBe('about 1 min a take')
+  it('words the time of a take and the menu entries, a guess until timed', () => {
+    const guesses = figuresOf({})
+    const timed = figuresOf({ klein: [23] })
+    expect(perTake('klein', guesses)).toBe('a guess: about 20 s a take')
+    expect(perTake('z-image-turbo', guesses)).toBe('a guess: about 1 min a take')
+    expect(perTake('klein', timed)).toBe('about 25 s a take')
     const entry = (
       id: 'klein' | 'z-image-turbo',
       download: 'whole' | 'partial' | 'absent',
       failed = false,
-    ) => imageMenuEntry(id, { download, failed })
-    expect(entry('klein', 'whole')).toBe('FLUX.2 klein 4B — about 8 s a take')
+      figures = timed,
+    ) => imageMenuEntry(id, { download, failed }, figures)
+    expect(entry('klein', 'whole')).toBe('FLUX.2 klein 4B — about 25 s a take')
+    expect(entry('klein', 'whole', false, guesses)).toBe(
+      'FLUX.2 klein 4B — a guess: about 20 s a take',
+    )
     expect(entry('z-image-turbo', 'absent')).toBe(
-      'Z-Image-Turbo — about 1 min a take — not on this computer',
+      'Z-Image-Turbo — a guess: about 1 min a take — not on this computer',
     )
     expect(entry('z-image-turbo', 'whole', true)).toBe(
-      'Z-Image-Turbo — about 1 min a take — last take failed',
-    )
-    expect(entry('klein', 'partial')).toBe(
-      'FLUX.2 klein 4B — about 8 s a take — download incomplete',
+      'Z-Image-Turbo — a guess: about 1 min a take — last take failed',
     )
     expect(entry('klein', 'partial', true)).toBe(
-      'FLUX.2 klein 4B — about 8 s a take — download incomplete',
+      'FLUX.2 klein 4B — about 25 s a take — download incomplete',
     )
-    expect(imageShortEntry('klein')).toBe('FLUX.2 klein — about 8 s a take')
+    expect(imageShortEntry('klein', guesses)).toBe('FLUX.2 klein — a guess: about 20 s a take')
+    expect(imageShortEntry('klein', timed)).toBe('FLUX.2 klein — about 25 s a take')
     expect(imageSaveFailureHeading('z-image-turbo')).toBe(
       'Z-Image-Turbo could not be saved as the image model.',
     )
@@ -159,20 +163,23 @@ describe('edit models', () => {
     expect(editModel('klein').command).toBe('mflux-generate-flux2-edit')
   })
 
-  it('reads the time and the menu entries', () => {
+  it('reads the time and the menu entries, klein patches timed apart from klein takes', () => {
     const whole = { download: 'whole', failed: false } as const
-    expect(editPerTake('qwen-edit')).toBe('about 8 min a take')
-    expect(editPerTake('klein')).toBe('about 20 s a take')
-    expect(editShortEntry('klein')).toBe('FLUX.2 klein — about 20 s a take')
-    expect(editMenuEntry('klein', whole)).toBe('FLUX.2 klein 4B — about 20 s a take')
-    expect(editMenuEntry('qwen-edit', { download: 'absent', failed: false })).toBe(
-      'Qwen Image Edit — about 8 min a take — not on this computer',
+    const guesses = figuresOf({})
+    const timed = figuresOf({ klein: [90], 'klein-edit': [23] })
+    expect(editPerTake('qwen-edit', guesses)).toBe('a guess: about 8 min a take')
+    expect(editPerTake('klein', guesses)).toBe('a guess: about 20 s a take')
+    expect(editPerTake('klein', timed)).toBe('about 25 s a take')
+    expect(editShortEntry('klein', guesses)).toBe('FLUX.2 klein — a guess: about 20 s a take')
+    expect(editMenuEntry('klein', whole, timed)).toBe('FLUX.2 klein 4B — about 25 s a take')
+    expect(editMenuEntry('qwen-edit', { download: 'absent', failed: false }, guesses)).toBe(
+      'Qwen Image Edit — a guess: about 8 min a take — not on this computer',
     )
-    expect(editMenuEntry('qwen-edit', { download: 'partial', failed: true })).toBe(
-      'Qwen Image Edit — about 8 min a take — download incomplete',
+    expect(editMenuEntry('qwen-edit', { download: 'partial', failed: true }, guesses)).toBe(
+      'Qwen Image Edit — a guess: about 8 min a take — download incomplete',
     )
-    expect(editMenuEntry('qwen-edit', { download: 'whole', failed: true })).toBe(
-      'Qwen Image Edit — about 8 min a take — last take failed',
+    expect(editMenuEntry('qwen-edit', { download: 'whole', failed: true }, guesses)).toBe(
+      'Qwen Image Edit — a guess: about 8 min a take — last take failed',
     )
   })
 
