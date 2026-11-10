@@ -725,12 +725,18 @@ describe('imageModelDownload', () => {
       'README.md',
       'flux-2-klein-4b.safetensors',
       'scheduler/scheduler_config.json',
+      'transformer/README.md',
     ]
     const PARTS = ['text_encoder', 'tokenizer', 'transformer', 'vae']
     /** The files `trees/abc.json` lists for a part. */
     const listed = (name: string) =>
       name === 'tokenizer'
-        ? [`${name}/tokenizer.json`]
+        ? [
+            `${name}/merges.txt`,
+            `${name}/tokenizer.json`,
+            `${name}/tokenizer_config.json`,
+            `${name}/vocab.json`,
+          ]
         : [`${name}/config.json`, `${name}/diffusion_pytorch_model.safetensors`]
     /** A snapshot like klein's: its parts, `refs/main` naming it and the listing, nothing unfinished. */
     const listedModel = (dir: string) => {
@@ -780,6 +786,23 @@ describe('imageModelDownload', () => {
       const snapshot = listedModel(dir)
       rmSync(join(snapshot, 'vae'), { recursive: true })
       part(snapshot, 'vae', [])
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    })
+
+    it('is partial while the tokenizer has lost some of its files, and whole once they are back', () => {
+      const dir = hub()
+      const snapshot = listedModel(dir)
+      for (const name of ['merges.txt', 'tokenizer.json', 'vocab.json'])
+        rmSync(join(snapshot, 'tokenizer', name))
+      expect(imageModelDownload(dir, 'klein')).toBe('partial')
+      rmSync(join(snapshot, 'tokenizer'), { recursive: true })
+      restore(snapshot, 'tokenizer')
+      expect(imageModelDownload(dir, 'klein')).toBe('whole')
+    })
+
+    it('is partial while a part with weights has lost its config', () => {
+      const dir = hub()
+      rmSync(join(listedModel(dir), 'vae', 'config.json'))
       expect(imageModelDownload(dir, 'klein')).toBe('partial')
     })
 

@@ -209,24 +209,17 @@ function currentRevision(folder: string): string | undefined {
   }
 }
 
-/** Whether a folder is there with something in it (it is made before its first file arrives). */
-function hasContents(folder: string): boolean {
-  try {
-    return readdirSync(folder).length > 0
-  } catch {
-    return false
-  }
-}
-
 /**
  * Whether `trees/<revision>.json`, the listing of the repository Hugging Face writes before it fetches
- * anything, names a part that has nothing in the revision's snapshot. It applies to any snapshot with
- * a listing, and is what catches a missing part where there is no `model_index.json`, which mflux does
- * not fetch. The listing also names what mflux
- * never fetches, so a part is a folder holding weights, or a tokenizer's. A repository with no listing,
- * or one that cannot be read, says nothing.
+ * anything, names a file mflux fetches that is not in the revision's snapshot. It applies to any
+ * snapshot with a listing, and is what catches a missing part, or a part that lost some of its files,
+ * where there is no `model_index.json`, which mflux does not fetch. The listing also names what mflux
+ * never fetches, so only what its download patterns take counts: the `.safetensors` and `.json` files
+ * of a folder holding weights (`vae/*.json`, …; not the weights at the top of the repository), and
+ * everything in the tokenizer's folder (`tokenizer/**`). A repository with no listing, or one that
+ * cannot be read, says nothing.
  */
-function lacksPartOfListing(folder: string, revision: string): boolean {
+function lacksFileOfListing(folder: string, revision: string): boolean {
   let paths: string[]
   try {
     const listing = JSON.parse(readFileSync(join(folder, 'trees', `${revision}.json`), 'utf8')) as {
@@ -236,10 +229,18 @@ function lacksPartOfListing(folder: string, revision: string): boolean {
   } catch {
     return false
   }
-  const parts = paths
-    .filter((path) => path.endsWith('.safetensors') || path.startsWith('tokenizer'))
-    .map(dirname)
-  return parts.some((part) => !hasContents(join(folder, 'snapshots', revision, part)))
+  const parts = new Set(
+    paths
+      .filter((path) => path.endsWith('.safetensors'))
+      .map(dirname)
+      .filter((part) => part !== '.'),
+  )
+  const fetched = paths.filter(
+    (path) =>
+      path.startsWith('tokenizer/') ||
+      (parts.has(dirname(path)) && (path.endsWith('.safetensors') || path.endsWith('.json'))),
+  )
+  return fetched.some((path) => !existsSync(join(folder, 'snapshots', revision, path)))
 }
 
 /**
@@ -260,7 +261,7 @@ export function hubDownload(hubDir: string, repo: string): ImageDownload {
     weights &&
     !broken &&
     !waiting &&
-    (revision === undefined || !lacksPartOfListing(folder, revision)) &&
+    (revision === undefined || !lacksFileOfListing(folder, revision)) &&
     (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
   return finished ? 'whole' : 'partial'
 }
