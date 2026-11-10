@@ -142,6 +142,20 @@ describe('matchOutside', () => {
     expect(rgbAt(out, 100, 70)).toEqual([100, 160, 80])
   })
 
+  it('leaves black and white as they are: a drift of the middle tones does not move them', () => {
+    // A mid-tone picture with black lines and white highlights; the model darkened only the middle.
+    const at = (x: number) => (x % 20 < 3 ? 0 : x % 20 > 17 ? 255 : 100)
+    const lined = painted(200, 200, (x) => [at(x), at(x), at(x)])
+    const darker = painted(200, 200, (x) => {
+      const v = at(x) === 100 ? 60 : at(x)
+      return [v, v, v]
+    })
+    const out = matchOutside(darker, lined, area)
+    expect(rgbAt(out, 10, 10)).toEqual([100, 100, 100])
+    expect(rgbAt(out, 1, 10)).toEqual([0, 0, 0])
+    expect(rgbAt(out, 19, 10)).toEqual([255, 255, 255])
+  })
+
   it('leaves a whole drift of the window kept as nothing once the mark is matched too', () => {
     const edited = plain(200, 200, [100, 160, 80])
     const patch = keepChanged(matchOutside(matchToTake(edited, take, area), take, area), take, area)

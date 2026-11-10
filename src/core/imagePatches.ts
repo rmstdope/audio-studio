@@ -301,11 +301,19 @@ function boxBlur(values: Float32Array, width: number, height: number, r: number)
   return out
 }
 
+/** Out of 255, how near black or white an edited value is left out of the drift outside the mark: a model's drift does not move them. */
+const DRIFT_CLIPPED = 8
+
+/** Out of 255, the tones nearest black and white over which the drift outside the mark eases out. */
+const DRIFT_EASE = 32
+
 /**
  * The edited picture with the drift of its colours taken away outside the mark: every pixel there
- * moved by the median offset (take minus edit, per channel) of all of them. `matchToTake` matches
- * the mark itself; this matches what lies round it, so a drift of the whole picture is no change
- * and an object kept past the mark is in the same colours on both sides of its edge.
+ * moved by the median offset (take minus edit, per channel) of them all, black and white left out.
+ * `matchToTake` matches the mark itself first; this matches what lies round it, so a drift of the
+ * whole picture is no change and an object kept past the mark is in the same colours on both sides
+ * of its edge. The move eases out towards black and white, which a drift of the middle tones leaves
+ * where they are, so outlines, shadows and highlights do not read as changed.
  */
 export function matchOutside(edited: Pixels, take: Pixels, area: PatchArea): Pixels {
   const { width, height } = edited
@@ -313,31 +321,37 @@ export function matchOutside(edited: Pixels, take: Pixels, area: PatchArea): Pix
     x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
   // The median by counting: an offset is one of 511 values.
   const counts = [0, 1, 2].map(() => new Uint32Array(511))
-  let outside = 0
+  const totals = [0, 0, 0]
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (inMark(x, y)) continue
       const i = (y * width + x) * 4
-      for (let c = 0; c < 3; c++) counts[c]![take.data[i + c]! - edited.data[i + c]! + 255]!++
-      outside++
+      for (let c = 0; c < 3; c++) {
+        const v = edited.data[i + c]!
+        if (v < DRIFT_CLIPPED || v > 255 - DRIFT_CLIPPED) continue
+        counts[c]![take.data[i + c]! - v + 255]!++
+        totals[c]!++
+      }
     }
   }
-  const data = new Uint8Array(edited.data)
-  if (outside === 0) return { width, height, data }
-  const offset = counts.map((count) => {
+  const offset = counts.map((count, c) => {
     let seen = 0
     for (let v = 0; v < count.length; v++) {
       seen += count[v]!
-      if (seen * 2 > outside) return v - 255
+      if (seen * 2 > totals[c]!) return v - 255
     }
-    return 0
+    return 0 // no tone between black and white to measure
   })
+  const data = new Uint8Array(edited.data)
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (inMark(x, y)) continue
       const i = (y * width + x) * 4
-      for (let c = 0; c < 3; c++)
-        data[i + c] = Math.max(0, Math.min(255, data[i + c]! + offset[c]!))
+      for (let c = 0; c < 3; c++) {
+        const v = data[i + c]!
+        const ease = Math.min(1, v / DRIFT_EASE, (255 - v) / DRIFT_EASE)
+        data[i + c] = Math.max(0, Math.min(255, Math.round(v + offset[c]! * ease)))
+      }
     }
   }
   return { width, height, data }
