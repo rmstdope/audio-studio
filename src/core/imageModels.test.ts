@@ -9,6 +9,7 @@ import {
   editModel,
   editPerTake,
   editShortEntry,
+  startEditModel,
   IMAGE_MODEL_IDS,
   checkImageRequest,
   defaultTakeModel,
@@ -195,8 +196,13 @@ describe('edit models', () => {
     )
   })
 
-  it('starts patches on klein', () => {
+  it('starts patches on klein, or on qwen when only qwen is whole', () => {
     expect(DEFAULT_EDIT_MODEL).toBe('klein')
+    expect(startEditModel({ klein: 'whole', 'qwen-edit': 'whole' })).toBe('klein')
+    expect(startEditModel({ klein: 'whole', 'qwen-edit': 'absent' })).toBe('klein')
+    expect(startEditModel({ klein: 'absent', 'qwen-edit': 'absent' })).toBe('klein')
+    expect(startEditModel({ klein: 'partial', 'qwen-edit': 'whole' })).toBe('qwen-edit')
+    expect(startEditModel({ klein: 'absent', 'qwen-edit': 'whole' })).toBe('qwen-edit')
   })
 
   it('says why a take failed, naming the model', () => {

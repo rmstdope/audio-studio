@@ -3,6 +3,7 @@ import { figuresOf, timeKeyOfEdit } from '../core/takeTimes'
 import { readTakeTimes, recordTakeTime } from './takeTimes'
 import { dirname, join } from 'node:path'
 import {
+  DEFAULT_EDIT_MODEL,
   EDIT_MODEL_IDS,
   editModel,
   type EditModelId,
@@ -48,11 +49,8 @@ import { decodePng, encodePng, encodeTransparentPng, pngSize } from './png'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
-/**
- * The model new takes are made with when the request names none, and the one that made every take
- * before there was a choice (so a board take without `model` reads as this). Both are klein.
- */
-const DEFAULT_MODEL: EditModelId = 'klein'
+/** The model that made every take before there was a choice, so a board take without `model` reads as this. */
+const BEFORE_CHOICE: EditModelId = 'klein'
 
 /** The sentence saying a model's weights are not on this computer. */
 const notHere = (model: EditModelId) =>
@@ -432,7 +430,7 @@ export function createImagePatches({
       ? failed.model
       : 'model' in request && request.model
         ? request.model
-        : DEFAULT_MODEL
+        : DEFAULT_EDIT_MODEL
     const problem = await makerProblem(model)
     if (problem) return { ok: false, message: problem }
     const queued: Entry[] = []
@@ -496,7 +494,7 @@ export function createImagePatches({
           earlier: t.words !== patch.words,
           chosen: t.n === chosen,
           isNew: !t.seen,
-          model: t.model ?? DEFAULT_MODEL,
+          model: t.model ?? BEFORE_CHOICE,
           look: bringing.has(`${found.key}\0${t.n}`)
             ? 'bringing'
             : !(await Bun.file(
@@ -659,7 +657,7 @@ export function createImagePatches({
         return { ok: false, message: 'None of the patches has an area to make it from.' }
       }
       const base = image.chosen!
-      const model = request.model ?? DEFAULT_MODEL
+      const model = request.model ?? DEFAULT_EDIT_MODEL
       const takes = new Map<string, number[]>()
       const undo = () => {
         for (const [patch, ns] of takes) {

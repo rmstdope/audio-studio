@@ -75,8 +75,8 @@ export const EDIT_MODEL_IDS = ['klein', 'qwen-edit'] as const
 export type EditModelId = (typeof EDIT_MODEL_IDS)[number]
 
 /**
- * The model every patch menu and the Remake menu start on, and the one a request naming none uses:
- * klein, which removed things cleanly in a trial where Qwen Image Edit did not (as-jgto).
+ * The model patch takes are made with unless another is picked: klein, which removed things
+ * cleanly in a trial where Qwen Image Edit did not (as-jgto).
  */
 export const DEFAULT_EDIT_MODEL: EditModelId = 'klein'
 
@@ -153,6 +153,19 @@ export function editMenuEntry(id: EditModelId, state: ImageModelState, figures: 
 /** An edit model's entry in a closed menu: its short name and time. */
 export function editShortEntry(id: EditModelId, figures: Figures): string {
   return `${EDIT_MODELS[id].short} — ${editPerTake(id, figures)}`
+}
+
+/**
+ * The model a patch menu starts on: klein, unless klein is not whole and Qwen Image Edit is (a
+ * project whose own image model is another one), so a menu never opens on a model that cannot work
+ * while the other could.
+ */
+export function startEditModel(
+  downloads: Partial<Record<EditModelId, ImageDownload>>,
+): EditModelId {
+  return downloads[DEFAULT_EDIT_MODEL] !== 'whole' && downloads['qwen-edit'] === 'whole'
+    ? 'qwen-edit'
+    : DEFAULT_EDIT_MODEL
 }
 
 /** The line under the Make row when a model that is not on this computer is picked. */

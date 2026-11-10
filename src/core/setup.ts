@@ -92,7 +92,7 @@ export interface SetupFacts {
     mflux: { ok: true } | { ok: false; reason: 'platform' | 'mflux'; message: string; fix: string }
     /** The project's main image model. */
     model: ImageModelId
-    /** How much of the stronger patch model, Qwen Image Edit, is here: optional, it only makes patches. */
+    /** How much of the optional patch model, Qwen Image Edit, is here: it only makes patches. */
     patchModel: ImageDownload
     /** Each image model: how much of its download is here, and its last take if that failed. */
     models: Record<

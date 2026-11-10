@@ -18,7 +18,7 @@ import {
 } from '../../../core/imagePatches'
 import { progressOf } from '../../musicTakesText'
 import { useImagePatchCompare, useImagePatches, useSetImagePatchWords } from '../../api'
-import { DEFAULT_EDIT_MODEL, type EditModelId } from '../../../core/imageModels'
+import { startEditModel, type EditModelId } from '../../../core/imageModels'
 import { patchRowId, RemakeLine } from './RemakeLine'
 import { rowFailed, rowMaking } from '../../remakeText'
 import { PatchWorkbench } from './PatchWorkbench'
@@ -185,7 +185,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [marks, setMarks] = useState<Record<string, PatchArea>>({})
   // The box "What the game gets" of each patch lives here too; every box is ticked when the page opens.
   const [games, setGames] = useState<Record<string, boolean>>({})
-  // The model picked in each patch's menu: not remembered past the page, so each starts on klein.
+  // The model picked in each patch's menu: not remembered past the page, so each starts on klein (`startEditModel`).
   const [picks, setPicks] = useState<Record<string, EditModelId>>({})
   const [remakePick, setRemakePick] = useState<EditModelId | null>(null)
   const view = query.data && 'patches' in query.data ? query.data : null
@@ -248,7 +248,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
           row={row}
           view={view}
           marks={marks}
-          model={remakePick ?? DEFAULT_EDIT_MODEL}
+          model={remakePick ?? startEditModel(view.models)}
           onModel={setRemakePick}
           onOpen={(id) => {
             setOpen((now) => new Set(now).add(id))
@@ -321,7 +321,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
                   imageSize={row}
                   game={games[patch.id] ?? true}
                   onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
-                  model={picks[patch.id] ?? DEFAULT_EDIT_MODEL}
+                  model={picks[patch.id] ?? startEditModel(view?.models ?? {})}
                   onModel={(model) => setPicks((now) => ({ ...now, [patch.id]: model }))}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}

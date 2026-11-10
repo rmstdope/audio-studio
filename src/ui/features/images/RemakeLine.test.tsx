@@ -382,9 +382,15 @@ describe('the model of the remake', () => {
 
   it('makes every take with the model picked', async () => {
     const { host, sent } = await render({ patches: [patch('door')] })
-    await pick(menu(host), 'klein')
+    await pick(menu(host), 'qwen-edit')
     await act(async () => button(host, 'Remake patches on this take').click())
-    expect(sent[0]!.body).toEqual({ count: 2, marks: {}, model: 'klein' })
+    expect(sent[0]!.body).toEqual({ count: 2, marks: {}, model: 'qwen-edit' })
+  })
+
+  it('starts on Qwen when klein is not here and Qwen is', async () => {
+    const { host } = await render({ models: { 'qwen-edit': 'whole', klein: 'absent' } })
+    expect(menu(host).value).toBe('qwen-edit')
+    expect(button(host, 'Remake patches on this take').disabled).toBe(false)
   })
 
   it('starts on klein with no line about Qwen when Qwen is absent', async () => {

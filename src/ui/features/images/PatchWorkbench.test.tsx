@@ -1245,6 +1245,16 @@ describe('the model of new takes', () => {
     expect(menuOf(host, 0).value).toBe('qwen-edit')
   })
 
+  it('starts on Qwen when klein is not here and Qwen is', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      withModels([work('a')], { 'qwen-edit': 'whole', klein: 'absent' }),
+    )
+    await open(host)
+    await drag(stageOf(host), [100, 50], [300, 250])
+    expect(menuOf(host).value).toBe('qwen-edit')
+    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+  })
+
   for (const qwen of ['absent', 'partial'] as const) {
     it(`starts on klein with no line about Qwen when Qwen is ${qwen}`, async () => {
       const { host } = await render([patchRow('a')], () =>
@@ -1343,7 +1353,8 @@ describe('the model of new takes', () => {
     const failed = [{ n: 4, message: 'out of memory.', area, model: 'qwen-edit' as const }]
     const here = await render([patchRow('a')], () => withModels([work('a', { failed })]))
     await open(here.host)
-    await pick(menuOf(here.host), 'klein')
+    // The menu is on klein; Try again still uses the model that failed.
+    expect(menuOf(here.host).value).toBe('klein')
     await act(async () => button(here.host, 'Try again')!.click())
     expect(here.sent).toEqual([
       { method: 'POST', path: '/api/images/inn/patches/a/takes', body: { retry: 4 } },
