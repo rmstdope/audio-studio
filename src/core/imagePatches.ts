@@ -229,31 +229,166 @@ export function checkPatchArea(
   return null
 }
 
+/** Out of 255 on the worst colour channel (smoothed), how far the edit must differ from the take outside the mark to count as changed. */
+export const PATCH_CHANGED = 30
+
+/** The same inside the mark, lower: what the edit was asked to change there, faint parts included (a hen's pale remnant, a fire's glow). */
+export const PATCH_CHANGED_INSIDE = 14
+
+/** The radius in pixels over which the difference is averaged, so that grain and dither do not count. */
+const CHANGE_SMOOTH = 3
+
+/** A changed region of fewer pixels than this is a speck and is left alone. */
+const CHANGE_SMALLEST = 40
+
+/** The radius of each of the two blurs that soften the edge of what is kept. */
+const KEEP_SOFT = 5
+
+/** How many pixels a patch fades out over towards a side of the window that lies inside the picture. */
+const WINDOW_FADE = 16
+
+/** At a side of the window inside the picture, this many pixels never count as changed: a model's own edge. */
+const WINDOW_BORDER = 4
+
+/** Which sides of a picture continue into more of the take (it is a window of it): a patch fades out there. */
+export interface OpenSides {
+  left: boolean
+  right: boolean
+  top: boolean
+  bottom: boolean
+}
+
+const CLOSED: OpenSides = { left: false, right: false, top: false, bottom: false }
+
+/** The sides of `window` that lie inside a picture of `size` rather than on its edge. */
+export function openSides(
+  window: { x: number; y: number; width: number; height: number },
+  size: { width: number; height: number },
+): OpenSides {
+  return {
+    left: window.x > 0,
+    right: window.x + window.width < size.width,
+    top: window.y > 0,
+    bottom: window.y + window.height < size.height,
+  }
+}
+
+/** The values averaged over a square of radius `r` round each place (stopping at the edges). */
+function boxBlur(values: Float32Array, width: number, height: number, r: number): Float32Array {
+  const across = new Float32Array(values.length)
+  const out = new Float32Array(values.length)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const from = Math.max(0, x - r)
+      const to = Math.min(width - 1, x + r)
+      let sum = 0
+      for (let k = from; k <= to; k++) sum += values[y * width + k]!
+      across[y * width + x] = sum / (to - from + 1)
+    }
+  }
+  for (let y = 0; y < height; y++) {
+    const from = Math.max(0, y - r)
+    const to = Math.min(height - 1, y + r)
+    for (let x = 0; x < width; x++) {
+      let sum = 0
+      for (let k = from; k <= to; k++) sum += across[k * width + x]!
+      out[y * width + x] = sum / (to - from + 1)
+    }
+  }
+  return out
+}
+
 /**
- * The part of a whole edited picture to keep: the same size, its colours inside `area` and
- * transparent everywhere else, fading in over the soft edge so that it blends with the take below.
- * An area's side that lies on the picture's own edge has nothing to blend with and does not fade.
+ * The part of an edited picture to keep: what the edit changed. Every connected region where the
+ * edit differs from the take (worst channel, averaged over a few pixels) by more than
+ * `PATCH_CHANGED`, or `PATCH_CHANGED_INSIDE` inside the mark, and that touches the mark, is kept in
+ * the edit's colours with a soft edge; everything else is transparent, so the take shows. An object
+ * the edit grew past the mark is kept whole, and the few levels a model drifts inside the mark leave
+ * no rectangle. A side in `open` lies inside the take (the picture is a window of it): the patch
+ * fades out towards it, so a change reaching it shows no line. Specks are left alone.
  */
-export function keepArea(edited: Pixels, area: PatchArea, feather = PATCH_FEATHER): Pixels {
+export function keepChanged(
+  edited: Pixels,
+  take: Pixels,
+  area: PatchArea,
+  open: OpenSides = CLOSED,
+): Pixels {
   const { width, height } = edited
-  const soft = Math.max(1, Math.min(feather, Math.floor(Math.min(area.width, area.height) / 2)))
-  const right = area.x + area.width
-  const bottom = area.y + area.height
-  const data = new Uint8Array(width * height * 4)
-  for (let y = area.y; y < bottom; y++) {
-    for (let x = area.x; x < right; x++) {
-      const distance = Math.min(
-        area.x > 0 ? x - area.x + 0.5 : Infinity,
-        right < width ? right - x - 0.5 : Infinity,
-        area.y > 0 ? y - area.y + 0.5 : Infinity,
-        bottom < height ? bottom - y - 0.5 : Infinity,
+  const count = width * height
+  const inMark = (x: number, y: number) =>
+    x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
+  const difference = new Float32Array(count)
+  for (let p = 0; p < count; p++) {
+    let most = 0
+    for (let c = 0; c < 3; c++) {
+      most = Math.max(most, Math.abs(edited.data[p * 4 + c]! - take.data[p * 4 + c]!))
+    }
+    difference[p] = most
+  }
+  const smooth = boxBlur(difference, width, height, CHANGE_SMOOTH)
+  const changed = new Uint8Array(count)
+  const left = open.left ? WINDOW_BORDER : 0
+  const right = width - (open.right ? WINDOW_BORDER : 0)
+  const top = open.top ? WINDOW_BORDER : 0
+  const bottom = height - (open.bottom ? WINDOW_BORDER : 0)
+  for (let y = top; y < bottom; y++) {
+    for (let x = left; x < right; x++) {
+      const bar = inMark(x, y) ? PATCH_CHANGED_INSIDE : PATCH_CHANGED
+      if (smooth[y * width + x]! > bar) changed[y * width + x] = 1
+    }
+  }
+
+  // The connected changed regions that touch the mark and are more than a speck.
+  const seen = new Uint8Array(count)
+  const keep = new Float32Array(count)
+  for (let start = 0; start < count; start++) {
+    if (!changed[start] || seen[start]) continue
+    const stack = [start]
+    const region: number[] = []
+    let touches = false
+    seen[start] = 1
+    while (stack.length > 0) {
+      const p = stack.pop()!
+      region.push(p)
+      const x = p % width
+      const y = (p - x) / width
+      if (inMark(x, y)) touches = true
+      const next = [
+        x > 0 ? p - 1 : -1,
+        x < width - 1 ? p + 1 : -1,
+        y > 0 ? p - width : -1,
+        y < height - 1 ? p + width : -1,
+      ]
+      for (const q of next) {
+        if (q < 0 || seen[q] || !changed[q]) continue
+        seen[q] = 1
+        stack.push(q)
+      }
+    }
+    if (touches && region.length >= CHANGE_SMALLEST) for (const p of region) keep[p] = 1
+  }
+
+  const soft = boxBlur(boxBlur(keep, width, height, KEEP_SOFT), width, height, KEEP_SOFT)
+  const ease = (t: number) => t * t * (3 - 2 * t)
+  const data = new Uint8Array(count * 4)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x
+      // More than the blur's share, so the kept region is whole a little inside its edge.
+      let t = Math.min(1, soft[p]! * 1.6)
+      const toSide = Math.min(
+        open.left ? x + 0.5 : Infinity,
+        open.right ? width - x - 0.5 : Infinity,
+        open.top ? y + 0.5 : Infinity,
+        open.bottom ? height - y - 0.5 : Infinity,
       )
-      const t = Math.min(1, distance / soft)
-      const i = (y * width + x) * 4
-      data[i] = edited.data[i]!
-      data[i + 1] = edited.data[i + 1]!
-      data[i + 2] = edited.data[i + 2]!
-      data[i + 3] = Math.round(255 * t * t * (3 - 2 * t))
+      t *= ease(Math.min(1, toSide / WINDOW_FADE))
+      const alpha = Math.round(255 * ease(t))
+      if (alpha === 0) continue
+      data.set(
+        [edited.data[p * 4]!, edited.data[p * 4 + 1]!, edited.data[p * 4 + 2]!, alpha],
+        p * 4,
+      )
     }
   }
   return { width, height, data }

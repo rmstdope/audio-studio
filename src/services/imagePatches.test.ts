@@ -138,7 +138,18 @@ describe('takes of a declared patch', () => {
   })
 
   it('gives the model only a window around the marked area of a big take, and keeps the take whole', async () => {
-    const { root, file, patches, requests, work } = setup({ picture: false })
+    const { root, file, patches, requests, work } = setup({
+      picture: false,
+      makes: (request) => {
+        // The model paints the marked area, 96 pixels into its window, white.
+        const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
+        for (let y = 96; y < 196; y++) {
+          for (let x = 96; x < 196; x++)
+            sent.data.set([255, 255, 255, 255], (y * sent.width + x) * 4)
+        }
+        return encodePng(sent)
+      },
+    })
     mkdirSync(dirname(join(root, TAKE)), { recursive: true })
     writeFileSync(join(root, TAKE), fakePng(1024, 640, 9))
     const small = { x: 600, y: 300, width: 100, height: 100 }
@@ -155,7 +166,7 @@ describe('takes of a declared patch', () => {
     expect(at(100, 100)).toBe(0)
   })
 
-  it("hands the model the take's own pixels at the window, and corrects a colour drift of the whole window", async () => {
+  it("hands the model the take's own pixels at the window, and keeps nothing of a colour drift of the whole window", async () => {
     const { root, file, patches, requests, work } = setup({
       picture: false,
       makes: (request) => {
@@ -181,21 +192,34 @@ describe('takes of a declared patch', () => {
     await work()
     const window = editWindow(small, take)
     expect(decodePng(sentPixels!).data).toEqual(cropPixels(take, window).data)
+    // Matched to the take, the drift is no change at all: the take shows everywhere.
     const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
-    for (const [x, y] of [
-      [602, 350],
-      [650, 302],
-      [697, 350],
-    ] as const) {
-      for (let c = 0; c < 3; c++) {
-        expect(
-          Math.abs(png.data[(y * 1024 + x) * 4 + c]! - take.data[(y * 1024 + x) * 4 + c]!),
-        ).toBeLessThan(8)
-      }
-    }
+    for (let i = 3; i < png.data.length; i += 4) expect(png.data[i]).toBe(0)
   })
 
-  it('keeps only the marked area of the edit, with its area and the words it was made from', async () => {
+  it('keeps an object the edit painted past the mark whole, and the rest of the take as it was', async () => {
+    const { root, file, patches, work } = setup({
+      makes: (request) => {
+        const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
+        // The window starts 4 pixels in: the object runs from inside the mark to well outside it.
+        for (let y = 106; y < 136; y++) {
+          for (let x = 116; x < 186; x++)
+            sent.data.set([250, 250, 250, 255], (y * sent.width + x) * 4)
+        }
+        return encodePng(sent)
+      },
+    })
+    const small = { x: 100, y: 100, width: 40, height: 40 }
+    await patches.make(file, 'inn', 'door', { count: 1, area: small })
+    await work()
+    const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
+    const alpha = (x: number, y: number) => png.data[(y * 256 + x) * 4 + 3]
+    expect(alpha(125, 120)).toBe(255)
+    expect(alpha(175, 120)).toBe(255)
+    expect(alpha(60, 60)).toBe(0)
+  })
+
+  it('saves the take with its area and the words it was made from', async () => {
     const { root, file, patches, work } = setup()
     await patches.make(file, 'inn', 'door', { count: 1, area })
     expect(await work()).toEqual({
