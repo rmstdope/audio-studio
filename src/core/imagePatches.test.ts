@@ -5,6 +5,7 @@ import {
   ChoosePatchTakeBody,
   keepChanged,
   MakePatchTakesBody,
+  matchOutside,
   openSides,
   PatchTakeSchema,
   RemakePatchesBody,
@@ -124,6 +125,27 @@ describe('keepChanged', () => {
     keepChanged(edited, take, area)
     expect([...edited.data]).toEqual(before)
     expect([...take.data]).toEqual([...plain(200, 200, grass).data])
+  })
+})
+
+describe('matchOutside', () => {
+  const take = plain(200, 200, [60, 120, 40])
+  const area = { x: 60, y: 60, width: 80, height: 80 }
+
+  it('takes the drift of the whole picture outside the mark away there, and leaves the mark alone', () => {
+    // The model lightened everything by 40 and painted an object, partly outside the mark.
+    const drifted = plain(200, 200, [100, 160, 80])
+    const edited = withBox(drifted, { x: 100, y: 90, width: 70, height: 30 }, [200, 100, 50])
+    const out = matchOutside(edited, take, area)
+    expect(rgbAt(out, 20, 20)).toEqual([60, 120, 40])
+    expect(rgbAt(out, 160, 105)).toEqual([160, 60, 10])
+    expect(rgbAt(out, 100, 70)).toEqual([100, 160, 80])
+  })
+
+  it('leaves a whole drift of the window kept as nothing once the mark is matched too', () => {
+    const edited = plain(200, 200, [100, 160, 80])
+    const patch = keepChanged(matchOutside(matchToTake(edited, take, area), take, area), take, area)
+    for (let i = 3; i < patch.data.length; i += 4) expect(patch.data[i]).toBe(0)
   })
 })
 

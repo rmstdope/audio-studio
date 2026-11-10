@@ -15,6 +15,7 @@ import { ImageManifestSchema, type ImageManifest } from '../core/imageTakes'
 import {
   checkPatchArea,
   keepChanged,
+  matchOutside,
   matchToTake,
   openSides,
   planRemake,
@@ -340,11 +341,12 @@ export function createImagePatches({
       }
       // The colours are matched in the window, where the model's drift is all there is to see:
       // laid into the whole take, everything outside the window would read as no drift at all.
-      // Then what the edit changed is kept, an object it grew past the mark whole.
+      // Then the drift round the mark is taken away too, and what the edit changed is kept, an
+      // object it grew past the mark whole.
       const inside = { ...entry.area, x: entry.area.x - window.x, y: entry.area.y - window.y }
       const original = cropPixels(around, window)
       const kept = keepChanged(
-        matchToTake(part, original, inside),
+        matchOutside(matchToTake(part, original, inside), original, inside),
         original,
         inside,
         openSides(window, take),
