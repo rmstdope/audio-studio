@@ -28,8 +28,6 @@ export interface ImageModel {
   /** Quantization bits and steps, when the model needs them to fit a 48 GB Mac and to do the job. */
   quantize?: number
   steps?: number
-  /** How closely the edit follows the words, when the model's advice differs from mflux's default. */
-  guidance?: number
 }
 
 /** The image models, by id. */
@@ -101,6 +99,8 @@ export interface EditModel {
   /** Quantization bits and steps, when the model needs them to fit and to do the job. */
   quantize?: number
   steps?: number
+  /** How closely the edit follows the words, when the model's advice differs from mflux's default. */
+  guidance?: number
 }
 
 /** The edit models, by id. */
