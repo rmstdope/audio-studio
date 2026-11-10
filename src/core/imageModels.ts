@@ -75,8 +75,8 @@ export const EDIT_MODEL_IDS = ['klein', 'qwen-edit'] as const
 export type EditModelId = (typeof EDIT_MODEL_IDS)[number]
 
 /**
- * The model patch takes are made with unless another is picked: klein, which removed things
- * cleanly in a trial where Qwen Image Edit did not (as-jgto).
+ * The model patch takes are made with unless another is picked: klein, which removes things about
+ * as cleanly as Qwen Image Edit 2511 in seconds where Qwen takes minutes (as-jgto, as-3l6k).
  */
 export const DEFAULT_EDIT_MODEL: EditModelId = 'klein'
 
@@ -96,7 +96,7 @@ export interface EditModel {
   base?: string
   /** The mflux command that edits a picture with this model. */
   command: string
-  /** Quantization bits and steps, when the model needs them to fit and to do the job. */
+  /** Quantization bits and steps, when the model needs them to fit a 48 GB Mac and to do the job. */
   quantize?: number
   steps?: number
   /** How closely the edit follows the words, when the model's advice differs from mflux's default. */
