@@ -1494,7 +1494,7 @@ describe('areas for the game', () => {
       height: 0.5,
       mark: { x: 0.3, y: 0.3 },
     })
-    expect(got && 'mark' in got.gate!).toBe(false)
+    expect(got?.gate).toEqual({ x: 0, y: 0, width: 0.1, height: 0.1 })
   })
 
   it('gives the take’s own point as the mark of the take in the game', () => {
