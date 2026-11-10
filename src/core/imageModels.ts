@@ -68,14 +68,17 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
 /** The mflux command that changes an existing picture from an instruction; FLUX.2 klein's own. */
 export const IMAGE_EDIT_COMMAND = 'mflux-generate-flux2-edit'
 
-/** The ids of the models a patch's takes are made with, the stronger one first. */
-export const EDIT_MODEL_IDS = ['qwen-edit', 'klein'] as const
+/** The ids of the models a patch's takes are made with, the one they start on first. */
+export const EDIT_MODEL_IDS = ['klein', 'qwen-edit'] as const
 
 /** One of the models that change a picture from an instruction (patches, §8.7). */
 export type EditModelId = (typeof EDIT_MODEL_IDS)[number]
 
-/** The model patches start on when it is on this computer. */
-export const DEFAULT_EDIT_MODEL: EditModelId = 'qwen-edit'
+/**
+ * The model patch takes are made with unless another is picked: klein, which removed things
+ * cleanly in a trial where Qwen Image Edit did not (as-jgto).
+ */
+export const DEFAULT_EDIT_MODEL: EditModelId = 'klein'
 
 /** An edit model: its names, its weights and how mflux runs it to change a picture. */
 export interface EditModel {
@@ -152,20 +155,17 @@ export function editShortEntry(id: EditModelId, figures: Figures): string {
   return `${EDIT_MODELS[id].short} — ${editPerTake(id, figures)}`
 }
 
-/** The model new patch takes start on: the stronger one when it is whole, else klein. */
+/**
+ * The model a patch menu starts on: klein, unless klein is not whole and Qwen Image Edit is (a
+ * project whose own image model is another one), so a menu never opens on a model that cannot work
+ * while the other could.
+ */
 export function startEditModel(
   downloads: Partial<Record<EditModelId, ImageDownload>>,
 ): EditModelId {
-  return downloads[DEFAULT_EDIT_MODEL] === 'whole' ? DEFAULT_EDIT_MODEL : 'klein'
-}
-
-/** The faint line under the Make row when the stronger model is not whole, so new takes use klein. */
-export function editAbsentLine(download: ImageDownload): string {
-  const { name } = EDIT_MODELS[DEFAULT_EDIT_MODEL]
-  const klein = EDIT_MODELS.klein.short
-  return download === 'partial'
-    ? `${name}'s download is incomplete, so these takes use ${klein}. Setup says how to finish it.`
-    : `${name} is not on this computer, so these takes use ${klein}. Setup says how to download it.`
+  return downloads[DEFAULT_EDIT_MODEL] !== 'whole' && downloads['qwen-edit'] === 'whole'
+    ? 'qwen-edit'
+    : DEFAULT_EDIT_MODEL
 }
 
 /** The line under the Make row when a model that is not on this computer is picked. */

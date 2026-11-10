@@ -185,7 +185,7 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [marks, setMarks] = useState<Record<string, PatchArea>>({})
   // The box "What the game gets" of each patch lives here too; every box is ticked when the page opens.
   const [games, setGames] = useState<Record<string, boolean>>({})
-  // The model picked in each patch's menu: not remembered past the page, so each starts on the stronger model.
+  // The model picked in each patch's menu: not remembered past the page, so each starts on klein (`startEditModel`).
   const [picks, setPicks] = useState<Record<string, EditModelId>>({})
   const [remakePick, setRemakePick] = useState<EditModelId | null>(null)
   const view = query.data && 'patches' in query.data ? query.data : null

@@ -276,7 +276,7 @@ describe('an open patch with no takes', () => {
     expect(sent[0]!.body).toEqual({
       count: 2,
       area: { x: 900, y: 500, width: 124, height: 76 },
-      model: 'qwen-edit',
+      model: 'klein',
     })
   })
 
@@ -302,7 +302,7 @@ describe('an open patch with no takes', () => {
       {
         method: 'POST',
         path: '/api/images/inn/patches/a/takes',
-        body: { count: 3, area, model: 'qwen-edit' },
+        body: { count: 3, area, model: 'klein' },
       },
     ])
   })
@@ -771,7 +771,7 @@ describe('a patch tied to a named area', () => {
     expect(sent[0]!.body).toEqual({
       count: 2,
       area: { x: 76, y: 76, width: 248, height: 198 },
-      model: 'qwen-edit',
+      model: 'klein',
     })
   })
 
@@ -915,7 +915,7 @@ describe('a patch tied to a named area', () => {
     expect(sent[0]!.body).toEqual({
       count: 2,
       area: { x: 0, y: 0, width: 124, height: 124 },
-      model: 'qwen-edit',
+      model: 'klein',
     })
   })
 
@@ -1200,18 +1200,18 @@ describe('the model of new takes', () => {
     over: Partial<ImagePatchesView> = {},
   ) => view(patches, { models, ...over })
 
-  it('has one menu above the count, offering the two models, on the stronger one', async () => {
+  it('has one menu above the count, offering the two models, on klein', async () => {
     const { host } = await render([patchRow('a')], () => withModels([work('a')]))
     await open(host)
     const menu = menuOf(host)
     expect([...menu.options].map((o) => o.textContent)).toEqual([
-      'Qwen Image Edit — a guess: about 8 min a take',
       'FLUX.2 klein 4B — a guess: about 20 s a take',
+      'Qwen Image Edit — a guess: about 8 min a take',
     ])
-    expect(menu.value).toBe('qwen-edit')
+    expect(menu.value).toBe('klein')
     // Closed, a face that can wrap shows the chosen entry's short form.
     expect(menu.closest('.menu-face')!.firstElementChild!.textContent).toBe(
-      'Qwen Image Edit — a guess: about 8 min a take',
+      'FLUX.2 klein — a guess: about 20 s a take',
     )
     expect(menu.options[0]!.hasAttribute('label')).toBe(false)
     const count = host.querySelector(COUNT)!
@@ -1225,9 +1225,9 @@ describe('the model of new takes', () => {
     await open(host)
     await drag(stageOf(host), [100, 50], [300, 250])
     await act(async () => button(host, 'Make 2 takes')!.click())
-    await pick(menuOf(host), 'klein')
+    await pick(menuOf(host), 'qwen-edit')
     await act(async () => button(host, 'Make 2 takes')!.click())
-    expect(sent.map((s) => (s.body as { model: string }).model)).toEqual(['qwen-edit', 'klein'])
+    expect(sent.map((s) => (s.body as { model: string }).model)).toEqual(['klein', 'qwen-edit'])
   })
 
   it('keeps one pick per patch, across closing and opening its row', async () => {
@@ -1235,39 +1235,39 @@ describe('the model of new takes', () => {
       withModels([work('a'), work('b')]),
     )
     await open(host, 0)
-    await pick(menuOf(host), 'klein')
+    await pick(menuOf(host), 'qwen-edit')
     await open(host, 1)
-    expect(menuOf(host, 0).value).toBe('klein')
-    expect(menuOf(host, 1).value).toBe('qwen-edit')
+    expect(menuOf(host, 0).value).toBe('qwen-edit')
+    expect(menuOf(host, 1).value).toBe('klein')
     await open(host, 0)
     expect(host.querySelectorAll(MODEL)).toHaveLength(1)
     await open(host, 0)
-    expect(menuOf(host, 0).value).toBe('klein')
+    expect(menuOf(host, 0).value).toBe('qwen-edit')
   })
 
-  it('starts on klein with a faint line under the Make row when the stronger model is absent', async () => {
+  it('starts on Qwen when klein is not here and Qwen is', async () => {
     const { host } = await render([patchRow('a')], () =>
-      withModels([work('a')], { 'qwen-edit': 'absent', klein: 'whole' }),
+      withModels([work('a')], { 'qwen-edit': 'whole', klein: 'absent' }),
     )
     await open(host)
     await drag(stageOf(host), [100, 50], [300, 250])
-    expect(menuOf(host).value).toBe('klein')
-    expect(text(host)).toContain(
-      'Qwen Image Edit is not on this computer, so these takes use FLUX.2 klein. Setup says how to download it.',
-    )
+    expect(menuOf(host).value).toBe('qwen-edit')
     expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
   })
 
-  it('says the stronger model is incomplete, not absent, when it is partly downloaded', async () => {
-    const { host } = await render([patchRow('a')], () =>
-      withModels([work('a')], { 'qwen-edit': 'partial', klein: 'whole' }),
-    )
-    await open(host)
-    await drag(stageOf(host), [100, 50], [300, 250])
-    expect(text(host)).toContain(
-      "Qwen Image Edit's download is incomplete, so these takes use FLUX.2 klein. Setup says how to finish it.",
-    )
-  })
+  for (const qwen of ['absent', 'partial'] as const) {
+    it(`starts on klein with no line about Qwen when Qwen is ${qwen}`, async () => {
+      const { host } = await render([patchRow('a')], () =>
+        withModels([work('a')], { 'qwen-edit': qwen, klein: 'whole' }),
+      )
+      await open(host)
+      await drag(stageOf(host), [100, 50], [300, 250])
+      expect(menuOf(host).value).toBe('klein')
+      expect(text(host)).not.toContain('so these takes use')
+      expect(text(host)).not.toContain('Setup says how')
+      expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    })
+  }
 
   it('says a picked model is not on this computer, turns Make off and points to Setup', async () => {
     const { host, sent } = await render([patchRow('a')], () =>
@@ -1299,10 +1299,10 @@ describe('the model of new takes', () => {
     await open(host)
     expect(text(menuOf(host).closest('.edit-model'))).toContain('last take failed')
     expect(menuOf(host).options[0]!.textContent).toBe(
-      'Qwen Image Edit — a guess: about 8 min a take — last take failed',
+      'FLUX.2 klein 4B — a guess: about 20 s a take',
     )
     expect(menuOf(host).options[1]!.textContent).toBe(
-      'FLUX.2 klein 4B — a guess: about 20 s a take',
+      'Qwen Image Edit — a guess: about 8 min a take — last take failed',
     )
   })
 
@@ -1344,14 +1344,17 @@ describe('the model of new takes', () => {
     // Pressing a take lays it over the picture and leaves the menu alone.
     await act(async () => first!.click())
     expect(heading(host)).toContain('FLUX.2 klein')
-    expect(menuOf(host).value).toBe('qwen-edit')
+    await act(async () => second!.click())
+    expect(heading(host)).toContain('Qwen Image Edit')
+    expect(menuOf(host).value).toBe('klein')
   })
 
   it('makes a failed take again with the model that failed, and is off when it is no longer here', async () => {
     const failed = [{ n: 4, message: 'out of memory.', area, model: 'qwen-edit' as const }]
     const here = await render([patchRow('a')], () => withModels([work('a', { failed })]))
     await open(here.host)
-    await pick(menuOf(here.host), 'klein')
+    // The menu is on klein; Try again still uses the model that failed.
+    expect(menuOf(here.host).value).toBe('klein')
     await act(async () => button(here.host, 'Try again')!.click())
     expect(here.sent).toEqual([
       { method: 'POST', path: '/api/images/inn/patches/a/takes', body: { retry: 4 } },
@@ -1373,22 +1376,22 @@ describe('the model of new takes', () => {
     expect(sent).toEqual([])
   })
 
-  it('leaves the Remake menu on the stronger model whatever a patch is picked on', async () => {
+  it('leaves the Remake menu on klein whatever a patch is picked on', async () => {
     const { host } = await render([patchRow('a', { chosenOn: [3] })], () =>
       withModels([work('a')], both, {
         remake: { earlier: { a: area }, press: null, failedModels: [] },
       }),
     )
     await open(host)
-    await pick(menuOf(host), 'klein')
+    await pick(menuOf(host), 'qwen-edit')
     const remake = host.querySelector<HTMLSelectElement>(
       'select[aria-label="Model for the new takes of each patch"]',
     )!
-    expect(remake.value).toBe('qwen-edit')
-    await pick(remake, 'klein')
-    expect(menuOf(host).value).toBe('klein')
-    await pick(menuOf(host), 'qwen-edit')
     expect(remake.value).toBe('klein')
+    await pick(remake, 'qwen-edit')
+    expect(menuOf(host).value).toBe('qwen-edit')
+    await pick(menuOf(host), 'klein')
+    expect(remake.value).toBe('qwen-edit')
   })
 
   it('has no menu with no chosen take of the image', async () => {

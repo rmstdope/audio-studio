@@ -16,13 +16,7 @@ import {
   type PatchTakeView,
   type PatchWorkView,
 } from '../../../core/imagePatches'
-import {
-  EDIT_SETUP_LINE,
-  editAbsentLine,
-  editModel,
-  type EditModelId,
-  DEFAULT_EDIT_MODEL,
-} from '../../../core/imageModels'
+import { EDIT_SETUP_LINE, editModel, type EditModelId } from '../../../core/imageModels'
 import { EditModelMenu } from './EditModelMenu'
 import { rightAfterDrop, stepRight } from '../../../core/imageTakes'
 import {
@@ -310,11 +304,7 @@ export function PatchWorkbench({
   const modelHere = view.models[model] === 'whole'
   const canMake =
     marked !== null && !busy && !make.isPending && !waitingForWords && view.maker.ok && modelHere
-  const absentLine = !modelHere
-    ? EDIT_SETUP_LINE
-    : view.models[DEFAULT_EDIT_MODEL] !== 'whole' && model === 'klein'
-      ? editAbsentLine(view.models[DEFAULT_EDIT_MODEL])
-      : null
+  const absentLine = modelHere ? null : EDIT_SETUP_LINE
   const canChange = !lockUnread && !choose.isPending && !drop.isPending
   const canChoose = canChange && lookError === null && shown !== null && shown.look !== 'bringing'
   const overlaid = showing ? shown : null
