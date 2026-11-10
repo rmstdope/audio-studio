@@ -3,8 +3,10 @@ import {
   checkPatchArea,
   gamePatch,
   ChoosePatchTakeBody,
-  keepArea,
+  keepChanged,
   MakePatchTakesBody,
+  matchOutside,
+  openSides,
   PatchTakeSchema,
   RemakePatchesBody,
   markFromArea,
@@ -31,48 +33,151 @@ function plain(width: number, height: number, rgb: [number, number, number]): Pi
 
 const alphaAt = (p: Pixels, x: number, y: number) => p.data[(y * p.width + x) * 4 + 3]!
 
-describe('keepArea', () => {
-  const edited = plain(200, 200, [10, 20, 30])
-  const area = { x: 50, y: 50, width: 100, height: 100 }
+/** A fully transparent picture. */
+const transparent = (width: number, height: number): Pixels => ({
+  width,
+  height,
+  data: new Uint8Array(width * height * 4),
+})
 
-  it('leaves everything outside the area transparent', () => {
-    const patch = keepArea(edited, area)
-    expect(alphaAt(patch, 49, 100)).toBe(0)
-    expect(alphaAt(patch, 150, 100)).toBe(0)
-    expect(alphaAt(patch, 100, 49)).toBe(0)
-    expect(alphaAt(patch, 100, 150)).toBe(0)
+/** A copy of `src` with the box painted in `rgb`. */
+function withBox(
+  src: Pixels,
+  box: { x: number; y: number; width: number; height: number },
+  rgb: [number, number, number],
+): Pixels {
+  const data = src.data.slice()
+  for (let y = box.y; y < box.y + box.height; y++) {
+    for (let x = box.x; x < box.x + box.width; x++) data.set([...rgb, 255], (y * src.width + x) * 4)
+  }
+  return { width: src.width, height: src.height, data }
+}
+
+describe('keepChanged', () => {
+  const grass: [number, number, number] = [60, 120, 40]
+  const take = plain(200, 200, grass)
+  const area = { x: 60, y: 60, width: 80, height: 80 }
+
+  it('keeps nothing where the edit only drifted a little inside the mark: no rectangle shows', () => {
+    const edited = withBox(take, area, [70, 130, 50])
+    const patch = keepChanged(edited, take, area)
+    for (let i = 3; i < patch.data.length; i += 4) expect(patch.data[i]).toBe(0)
   })
 
-  it('keeps the middle of the area whole, in the colours of the edit', () => {
-    const patch = keepArea(edited, area)
-    const at = (100 * 200 + 100) * 4
-    expect([...patch.data.subarray(at, at + 4)]).toEqual([10, 20, 30, 255])
+  it('keeps an added object whole where it grows past the mark, in the colours of the edit', () => {
+    const edited = withBox(take, { x: 100, y: 90, width: 70, height: 30 }, [120, 80, 40])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 160, 105)).toBe(255)
+    expect(alphaAt(patch, 110, 105)).toBe(255)
+    const at = (105 * 200 + 160) * 4
+    expect([...patch.data.subarray(at, at + 3)]).toEqual([120, 80, 40])
   })
 
-  it('fades in from the edge of the area over the soft edge', () => {
-    const patch = keepArea(edited, area)
-    const ramp = Array.from({ length: PATCH_FEATHER + 1 }, (_, i) => alphaAt(patch, 50 + i, 100))
-    expect(ramp[0]!).toBeLessThan(20)
+  it('leaves what the edit did not change transparent, inside the mark and out', () => {
+    const edited = withBox(take, { x: 100, y: 90, width: 70, height: 30 }, [120, 80, 40])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 70, 70)).toBe(0)
+    expect(alphaAt(patch, 20, 20)).toBe(0)
+  })
+
+  it('leaves a change that does not touch the mark alone', () => {
+    const edited = withBox(take, { x: 10, y: 160, width: 30, height: 30 }, [120, 80, 40])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 25, 175)).toBe(0)
+  })
+
+  it('takes a smaller change as asked for inside the mark than outside it', () => {
+    // 20 levels lighter: above the bar inside the mark, below it outside
+    const edited = withBox(take, { x: 80, y: 80, width: 100, height: 40 }, [80, 140, 60])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 100, 100)).toBe(255)
+    expect(alphaAt(patch, 170, 100)).toBe(0)
+  })
+
+  it('leaves a speck alone', () => {
+    const edited = withBox(take, { x: 100, y: 100, width: 2, height: 2 }, [255, 255, 255])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 100, 100)).toBe(0)
+  })
+
+  it('fades in over a soft edge round what it keeps', () => {
+    const edited = withBox(take, { x: 80, y: 80, width: 40, height: 40 }, [120, 80, 40])
+    const patch = keepChanged(edited, take, area)
+    const ramp = Array.from({ length: 30 }, (_, i) => alphaAt(patch, 65 + i, 100))
+    expect(ramp[0]).toBe(0)
     expect(ramp.at(-1)).toBe(255)
     expect(ramp).toEqual([...ramp].sort((a, b) => a - b))
     expect(ramp.some((a) => a > 60 && a < 200)).toBe(true)
   })
 
-  it('does not fade along an edge of the picture itself', () => {
-    const patch = keepArea(edited, { x: 0, y: 50, width: 100, height: 100 })
-    expect(alphaAt(patch, 0, 100)).toBe(255)
-    expect(alphaAt(patch, 99, 100)).toBeLessThan(20)
+  it('stays whole to an edge of the picture itself, and fades out at a side that is only a window', () => {
+    const edited = withBox(take, { x: 100, y: 90, width: 100, height: 30 }, [120, 80, 40])
+    expect(alphaAt(keepChanged(edited, take, area), 199, 105)).toBe(255)
+    const open = { left: false, right: true, top: false, bottom: false }
+    const windowed = keepChanged(edited, take, area, open)
+    expect(alphaAt(windowed, 199, 105)).toBe(0)
+    expect(alphaAt(windowed, 150, 105)).toBe(255)
   })
 
-  it('still reaches whole in the middle of an area narrower than two soft edges', () => {
-    const patch = keepArea(edited, { x: 50, y: 50, width: 21, height: 100 })
-    expect(alphaAt(patch, 60, 100)).toBe(255)
-  })
-
-  it('does not change the edit it is given', () => {
+  it('does not change the pictures it is given', () => {
+    const edited = withBox(take, { x: 100, y: 90, width: 70, height: 30 }, [120, 80, 40])
     const before = [...edited.data]
-    keepArea(edited, area)
+    keepChanged(edited, take, area)
     expect([...edited.data]).toEqual(before)
+    expect([...take.data]).toEqual([...plain(200, 200, grass).data])
+  })
+})
+
+describe('matchOutside', () => {
+  const take = plain(200, 200, [60, 120, 40])
+  const area = { x: 60, y: 60, width: 80, height: 80 }
+
+  it('takes the drift of the whole picture outside the mark away there, and leaves the mark alone', () => {
+    // The model lightened everything by 40 and painted an object, partly outside the mark.
+    const drifted = plain(200, 200, [100, 160, 80])
+    const edited = withBox(drifted, { x: 100, y: 90, width: 70, height: 30 }, [200, 100, 50])
+    const out = matchOutside(edited, take, area)
+    expect(rgbAt(out, 20, 20)).toEqual([60, 120, 40])
+    expect(rgbAt(out, 160, 105)).toEqual([160, 60, 10])
+    expect(rgbAt(out, 100, 70)).toEqual([100, 160, 80])
+  })
+
+  it('leaves black and white as they are: a drift of the middle tones does not move them', () => {
+    // A mid-tone picture with black lines and white highlights; the model darkened only the middle.
+    const at = (x: number) => (x % 20 < 3 ? 0 : x % 20 > 17 ? 255 : 100)
+    const lined = painted(200, 200, (x) => [at(x), at(x), at(x)])
+    const darker = painted(200, 200, (x) => {
+      const v = at(x) === 100 ? 60 : at(x)
+      return [v, v, v]
+    })
+    const out = matchOutside(darker, lined, area)
+    expect(rgbAt(out, 10, 10)).toEqual([100, 100, 100])
+    expect(rgbAt(out, 1, 10)).toEqual([0, 0, 0])
+    expect(rgbAt(out, 19, 10)).toEqual([255, 255, 255])
+  })
+
+  it('leaves a whole drift of the window kept as nothing once the mark is matched too', () => {
+    const edited = plain(200, 200, [100, 160, 80])
+    const patch = keepChanged(matchOutside(matchToTake(edited, take, area), take, area), take, area)
+    for (let i = 3; i < patch.data.length; i += 4) expect(patch.data[i]).toBe(0)
+  })
+})
+
+describe('openSides', () => {
+  it('names the sides of a window that lie inside the picture', () => {
+    const size = { width: 1024, height: 576 }
+    expect(openSides({ x: 0, y: 100, width: 300, height: 476 }, size)).toEqual({
+      left: false,
+      right: true,
+      top: true,
+      bottom: false,
+    })
+    expect(openSides({ x: 0, y: 0, width: 1024, height: 576 }, size)).toEqual({
+      left: false,
+      right: false,
+      top: false,
+      bottom: false,
+    })
   })
 })
 
@@ -505,7 +610,7 @@ describe('gamePatch', () => {
   const size = { width: 64, height: 64 }
   const base = plain(128, 128, [0, 0, 0])
   const paint = (area: { x: number; y: number; width: number; height: number }) =>
-    keepArea(plain(128, 128, [255, 255, 255]), area)
+    withBox(transparent(128, 128), area, [255, 255, 255])
 
   it('keeps only the dots that differ, each fully solid or fully transparent, in palette colours', () => {
     const out = gamePatch(base, paint({ x: 32, y: 32, width: 64, height: 64 }), look, size)
@@ -532,7 +637,11 @@ describe('gamePatch', () => {
   it('shows no change when the area lies outside what the game shows', () => {
     // a wide take cropped to a square: the sides are cut off
     const wide = plain(256, 128, [0, 0, 0])
-    const edge = keepArea(plain(256, 128, [255, 255, 255]), { x: 0, y: 0, width: 32, height: 128 })
+    const edge = withBox(
+      transparent(256, 128),
+      { x: 0, y: 0, width: 32, height: 128 },
+      [255, 255, 255],
+    )
     const out = gamePatch(wide, edge, look, size)
     expect([...out.data].filter((_, i) => i % 4 === 3 && out.data[i] !== 0)).toEqual([])
   })

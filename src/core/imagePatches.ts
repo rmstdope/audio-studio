@@ -4,8 +4,11 @@ import type { AreaBox, AreaRow, ImageRow, PatchRow } from './images'
 import type { Look, LookSize } from './imageLook'
 import { bringToLook, type Pixels } from './imagePixels'
 
-/** How many pixels of a patch fade in from the edge of its marked area. */
+/** How many pixels a mark computed from a named area reaches beyond the area on every side. */
 export const PATCH_FEATHER = 24
+
+/** Eases 0 to 1 in and out (a smoothstep). */
+const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
 /** The narrowest side a marked area may have, in pixels of the take. */
 export const PATCH_SMALLEST = 8
@@ -229,31 +232,220 @@ export function checkPatchArea(
   return null
 }
 
+/** Out of 255 on the worst colour channel (smoothed), how far the edit must differ from the take outside the mark to count as changed. */
+export const PATCH_CHANGED = 30
+
+/** The same inside the mark, lower: what the edit was asked to change there, faint parts included (a hen's pale remnant, a fire's glow). */
+export const PATCH_CHANGED_INSIDE = 14
+
+/** The radius in pixels over which the difference is averaged, so that grain and dither do not count. */
+const CHANGE_SMOOTH = 3
+
+/** A changed region of fewer pixels than this is a speck and is left alone. */
+const CHANGE_SMALLEST = 40
+
+/** The radius of each of the two blurs that soften the edge of what is kept. */
+const KEEP_SOFT = 5
+
+/** How many pixels a patch fades out over towards a side of the window that lies inside the picture. */
+const WINDOW_FADE = 16
+
+/** At a side of the window inside the picture, this many pixels never count as changed: a model's own edge. */
+const WINDOW_BORDER = 4
+
+/** Which sides of a picture continue into more of the take (it is a window of it): a patch fades out there. */
+export interface OpenSides {
+  left: boolean
+  right: boolean
+  top: boolean
+  bottom: boolean
+}
+
+const CLOSED: OpenSides = { left: false, right: false, top: false, bottom: false }
+
+/** The sides of `window` that lie inside a picture of `size` rather than on its edge. */
+export function openSides(
+  window: { x: number; y: number; width: number; height: number },
+  size: { width: number; height: number },
+): OpenSides {
+  return {
+    left: window.x > 0,
+    right: window.x + window.width < size.width,
+    top: window.y > 0,
+    bottom: window.y + window.height < size.height,
+  }
+}
+
+/** The values averaged over a square of radius `r` round each place (stopping at the edges). */
+function boxBlur(values: Float32Array, width: number, height: number, r: number): Float32Array {
+  const across = new Float32Array(values.length)
+  const out = new Float32Array(values.length)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const from = Math.max(0, x - r)
+      const to = Math.min(width - 1, x + r)
+      let sum = 0
+      for (let k = from; k <= to; k++) sum += values[y * width + k]!
+      across[y * width + x] = sum / (to - from + 1)
+    }
+  }
+  for (let y = 0; y < height; y++) {
+    const from = Math.max(0, y - r)
+    const to = Math.min(height - 1, y + r)
+    for (let x = 0; x < width; x++) {
+      let sum = 0
+      for (let k = from; k <= to; k++) sum += across[k * width + x]!
+      out[y * width + x] = sum / (to - from + 1)
+    }
+  }
+  return out
+}
+
+/** Out of 255, how near black or white an edited value is left out of the drift outside the mark: a model's drift does not move them. */
+const DRIFT_CLIPPED = 8
+
+/** Out of 255, the tones nearest black and white over which the drift outside the mark eases out. */
+const DRIFT_EASE = 32
+
 /**
- * The part of a whole edited picture to keep: the same size, its colours inside `area` and
- * transparent everywhere else, fading in over the soft edge so that it blends with the take below.
- * An area's side that lies on the picture's own edge has nothing to blend with and does not fade.
+ * The edited picture with the drift of its colours taken away outside the mark: every pixel there
+ * moved by the median offset (take minus edit, per channel) of them all, black and white left out.
+ * `matchToTake` matches the mark itself first; this matches what lies round it, so a drift of the
+ * whole picture is no change and an object kept past the mark is in the same colours on both sides
+ * of its edge. The move eases out towards black and white, which a drift of the middle tones leaves
+ * where they are, so outlines, shadows and highlights do not read as changed.
  */
-export function keepArea(edited: Pixels, area: PatchArea, feather = PATCH_FEATHER): Pixels {
+export function matchOutside(edited: Pixels, take: Pixels, area: PatchArea): Pixels {
   const { width, height } = edited
-  const soft = Math.max(1, Math.min(feather, Math.floor(Math.min(area.width, area.height) / 2)))
-  const right = area.x + area.width
-  const bottom = area.y + area.height
-  const data = new Uint8Array(width * height * 4)
-  for (let y = area.y; y < bottom; y++) {
-    for (let x = area.x; x < right; x++) {
-      const distance = Math.min(
-        area.x > 0 ? x - area.x + 0.5 : Infinity,
-        right < width ? right - x - 0.5 : Infinity,
-        area.y > 0 ? y - area.y + 0.5 : Infinity,
-        bottom < height ? bottom - y - 0.5 : Infinity,
-      )
-      const t = Math.min(1, distance / soft)
+  const inMark = (x: number, y: number) =>
+    x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
+  // The median by counting: an offset is one of 511 values.
+  const counts = [0, 1, 2].map(() => new Uint32Array(511))
+  const totals = [0, 0, 0]
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (inMark(x, y)) continue
       const i = (y * width + x) * 4
-      data[i] = edited.data[i]!
-      data[i + 1] = edited.data[i + 1]!
-      data[i + 2] = edited.data[i + 2]!
-      data[i + 3] = Math.round(255 * t * t * (3 - 2 * t))
+      for (let c = 0; c < 3; c++) {
+        const v = edited.data[i + c]!
+        if (v < DRIFT_CLIPPED || v > 255 - DRIFT_CLIPPED) continue
+        counts[c]![take.data[i + c]! - v + 255]!++
+        totals[c]!++
+      }
+    }
+  }
+  const offset = counts.map((count, c) => {
+    let seen = 0
+    for (let v = 0; v < count.length; v++) {
+      seen += count[v]!
+      if (seen * 2 > totals[c]!) return v - 255
+    }
+    return 0 // no tone between black and white to measure
+  })
+  const data = new Uint8Array(edited.data)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (inMark(x, y)) continue
+      const i = (y * width + x) * 4
+      for (let c = 0; c < 3; c++) {
+        const v = data[i + c]!
+        const ease = Math.min(1, v / DRIFT_EASE, (255 - v) / DRIFT_EASE)
+        data[i + c] = Math.max(0, Math.min(255, Math.round(v + offset[c]! * ease)))
+      }
+    }
+  }
+  return { width, height, data }
+}
+
+/**
+ * The part of an edited picture to keep: what the edit changed. Every connected region where the
+ * edit differs from the take (worst channel, averaged over a few pixels) by more than
+ * `PATCH_CHANGED`, or `PATCH_CHANGED_INSIDE` inside the mark, and that touches the mark, is kept in
+ * the edit's colours with a soft edge; everything else is transparent, so the take shows. An object
+ * the edit grew past the mark is kept whole, and the few levels a model drifts inside the mark leave
+ * no rectangle. A side in `open` lies inside the take (the picture is a window of it): the patch
+ * fades out towards it, so a change reaching it shows no line. Specks are left alone.
+ */
+export function keepChanged(
+  edited: Pixels,
+  take: Pixels,
+  area: PatchArea,
+  open: OpenSides = CLOSED,
+): Pixels {
+  const { width, height } = edited
+  const count = width * height
+  const inMark = (x: number, y: number) =>
+    x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
+  const difference = new Float32Array(count)
+  for (let p = 0; p < count; p++) {
+    let most = 0
+    for (let c = 0; c < 3; c++) {
+      most = Math.max(most, Math.abs(edited.data[p * 4 + c]! - take.data[p * 4 + c]!))
+    }
+    difference[p] = most
+  }
+  const smooth = boxBlur(difference, width, height, CHANGE_SMOOTH)
+  const changed = new Uint8Array(count)
+  const left = open.left ? WINDOW_BORDER : 0
+  const right = width - (open.right ? WINDOW_BORDER : 0)
+  const top = open.top ? WINDOW_BORDER : 0
+  const bottom = height - (open.bottom ? WINDOW_BORDER : 0)
+  for (let y = top; y < bottom; y++) {
+    for (let x = left; x < right; x++) {
+      const bar = inMark(x, y) ? PATCH_CHANGED_INSIDE : PATCH_CHANGED
+      if (smooth[y * width + x]! > bar) changed[y * width + x] = 1
+    }
+  }
+
+  // The connected changed regions that touch the mark and are more than a speck.
+  const seen = new Uint8Array(count)
+  const keep = new Float32Array(count)
+  const stack: number[] = []
+  const visit = (q: number) => {
+    if (seen[q] || !changed[q]) return
+    seen[q] = 1
+    stack.push(q)
+  }
+  for (let start = 0; start < count; start++) {
+    if (!changed[start] || seen[start]) continue
+    stack.push(start)
+    const region: number[] = []
+    let touches = false
+    seen[start] = 1
+    while (stack.length > 0) {
+      const p = stack.pop()!
+      region.push(p)
+      const x = p % width
+      const y = (p - x) / width
+      if (inMark(x, y)) touches = true
+      if (x > 0) visit(p - 1)
+      if (x < width - 1) visit(p + 1)
+      if (y > 0) visit(p - width)
+      if (y < height - 1) visit(p + width)
+    }
+    if (touches && region.length >= CHANGE_SMALLEST) for (const p of region) keep[p] = 1
+  }
+
+  const soft = boxBlur(boxBlur(keep, width, height, KEEP_SOFT), width, height, KEEP_SOFT)
+  const data = new Uint8Array(count * 4)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x
+      // More than the blur's share, so the kept region is whole a little inside its edge.
+      let t = Math.min(1, soft[p]! * 1.6)
+      const toSide = Math.min(
+        open.left ? x + 0.5 : Infinity,
+        open.right ? width - x - 0.5 : Infinity,
+        open.top ? y + 0.5 : Infinity,
+        open.bottom ? height - y - 0.5 : Infinity,
+      )
+      t *= smoothstep(Math.min(1, toSide / WINDOW_FADE))
+      const alpha = Math.round(255 * smoothstep(t))
+      if (alpha === 0) continue
+      data.set(
+        [edited.data[p * 4]!, edited.data[p * 4 + 1]!, edited.data[p * 4 + 2]!, alpha],
+        p * 4,
+      )
     }
   }
   return { width, height, data }
@@ -449,7 +641,7 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
             0,
             Math.min(1, (Math.abs(o[c]! - reference[c]!) - MATCH_FOLLOW) / MATCH_IGNORE),
           )
-          o[c] = o[c]! + (reference[c]! - o[c]!) * t * t * (3 - 2 * t)
+          o[c] = o[c]! + (reference[c]! - o[c]!) * smoothstep(t)
         }
       }
     }
@@ -506,7 +698,7 @@ export function matchToTake(edited: Pixels, take: Pixels, area: PatchArea): Pixe
       let strength = 1
       if (big) {
         const t = Math.min(1, nearest[k]! / PATCH_EASE)
-        strength = 1 - t * t * (3 - 2 * t)
+        strength = 1 - smoothstep(t)
       }
       const i = (y * width + x) * 4
       for (let c = 0; c < 3; c++) {
@@ -526,8 +718,9 @@ export interface PatchTie {
 
 /**
  * The mark a named area gives a patch on a take: the area (a box in the image's pixels, scaled to
- * the take's), grown on every side by the patch's feather so the soft edge fades outside the
- * thing it changes, and stopping at the picture's edges. Null when the result cannot be patched.
+ * the take's), grown on every side by `PATCH_FEATHER` so the model sees the whole thing with a
+ * margin and the lower bar for a change covers it, and stopping at the picture's edges. Null when
+ * the result cannot be patched.
  */
 export function markFromArea(
   box: AreaBox,

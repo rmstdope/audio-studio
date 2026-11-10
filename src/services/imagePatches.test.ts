@@ -138,7 +138,18 @@ describe('takes of a declared patch', () => {
   })
 
   it('gives the model only a window around the marked area of a big take, and keeps the take whole', async () => {
-    const { root, file, patches, requests, work } = setup({ picture: false })
+    const { root, file, patches, requests, work } = setup({
+      picture: false,
+      makes: (request) => {
+        // The model paints the marked area, 96 pixels into its window, white.
+        const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
+        for (let y = 96; y < 196; y++) {
+          for (let x = 96; x < 196; x++)
+            sent.data.set([255, 255, 255, 255], (y * sent.width + x) * 4)
+        }
+        return encodePng(sent)
+      },
+    })
     mkdirSync(dirname(join(root, TAKE)), { recursive: true })
     writeFileSync(join(root, TAKE), fakePng(1024, 640, 9))
     const small = { x: 600, y: 300, width: 100, height: 100 }
@@ -155,15 +166,16 @@ describe('takes of a declared patch', () => {
     expect(at(100, 100)).toBe(0)
   })
 
-  it("hands the model the take's own pixels at the window, and corrects a colour drift of the whole window", async () => {
+  it("hands the model the take's own pixels at the window, and keeps nothing of a colour drift of the whole window", async () => {
     const { root, file, patches, requests, work } = setup({
       picture: false,
       makes: (request) => {
         const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
-        // The model shifts every colour of its window by 30, as a model can.
+        // The model shifts every colour of its window by 40, as a model can: more than the bar
+        // for a change outside the mark.
         return encodePng({
           ...sent,
-          data: sent.data.map((v, i) => (i % 4 === 3 ? v : Math.min(255, v + 30))),
+          data: sent.data.map((v, i) => (i % 4 === 3 ? v : Math.min(255, v + 40))),
         })
       },
     })
@@ -181,21 +193,60 @@ describe('takes of a declared patch', () => {
     await work()
     const window = editWindow(small, take)
     expect(decodePng(sentPixels!).data).toEqual(cropPixels(take, window).data)
+    // Matched to the take, the drift is no change at all: the take shows everywhere.
     const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
-    for (const [x, y] of [
-      [602, 350],
-      [650, 302],
-      [697, 350],
-    ] as const) {
-      for (let c = 0; c < 3; c++) {
-        expect(
-          Math.abs(png.data[(y * 1024 + x) * 4 + c]! - take.data[(y * 1024 + x) * 4 + c]!),
-        ).toBeLessThan(8)
-      }
-    }
+    for (let i = 3; i < png.data.length; i += 4) expect(png.data[i]).toBe(0)
   })
 
-  it('keeps only the marked area of the edit, with its area and the words it was made from', async () => {
+  it('shows no step of colour where a kept object crosses the edge of the mark', async () => {
+    const { root, file, patches, work } = setup({
+      makes: (request) => {
+        const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
+        // The model drifts everything by 25, then paints an object from inside the mark to well outside it.
+        const data = sent.data.map((v, i) => (i % 4 === 3 ? v : Math.min(255, v + 25)))
+        for (let y = 106; y < 136; y++) {
+          for (let x = 116; x < 186; x++) data.set([200, 100, 50, 255], (y * sent.width + x) * 4)
+        }
+        return encodePng({ ...sent, data })
+      },
+    })
+    await patches.make(file, 'inn', 'door', {
+      count: 1,
+      area: { x: 100, y: 100, width: 40, height: 40 },
+    })
+    await work()
+    const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
+    const rgb = (x: number, y: number) => [
+      ...png.data.subarray((y * 256 + x) * 4, (y * 256 + x) * 4 + 3),
+    ]
+    // The mark's right side is at x = 140: one pixel either side of it.
+    const [inside, outside] = [rgb(139, 120), rgb(140, 120)]
+    for (let c = 0; c < 3; c++) expect(Math.abs(inside[c]! - outside[c]!)).toBeLessThan(6)
+  })
+
+  it('keeps an object the edit painted past the mark whole, and the rest of the take as it was', async () => {
+    const { root, file, patches, work } = setup({
+      makes: (request) => {
+        const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
+        // The window starts 4 pixels in: the object runs from inside the mark to well outside it.
+        for (let y = 106; y < 136; y++) {
+          for (let x = 116; x < 186; x++)
+            sent.data.set([250, 250, 250, 255], (y * sent.width + x) * 4)
+        }
+        return encodePng(sent)
+      },
+    })
+    const small = { x: 100, y: 100, width: 40, height: 40 }
+    await patches.make(file, 'inn', 'door', { count: 1, area: small })
+    await work()
+    const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
+    const alpha = (x: number, y: number) => png.data[(y * 256 + x) * 4 + 3]
+    expect(alpha(125, 120)).toBe(255)
+    expect(alpha(175, 120)).toBe(255)
+    expect(alpha(60, 60)).toBe(0)
+  })
+
+  it('saves the take with its area and the words it was made from', async () => {
     const { root, file, patches, work } = setup()
     await patches.make(file, 'inn', 'door', { count: 1, area })
     expect(await work()).toEqual({
@@ -233,13 +284,23 @@ describe('takes of a declared patch', () => {
   })
 
   it('matches the colours of the kept area to the take around it before saving', async () => {
+    // Another tone everywhere, and the marked area painted over: the model's own colours.
+    const paintedOver = (width: number, height: number) => {
+      const pixels = decodePng(fakePng(width, height, 5))
+      for (let y = area.y; y < area.y + area.height; y++) {
+        for (let x = area.x; x < area.x + area.width; x++) {
+          pixels.data.set([240, 230, 220, 255], (y * width + x) * 4)
+        }
+      }
+      return pixels
+    }
     const { root, file, patches, work } = setup({
-      makes: (request) => fakePng(request.width, request.height, 5),
+      makes: (request) => encodePng(paintedOver(request.width, request.height)),
     })
     await patches.make(file, 'inn', 'door', { count: 1, area })
     await work()
     const take = decodePng(new Uint8Array(readFileSync(join(root, TAKE))))
-    const edited = decodePng(fakePng(256, 256, 5))
+    const edited = paintedOver(256, 256)
     const saved = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
     const at = (p: { width: number; data: Uint8Array }, x: number, y: number) => [
       ...p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3),
