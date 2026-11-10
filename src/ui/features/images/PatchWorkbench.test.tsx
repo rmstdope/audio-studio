@@ -377,6 +377,37 @@ describe('an open patch with takes', () => {
     expect(ratios).toEqual(['192 / 288', '150 / 150', '150 / 150'])
   })
 
+  it('leaves the other close-ups as they were when a take lands, and frames a take still being made on the mark', async () => {
+    const tall = { x: 150, y: 0, width: 40, height: 500 }
+    let takes = [takeOf(1, { kept: tall })]
+    const { host } = await render([patchRow('a')], () =>
+      view([
+        work('a', {
+          takes,
+          making:
+            takes.length === 1
+              ? [{ n: 2, state: 'making', elapsed: 1, expected: 15, area, model: 'klein' }]
+              : [],
+        }),
+      ]),
+    )
+    await open(host)
+    const ratios = () =>
+      [...host.querySelectorAll<HTMLElement>('.patch-thumb .patch-closeup')].map(
+        (c) => c.style.aspectRatio,
+      )
+    // The take being made is framed on the mark.
+    expect(ratios()).toEqual(['192 / 288', '150 / 150'])
+    takes = [
+      takeOf(1, { kept: tall }),
+      takeOf(2, { kept: { x: 100, y: 50, width: 300, height: 100 } }),
+    ]
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(ratios()[0]).toBe('192 / 288')
+  })
+
   it('heads the takes with their count and explains how to look at one', async () => {
     const { host } = await render([patchRow('a')], made())
     await open(host)

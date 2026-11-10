@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, utimesSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { EditModelId } from '../core/imageModels'
@@ -13,7 +13,7 @@ import { createImagePatches } from './imagePatches'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
 import { cropPixels, editWindow } from '../core/imagePixels'
-import { decodePng, encodePng } from './png'
+import { decodePng, encodePng, encodeTransparentPng } from './png'
 import { createSerial, type Serial } from './serial'
 
 const images = {
@@ -271,6 +271,26 @@ describe('takes of a declared patch', () => {
     expect(kept).toEqual(keptBox(png)!)
     expect(kept.x + kept.width).toBeGreaterThan(180)
     expect(kept.x).toBeLessThan(120)
+  })
+
+  it('follows a take’s file when it changes, and falls back to none when it cannot be read', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    expect((await work()).takes[0]!.kept).toBeNull()
+    const path = join(root, FOLDER, '1.png')
+    const picture = (x: number, width: number) => {
+      const data = new Uint8Array(256 * 256 * 4)
+      for (let y = 10; y < 30; y++)
+        for (let i = x; i < x + width; i++) data.set([9, 9, 9, 255], (y * 256 + i) * 4)
+      return encodeTransparentPng({ width: 256, height: 256, data })
+    }
+    writeFileSync(path, picture(20, 40))
+    expect((await work()).takes[0]!.kept).toEqual({ x: 20, y: 10, width: 40, height: 20 })
+    writeFileSync(path, picture(100, 70))
+    utimesSync(path, new Date(Date.now() + 5000), new Date(Date.now() + 5000))
+    expect((await work()).takes[0]!.kept).toEqual({ x: 100, y: 10, width: 70, height: 20 })
+    writeFileSync(path, 'not a picture')
+    expect((await work()).takes[0]!.kept).toBeNull()
   })
 
   it('saves the take with its area and the words it was made from', async () => {

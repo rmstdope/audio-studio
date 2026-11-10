@@ -69,15 +69,24 @@ describe('closeUp with what a take keeps', () => {
   })
 
   it('moves the widened frame inward at the picture’s edge', () => {
-    const crop = closeUp({ x: 0, y: 400, width: 20, height: 20 }, big, {
-      x: 0,
-      y: 100,
-      width: 20,
-      height: 400,
-    })
-    expect(crop.x).toBe(0)
-    expect(crop.height / crop.width).toBeLessThanOrEqual(1.5)
-    expect(crop.x + crop.width).toBeLessThanOrEqual(1000)
+    // Joined (0, 100, 20, 400) plus a quarter: 30 x 600 at x 0; widened to 400, centred at 15 and moved inward.
+    expect(
+      closeUp({ x: 0, y: 400, width: 20, height: 20 }, big, {
+        x: 0,
+        y: 100,
+        width: 20,
+        height: 400,
+      }),
+    ).toEqual({ x: 0, y: 0, width: 400, height: 600 })
+    // At the right edge it moves inward the other way.
+    expect(
+      closeUp({ x: 980, y: 400, width: 20, height: 20 }, big, {
+        x: 980,
+        y: 100,
+        width: 20,
+        height: 400,
+      }),
+    ).toEqual({ x: 600, y: 0, width: 400, height: 600 })
   })
 
   it('stops at the picture when it is too small for the usual shape', () => {
