@@ -48,6 +48,18 @@ describe('syncImageAreas', () => {
     })
   })
 
+  it('writes a placed area’s point as its mark, over an entry that has the box without it', async () => {
+    const fractions = { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }
+    const { run, read } = repo({
+      [MANIFEST]: { inn: { ...entry, areas: { fountain: fractions } } },
+      [EDITS]: { images: { inn: { areas: { fountain: { ...box, point: { x: 96, y: 60 } } } } } },
+    })
+    expect(await run(['inn'])).toEqual({ ok: true })
+    expect(read()).toEqual({
+      inn: { ...entry, areas: { fountain: { ...fractions, mark: { x: 0.3, y: 0.3 } } } },
+    })
+  })
+
   it('takes areas the game no longer asks for out, and the last one takes the key out', async () => {
     const { run, read } = repo({
       'tts/act1/images.json': [inn],

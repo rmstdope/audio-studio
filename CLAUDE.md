@@ -100,7 +100,8 @@ bundle breaks.
   writes the whole file again in its own indentation and line endings (a hand-compacted object is
   written out).
 - The images manifest is the studio's to write beyond the chosen takes in one way: an image's entry
-  gains `areas`, the boxes placed for the game's named areas as fractions of the picture, written in the
+  gains `areas`, the boxes placed for the game's named areas as fractions of the picture (each with
+  its point as `mark` when it has one), written in the
   same save as the box and on Refresh from the game; the entry keeps its other fields as they were.
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
