@@ -81,6 +81,39 @@ describe('keepChanged', () => {
     expect(alphaAt(patch, 20, 20)).toBe(0)
   })
 
+  it('keeps a part outside the mark that only a thin line of no change parts from what touches it', () => {
+    // A head above the mark, its neck the same tone as what lies behind it, the body in the mark.
+    const head = withBox(take, { x: 90, y: 30, width: 30, height: 26 }, [20, 20, 20])
+    const edited = withBox(head, { x: 85, y: 66, width: 40, height: 50 }, [20, 20, 20])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 105, 90)).toBe(255)
+    expect(alphaAt(patch, 105, 40)).toBe(255)
+  })
+
+  it('does not reach across a wider line of no change', () => {
+    // 24 rows apart: more than a thin line.
+    const head = withBox(take, { x: 90, y: 20, width: 30, height: 22 }, [20, 20, 20])
+    const edited = withBox(head, { x: 85, y: 66, width: 40, height: 50 }, [20, 20, 20])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 105, 90)).toBe(255)
+    expect(alphaAt(patch, 105, 28)).toBe(0)
+  })
+
+  it('does not let a trail of specks near the kept change chain it across the picture', () => {
+    let edited = withBox(take, { x: 90, y: 90, width: 40, height: 30 }, [20, 20, 20])
+    for (let x = 145; x < 195; x += 14)
+      edited = withBox(edited, { x, y: 100, width: 5, height: 5 }, [255, 255, 255])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 105, 105)).toBe(255)
+    expect(alphaAt(patch, 189, 102)).toBe(0)
+  })
+
+  it('leaves a change just outside the mark alone when nothing in the mark changed', () => {
+    const edited = withBox(take, { x: 90, y: 30, width: 30, height: 24 }, [20, 20, 20])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 105, 40)).toBe(0)
+  })
+
   it('leaves a change that does not touch the mark alone', () => {
     const edited = withBox(take, { x: 10, y: 160, width: 30, height: 30 }, [120, 80, 40])
     const patch = keepChanged(edited, take, area)

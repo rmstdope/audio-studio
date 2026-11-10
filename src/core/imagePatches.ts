@@ -243,6 +243,13 @@ export const PATCH_CHANGED_INSIDE = 14
 /** The radius in pixels over which the difference is averaged, so that grain and dither do not count. */
 const CHANGE_SMOOTH = 3
 
+/**
+ * A changed region at most this many pixels (of the smoothed difference) from one with a change
+ * inside the mark is kept with it: a part parted from the rest only by a thin line of no change (a
+ * black cat's neck against black shadow) stays on.
+ */
+const CHANGE_GAP = 12
+
 /** A changed region of fewer pixels than this is a speck and is left alone. */
 const CHANGE_SMALLEST = 40
 
@@ -363,7 +370,8 @@ export function matchOutside(edited: Pixels, take: Pixels, area: PatchArea): Pix
  * The part of an edited picture to keep: what the edit changed. Every connected region where the
  * edit differs from the take (worst channel, averaged over a few pixels) by more than
  * `PATCH_CHANGED`, or `PATCH_CHANGED_INSIDE` inside the mark, and that touches the mark, is kept in
- * the edit's colours with a soft edge; everything else is transparent, so the take shows. An object
+ * the edit's colours with a soft edge, and so is a region within `CHANGE_GAP` of one of those (one
+ * step, no further); everything else is transparent, so the take shows. An object
  * the edit grew past the mark is kept whole, and the few levels a model drifts inside the mark leave
  * no rectangle. A side in `open` lies inside the take (the picture is a window of it): the patch
  * fades out towards it, so a change reaching it shows no line. Specks are left alone.
@@ -399,33 +407,51 @@ export function keepChanged(
     }
   }
 
-  // The connected changed regions that touch the mark and are more than a speck.
-  const seen = new Uint8Array(count)
-  const keep = new Float32Array(count)
-  const stack: number[] = []
-  const visit = (q: number) => {
-    if (seen[q] || !changed[q]) return
-    seen[q] = 1
-    stack.push(q)
-  }
-  for (let start = 0; start < count; start++) {
-    if (!changed[start] || seen[start]) continue
-    stack.push(start)
-    const region: number[] = []
-    let touches = false
-    seen[start] = 1
-    while (stack.length > 0) {
-      const p = stack.pop()!
-      region.push(p)
-      const x = p % width
-      const y = (p - x) / width
-      if (inMark(x, y)) touches = true
-      if (x > 0) visit(p - 1)
-      if (x < width - 1) visit(p + 1)
-      if (y > 0) visit(p - width)
-      if (y < height - 1) visit(p + width)
+  /** Calls `each` with the places of every connected region of those `inside` says belong. */
+  const regions = (inside: (p: number) => boolean, each: (changes: number[]) => void) => {
+    const seen = new Uint8Array(count)
+    const stack: number[] = []
+    const visit = (q: number) => {
+      if (seen[q] || !inside(q)) return
+      seen[q] = 1
+      stack.push(q)
     }
-    if (touches && region.length >= CHANGE_SMALLEST) for (const p of region) keep[p] = 1
+    for (let start = 0; start < count; start++) {
+      if (seen[start] || !inside(start)) continue
+      seen[start] = 1
+      stack.push(start)
+      const changes: number[] = []
+      while (stack.length > 0) {
+        const p = stack.pop()!
+        changes.push(p)
+        const x = p % width
+        if (x > 0) visit(p - 1)
+        if (x < width - 1) visit(p + 1)
+        if (p >= width) visit(p - width)
+        if (p + width < count) visit(p + width)
+      }
+      each(changes)
+    }
+  }
+
+  // The regions with a change inside the mark are kept; a region parted from one of them only by
+  // a thin line of no change is kept with it, one step only, so that nothing chains on from there.
+  const keep = new Float32Array(count)
+  const others: number[][] = []
+  regions(
+    (p) => changed[p] === 1,
+    (changes) => {
+      if (changes.length < CHANGE_SMALLEST) return
+      if (changes.some((p) => inMark(p % width, Math.floor(p / width)))) {
+        for (const p of changes) keep[p] = 1
+      } else {
+        others.push(changes)
+      }
+    },
+  )
+  const near = boxBlur(keep, width, height, CHANGE_GAP)
+  for (const changes of others) {
+    if (changes.some((p) => near[p]! > 0)) for (const p of changes) keep[p] = 1
   }
 
   const soft = boxBlur(boxBlur(keep, width, height, KEEP_SOFT), width, height, KEEP_SOFT)
