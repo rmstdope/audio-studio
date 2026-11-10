@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { imageModel } from '../core/imageModels'
 import { createGpuWorkers, gpuInUse, GPU } from './gpu'
 import {
   createMfluxGenerator,
@@ -41,6 +42,23 @@ describe('mfluxArguments', () => {
     expect(mfluxArguments({ ...request, model: 'z-image-turbo' }, '/tmp/x.png').program).toBe(
       'mflux-generate-z-image-turbo',
     )
+  })
+
+  it('runs Qwen-Image through mflux-generate-qwen with its repository as the model, quantizing and steps', () => {
+    const model = imageModel('qwen-image')
+    const args = mfluxArguments({ ...request, model: 'qwen-image' }, '/tmp/x.png')
+    expect(args.program).toBe('mflux-generate-qwen')
+    expect(args.args).toEqual([
+      '--model', 'Qwen/Qwen-Image',
+      '--base-model', 'qwen-image',
+      ...(model.quantize ? ['--quantize', String(model.quantize)] : []),
+      ...(model.steps ? ['--steps', String(model.steps)] : []),
+      '--prompt', 'a room',
+      '--width', '1024',
+      '--height', '576',
+      '--seed', '42',
+      '--output', '/tmp/x.png',
+    ]) // prettier-ignore
   })
 
   it('names the model mflux knows, the size and the seed', () => {
@@ -151,6 +169,8 @@ describe('mfluxReady', () => {
       ok: false,
       message: expect.stringContaining('mflux-generate-z-image-turbo'),
     })
+    // An mflux without the Qwen-Image command still runs the other two.
+    expect(mfluxReady({ ...mac, which: (c) => c !== 'mflux-generate-qwen' })).toEqual({ ok: true })
     expect(mfluxReady({ ...mac, platform: 'linux' })).toMatchObject({ ok: false })
     expect(mfluxReady({ ...mac, which: () => false })).toMatchObject({
       ok: false,
@@ -302,6 +322,16 @@ describe('createMfluxGenerator', () => {
     setTimeout(() => controller.abort(), 100)
     await expect(take).rejects.toThrow(/stopped/)
     expect(Date.now() - started).toBeLessThan(5000)
+  })
+
+  it('says an mflux without the model’s command cannot make it, not the raw spawn error', async () => {
+    const generator = createMfluxGenerator({
+      build: () => ({ command: ['/no/such/mflux-generate-qwen'], out: '/tmp/none.png' }),
+      log: () => {},
+    })
+    await expect(generator.generate({ ...request, model: 'qwen-image' })).rejects.toThrow(
+      /installed mflux cannot make Qwen-Image images/,
+    )
   })
 
   it('refuses a request mflux cannot make, before running anything', async () => {

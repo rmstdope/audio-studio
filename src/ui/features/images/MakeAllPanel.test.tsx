@@ -83,7 +83,7 @@ function render(subject: ImagesAct, options: Options = {}) {
     ok: true,
     main: options.main ?? 'klein',
     ready: options.ready ?? true,
-    states: options.states ?? { klein: whole, 'z-image-turbo': whole },
+    states: options.states ?? { klein: whole, 'z-image-turbo': whole, 'qwen-image': whole },
   })
   if (options.batch) client.setQueryData(['images-batch', subject.id], options.batch)
   const container = document.createElement('div')
@@ -149,7 +149,11 @@ describe('Make takes for every image with no chosen take', () => {
 
   it('names the other model and why when Setup’s is not usable', async () => {
     const page = render(three, {
-      states: { klein: { download: 'partial', failed: false }, 'z-image-turbo': whole },
+      states: {
+        klein: { download: 'partial', failed: false },
+        'z-image-turbo': whole,
+        'qwen-image': whole,
+      },
     })
     await page.press('Make 4 takes each')
     expect(page.text()).toContain(
@@ -348,7 +352,9 @@ describe('Make takes for every image with no chosen take', () => {
 
   it('says images cannot be made yet, with a link to Setup, when neither model can run', () => {
     const none: ImageModelState = { download: 'absent', failed: false }
-    const page = render(three, { states: { klein: none, 'z-image-turbo': none } })
+    const page = render(three, {
+      states: { klein: none, 'z-image-turbo': none, 'qwen-image': none },
+    })
     expect(page.text()).toContain("Images can't be made yet. Setup says what is missing.")
     expect(page.button('Open Setup').getAttribute('href')).toContain('setup')
     expect(page.text()).not.toContain('Make 4 takes each')

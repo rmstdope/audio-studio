@@ -4,7 +4,13 @@ import { z } from 'zod'
  * What image takes are timed for: each model apart, and FLUX.2 klein's patches apart from its
  * takes, since they do different work and can read differently.
  */
-export const TIME_KEYS = ['klein', 'z-image-turbo', 'qwen-edit', 'klein-edit'] as const
+export const TIME_KEYS = [
+  'klein',
+  'z-image-turbo',
+  'qwen-image',
+  'qwen-edit',
+  'klein-edit',
+] as const
 
 /** One of the things image takes are timed for. */
 export type TimeKey = (typeof TIME_KEYS)[number]
@@ -13,6 +19,7 @@ export type TimeKey = (typeof TIME_KEYS)[number]
 export const STARTING_SECONDS: Record<TimeKey, number> = {
   klein: 20,
   'z-image-turbo': 60,
+  'qwen-image': 240,
   'qwen-edit': 480,
   'klein-edit': 20,
 }

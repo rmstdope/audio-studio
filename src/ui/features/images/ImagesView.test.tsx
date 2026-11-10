@@ -149,6 +149,7 @@ const noTakes: ImageTakesView = {
   models: [
     { id: 'klein', installed: true, download: 'whole', failed: false },
     { id: 'z-image-turbo', installed: true, download: 'whole', failed: false },
+    { id: 'qwen-image', installed: true, download: 'whole', failed: false },
   ],
   takes: [],
   making: [],
@@ -175,7 +176,7 @@ function render(
       ok: true,
       main: 'klein',
       ready: true,
-      states: { klein: whole, 'z-image-turbo': whole },
+      states: { klein: whole, 'z-image-turbo': whole, 'qwen-image': whole },
     })
   }
   const container = document.createElement('div')

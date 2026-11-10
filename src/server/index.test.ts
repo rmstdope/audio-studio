@@ -5691,6 +5691,7 @@ describe('the image model routes', () => {
       states: {
         klein: { download: 'absent', failed: false },
         'z-image-turbo': { download: 'whole', failed: false },
+        'qwen-image': { download: 'whole', failed: false },
       },
     })
     const setup = await (await fetch(at('/api/setup'))).json()

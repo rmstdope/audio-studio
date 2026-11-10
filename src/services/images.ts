@@ -7,7 +7,6 @@ import {
   checkImageRequest,
   EDIT_MODELS,
   IMAGE_EDIT_COMMAND,
-  IMAGE_MODEL_IDS,
   editFailureReason,
   imageFailureReason,
   imageModel,
@@ -282,6 +281,9 @@ export function imageModelInstalled(hubDir: string, model: ImageModelId | EditMo
   return imageModelDownload(hubDir, model) === 'whole'
 }
 
+/** The models whose mflux commands must exist for mflux to count as installed. */
+const REQUIRED_COMMAND_MODELS = ['klein', 'z-image-turbo'] as const
+
 /** Whether mflux can run here, and the first thing that stops it if not. */
 export function mfluxReady(machine: Machine): ImageReady {
   if (!(machine.platform === 'darwin' && machine.arch === 'arm64')) {
@@ -292,7 +294,8 @@ export function mfluxReady(machine: Machine): ImageReady {
       fix: 'Images are made on a Mac with Apple silicon; there is nothing to install on this computer.',
     }
   }
-  const missing = IMAGE_MODEL_IDS.map((id) => imageModel(id).command).filter(
+  // Qwen-Image's command is not needed to run the other two: an mflux too old for it fails its takes.
+  const missing = REQUIRED_COMMAND_MODELS.map((id) => imageModel(id).command).filter(
     (command) => !machine.which(command),
   )
   if (missing.length > 0) {
@@ -341,6 +344,9 @@ export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand
     program: request.editing ? IMAGE_EDIT_COMMAND : model.command,
     args: [
       '--model', model.mflux,
+      ...(!request.editing && model.base ? ['--base-model', model.base] : []),
+      ...(!request.editing && model.quantize ? ['--quantize', String(model.quantize)] : []),
+      ...(!request.editing && model.steps ? ['--steps', String(model.steps)] : []),
       ...(request.editing ? ['--image-paths', request.editing] : []),
       '--prompt', request.prompt,
       '--width', String(request.width),
@@ -390,7 +396,19 @@ export function createMfluxGenerator({
         mfluxArguments(request, join(tmpdir(), `content-studio-image-${randomUUID()}.png`)),
       )
       try {
-        const proc = Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe', detached: true })
+        const proc = (() => {
+          try {
+            return Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe', detached: true })
+          } catch {
+            // The program is not there: an mflux too old to have this model's command.
+            const what = request.editing
+              ? 'patches'
+              : `${imageModel(request.model as ImageModelId).name} images`
+            throw new Error(
+              `The installed mflux cannot make ${what}; update it with uv tool install --upgrade mflux, then Try again.`,
+            )
+          }
+        })()
         const forget = stopWithStudio(proc.pid)
         void proc.exited.then(forget)
         let stopped = ''
