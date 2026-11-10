@@ -735,6 +735,28 @@ describe('the image models check', () => {
     )
   })
 
+  it('keeps Ready when a stale failure is remembered for a Qwen-Image that is not whole', () => {
+    for (const download of ['absent', 'partial'] as const) {
+      const found = row(imageFacts({ 'qwen-image': { download, failure } }))
+      expect(found).toMatchObject({ state: 'ok' })
+      expect(found.failures).toBeUndefined()
+      expect(found.notes).toHaveLength(1)
+    }
+  })
+
+  it('leads with the project’s model when it and another are missing', () => {
+    const found = row(
+      imageFacts({
+        model: 'qwen-image',
+        klein: { download: 'absent' },
+        'qwen-image': { download: 'absent' },
+      }),
+    )
+    expect(
+      found.detail.startsWith("The project's image model, Qwen-Image, is not on this computer."),
+    ).toBe(true)
+  })
+
   it('says the incomplete download of Qwen-Image, not its failure', () => {
     const found = row(
       imageFacts({ model: 'qwen-image', 'qwen-image': { download: 'partial', failure } }),

@@ -537,7 +537,7 @@ function imageModels(facts: SetupFacts): SetupCheck {
         : { parts: [`Download it, once (about ${gigabytes} GB):`], commands: [command] },
     )
   }
-  if (!notes.length && !extra) return check
+  if (!notes.length) return check
   return {
     ...check,
     ...(notes.length ? { notes: [...(check.notes ?? []), ...notes] } : {}),
@@ -639,16 +639,16 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
       steps: noteSteps([...downloadSteps, ...optional]),
     }
   }
-  const affected = IMAGE_MODEL_IDS.filter(
-    (id) => (!extra(id) && models[id].download !== 'whole') || models[id].failure,
+  // The project's model is named first, then the others in menu order.
+  const affected = [model, ...IMAGE_MODEL_IDS.filter((id) => id !== model)].filter(
+    (id) => (!extra(id) && models[id].download !== 'whole') || failed.includes(id),
   )
   if (!affected.length) {
-    const together = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'whole')
     return {
       id: 'imageModels',
       title,
       state: 'ok',
-      detail: `${listed(together.map(name))} ${together.length > 1 ? 'are' : 'is'} fully downloaded on this computer; a model loads on its first take.`,
+      detail: `${listed(whole.map(name))} ${whole.length > 1 ? 'are' : 'is'} fully downloaded on this computer; a model loads on its first take.`,
     }
   }
   const single = affected.length === 1
@@ -688,22 +688,20 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
     .map(downloadSentence)
   // The models in place close what is said once: after the downloads, else after a single failure.
   const detail = downloadSentences.join(' ') + (downloadSentences.length ? tail : '')
-  const failures = failed
-    .filter((id) => !extra(id) || models[id].failure)
-    .map((id) => {
-      const failure = models[id].failure!
-      const on = failure.image ? ` on ${failure.image.title}` : ''
-      const head =
-        id === model
-          ? `The last take with ${name(id)}, the project's image model, failed${on}.`
-          : `${single ? 'Optional: the' : 'The'} last take with ${name(id)} failed${on}.`
-      return {
-        sentence: head + (single && !downloadSentences.length ? tail : ''),
-        error: failure.error,
-        ...(link(failure) ? { link: link(failure) } : {}),
-        clears: `This clears when a take with ${name(id)} works.`,
-      }
-    })
+  const failures = failed.map((id) => {
+    const failure = models[id].failure!
+    const on = failure.image ? ` on ${failure.image.title}` : ''
+    const head =
+      id === model
+        ? `The last take with ${name(id)}, the project's image model, failed${on}.`
+        : `${single ? 'Optional: the' : 'The'} last take with ${name(id)} failed${on}.`
+    return {
+      sentence: head + (single && !downloadSentences.length ? tail : ''),
+      error: failure.error,
+      ...(link(failure) ? { link: link(failure) } : {}),
+      clears: `This clears when a take with ${name(id)} works.`,
+    }
+  })
   return {
     id: 'imageModels',
     title,

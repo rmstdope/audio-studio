@@ -356,7 +356,19 @@ export function createMfluxGenerator({
         mfluxArguments(request, join(tmpdir(), `content-studio-image-${randomUUID()}.png`)),
       )
       try {
-        const proc = Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe', detached: true })
+        const proc = (() => {
+          try {
+            return Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe', detached: true })
+          } catch {
+            // The program is not there: an mflux too old to have this model's command.
+            const what = request.editing
+              ? 'patches'
+              : `${imageModel(request.model as ImageModelId).name} images`
+            throw new Error(
+              `The installed mflux cannot make ${what}; update it with uv tool install --upgrade mflux, then Try again.`,
+            )
+          }
+        })()
         const forget = stopWithStudio(proc.pid)
         void proc.exited.then(forget)
         let stopped = ''

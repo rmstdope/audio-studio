@@ -324,6 +324,16 @@ describe('createMfluxGenerator', () => {
     expect(Date.now() - started).toBeLessThan(5000)
   })
 
+  it('says an mflux without the model’s command cannot make it, not the raw spawn error', async () => {
+    const generator = createMfluxGenerator({
+      build: () => ({ command: ['/no/such/mflux-generate-qwen'], out: '/tmp/none.png' }),
+      log: () => {},
+    })
+    await expect(generator.generate({ ...request, model: 'qwen-image' })).rejects.toThrow(
+      /installed mflux cannot make Qwen-Image images/,
+    )
+  })
+
   it('refuses a request mflux cannot make, before running anything', async () => {
     const generator = createMfluxGenerator({ build: fake(writes) })
     await expect(generator.generate({ ...request, width: 1000 })).rejects.toThrow(/width/)
