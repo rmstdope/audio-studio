@@ -151,3 +151,22 @@ describe('the point of a box', () => {
     expect(keepPoint(box, { ...box, x: 5 })).toEqual({ ...box, x: 5 })
   })
 })
+
+describe('the point of a box with an odd side', () => {
+  const odd = { x: 100, y: 50, width: 61, height: 41 }
+  it('rounds the centre once so the first step is the whole step both ways', () => {
+    expect(pointOf(odd)).toEqual({ x: 131, y: 71 })
+    expect(nudgePoint(odd, 'ArrowLeft')?.point?.x).toBe(131 - ARROW_STEP)
+    expect(nudgePoint(odd, 'ArrowRight')?.point?.x).toBe(131 + ARROW_STEP)
+  })
+  it('counts a point one pixel off the centre as moved', () => {
+    expect(isCentred({ ...odd, point: { x: 132, y: 71 } })).toBe(false)
+  })
+})
+
+describe('keepPoint on a placed point', () => {
+  it('keeps the placed point even when the new centre falls on it', () => {
+    const was = { ...box, point: { x: 120, y: 70 } }
+    expect(keepPoint(was, { ...box, x: 90 }).point).toEqual({ x: 120, y: 70 })
+  })
+})

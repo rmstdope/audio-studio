@@ -957,6 +957,35 @@ describe('the point of a box', () => {
     expect(puts[0]!.body).toEqual({ box: null })
   })
 
+  it('starts a box drawn after Clear with its point at the centre', async () => {
+    const { host, stage, puts } = await setup({ ...box, point: { x: 110, y: 60 } })
+    await act(async () => host.querySelector<HTMLButtonElement>('.named-area-clear')!.click())
+    await settle()
+    await drag(stage!, [10, 10], [70, 50])
+    expect(puts[1]!.body.box).toEqual({ x: 10, y: 10, width: 60, height: 40 })
+  })
+
+  it('lets presses through the dot of a box too small to grab by it', async () => {
+    const { host } = await setup({ x: 100, y: 50, width: 8, height: 8 })
+    expect(dotOf(host, 'a')!.classList.contains('tiny')).toBe(true)
+  })
+
+  it('names the selected point and hides the small dots from assistive tools', async () => {
+    const { host } = await setup()
+    expect(dotOf(host, 'a')!.getAttribute('aria-label')).toBe('Point of Title of a')
+    expect(dotOf(host, 'b')!.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('draws the point small when the window narrows under a selected box', async () => {
+    const { host, stage } = await setup()
+    expect(dotOf(host, 'a')!.classList.contains('small')).toBe(false)
+    stage!.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 62 }) as DOMRect
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(dotOf(host, 'a')!.classList.contains('small')).toBe(true)
+  })
+
   it('goes back to where it was and names the area when saving fails', async () => {
     const { host, stage } = await render([placedAt('a', box)], {
       saved: { status: 409, body: { ok: false, problems: [{ message: 'no room' }] } },

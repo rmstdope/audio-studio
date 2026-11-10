@@ -5205,6 +5205,10 @@ button.cue-chip[aria-expanded='true'] {
   border: 0;
   background: #fff;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 65%);
+  cursor: pointer;
+}
+.area-point.tiny {
+  pointer-events: none;
 }
 .named-area-box .handle {
   position: absolute;

@@ -109,14 +109,19 @@ export function smallestAt(boxes: { id: string; box: AreaBox }[], at: Point): st
 
 /** Where a box's point is: the one placed, or the centre while it was never moved. */
 export function pointOf(box: AreaBox): Point {
-  return box.point ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  return (
+    box.point ?? {
+      x: Math.round(box.x + box.width / 2),
+      y: Math.round(box.y + box.height / 2),
+    }
+  )
 }
 
 /** Whether the point is at the centre (never moved, or put back there). */
 export function isCentred(box: AreaBox): boolean {
   if (!box.point) return true
   const centre = pointOf({ ...box, point: undefined })
-  return Math.abs(box.point.x - centre.x) <= 0.5 && Math.abs(box.point.y - centre.y) <= 0.5
+  return box.point.x === centre.x && box.point.y === centre.y
 }
 
 /** The box with its point at `at`, stopping at the box's edges; a point on the centre is no point. */
@@ -151,5 +156,12 @@ export function centred(box: AreaBox): AreaBox {
  */
 export function keepPoint(was: AreaBox, next: AreaBox): AreaBox {
   const { point: _old, ...rest } = next
-  return was.point ? movePoint(rest, was.point) : rest
+  if (!was.point) return rest
+  return {
+    ...rest,
+    point: {
+      x: clamp(was.point.x, rest.x, rest.x + rest.width),
+      y: clamp(was.point.y, rest.y, rest.y + rest.height),
+    },
+  }
 }
