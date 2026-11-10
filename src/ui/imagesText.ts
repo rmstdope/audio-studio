@@ -313,7 +313,7 @@ export function bringFailureText(
 export function areaLineText(selected: { title: string; placed: boolean } | null): string {
   if (!selected) return 'Press an area in the list or on the picture to change it.'
   return selected.placed
-    ? 'Drag the box to move it, or its corners and sides to resize it. Arrow keys move it; with Shift they resize it.'
+    ? 'Drag the box to move it, or its corners and sides to resize it. Drag the point to choose where What’s there marks it. Arrow keys move the box; with Shift they resize it; with Alt they move the point.'
     : `Drag over the picture to mark “${selected.title}”.`
 }
 
