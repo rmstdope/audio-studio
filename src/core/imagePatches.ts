@@ -243,6 +243,13 @@ export const PATCH_CHANGED_INSIDE = 14
 /** The radius in pixels over which the difference is averaged, so that grain and dither do not count. */
 const CHANGE_SMOOTH = 3
 
+/**
+ * Changed places at most twice this many pixels apart count as one region when deciding what
+ * touches the mark: a part parted from the rest only by a thin line of no change (a black cat's
+ * neck against black shadow) is kept with it.
+ */
+const CHANGE_GAP = 6
+
 /** A changed region of fewer pixels than this is a speck and is left alone. */
 const CHANGE_SMALLEST = 40
 
@@ -399,6 +406,10 @@ export function keepChanged(
     }
   }
 
+  // Places within the gap of a change join its region (2) but are not kept themselves.
+  const near = boxBlur(Float32Array.from(changed), width, height, CHANGE_GAP)
+  for (let p = 0; p < count; p++) if (!changed[p] && near[p]! > 0) changed[p] = 2
+
   // The connected changed regions that touch the mark and are more than a speck.
   const seen = new Uint8Array(count)
   const keep = new Float32Array(count)
@@ -413,19 +424,25 @@ export function keepChanged(
     stack.push(start)
     const region: number[] = []
     let touches = false
+    let changes = 0
     seen[start] = 1
     while (stack.length > 0) {
       const p = stack.pop()!
       region.push(p)
       const x = p % width
       const y = (p - x) / width
-      if (inMark(x, y)) touches = true
+      if (changed[p] === 1) {
+        changes++
+        if (inMark(x, y)) touches = true
+      }
       if (x > 0) visit(p - 1)
       if (x < width - 1) visit(p + 1)
       if (y > 0) visit(p - width)
       if (y < height - 1) visit(p + width)
     }
-    if (touches && region.length >= CHANGE_SMALLEST) for (const p of region) keep[p] = 1
+    if (touches && changes >= CHANGE_SMALLEST) {
+      for (const p of region) if (changed[p] === 1) keep[p] = 1
+    }
   }
 
   const soft = boxBlur(boxBlur(keep, width, height, KEEP_SOFT), width, height, KEEP_SOFT)

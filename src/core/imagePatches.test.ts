@@ -81,6 +81,21 @@ describe('keepChanged', () => {
     expect(alphaAt(patch, 20, 20)).toBe(0)
   })
 
+  it('keeps a part outside the mark that only a thin line of no change parts from what touches it', () => {
+    // A head above the mark, its neck the same tone as what lies behind it, the body in the mark.
+    const head = withBox(take, { x: 90, y: 30, width: 30, height: 26 }, [20, 20, 20])
+    const edited = withBox(head, { x: 85, y: 66, width: 40, height: 50 }, [20, 20, 20])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 105, 90)).toBe(255)
+    expect(alphaAt(patch, 105, 40)).toBe(255)
+  })
+
+  it('leaves a change just outside the mark alone when nothing in the mark changed', () => {
+    const edited = withBox(take, { x: 90, y: 30, width: 30, height: 24 }, [20, 20, 20])
+    const patch = keepChanged(edited, take, area)
+    expect(alphaAt(patch, 105, 40)).toBe(0)
+  })
+
   it('leaves a change that does not touch the mark alone', () => {
     const edited = withBox(take, { x: 10, y: 160, width: 30, height: 30 }, [120, 80, 40])
     const patch = keepChanged(edited, take, area)
