@@ -15,6 +15,7 @@ import { ImageManifestSchema, type ImageManifest } from '../core/imageTakes'
 import {
   checkPatchArea,
   keepChanged,
+  keptBox,
   matchOutside,
   matchToTake,
   openSides,
@@ -165,6 +166,8 @@ export function createImagePatches({
   const shared = globalThis as { contentStudioPatchTakes?: Map<string, Map<number, Entry>> }
   // Kept across `--dev` reloads, as the takes being made are.
   const active = (shared.contentStudioPatchTakes ??= new Map())
+  // What each take file keeps, by project root and path, with the file's time and size it was read at.
+  const keptBoxes = new Map<string, { key: string; kept: PatchArea | null }>()
   // Takes being brought to the look right now (`<patch key>\0<n>`), kept across `--dev` reloads.
   const bringing = ((
     globalThis as { contentStudioPatchBringing?: Set<string> }
@@ -475,6 +478,21 @@ export function createImagePatches({
     return { ok: true }
   }
 
+  /** What the take at this path keeps (`keptBox`), read again only when its file changed; none when unreadable. */
+  async function keptOf(root: string, path: string): Promise<PatchArea | null> {
+    try {
+      const file = Bun.file(resolveInRoot(root, path))
+      const key = `${file.lastModified}:${file.size}`
+      const known = keptBoxes.get(`${root}\0${path}`)
+      if (known?.key === key) return known.kept
+      const kept = keptBox(decodePng(new Uint8Array(await file.arrayBuffer())))
+      keptBoxes.set(`${root}\0${path}`, { key, kept })
+      return kept
+    } catch {
+      return null
+    }
+  }
+
   /** Each patch's takes on the chosen take, and the area of its earlier choice; a failure when a board cannot be read. */
   async function workOf(image: Image) {
     const figures = figuresOf(await readTakeTimes(image.projectFile))
@@ -505,6 +523,7 @@ export function createImagePatches({
           chosen: t.n === chosen,
           isNew: !t.seen,
           model: t.model ?? BEFORE_CHOICE,
+          kept: await keptOf(image.root, `${found.folder}/${t.n}.png`),
           look: bringing.has(`${found.key}\0${t.n}`)
             ? 'bringing'
             : !(await Bun.file(

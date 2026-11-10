@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  keptBox,
   checkPatchArea,
   gamePatch,
   ChoosePatchTakeBody,
@@ -960,5 +961,33 @@ describe('named areas set aside', () => {
       leaving: ['Bread taken'],
       leavingAreas: ['Well'],
     })
+  })
+})
+
+describe('keptBox', () => {
+  const blank = (width: number, height: number): Pixels => ({
+    width,
+    height,
+    data: new Uint8Array(width * height * 4),
+  })
+  const put = (p: Pixels, x: number, y: number, alpha: number) => {
+    p.data[(y * p.width + x) * 4 + 3] = alpha
+  }
+
+  it('is none for a picture with nothing visible', () => {
+    expect(keptBox(blank(8, 6))).toBeNull()
+  })
+
+  it('is the box round every pixel with any alpha, soft edges included', () => {
+    const p = blank(10, 8)
+    put(p, 2, 3, 255)
+    put(p, 6, 5, 1)
+    expect(keptBox(p)).toEqual({ x: 2, y: 3, width: 5, height: 3 })
+  })
+
+  it('is one pixel for one pixel', () => {
+    const p = blank(4, 4)
+    put(p, 3, 0, 9)
+    expect(keptBox(p)).toEqual({ x: 3, y: 0, width: 1, height: 1 })
   })
 })
