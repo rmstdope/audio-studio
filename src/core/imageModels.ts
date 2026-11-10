@@ -55,12 +55,13 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     name: 'Qwen-Image',
     short: 'Qwen-Image',
     repo: 'Qwen/Qwen-Image',
-    gigabytes: 58,
+    gigabytes: 54,
     // mflux's own alias `qwen-image` is the 2512 weights, which are not the ones downloaded.
     mflux: 'Qwen/Qwen-Image',
     base: 'qwen-image',
     command: 'mflux-generate-qwen',
-    quantize: 8,
+    quantize: 4,
+    steps: 20,
   },
 }
 

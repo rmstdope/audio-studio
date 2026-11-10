@@ -261,7 +261,7 @@ describe('the Images row of the Models panel', () => {
     expect([...menuOf(page.container).options].map((o) => o.textContent)).toEqual([
       'FLUX.2 klein 4B — a guess: about 20 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
-      'Qwen-Image — a guess: about 3 min a take',
+      'Qwen-Image — a guess: about 4 min a take',
     ])
     expect(menuOf(page.container).value).toBe('klein')
     // The closed menu is a face that wraps, with the same words as the open list.

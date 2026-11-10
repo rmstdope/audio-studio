@@ -19,7 +19,7 @@ export type TimeKey = (typeof TIME_KEYS)[number]
 export const STARTING_SECONDS: Record<TimeKey, number> = {
   klein: 20,
   'z-image-turbo': 60,
-  'qwen-image': 180,
+  'qwen-image': 240,
   'qwen-edit': 480,
   'klein-edit': 20,
 }

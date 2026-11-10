@@ -926,7 +926,7 @@ describe('the Takes section’s model menu', () => {
     expect([...modelMenu(s).options].map((o) => o.textContent)).toEqual([
       'FLUX.2 klein 4B — a guess: about 20 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
-      'Qwen-Image — a guess: about 3 min a take',
+      'Qwen-Image — a guess: about 4 min a take',
     ])
     // Closed, a face that can wrap shows the short name and the time; the list keeps full entries.
     expect(faceOf(s)).toBe('FLUX.2 klein — a guess: about 20 s a take')
@@ -939,7 +939,7 @@ describe('the Takes section’s model menu', () => {
       s.client.setQueryData(['image-take-times'], {
         klein: { seconds: 23, guess: false },
         'z-image-turbo': { seconds: 60, guess: true },
-        'qwen-image': { seconds: 180, guess: true },
+        'qwen-image': { seconds: 240, guess: true },
         'qwen-edit': { seconds: 480, guess: true },
         'klein-edit': { seconds: 20, guess: true },
       })
@@ -948,7 +948,7 @@ describe('the Takes section’s model menu', () => {
     expect([...modelMenu(s).options].map((o) => o.textContent)).toEqual([
       'FLUX.2 klein 4B — about 25 s a take',
       'Z-Image-Turbo — a guess: about 1 min a take',
-      'Qwen-Image — a guess: about 3 min a take',
+      'Qwen-Image — a guess: about 4 min a take',
     ])
     expect(faceOf(s)).toBe('FLUX.2 klein — about 25 s a take')
   })
@@ -968,7 +968,7 @@ describe('the Takes section’s model menu', () => {
     const s = await show(view({ takes: three }))
     await pick(s, 'qwen-image')
     expect(modelMenu(s).value).toBe('qwen-image')
-    expect(faceOf(s)).toBe('Qwen-Image — a guess: about 3 min a take')
+    expect(faceOf(s)).toBe('Qwen-Image — a guess: about 4 min a take')
     await s.click(s.button('Make 2 more takes'))
     expect(s.calls.at(-1)).toMatchObject({ body: { count: 2, model: 'qwen-image' } })
     const absent = await show(
