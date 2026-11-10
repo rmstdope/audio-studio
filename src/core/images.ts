@@ -612,12 +612,17 @@ export function applyStyleChange(
   return { ...edits, style: { ...edits.style, [field]: words } }
 }
 
-/** A placed area as the game receives it: the box as fractions of the picture's width and height. */
+/**
+ * A placed area as the game receives it: the box as fractions of the picture's width and height,
+ * and its `mark`, the point the game marks it at, as fractions of the picture too (absent: the
+ * middle of the box).
+ */
 export interface AreaFractions {
   x: number
   y: number
   width: number
   height: number
+  mark?: { x: number; y: number }
 }
 
 /** A fraction of a side, to six decimals so the file stays small and its diffs stable. */
@@ -643,6 +648,9 @@ export function areaFractions(
         y: fraction(b.y, size.height),
         width: fraction(b.width, size.width),
         height: fraction(b.height, size.height),
+        ...(b.point && {
+          mark: { x: fraction(b.point.x, size.width), y: fraction(b.point.y, size.height) },
+        }),
       },
     ]),
   )

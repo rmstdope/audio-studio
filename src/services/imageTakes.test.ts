@@ -399,13 +399,15 @@ describe('choosing', () => {
     expect(await takes.currentFile(file, 'inn')).toBeNull()
   })
 
-  it('keeps the placed areas on the manifest entry: choosing writes them, un-choosing takes them with it', async () => {
-    const box = { x: 80, y: 50, width: 160, height: 100 }
+  it('keeps the placed areas on the manifest entry, points as marks: choosing writes them, un-choosing takes them with it', async () => {
+    const box = { x: 80, y: 50, width: 160, height: 100, point: { x: 96, y: 60 } }
     const { takes, file, read } = await made({
       'tts/act1/images.json': [{ ...inn, areas: [{ id: 'fountain', title: 'Fountain' }] }],
       [EDITS]: { style: STYLE, images: { inn: { areas: { fountain: box } } } },
     })
-    const areas = { fountain: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } }
+    const areas = {
+      fountain: { x: 0.25, y: 0.25, width: 0.5, height: 0.5, mark: { x: 0.3, y: 0.3 } },
+    }
     await takes.choose(file, 'inn', 1)
     expect(JSON.parse(read('web/images/manifest.json')).inn).toEqual({
       file: 'inn.png',

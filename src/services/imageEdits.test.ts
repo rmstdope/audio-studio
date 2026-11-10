@@ -378,7 +378,7 @@ describe('the box of a named area', () => {
     expect(read('tts/act1/images.json')).toEqual(before)
   })
 
-  it('keeps a point in the file, leaves the game’s areas as they were, and refuses one outside the box', async () => {
+  it('keeps a point in the file, passes it to the game as the area’s mark in the same save, and refuses one outside the box', async () => {
     const { file, read } = withArea()
     const pointed = { ...box, point: { x: 20, y: 30 } }
     expect(await setImageAreaBox(file, 'inn', 'fountain', pointed)).toEqual({ ok: true })
@@ -388,6 +388,7 @@ describe('the box of a named area', () => {
       y: 0.1,
       width: 0.15625,
       height: 0.2,
+      mark: { x: 0.0625, y: 0.15 },
     })
     const before = read(EDITS)
     const out = await setImageAreaBox(file, 'inn', 'fountain', { ...box, point: { x: 5, y: 30 } })

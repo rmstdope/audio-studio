@@ -33,6 +33,7 @@ import {
   type ImageEdits,
   type ImageStyle,
   type MadeFrom,
+  type AreaBox,
   type ImagesInput,
 } from './images'
 
@@ -1457,10 +1458,7 @@ describe('the boxes of each take', () => {
 })
 
 describe('areas for the game', () => {
-  const row = (
-    id: string,
-    box: { x: number; y: number; width: number; height: number } | null,
-  ) => ({
+  const row = (id: string, box: AreaBox | null) => ({
     id,
     title: id,
     placed: box !== null,
@@ -1479,6 +1477,30 @@ describe('areas for the game', () => {
       ),
     ).toEqual({ fountain: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } })
     expect(areaFractions([row('gate', null)], size)).toBeUndefined()
+  })
+
+  it('gives a placed area’s point as its mark, in fractions of the picture, and no mark without one', () => {
+    const got = areaFractions(
+      [
+        row('voice', { x: 80, y: 50, width: 160, height: 100, point: { x: 96, y: 60 } }),
+        row('gate', { x: 0, y: 0, width: 32, height: 20 }),
+      ],
+      size,
+    )
+    expect(got?.voice).toEqual({
+      x: 0.25,
+      y: 0.25,
+      width: 0.5,
+      height: 0.5,
+      mark: { x: 0.3, y: 0.3 },
+    })
+    expect(got?.gate).toEqual({ x: 0, y: 0, width: 0.1, height: 0.1 })
+  })
+
+  it('gives the take’s own point as the mark of the take in the game', () => {
+    const box = { x: 80, y: 50, width: 160, height: 100, point: { x: 240, y: 150 } }
+    const got = areaFractionsOn([{ ...row('voice', null), boxes: { 2: box } }], 2, size)
+    expect(got?.voice?.mark).toEqual({ x: 0.75, y: 0.75 })
   })
 
   it('rounds to six decimals', () => {
