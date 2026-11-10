@@ -156,9 +156,9 @@ async function drag(
   await settle()
 }
 
-async function press(target: Element, key: string, shiftKey = false) {
+async function press(target: Element, key: string, shiftKey = false, altKey = false) {
   await act(async () => {
-    target.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true }))
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, altKey, bubbles: true }))
   })
   await settle()
 }
@@ -821,5 +821,188 @@ describe('areas to place again', () => {
     await draw([again('x', 2), again('a', 2)], 4)
     await settle()
     expect(selectedIds(host)).toEqual([0])
+  })
+})
+
+describe('the point of a box', () => {
+  const box = { x: 100, y: 50, width: 60, height: 40 }
+  const other = { x: 200, y: 100, width: 80, height: 50 }
+  const dots = (host: HTMLElement) => [...host.querySelectorAll<HTMLElement>('.area-point')]
+  const dotOf = (host: HTMLElement, id: string) =>
+    host.querySelector<HTMLElement>(`[data-point-of="${id}"]`)
+  /** Where a dot sits in its box, as a percentage each way. */
+  const at = (dot: HTMLElement) => [parseFloat(dot.style.left), parseFloat(dot.style.top)]
+  const setup = async (first: AreaBox = box) => {
+    const made = await render([placedAt('a', first), placedAt('b', other)])
+    await act(async () => mainOf(made.host, 0).click())
+    return made
+  }
+
+  it('shows the full point at the centre of the selected box and small dots on the others', async () => {
+    const { host } = await setup()
+    expect(dotOf(host, 'a')!.classList.contains('small')).toBe(false)
+    expect(at(dotOf(host, 'a')!)).toEqual([50, 50])
+    expect(dotOf(host, 'b')!.classList.contains('small')).toBe(true)
+    expect(host.querySelector('.named-area-point-centre')).toBeNull()
+  })
+
+  it('shows small dots on every box while none is selected, and none on a box being drawn', async () => {
+    const { host, stage } = await render([placedAt('a', box), area('b')])
+    expect(dots(host).map((d) => d.classList.contains('small'))).toEqual([true])
+    await act(async () => mainOf(host, 1).click())
+    await pointer(stage!, 'pointerdown', 10, 10)
+    await pointer(stage!, 'pointermove', 60, 60)
+    expect(host.querySelector('.drawing .area-point')).toBeNull()
+  })
+
+  it('draws the selected point small when the box is under 40 screen pixels each way', async () => {
+    const wide = await setup({ x: 100, y: 50, width: 39, height: 40 })
+    expect(dotOf(wide.host, 'a')!.classList.contains('small')).toBe(true)
+    const tall = await setup({ x: 100, y: 50, width: 60, height: 39 })
+    expect(dotOf(tall.host, 'a')!.classList.contains('small')).toBe(true)
+    const ok = await setup({ x: 100, y: 50, width: 40, height: 40 })
+    expect(dotOf(ok.host, 'a')!.classList.contains('small')).toBe(false)
+  })
+
+  it('moves by a drag on the point, saved at the drop, and shows Centre the point', async () => {
+    const { host, stage, puts } = await setup()
+    await drag(stage!, [130, 70], [110, 60], dotOf(host, 'a')!)
+    expect(puts.map((p) => p.body.box)).toEqual([{ ...box, point: { x: 110, y: 60 } }])
+    expect(at(dotOf(host, 'a')!).map(Math.round)).toEqual([17, 25])
+    const centre = rows(host)[0]!.querySelector('.named-area-point-centre')!
+    expect(centre.textContent).toBe('Centre the point')
+    expect(centre.nextElementSibling!.textContent).toBe('Clear')
+    expect(document.activeElement).toBe(mainOf(host, 0))
+  })
+
+  it('stops at the box’s edges and never moves the box', async () => {
+    const { host, stage, puts } = await setup()
+    await drag(stage!, [130, 70], [500, -20], dotOf(host, 'a')!)
+    expect(puts[0]!.body.box).toEqual({ ...box, point: { x: 160, y: 50 } })
+  })
+
+  it('saves nothing for a press on the point that does not move it', async () => {
+    const { host, stage, puts } = await setup()
+    await drag(stage!, [130, 70], [130, 70], dotOf(host, 'a')!)
+    expect(puts).toEqual([])
+  })
+
+  it('selects a box by pressing its small dot, as a click does', async () => {
+    const { host, stage, puts } = await setup()
+    await drag(stage!, [240, 125], [240, 125], dotOf(host, 'b')!)
+    expect(puts).toEqual([])
+    expect(selectedIds(host)).toEqual([1])
+  })
+
+  it('moves with Alt and the arrow keys by the step, focus staying on the row', async () => {
+    const { host, puts } = await setup()
+    mainOf(host, 0).focus()
+    await press(mainOf(host, 0), 'ArrowRight', false, true)
+    await press(mainOf(host, 0), 'ArrowDown', false, true)
+    expect(puts.map((p) => p.body.box)).toEqual([
+      { ...box, point: { x: 134, y: 70 } },
+      { ...box, point: { x: 134, y: 74 } },
+    ])
+    expect(document.activeElement).toBe(mainOf(host, 0))
+  })
+
+  it('stops at the edge with Alt and saves nothing when it cannot move', async () => {
+    const { host, puts } = await setup({ ...box, point: { x: 160, y: 70 } })
+    await press(mainOf(host, 0), 'ArrowRight', false, true)
+    expect(puts).toEqual([])
+  })
+
+  it('stays on the same spot when the box is moved or resized, pushed to the edge if no longer covered', async () => {
+    const pointed = { ...box, point: { x: 110, y: 60 } }
+    const moved = await setup(pointed)
+    await press(mainOf(moved.host, 0), 'ArrowRight')
+    expect(moved.puts[0]!.body.box).toEqual({ ...pointed, x: 104, point: { x: 110, y: 60 } })
+    const resized = await setup(pointed)
+    await drag(resized.stage!, [100, 70], [130, 70], resized.host.querySelector('.handle-w')!)
+    expect(resized.puts[0]!.body.box).toEqual({
+      x: 130,
+      y: 50,
+      width: 30,
+      height: 40,
+      point: { x: 130, y: 60 },
+    })
+  })
+
+  it('leaves a point never moved at the centre when the box is resized', async () => {
+    const { host, stage, puts } = await setup()
+    await drag(stage!, [160, 90], [200, 120], host.querySelector('.handle-se')!)
+    expect(puts[0]!.body.box).toEqual({ x: 100, y: 50, width: 100, height: 70 })
+  })
+
+  it('goes back to the centre from the button, which then disappears', async () => {
+    const { host, puts } = await setup({ ...box, point: { x: 110, y: 60 } })
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('.named-area-point-centre')!.click(),
+    )
+    await settle()
+    expect(puts.map((p) => p.body.box)).toEqual([box])
+    expect(host.querySelector('.named-area-point-centre')).toBeNull()
+    expect(document.activeElement).toBe(mainOf(host, 0))
+  })
+
+  it('has no Centre button on rows that are not selected', async () => {
+    const { host } = await render([placedAt('a', { ...box, point: { x: 110, y: 60 } })])
+    expect(host.querySelector('.named-area-point-centre')).toBeNull()
+  })
+
+  it('takes the point away with the box on Clear', async () => {
+    const { host, puts } = await setup({ ...box, point: { x: 110, y: 60 } })
+    await act(async () => host.querySelector<HTMLButtonElement>('.named-area-clear')!.click())
+    await settle()
+    expect(puts[0]!.body).toEqual({ box: null })
+  })
+
+  it('starts a box drawn after Clear with its point at the centre', async () => {
+    const { host, stage, puts } = await setup({ ...box, point: { x: 110, y: 60 } })
+    await act(async () => host.querySelector<HTMLButtonElement>('.named-area-clear')!.click())
+    await settle()
+    await drag(stage!, [10, 10], [70, 50])
+    expect(puts[1]!.body.box).toEqual({ x: 10, y: 10, width: 60, height: 40 })
+  })
+
+  it('lets presses through the dot of a box too small to grab by it', async () => {
+    const { host } = await setup({ x: 100, y: 50, width: 8, height: 8 })
+    expect(dotOf(host, 'a')!.classList.contains('tiny')).toBe(true)
+  })
+
+  it('names the selected point and hides the small dots from assistive tools', async () => {
+    const { host } = await setup()
+    expect(dotOf(host, 'a')!.getAttribute('aria-label')).toBe('Point of Title of a')
+    expect(dotOf(host, 'b')!.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('draws the point small when the window narrows under a selected box', async () => {
+    const { host, stage } = await setup()
+    expect(dotOf(host, 'a')!.classList.contains('small')).toBe(false)
+    stage!.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 62 }) as DOMRect
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(dotOf(host, 'a')!.classList.contains('small')).toBe(true)
+  })
+
+  it('goes back to where it was and names the area when saving fails', async () => {
+    const { host, stage } = await render([placedAt('a', box)], {
+      saved: { status: 409, body: { ok: false, problems: [{ message: 'no room' }] } },
+    })
+    await act(async () => mainOf(host, 0).click())
+    await drag(stage!, [130, 70], [110, 60], dotOf(host, 'a')!)
+    expect(host.querySelector('[role="alert"]')!.textContent).toBe(
+      '“Title of a” could not be saved: no room.',
+    )
+    expect(at(dotOf(host, 'a')!)).toEqual([50, 50])
+    expect(host.querySelector('.named-area-point-centre')).toBeNull()
+  })
+
+  it('says how to choose where What’s there marks the area', async () => {
+    const { host } = await setup()
+    expect(line(host)).toBe(
+      'Drag the box to move it, or its corners and sides to resize it. Drag the point to choose where What’s there marks it. Arrow keys move the box; with Shift they resize it; with Alt they move the point.',
+    )
   })
 })

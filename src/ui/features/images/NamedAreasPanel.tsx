@@ -11,8 +11,14 @@ import { useImagePatches, useSetImageAreaBox } from '../../api'
 import {
   HANDLES,
   boxFromDrag,
+  centred,
+  isCentred,
+  keepPoint,
   moveBox,
+  movePoint,
   nudgeBox,
+  nudgePoint,
+  pointOf,
   pointOnPicture,
   resizeBox,
   smallestAt,
@@ -54,7 +60,7 @@ const CLICK_SLACK = 3
 
 /** What a drag on the picture is doing. */
 interface Gesture {
-  mode: 'draw' | 'move' | 'resize'
+  mode: 'draw' | 'move' | 'resize' | 'point'
   /** The area it changes. */
   area: string
   start: Point
@@ -71,12 +77,34 @@ interface Gesture {
   clicked: string | null
 }
 
-/** Whether two boxes are the same. */
+/** Whether two boxes are the same, point included. */
 function same(a: AreaBox | null, b: AreaBox | null): boolean {
   return (
     a === b ||
-    (!!a && !!b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height)
+    (!!a &&
+      !!b &&
+      a.x === b.x &&
+      a.y === b.y &&
+      a.width === b.width &&
+      a.height === b.height &&
+      a.point?.x === b.point?.x &&
+      a.point?.y === b.point?.y)
   )
+}
+
+/** The narrowest side, in screen pixels, a selected box can have and still show the full-size point. */
+const POINT_FULL_AT = 40
+
+/** Under this many screen pixels a selected box's point lets presses through, so the box can still be grabbed. */
+const POINT_PASS_THROUGH = 20
+
+/** A point as the percentages of its box it is drawn with. */
+function pointStyle(box: AreaBox) {
+  const at = pointOf(box)
+  return {
+    left: `${((at.x - box.x) / box.width) * 100}%`,
+    top: `${((at.y - box.y) / box.height) * 100}%`,
+  }
 }
 
 /** A box as the percentages of the picture it is drawn with. */
@@ -131,6 +159,15 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     taken.current = row.chosenTake
     select(row.areas.find((area) => !area.placed)?.id ?? null)
   }, [row.chosenTake, row.areas])
+
+  // The picture's size on the screen decides how the points are drawn: redraw when it changes.
+  const [, remeasure] = useState(0)
+  useEffect(() => {
+    const again = () => remeasure((n) => n + 1)
+    again()
+    window.addEventListener('resize', again)
+    return () => window.removeEventListener('resize', again)
+  }, [])
 
   // Esc cancels a drag in progress.
   useEffect(() => {
@@ -209,10 +246,25 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     const at = pointAt(event)
     const handle = (event.target as HTMLElement).dataset?.handle as Handle | undefined
     const boxes = areas.flatMap((a) => (a.box ? [{ id: a.id, box: a.box }] : []))
-    const tagged = (event.target as HTMLElement).closest?.('[data-tag-of]')
-    const clicked = tagged?.getAttribute('data-tag-of') ?? smallestAt(boxes, at)
+    const tagged = (event.target as HTMLElement).closest?.('[data-tag-of], [data-point-of]')
+    const clicked =
+      tagged?.getAttribute('data-tag-of') ??
+      tagged?.getAttribute('data-point-of') ??
+      smallestAt(boxes, at)
+    const onPoint = tagged?.getAttribute('data-point-of') === current?.id
     let next: Gesture | null = null
-    if (current && current.box && handle) {
+    if (current && current.box && onPoint) {
+      next = {
+        mode: 'point',
+        area: current.id,
+        start: at,
+        screen: { x: event.clientX, y: event.clientY },
+        origin: current.box,
+        preview: current.box,
+        moved: false,
+        clicked: null,
+      }
+    } else if (current && current.box && handle) {
       next = {
         mode: 'resize',
         area: current.id,
@@ -259,10 +311,12 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     const moved = g.moved || Math.hypot(screen.x - g.screen.x, screen.y - g.screen.y) >= CLICK_SLACK
     if (!moved) return g
     if (g.mode === 'draw') return { ...g, moved, preview: boxFromDrag(g.start, at) }
+    if (g.mode === 'point') return { ...g, moved, preview: movePoint(g.origin!, at) }
     if (g.mode === 'move') {
-      return { ...g, moved, preview: moveBox(g.origin!, at.x - g.start.x, at.y - g.start.y, size) }
+      const shifted = moveBox(g.origin!, at.x - g.start.x, at.y - g.start.y, size)
+      return { ...g, moved, preview: keepPoint(g.origin!, shifted) }
     }
-    return { ...g, moved, preview: resizeBox(g.origin!, g.handle!, at) }
+    return { ...g, moved, preview: keepPoint(g.origin!, resizeBox(g.origin!, g.handle!, at)) }
   }
 
   const move = (event: PointerEvent<HTMLDivElement>) => {
@@ -294,7 +348,10 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
       commit(area, null)
       return
     }
-    const next = nudgeBox(area.box, event.key, event.shiftKey, size)
+    const nudged = event.altKey ? null : nudgeBox(area.box, event.key, event.shiftKey, size)
+    const next = event.altKey
+      ? nudgePoint(area.box, event.key)
+      : nudged && keepPoint(area.box, nudged)
     if (!next) return
     event.preventDefault()
     if (!same(next, area.box)) commit(area, next)
@@ -305,6 +362,20 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     const box = live ?? area.box
     return box ? [{ area, box }] : []
   })
+  /** Whether a box is under `limit` screen pixels wide or high (false while the picture is not measured). */
+  const under = (box: AreaBox, limit: number) => {
+    const shown = stage.current?.getBoundingClientRect()
+    return (
+      !!shown &&
+      shown.width > 0 &&
+      ((box.width / row.width) * shown.width < limit ||
+        (box.height / row.height) * shown.height < limit)
+    )
+  }
+  /** The box is too small for the full-size point. */
+  const small = (box: AreaBox) => under(box, POINT_FULL_AT)
+  /** The box is so small that its point would cover it: the dot lets presses through to the box. */
+  const tiny = (box: AreaBox) => under(box, POINT_PASS_THROUGH)
   const drawing = gesture?.mode === 'draw' ? gesture.preview : null
   const ordered = [
     ...boxes.filter((b) => b.area.id !== selected),
@@ -361,6 +432,18 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                     <span className="mono muted">{area.id}</span>
                   </span>
                 </button>
+                {isSelected && area.box && !isCentred(area.box) && (
+                  <button
+                    type="button"
+                    className="btn named-area-point-centre"
+                    onClick={() => {
+                      commit(area, centred(area.box!))
+                      focusRow(area.id)
+                    }}
+                  >
+                    Centre the point
+                  </button>
+                )}
                 {isSelected && area.placed && (
                   <button
                     type="button"
@@ -430,6 +513,14 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                       <span title={area.title} data-tag-of={area.id}>
                         {areaTagText(area.title)}
                       </span>
+                      <i
+                        className={`area-point${isSelected && !small(box) ? '' : ' small'}${isSelected && tiny(box) ? ' tiny' : ''}`}
+                        style={pointStyle(box)}
+                        data-point-of={area.id}
+                        {...(isSelected
+                          ? { role: 'img', 'aria-label': `Point of ${area.title}` }
+                          : { 'aria-hidden': true })}
+                      />
                       {isSelected &&
                         HANDLES.map((handle) => (
                           <i

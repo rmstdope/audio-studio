@@ -124,13 +124,18 @@ const PatchEditSchema = z.object({ text: z.string().min(1), gameWas: z.string() 
 /** The smallest side of a box marked for a named area, in the image's pixels. */
 export const MIN_AREA_SIZE = 4
 
-/** Where a named area is on its image: a rectangle in the image's own pixels (the game's size). */
+/**
+ * Where a named area is on its image: a rectangle in the image's own pixels (the game's size),
+ * and optionally its `point`, where the game marks the thing, in the image's pixels too and inside
+ * the rectangle. No point means the centre.
+ */
 const AreaBoxSchema = z
   .object({
     x: z.number().int(),
     y: z.number().int(),
     width: z.number().int(),
     height: z.number().int(),
+    point: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
   })
   .strict()
 
@@ -151,6 +156,20 @@ export function checkAreaBox(box: AreaBox, size: { width: number; height: number
     box.y + box.height > size.height
   ) {
     return 'a box lies inside the picture'
+  }
+  const { point } = box
+  if (point) {
+    if (!Number.isInteger(point.x) || !Number.isInteger(point.y)) {
+      return 'a point is made of whole pixels'
+    }
+    if (
+      point.x < box.x ||
+      point.y < box.y ||
+      point.x > box.x + box.width ||
+      point.y > box.y + box.height
+    ) {
+      return 'a point lies inside its box'
+    }
   }
   return null
 }
@@ -260,8 +279,11 @@ export function formatImageEdits(edits: ImageEdits): string {
             Object.keys(boxesOf)
               .sort()
               .map((area) => {
-                const { x, y, width, height } = boxesOf[area]!
-                return [area, { x, y, width, height }]
+                const { x, y, width, height, point } = boxesOf[area]!
+                return [
+                  area,
+                  { x, y, width, height, ...(point && { point: { x: point.x, y: point.y } }) },
+                ]
               }),
           )
         const perTake =

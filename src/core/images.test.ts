@@ -1252,6 +1252,28 @@ describe('the boxes marked for named areas', () => {
     expect(checkAreaBox({ x: 0, y: 0, width: 3, height: 10 }, size)).not.toBeNull()
     expect(checkAreaBox({ x: 0, y: 0, width: 10.5, height: 10 }, size)).not.toBeNull()
   })
+  it('keeps a point inside its box and refuses one outside or not whole', () => {
+    expect(checkAreaBox({ ...box, point: { x: box.x, y: box.y } }, size)).toBeNull()
+    expect(
+      checkAreaBox({ ...box, point: { x: box.x + box.width, y: box.y + box.height } }, size),
+    ).toBeNull()
+    expect(checkAreaBox({ ...box, point: { x: box.x - 1, y: box.y } }, size)).not.toBeNull()
+    expect(
+      checkAreaBox({ ...box, point: { x: box.x, y: box.y + box.height + 1 } }, size),
+    ).not.toBeNull()
+    expect(checkAreaBox({ ...box, point: { x: box.x + 0.5, y: box.y } }, size)).not.toBeNull()
+  })
+  it('reads the point from the edits and keeps it per take', () => {
+    const withPoint = { ...box, point: { x: box.x + 3, y: box.y + 4 } }
+    const edits = applyAreaBox(none, 'inn', 'fountain', withPoint, 2)
+    expect(edits.images.inn?.takeAreas?.['2']?.fountain?.point).toEqual({
+      x: box.x + 3,
+      y: box.y + 4,
+    })
+    expect(readImageEditsValue(JSON.parse(JSON.stringify(edits)), 'edits.json').problems).toEqual(
+      [],
+    )
+  })
   it('sets, replaces and clears a box, dropping what is left empty', () => {
     const one = applyAreaBox(none, 'inn', 'fountain', box)
     expect(one.images.inn?.areas).toEqual({ fountain: box })

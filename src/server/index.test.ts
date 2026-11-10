@@ -5297,6 +5297,10 @@ describe('the images routes', () => {
       width: 0.15625,
       height: 0.2,
     })
+    const pointed = { ...box, point: { x: 30, y: 25 } }
+    expect(await (await send('PUT', path, { box: pointed })).json()).toEqual({ ok: true })
+    expect(await placed()).toMatchObject({ box: pointed })
+    expect((await send('PUT', path, { box: { ...box, point: { x: 0, y: 0 } } })).status).toBe(409)
     expect(await (await send('PUT', path, { box: null })).json()).toEqual({ ok: true })
     expect(await placed()).toMatchObject({ placed: false, box: null })
     expect(JSON.parse(readFileSync(manifestFile, 'utf8')).inn.areas).toBeUndefined()
