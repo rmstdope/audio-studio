@@ -106,3 +106,50 @@ export function smallestAt(boxes: { id: string; box: AreaBox }[], at: Point): st
   }
   return found?.id ?? null
 }
+
+/** Where a box's point is: the one placed, or the centre while it was never moved. */
+export function pointOf(box: AreaBox): Point {
+  return box.point ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+}
+
+/** Whether the point is at the centre (never moved, or put back there). */
+export function isCentred(box: AreaBox): boolean {
+  if (!box.point) return true
+  const centre = pointOf({ ...box, point: undefined })
+  return Math.abs(box.point.x - centre.x) <= 0.5 && Math.abs(box.point.y - centre.y) <= 0.5
+}
+
+/** The box with its point at `at`, stopping at the box's edges; a point on the centre is no point. */
+export function movePoint(box: AreaBox, at: Point): AreaBox {
+  const { point: _old, ...rest } = box
+  const point = {
+    x: clamp(Math.round(at.x), box.x, box.x + box.width),
+    y: clamp(Math.round(at.y), box.y, box.y + box.height),
+  }
+  const next = { ...rest, point }
+  return isCentred(next) ? rest : next
+}
+
+/** The box with its point moved by `ARROW_STEP` for an arrow key, stopping at the edges; null for any other key. */
+export function nudgePoint(box: AreaBox, key: string): AreaBox | null {
+  const by = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[key]
+  if (!by) return null
+  const now = pointOf(box)
+  return movePoint(box, { x: now.x + by[0]! * ARROW_STEP, y: now.y + by[1]! * ARROW_STEP })
+}
+
+/** The box with its point back at the centre. */
+export function centred(box: AreaBox): AreaBox {
+  const { point: _old, ...rest } = box
+  return rest
+}
+
+/**
+ * `next`, a changed `was`, with the point of `was` on the same spot of the picture, pushed to the
+ * nearest place on the new box when it no longer covers that spot; a point never moved stays at
+ * the centre.
+ */
+export function keepPoint(was: AreaBox, next: AreaBox): AreaBox {
+  const { point: _old, ...rest } = next
+  return was.point ? movePoint(rest, was.point) : rest
+}

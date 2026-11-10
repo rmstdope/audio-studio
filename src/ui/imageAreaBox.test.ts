@@ -2,8 +2,14 @@ import { describe, expect, it } from 'bun:test'
 import {
   ARROW_STEP,
   boxFromDrag,
+  centred,
+  isCentred,
+  keepPoint,
   moveBox,
+  movePoint,
   nudgeBox,
+  nudgePoint,
+  pointOf,
   pointOnPicture,
   resizeBox,
   smallestAt,
@@ -107,5 +113,41 @@ describe('smallestAt', () => {
     expect(smallestAt(boxes, { x: 100, y: 50 })).toBe('big')
     expect(smallestAt(boxes, { x: 260, y: 160 })).toBe('far')
     expect(smallestAt(boxes, { x: 230, y: 140 })).toBeNull()
+  })
+})
+
+describe('the point of a box', () => {
+  it('is the centre until it is moved', () => {
+    expect(pointOf(box)).toEqual({ x: 130, y: 70 })
+    expect(isCentred(box)).toBe(true)
+    expect(isCentred({ ...box, point: { x: 131, y: 70 } })).toBe(false)
+  })
+  it('moves with the pointer but stops at the box’s edges', () => {
+    expect(movePoint(box, { x: 110, y: 55 }).point).toEqual({ x: 110, y: 55 })
+    expect(movePoint(box, { x: 0, y: 999 }).point).toEqual({ x: 100, y: 90 })
+  })
+  it('is not kept when dropped on the centre', () => {
+    expect(movePoint({ ...box, point: { x: 101, y: 51 } }, { x: 130, y: 70 })).toEqual(box)
+  })
+  it('steps by the arrow step with Alt and stops at the edges', () => {
+    expect(nudgePoint(box, 'ArrowRight')?.point).toEqual({ x: 130 + ARROW_STEP, y: 70 })
+    const edge = { ...box, point: { x: 159, y: 90 } }
+    expect(nudgePoint(edge, 'ArrowRight')?.point).toEqual({ x: 160, y: 90 })
+    expect(nudgePoint(edge, 'ArrowDown')?.point).toEqual({ x: 159, y: 90 })
+    expect(nudgePoint(box, 'a')).toBeNull()
+  })
+  it('goes back to the centre', () => {
+    expect(centred({ ...box, point: { x: 101, y: 51 } })).toEqual(box)
+  })
+  it('stays on the same spot of the picture when the box changes, or is pushed to the nearest edge', () => {
+    const was = { ...box, point: { x: 110, y: 60 } }
+    expect(keepPoint(was, { ...box, x: 90, width: 80 }).point).toEqual({ x: 110, y: 60 })
+    expect(keepPoint(was, { x: 120, y: 50, width: 40, height: 40 }).point).toEqual({
+      x: 120,
+      y: 60,
+    })
+  })
+  it('leaves a never-moved point at the centre wherever the box goes', () => {
+    expect(keepPoint(box, { ...box, x: 5 })).toEqual({ ...box, x: 5 })
   })
 })
