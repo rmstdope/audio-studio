@@ -326,7 +326,15 @@ const StageParam = z.enum(['audition', 'draft', 'final'])
 
 /** The box of a named area as the page saves it; null takes it away. */
 const AreaBoxBody = z.object({
-  box: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable(),
+  box: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+      width: z.number(),
+      height: z.number(),
+      point: z.object({ x: z.number(), y: z.number() }).optional(),
+    })
+    .nullable(),
 })
 
 /** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
