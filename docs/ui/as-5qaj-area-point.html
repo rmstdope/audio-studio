@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Choosing an area’s point</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --glass: rgb(255 255 255/3.5%);
+        --glass-strong: rgb(255 255 255/6%);
+        --edge: rgb(255 255 255/8%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft: #ff9a6b;
+        --accent-ink: #1a0d06;
+        --ok-bg: #10291f;
+        --ok-ink: #5be3ae;
+        --att-ink: #ffb38f;
+        --att-bg: rgb(255 122 61/10%);
+        --info: #7cc4ff;
+        --danger-ink: #ff94a8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px 64px;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+      }
+      .tag {
+        color: var(--accent-soft);
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin: 0;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 2px 0 4px;
+      }
+      .lede {
+        color: var(--soft);
+        margin: 0;
+        max-width: 75ch;
+      }
+      .state {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .state > h2 {
+        font-size: 15px;
+        margin: 0;
+        color: var(--accent-soft);
+      }
+      .state > p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        max-width: 80ch;
+      }
+      .panel {
+        padding: 18px 20px;
+        border-radius: 20px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .head h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .body {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+      }
+      @media (max-width: 700px) {
+        .body {
+          grid-template-columns: 1fr;
+        }
+      }
+      .stage {
+        position: relative;
+        aspect-ratio: 16/10;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #1d2230;
+      }
+      .stage svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .box {
+        position: absolute;
+        border: 1.5px solid #fff;
+        background: rgb(255 255 255/8%);
+        box-shadow: 0 0 0 1px rgb(0 0 0/55%);
+      }
+      .box > span.t {
+        position: absolute;
+        left: -1.5px;
+        top: -1.5px;
+        transform: translateY(-100%);
+        background: rgb(12 13 18/86%);
+        color: #fff;
+        font-size: 11px;
+        line-height: 1;
+        padding: 4px 6px;
+        border-radius: 4px 4px 0 0;
+        white-space: nowrap;
+      }
+      .box.sel {
+        border: 2px solid var(--accent);
+        background: color-mix(in srgb, var(--accent) 14%, transparent);
+      }
+      .box.sel > span.t {
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .h {
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        margin: -4.5px 0 0 -4.5px;
+        background: #fff;
+        border: 1.5px solid var(--accent);
+        border-radius: 2px;
+      }
+      .pt {
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        background: var(--accent);
+        box-shadow: 0 0 0 2px rgb(0 0 0/60%);
+        cursor: grab;
+      }
+      .pt::after {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: 50%;
+        background: #fff;
+      }
+      .pt.faint {
+        width: 9px;
+        height: 9px;
+        margin: -4.5px 0 0 -4.5px;
+        border-width: 1.5px;
+        background: #fff;
+        cursor: default;
+        opacity: 0.8;
+      }
+      .pt.faint::after {
+        display: none;
+      }
+      .pt.ghost {
+        width: 9px;
+        height: 9px;
+        margin: -4.5px 0 0 -4.5px;
+        border: 1.5px dashed #fff;
+        background: none;
+        box-shadow: none;
+        opacity: 0.7;
+      }
+      .pt.ghost::after {
+        display: none;
+      }
+      .cross {
+        position: absolute;
+        background: rgb(255 255 255/35%);
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--glass);
+        border: 1px solid transparent;
+        flex-wrap: wrap;
+      }
+      li.sel {
+        border-color: var(--accent);
+        background: var(--att-bg);
+      }
+      li .n {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--glass-strong);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok-ink);
+      }
+      .chip.att {
+        background: var(--att-bg);
+        color: var(--att-ink);
+      }
+      .btn {
+        font: inherit;
+        font-size: 12.5px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        background: var(--glass-strong);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .btn.on {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .line {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .note {
+        border-left: 3px solid var(--accent-soft);
+        padding: 6px 12px;
+        color: var(--soft);
+        font-size: 13px;
+        background: var(--glass);
+      }
+      .err {
+        color: var(--danger-ink);
+        font-size: 13px;
+        margin: 0;
+      }
+      .pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      @media (max-width: 700px) {
+        .pair {
+          grid-template-columns: 1fr;
+        }
+      }
+      .cap {
+        font-size: 12.5px;
+        color: var(--muted);
+        margin: 4px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <p class="tag">as-5qaj · agreed</p>
+        <h1>Where What’s there marks each named area</h1>
+        <p class="lede">
+          In the Named areas panel, each placed box has a point: where RetroQuest’s What’s there
+          marks the thing. It starts at the centre. Drag it anywhere inside the box; it is saved as
+          soon as it is let go.
+        </p>
+      </div>
+      <section class="state">
+        <h2>A placed box, point never moved</h2>
+        <p>
+          The selected box shows the full-size point at its centre; the other placed boxes show a
+          small dot. No “Centre the point” button: there is nothing to undo.
+        </p>
+        <section class="panel">
+          <div class="head">
+            <h3>Named areas</h3>
+            <span class="muted">3 of 3 placed</span>
+          </div>
+          <p class="muted" style="margin: 0">
+            The parts of this picture the game names, so that a player can click them.
+          </p>
+          <div class="body">
+            <div>
+              <div class="stage">
+                <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                  <rect width="160" height="62" fill="#3a3040" />
+                  <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                  <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                  <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                  <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                  <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                  <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                  <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                  <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                  <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                  <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+                </svg>
+                <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                  <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                  <span class="t">Fireplace</span
+                  ><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box sel" style="left: 26%; top: 30%; width: 24%; height: 54%">
+                  <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                  ><i class="h" style="left: 50%; top: 0%"></i
+                  ><i class="h" style="left: 100%; top: 0%"></i
+                  ><i class="h" style="left: 0%; top: 50%"></i
+                  ><i class="h" style="left: 100%; top: 50%"></i
+                  ><i class="h" style="left: 0%; top: 100%"></i
+                  ><i class="h" style="left: 50%; top: 100%"></i
+                  ><i class="h" style="left: 100%; top: 100%"></i
+                  ><i class="pt" style="left: 50%; top: 50%"></i>
+                </div>
+              </div>
+              <p class="line">
+                Drag the box to move it, or its corners and sides to resize it. Drag the point to
+                choose where What’s there marks it. Arrow keys move the box; with Shift they resize
+                it; with Alt they move the point.
+              </p>
+            </div>
+            <ul>
+              <li class="">
+                <span class="n"><b>Window</b><span class="mono muted">window</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="sel">
+                <span class="n"><b>Old well</b><span class="mono muted">well</span></span
+                ><button class="btn">Clear</button><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="n"><b>Fireplace</b><span class="mono muted">fireplace</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </section>
+      <section class="state">
+        <h2>The point dragged onto the well</h2>
+        <p>
+          Dragging anywhere else inside the box still moves the box; only the point moves the point.
+          “Centre the point” appears beside Clear while the point is not at the centre.
+        </p>
+        <section class="panel">
+          <div class="head">
+            <h3>Named areas</h3>
+            <span class="muted">3 of 3 placed</span>
+          </div>
+          <p class="muted" style="margin: 0">
+            The parts of this picture the game names, so that a player can click them.
+          </p>
+          <div class="body">
+            <div>
+              <div class="stage">
+                <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                  <rect width="160" height="62" fill="#3a3040" />
+                  <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                  <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                  <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                  <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                  <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                  <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                  <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                  <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                  <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                  <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+                </svg>
+                <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                  <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                  <span class="t">Fireplace</span
+                  ><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box sel" style="left: 26%; top: 30%; width: 24%; height: 54%">
+                  <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                  ><i class="h" style="left: 50%; top: 0%"></i
+                  ><i class="h" style="left: 100%; top: 0%"></i
+                  ><i class="h" style="left: 0%; top: 50%"></i
+                  ><i class="h" style="left: 100%; top: 50%"></i
+                  ><i class="h" style="left: 0%; top: 100%"></i
+                  ><i class="h" style="left: 50%; top: 100%"></i
+                  ><i class="h" style="left: 100%; top: 100%"></i
+                  ><i class="pt" style="left: 50%; top: 82%"></i>
+                </div>
+              </div>
+              <p class="line">
+                Drag the box to move it, or its corners and sides to resize it. Drag the point to
+                choose where What’s there marks it. Arrow keys move the box; with Shift they resize
+                it; with Alt they move the point.
+              </p>
+            </div>
+            <ul>
+              <li class="">
+                <span class="n"><b>Window</b><span class="mono muted">window</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="sel">
+                <span class="n"><b>Old well</b><span class="mono muted">well</span></span
+                ><button class="btn">Centre the point</button><button class="btn">Clear</button
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="n"><b>Fireplace</b><span class="mono muted">fireplace</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </section>
+      <section class="state">
+        <h2>Dragging past the edge</h2>
+        <p>The point stops at the box’s edge; it can never leave the box.</p>
+        <section class="panel">
+          <div class="head">
+            <h3>Named areas</h3>
+            <span class="muted">3 of 3 placed</span>
+          </div>
+          <p class="muted" style="margin: 0">
+            The parts of this picture the game names, so that a player can click them.
+          </p>
+          <div class="body">
+            <div>
+              <div class="stage">
+                <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                  <rect width="160" height="62" fill="#3a3040" />
+                  <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                  <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                  <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                  <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                  <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                  <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                  <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                  <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                  <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                  <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+                </svg>
+                <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                  <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                  <span class="t">Fireplace</span
+                  ><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box sel" style="left: 26%; top: 30%; width: 24%; height: 54%">
+                  <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                  ><i class="h" style="left: 50%; top: 0%"></i
+                  ><i class="h" style="left: 100%; top: 0%"></i
+                  ><i class="h" style="left: 0%; top: 50%"></i
+                  ><i class="h" style="left: 100%; top: 50%"></i
+                  ><i class="h" style="left: 0%; top: 100%"></i
+                  ><i class="h" style="left: 50%; top: 100%"></i
+                  ><i class="h" style="left: 100%; top: 100%"></i
+                  ><i class="pt" style="left: 100%; top: 82%"></i>
+                </div>
+              </div>
+              <p class="line">
+                Drag the box to move it, or its corners and sides to resize it. Drag the point to
+                choose where What’s there marks it. Arrow keys move the box; with Shift they resize
+                it; with Alt they move the point.
+              </p>
+            </div>
+            <ul>
+              <li class="">
+                <span class="n"><b>Window</b><span class="mono muted">window</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="sel">
+                <span class="n"><b>Old well</b><span class="mono muted">well</span></span
+                ><button class="btn">Centre the point</button><button class="btn">Clear</button
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="n"><b>Fireplace</b><span class="mono muted">fireplace</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </section>
+      <section class="state">
+        <h2>Resizing the box leaves the point on the picture</h2>
+        <p>
+          Before, and after dragging the top handle up: the point keeps its spot on the picture.
+        </p>
+        <div class="pair">
+          <div>
+            <div class="stage">
+              <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                <rect width="160" height="62" fill="#3a3040" />
+                <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+              </svg>
+              <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                <span class="t">Fireplace</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box sel" style="left: 26%; top: 30%; width: 24%; height: 54%">
+                <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                ><i class="h" style="left: 50%; top: 0%"></i
+                ><i class="h" style="left: 100%; top: 0%"></i
+                ><i class="h" style="left: 0%; top: 50%"></i
+                ><i class="h" style="left: 100%; top: 50%"></i
+                ><i class="h" style="left: 0%; top: 100%"></i
+                ><i class="h" style="left: 50%; top: 100%"></i
+                ><i class="h" style="left: 100%; top: 100%"></i
+                ><i class="pt" style="left: 50%; top: 82%"></i>
+              </div>
+            </div>
+            <p class="cap">Before</p>
+          </div>
+          <div>
+            <div class="stage">
+              <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                <rect width="160" height="62" fill="#3a3040" />
+                <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+              </svg>
+              <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                <span class="t">Fireplace</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box sel" style="left: 26%; top: 12%; width: 24%; height: 72%">
+                <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                ><i class="h" style="left: 50%; top: 0%"></i
+                ><i class="h" style="left: 100%; top: 0%"></i
+                ><i class="h" style="left: 0%; top: 50%"></i
+                ><i class="h" style="left: 100%; top: 50%"></i
+                ><i class="h" style="left: 0%; top: 100%"></i
+                ><i class="h" style="left: 50%; top: 100%"></i
+                ><i class="h" style="left: 100%; top: 100%"></i
+                ><i class="pt" style="left: 50%; top: 86.5%"></i>
+              </div>
+            </div>
+            <p class="cap">After: still on the well</p>
+          </div>
+        </div>
+      </section>
+      <section class="state">
+        <h2>Moving the box away from the point</h2>
+        <p>
+          The point is pushed to the nearest edge inside the box only when the box no longer covers
+          it.
+        </p>
+        <div class="pair">
+          <div>
+            <div class="stage">
+              <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                <rect width="160" height="62" fill="#3a3040" />
+                <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+              </svg>
+              <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                <span class="t">Fireplace</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box sel" style="left: 26%; top: 30%; width: 24%; height: 54%">
+                <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                ><i class="h" style="left: 50%; top: 0%"></i
+                ><i class="h" style="left: 100%; top: 0%"></i
+                ><i class="h" style="left: 0%; top: 50%"></i
+                ><i class="h" style="left: 100%; top: 50%"></i
+                ><i class="h" style="left: 0%; top: 100%"></i
+                ><i class="h" style="left: 50%; top: 100%"></i
+                ><i class="h" style="left: 100%; top: 100%"></i
+                ><i class="pt" style="left: 50%; top: 82%"></i>
+              </div>
+            </div>
+            <p class="cap">Before</p>
+          </div>
+          <div>
+            <div class="stage">
+              <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                <rect width="160" height="62" fill="#3a3040" />
+                <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+              </svg>
+              <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                <span class="t">Fireplace</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+              </div>
+              <div class="box sel" style="left: 26%; top: 10%; width: 24%; height: 54%">
+                <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                ><i class="h" style="left: 50%; top: 0%"></i
+                ><i class="h" style="left: 100%; top: 0%"></i
+                ><i class="h" style="left: 0%; top: 50%"></i
+                ><i class="h" style="left: 100%; top: 50%"></i
+                ><i class="h" style="left: 0%; top: 100%"></i
+                ><i class="h" style="left: 50%; top: 100%"></i
+                ><i class="h" style="left: 100%; top: 100%"></i
+                ><i class="pt" style="left: 50%; top: 100%"></i>
+              </div>
+            </div>
+            <p class="cap">After: on the bottom edge</p>
+          </div>
+        </div>
+      </section>
+      <section class="state">
+        <h2>A very small box</h2>
+        <p>
+          Under about 40 screen pixels either way, the selected point is drawn as the small dot,
+          still draggable, so the box stays easy to grab.
+        </p>
+        <section class="panel">
+          <div class="head">
+            <h3>Named areas</h3>
+            <span class="muted">4 of 4 placed</span>
+          </div>
+          <p class="muted" style="margin: 0">
+            The parts of this picture the game names, so that a player can click them.
+          </p>
+          <div class="body">
+            <div>
+              <div class="stage">
+                <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                  <rect width="160" height="62" fill="#3a3040" />
+                  <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                  <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                  <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                  <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                  <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                  <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                  <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                  <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                  <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                  <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+                </svg>
+                <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                  <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                  <span class="t">Fireplace</span
+                  ><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box" style="left: 26%; top: 30%; width: 24%; height: 54%">
+                  <span class="t">Old well</span
+                  ><i class="pt faint" style="left: 50%; top: 82%"></i>
+                </div>
+                <div class="box sel" style="left: 73%; top: 70%; width: 4%; height: 5%">
+                  <span class="t">Key</span><i class="h" style="left: 0%; top: 0%"></i
+                  ><i class="h" style="left: 50%; top: 0%"></i
+                  ><i class="h" style="left: 100%; top: 0%"></i
+                  ><i class="h" style="left: 0%; top: 50%"></i
+                  ><i class="h" style="left: 100%; top: 50%"></i
+                  ><i class="h" style="left: 0%; top: 100%"></i
+                  ><i class="h" style="left: 50%; top: 100%"></i
+                  ><i class="h" style="left: 100%; top: 100%"></i
+                  ><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+              </div>
+              <p class="line">
+                Drag the box to move it, or its corners and sides to resize it. Drag the point to
+                choose where What’s there marks it. Arrow keys move the box; with Shift they resize
+                it; with Alt they move the point.
+              </p>
+            </div>
+            <ul>
+              <li class="">
+                <span class="n"><b>Window</b><span class="mono muted">window</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="n"><b>Old well</b><span class="mono muted">well</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="n"><b>Fireplace</b><span class="mono muted">fireplace</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="sel">
+                <span class="n"><b>Key</b><span class="mono muted">key</span></span
+                ><button class="btn">Clear</button><span class="chip ok">Placed</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </section>
+      <section class="state">
+        <h2>Saving fails</h2>
+        <p>The point goes back to where it was and the panel’s red line says why, as for boxes.</p>
+        <p class="err">“Old well” could not be saved: the image’s edits could not be written.</p>
+        <section class="panel">
+          <div class="head">
+            <h3>Named areas</h3>
+            <span class="muted">3 of 3 placed</span>
+          </div>
+          <p class="muted" style="margin: 0">
+            The parts of this picture the game names, so that a player can click them.
+          </p>
+          <div class="body">
+            <div>
+              <div class="stage">
+                <svg viewBox="0 0 160 100" preserveAspectRatio="none">
+                  <rect width="160" height="62" fill="#3a3040" />
+                  <rect y="62" width="160" height="38" fill="#4a3a2a" />
+                  <rect x="10" y="14" width="26" height="22" fill="#6d8fb5" />
+                  <rect x="22" y="14" width="2" height="22" fill="#3a3040" />
+                  <rect x="104" y="30" width="34" height="34" fill="#5a4636" />
+                  <rect x="104" y="22" width="34" height="8" fill="#6f5640" />
+                  <rect x="112" y="40" width="18" height="16" fill="#e0782c" />
+                  <ellipse cx="60" cy="78" rx="14" ry="4" fill="#6b6b6b" />
+                  <rect x="46" y="66" width="28" height="12" fill="#7d7d7d" />
+                  <rect x="58" y="40" width="2" height="26" fill="#a08050" />
+                  <rect x="48" y="38" width="22" height="3" fill="#8a6a40" />
+                </svg>
+                <div class="box" style="left: 5%; top: 12%; width: 18%; height: 26%">
+                  <span class="t">Window</span><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box" style="left: 64%; top: 20%; width: 24%; height: 46%">
+                  <span class="t">Fireplace</span
+                  ><i class="pt faint" style="left: 50%; top: 50%"></i>
+                </div>
+                <div class="box sel" style="left: 26%; top: 30%; width: 24%; height: 54%">
+                  <span class="t">Old well</span><i class="h" style="left: 0%; top: 0%"></i
+                  ><i class="h" style="left: 50%; top: 0%"></i
+                  ><i class="h" style="left: 100%; top: 0%"></i
+                  ><i class="h" style="left: 0%; top: 50%"></i
+                  ><i class="h" style="left: 100%; top: 50%"></i
+                  ><i class="h" style="left: 0%; top: 100%"></i
+                  ><i class="h" style="left: 50%; top: 100%"></i
+                  ><i class="h" style="left: 100%; top: 100%"></i
+                  ><i class="pt" style="left: 50%; top: 50%"></i>
+                </div>
+              </div>
+              <p class="line">
+                Drag the box to move it, or its corners and sides to resize it. Drag the point to
+                choose where What’s there marks it. Arrow keys move the box; with Shift they resize
+                it; with Alt they move the point.
+              </p>
+            </div>
+            <ul>
+              <li class="">
+                <span class="n"><b>Window</b><span class="mono muted">window</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+              <li class="sel">
+                <span class="n"><b>Old well</b><span class="mono muted">well</span></span
+                ><button class="btn">Clear</button><span class="chip ok">Placed</span>
+              </li>
+              <li class="">
+                <span class="n"><b>Fireplace</b><span class="mono muted">fireplace</span></span
+                ><span class="chip ok">Placed</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
