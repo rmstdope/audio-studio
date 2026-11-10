@@ -513,14 +513,6 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                       <span title={area.title} data-tag-of={area.id}>
                         {areaTagText(area.title)}
                       </span>
-                      <i
-                        className={`area-point${isSelected && !small(box) ? '' : ' small'}${isSelected && tiny(box) ? ' tiny' : ''}`}
-                        style={pointStyle(box)}
-                        data-point-of={area.id}
-                        {...(isSelected
-                          ? { role: 'img', 'aria-label': `Point of ${area.title}` }
-                          : { 'aria-hidden': true })}
-                      />
                       {isSelected &&
                         HANDLES.map((handle) => (
                           <i
@@ -529,6 +521,15 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                             data-handle={handle}
                           />
                         ))}
+                      {/* After the handles, so a point on a corner or a side is pressed, not the handle. */}
+                      <i
+                        className={`area-point${isSelected && !small(box) ? '' : ' small'}${isSelected && tiny(box) ? ' tiny' : ''}`}
+                        style={pointStyle(box)}
+                        data-point-of={area.id}
+                        {...(isSelected
+                          ? { role: 'img', 'aria-label': `Point of ${area.title}` }
+                          : { 'aria-hidden': true })}
+                      />
                     </div>
                   )
                 })}

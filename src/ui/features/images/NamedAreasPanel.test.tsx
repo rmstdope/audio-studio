@@ -906,6 +906,22 @@ describe('the point of a box', () => {
     expect(document.activeElement).toBe(mainOf(host, 0))
   })
 
+  it('is drawn above the handles, so a press on a point sitting on a corner moves the point', async () => {
+    // A browser hands a press to the topmost element under it; with no z-index of their own, the
+    // later of two positioned siblings is the one on top.
+    const { host, stage, puts } = await setup({ ...box, point: { x: 160, y: 90 } })
+    const inBox = [...tagOf(host, 'a').children]
+    const point = dotOf(host, 'a')!
+    const handles = [...tagOf(host, 'a').querySelectorAll('.handle')]
+    for (const handle of handles) {
+      expect(inBox.indexOf(point)).toBeGreaterThan(inBox.indexOf(handle))
+      expect(valuesInEveryWindow(handle, 'z-index')).toEqual([])
+    }
+    expect(valuesInEveryWindow(point, 'z-index')).toEqual([])
+    await drag(stage!, [160, 90], [140, 80], point)
+    expect(puts.map((p) => p.body.box)).toEqual([{ ...box, point: { x: 140, y: 80 } }])
+  })
+
   it('stops at the edge with Alt and saves nothing when it cannot move', async () => {
     const { host, puts } = await setup({ ...box, point: { x: 160, y: 70 } })
     await press(mainOf(host, 0), 'ArrowRight', false, true)
