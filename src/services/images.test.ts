@@ -91,17 +91,18 @@ describe('mfluxArguments of an edit', () => {
 })
 
 describe('mfluxArguments of a Qwen Image Edit take', () => {
-  it('names the repository, its base, 8 bits and 30 steps, with its own command', () => {
+  it('names the 2511 repository, its base, 8 bits, 40 steps and guidance 4, with its own command', () => {
     const edit = mfluxArguments(
       { ...request, model: 'qwen-edit', editing: '/repo/25.png' },
       '/tmp/x.png',
     )
     expect(edit.program).toBe('mflux-generate-qwen-edit')
     expect(edit.args).toEqual([
-      '--model', 'Qwen/Qwen-Image-Edit',
+      '--model', 'Qwen/Qwen-Image-Edit-2511',
       '--base-model', 'qwen-image-edit',
       '--quantize', '8',
-      '--steps', '30',
+      '--steps', '40',
+      '--guidance', '4',
       '--image-paths', '/repo/25.png',
       '--prompt', 'a room',
       '--width', '1024',
@@ -111,10 +112,13 @@ describe('mfluxArguments of a Qwen Image Edit take', () => {
     ]) // prettier-ignore
   })
 
-  it('finds the Qwen weights in the hub by their repository', () => {
+  it('finds the Qwen 2511 weights in the hub by their repository, and not the older ones', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hub-'))
+    const older = join(dir, 'models--Qwen--Qwen-Image-Edit', 'snapshots', 'old')
+    mkdirSync(older, { recursive: true })
+    writeFileSync(join(older, 'model.safetensors'), '{}')
     expect(imageModelDownload(dir, 'qwen-edit')).toBe('absent')
-    const snapshot = join(dir, 'models--Qwen--Qwen-Image-Edit', 'snapshots', 'abc')
+    const snapshot = join(dir, 'models--Qwen--Qwen-Image-Edit-2511', 'snapshots', 'abc')
     mkdirSync(snapshot, { recursive: true })
     writeFileSync(join(snapshot, 'model.safetensors'), '{}')
     expect(imageModelDownload(dir, 'qwen-edit')).toBe('whole')

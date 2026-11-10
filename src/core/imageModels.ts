@@ -75,8 +75,8 @@ export const EDIT_MODEL_IDS = ['klein', 'qwen-edit'] as const
 export type EditModelId = (typeof EDIT_MODEL_IDS)[number]
 
 /**
- * The model patch takes are made with unless another is picked: klein, which removed things
- * cleanly in a trial where Qwen Image Edit did not (as-jgto).
+ * The model patch takes are made with unless another is picked: klein, which removes things about
+ * as cleanly as Qwen Image Edit 2511 in seconds where Qwen takes minutes (as-jgto, as-3l6k).
  */
 export const DEFAULT_EDIT_MODEL: EditModelId = 'klein'
 
@@ -96,9 +96,11 @@ export interface EditModel {
   base?: string
   /** The mflux command that edits a picture with this model. */
   command: string
-  /** Quantization bits and steps, when the model needs them to fit and to do the job. */
+  /** Quantization bits and steps, when the model needs them to fit a 48 GB Mac and to do the job. */
   quantize?: number
   steps?: number
+  /** How closely the edit follows the words, when the model's advice differs from mflux's default. */
+  guidance?: number
 }
 
 /** The edit models, by id. */
@@ -107,15 +109,19 @@ export const EDIT_MODELS: Record<EditModelId, EditModel> = {
     id: 'qwen-edit',
     name: 'Qwen Image Edit',
     short: 'Qwen Image Edit',
-    repo: 'Qwen/Qwen-Image-Edit',
-    gigabytes: 53,
-    // mflux's own alias `qwen-image-edit` is the 2509 weights, which are not the ones downloaded.
-    mflux: 'Qwen/Qwen-Image-Edit',
+    // mflux runs Qwen edits the way the 2509 and 2511 weights were made (a 384 × 384 view of the
+    // picture); the first weights, run that way, paint a new scene instead of editing (as-3l6k).
+    repo: 'Qwen/Qwen-Image-Edit-2511',
+    gigabytes: 58,
+    // mflux's own alias `qwen-image-edit` downloads the 2509 weights, so the repository is named.
+    mflux: 'Qwen/Qwen-Image-Edit-2511',
     base: 'qwen-image-edit',
     command: 'mflux-generate-qwen-edit',
     // Unquantized it does not fit a 48 GB Mac; 8 bits peaks near 38 GB.
     quantize: 8,
-    steps: 30,
+    // The weights' own advice: 40 steps, guidance 4 (mflux's default is 2.5).
+    steps: 40,
+    guidance: 4,
   },
   klein: {
     id: 'klein',

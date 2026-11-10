@@ -352,7 +352,7 @@ describe('checkSetup of the image models', () => {
       'Optional: for patches. Qwen Image Edit is not on this computer.',
     ])
     expect(without.steps!.list.at(-1)!.commands).toEqual([
-      'uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit',
+      'uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit-2511',
     ])
     expect(await check(imagesSection, mac, () => true)).not.toHaveProperty('notes')
   })
