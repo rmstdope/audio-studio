@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>A patch take's close-up shows its whole change</title>
+<style>
+:root{--bg:#06070c;--panel:#10121a;--raised:#191c24;--inset:#0d0f14;--line:rgb(255 255 255/8%);--text:#eceef3;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--ok:#3ddc97;--ok-bg:#10291f;--ok-ink:#5be3ae;--new-bg:#2a1b12;--new-ink:#ff9a6b;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,sans-serif;padding:24px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:20px;margin:0 0 4px}.intro{color:var(--muted);max-width:780px}.intro p{margin:0 0 6px}
+.state{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:18px 0 -6px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.bench{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:700px){.bench{grid-template-columns:1fr}}
+.large{border-radius:8px;overflow:hidden;background:var(--inset)}
+.large svg{display:block;width:100%;height:auto}
+h3{margin:0;font-size:12.5px;color:var(--muted)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;align-items:start}
+.thumb{display:flex;flex-direction:column;gap:4px;padding:5px;background:var(--raised);border:1px solid var(--line);border-radius:9px;font-size:12px}
+.thumb.on{outline:2px solid var(--accent);outline-offset:1px}
+.cu{display:block;width:100%;border-radius:5px;background:var(--inset);overflow:hidden}
+.cu svg{display:block;width:100%;height:100%}
+.cu.empty{min-height:44px}
+.lbl{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}.grow{flex:1}
+.chip{font-size:11px;padding:0 6px;border-radius:99px}.ok{background:var(--ok-bg);color:var(--ok-ink)}.new{background:var(--new-bg);color:var(--new-ink)}
+.faint{color:var(--faint)}.small{font-size:12px}
+.bar{height:4px;background:var(--inset);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+.note{font-size:12.5px;color:var(--muted);border-left:2px solid var(--accent);padding-left:10px}
+.narrow{max-width:360px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="intro"><h1>A patch take's close-up shows its whole change</h1><p>Each close-up frames what its own take keeps, together with the mark, plus a quarter of that size on each side, inside the picture. No close-up is more than one and a half times as tall as it is wide, or more than two and a half times as wide as it is tall: the frame is widened around the change to fit. A take that kept nothing, or is still being made, is framed on the mark as before.</p></div>
+<div class="state">The takes of one patch — the mark is the dashed box on the grass</div>
+<div class="panel"><div class="bench">
+  <div class="large" id="large"></div>
+  <div style="display:flex;flex-direction:column;gap:8px"><h3>Takes</h3><div class="thumbs" id="thumbs"></div>
+  <span class="faint small">Press a take, or use ← →, to lay it over the picture.</span></div>
+</div></div>
+<div class="state">A narrow window</div>
+<div class="panel narrow"><div class="thumbs" id="thumbs2"></div></div>
+<div class="note" id="notes"></div>
+</div>
+<script>
+const MODE="capped"; // own | shared | keptonly
+const W=640,H=400, mark={x:300,y:250,w:40,h:30};
+const scene=`<rect width="640" height="400" fill="#7fb4e0"/><circle cx="540" cy="70" r="28" fill="#ffe08a"/>
+<rect y="180" width="640" height="220" fill="#4f9a3c"/><rect y="180" width="640" height="10" fill="#3f7f2f"/>
+${[...Array(12)].map((_,i)=>`<rect x="${20+i*52}" y="140" width="8" height="60" fill="#8b6a43"/>`).join('')}
+<rect y="150" width="640" height="6" fill="#8b6a43"/><rect y="172" width="640" height="6" fill="#8b6a43"/>
+<rect x="60" y="230" width="90" height="70" fill="#a0522d"/><polygon points="50,230 105,190 160,230" fill="#6b2f1a"/>
+${[...Array(30)].map((_,i)=>`<rect x="${(i*137)%640}" y="${200+(i*53)%190}" width="3" height="6" fill="#3d7a2c"/>`).join('')}`;
+const obj={
+ b1:`<polygon points="306,256 334,256 330,278 310,278" fill="#8b5a2b"/><rect x="305" y="254" width="30" height="4" fill="#5a3a1c"/>`,
+ b2:`<path d="M298 228 Q322 196 346 228" stroke="#444" stroke-width="3" fill="none"/><polygon points="296,228 348,228 340,284 304,284" fill="#8b5a2b"/><rect x="294" y="226" width="56" height="5" fill="#5a3a1c"/><rect x="300" y="250" width="44" height="3" fill="#555"/><rect x="302" y="270" width="40" height="3" fill="#555"/>`,
+ tr:`<rect x="242" y="250" width="166" height="34" rx="4" fill="#7a4e26"/><rect x="246" y="250" width="158" height="8" fill="#5f8fbf"/><rect x="250" y="284" width="8" height="8" fill="#5a3a1c"/><rect x="392" y="284" width="8" height="8" fill="#5a3a1c"/>`,
+ po:`<rect x="316" y="40" width="8" height="240" fill="#6b4a2a"/><rect x="296" y="40" width="48" height="10" fill="#6b4a2a"/><rect x="300" y="52" width="40" height="26" fill="#e8dcc0"/>`,
+ st:`<ellipse cx="319" cy="268" rx="7" ry="5" fill="#9a9a9a"/>`,
+};
+const takes=[
+ {n:1,o:'b1',k:{x:302,y:252,w:36,h:28},chosen:true},
+ {n:2,o:'b2',k:{x:292,y:194,w:60,h:92},on:true},
+ {n:3,o:'tr',k:{x:240,y:248,w:170,h:46}},
+ {n:4,o:'st',k:{x:310,y:261,w:18,h:14},isNew:true},
+ {n:8,o:'po',k:{x:294,y:38,w:52,h:244},note:'tall sign'},
+ {n:5,o:null,k:null,note:'kept nothing'},
+ {n:6,making:true},
+ {n:7,broken:true},
+];
+const uni=(a,b)=>{const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return{x,y,w:Math.max(a.x+a.w,b.x+b.w)-x,h:Math.max(a.y+a.h,b.y+b.h)-y}};
+const frameOf=t=>{if(!t.k)return mark; return MODE==='keptonly'?t.k:uni(t.k,mark)};
+const pad=r=>{const x=Math.max(0,Math.round(r.x-r.w*.25)),y=Math.max(0,Math.round(r.y-r.h*.25));const R=Math.min(W,Math.round(r.x+r.w*1.25)),B=Math.min(H,Math.round(r.y+r.h*1.25));return{x,y,w:R-x,h:B-y}};
+let shared=mark; takes.forEach(t=>{if(t.k)shared=uni(shared,t.k)});
+const cap=c=>{if(MODE!=='capped')return c;let {x,y,w,h}=c;if(h>1.5*w){const nw=Math.min(W,h/1.5);x=Math.max(0,Math.min(W-nw,x-(nw-w)/2));w=nw}if(w>2.5*h){const nh=Math.min(H,w/2.5);y=Math.max(0,Math.min(H-nh,y-(nh-h)/2));h=nh}return{x,y,w,h}};
+const crop=t=>cap(pad(MODE==='shared'?shared:frameOf(t)));
+const svg=(c,o)=>`<svg viewBox="${c.x} ${c.y} ${c.w} ${c.h}" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges">${scene}${o?obj[o]:''}</svg>`;
+document.getElementById('large').innerHTML=`<svg viewBox="0 0 640 400">${scene}${obj.b2}<rect x="${mark.x}" y="${mark.y}" width="${mark.w}" height="${mark.h}" fill="none" stroke="#fff" stroke-dasharray="4 3" stroke-width="1.5"/></svg>`;
+const thumb=t=>{const c=crop(t);const ar=`aspect-ratio:${c.w}/${c.h}`;
+ if(t.making)return `<div class="thumb"><span class="cu empty" style="${ar}"></span><span class="lbl"><span class="grow">Take ${t.n}</span></span><span class="faint small">FLUX.2 klein</span><span class="faint small">about 40 s left</span><div class="bar"><i style="width:35%"></i></div></div>`;
+ if(t.broken)return `<div class="thumb"><span class="cu empty" style="${ar}"></span><span class="lbl"><span class="grow">Take ${t.n}</span></span><span class="faint small">FLUX.2 klein</span></div>`;
+ return `<div class="thumb${t.on?' on':''}"><span class="cu" style="${ar}">${svg(c,t.o)}</span><span class="lbl"><span class="grow">Take ${t.n}</span>${t.chosen?'<span class="chip ok">Chosen</span>':''}${t.isNew?'<span class="chip new">new</span>':''}</span><span class="faint small">FLUX.2 klein</span></div>`};
+const html=takes.map(thumb).join('');
+document.getElementById('thumbs').innerHTML=html;document.getElementById('thumbs2').innerHTML=html;
+document.getElementById('notes').innerHTML=`Take 1: a bucket inside the mark. Take 2: a tall bucket that grew past the mark. Take 3: a long trough, much wider than the mark. Take 4: a small stone, smaller than the mark. Take 8: a tall signpost that grew far above the mark. Take 5: the edit changed nothing, so it shows the mark as today. Take 6 is still being made, so it is framed on the mark. Take 7's picture could not be read (an empty box, as today).`;
+</script>
+</body></html>
