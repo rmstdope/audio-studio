@@ -185,7 +185,7 @@ describe('the Remake patches line', () => {
     await act(async () => button(host, 'Remake patches on this take').click())
     expect(sent[0]).toEqual({
       path: '/api/images/inn/patches/remake',
-      body: { count: 3, marks: {}, model: 'qwen-edit' },
+      body: { count: 3, marks: {}, model: 'klein' },
     })
   })
 
@@ -370,13 +370,13 @@ describe('the model of the remake', () => {
       m.dispatchEvent(new Event('change', { bubbles: true }))
     })
 
-  it('has its own menu on its line, with the two models, starting on the stronger one', async () => {
+  it('has its own menu on its line, with the two models, starting on klein', async () => {
     const { host } = await render()
     expect([...menu(host).options].map((o) => text(o))).toEqual([
-      'Qwen Image Edit — a guess: about 8 min a take',
       'FLUX.2 klein 4B — a guess: about 20 s a take',
+      'Qwen Image Edit — a guess: about 8 min a take',
     ])
-    expect(menu(host).value).toBe('qwen-edit')
+    expect(menu(host).value).toBe('klein')
     expect(menu(host).closest('.remake-line')).not.toBeNull()
   })
 
@@ -387,12 +387,11 @@ describe('the model of the remake', () => {
     expect(sent[0]!.body).toEqual({ count: 2, marks: {}, model: 'klein' })
   })
 
-  it('starts on klein with the faint line when the stronger model is absent', async () => {
+  it('starts on klein with no line about Qwen when Qwen is absent', async () => {
     const { host } = await render({ models: { 'qwen-edit': 'absent', klein: 'whole' } })
     expect(menu(host).value).toBe('klein')
-    expect(text(host)).toContain(
-      'Qwen Image Edit is not on this computer, so these takes use FLUX.2 klein. Setup says how to download it.',
-    )
+    expect(text(host)).not.toContain('so these takes use')
+    expect(text(host)).not.toContain('Setup says how')
     expect(button(host, 'Remake patches on this take').disabled).toBe(false)
   })
 

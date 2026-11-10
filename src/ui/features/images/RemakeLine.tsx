@@ -1,10 +1,5 @@
 import { EditModelMenu } from './EditModelMenu'
-import {
-  EDIT_SETUP_LINE,
-  editAbsentLine,
-  DEFAULT_EDIT_MODEL,
-  type EditModelId,
-} from '../../../core/imageModels'
+import { EDIT_SETUP_LINE, type EditModelId } from '../../../core/imageModels'
 import { useEffect, useRef, useState } from 'react'
 import { planRemake, remakeCovered, tieOf, type ImagePatchesView } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
@@ -202,14 +197,7 @@ export function RemakeLine({
         </button>
       </div>
       {off && <span className="muted small">{off}</span>}
-      {!modelHere ? (
-        <span className="faint small">{EDIT_SETUP_LINE}</span>
-      ) : (
-        view.models[DEFAULT_EDIT_MODEL] !== 'whole' &&
-        model === 'klein' && (
-          <span className="faint small">{editAbsentLine(view.models[DEFAULT_EDIT_MODEL])}</span>
-        )
-      )}
+      {!modelHere && <span className="faint small">{EDIT_SETUP_LINE}</span>}
       <span className="faint small">{REMAKE_USES}</span>
       {plan.leftOut.length > 0 && <span className="faint small">{left}</span>}
       {failed && (

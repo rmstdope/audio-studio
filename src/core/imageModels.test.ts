@@ -2,14 +2,13 @@ import { figuresOf } from './takeTimes'
 import { describe, expect, it } from 'bun:test'
 import {
   DEFAULT_IMAGE_MODEL,
+  DEFAULT_EDIT_MODEL,
   EDIT_MODEL_IDS,
-  editAbsentLine,
   editFailureReason,
   editMenuEntry,
   editModel,
   editPerTake,
   editShortEntry,
-  startEditModel,
   IMAGE_MODEL_IDS,
   checkImageRequest,
   defaultTakeModel,
@@ -170,8 +169,8 @@ describe('imageFailureReason', () => {
 })
 
 describe('edit models', () => {
-  it('knows qwen-edit and klein, qwen first', () => {
-    expect([...EDIT_MODEL_IDS]).toEqual(['qwen-edit', 'klein'])
+  it('knows klein and qwen-edit, klein first', () => {
+    expect([...EDIT_MODEL_IDS]).toEqual(['klein', 'qwen-edit'])
     expect(editModel('qwen-edit').repo).toBe('Qwen/Qwen-Image-Edit')
     expect(editModel('klein').command).toBe('mflux-generate-flux2-edit')
   })
@@ -196,10 +195,8 @@ describe('edit models', () => {
     )
   })
 
-  it('starts on qwen when it is whole, else on klein', () => {
-    expect(startEditModel({ 'qwen-edit': 'whole' })).toBe('qwen-edit')
-    expect(startEditModel({ 'qwen-edit': 'partial' })).toBe('klein')
-    expect(startEditModel({ 'qwen-edit': 'absent' })).toBe('klein')
+  it('starts patches on klein', () => {
+    expect(DEFAULT_EDIT_MODEL).toBe('klein')
   })
 
   it('says why a take failed, naming the model', () => {
@@ -213,15 +210,6 @@ describe('edit models', () => {
     )
     expect(editFailureReason('klein', 1, 'error: unrecognized arguments: x')).toMatch(
       /update it with uv tool install --upgrade mflux/,
-    )
-  })
-
-  it('has the lines for an absent model', () => {
-    expect(editAbsentLine('partial')).toBe(
-      "Qwen Image Edit's download is incomplete, so these takes use FLUX.2 klein. Setup says how to finish it.",
-    )
-    expect(editAbsentLine('absent')).toBe(
-      'Qwen Image Edit is not on this computer, so these takes use FLUX.2 klein. Setup says how to download it.',
     )
   })
 })
