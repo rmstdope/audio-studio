@@ -153,6 +153,7 @@ and a question to the navigator as verify-bead says.
 their own studio there writes into their game when clicked. Open the exact URL your launch printed
 (`Open http://127.0.0.1:<port>/`; the server listens on 127.0.0.1 only, so not `localhost`), act
 only in tabs you opened, and before the first action confirm the page names **Sample Quest**.
+Never change the size or position of the navigator's own Chrome window (see *Wide and narrow*).
 
 ## Fish: credit, the key and the navigator's account
 
@@ -207,9 +208,14 @@ On top of verify-bead's *Look*, check what the acceptance touches:
   that the mockup was served on that port because Chrome refused `file://`.
 - **Wide and narrow.** The studio is a desktop tool. Its layout changes at 1100 and 900 pixels and
   wider (the audition brief becomes a side column at 1100) and below 720, 640 and 600. Look at a
-  window at least 1100 wide first, then resize to about 600×900 and look again. A bead that changes
+  window at least 1100 wide first, then a screen about 600×900 and look again. A bead that changes
   a page's layout, a table, a dialog or long text always gets both. Phone width is only looked at
-  when the acceptance names it.
+  when the acceptance names it. **Never resize, move or maximise the navigator's Chrome window**:
+  they use it while you verify. Set the size with Chrome's device emulation (the developer tools'
+  device toolbar, or whatever emulation tool the browser extension offers) on a tab you opened, and
+  turn it off when done. If emulation is not possible, open a Chrome window of your own (for
+  example `window.open(url, "_blank", "width=600,height=900")` from a tab you opened), resize only
+  that window, and close it when done; say in the report which way the sizes were set.
 - **The theme.** The studio has one theme, dark, with colours from the tokens on `:root` in
   `src/ui/styles.css`. A colour that is not a token is a finding only when this bead introduced it;
   a literal already in the stylesheet is not.
@@ -372,5 +378,5 @@ git -C .cerebro/worktrees/psylocke status --porcelain                   # nothin
 ```
 
 Anything the check found outside the sample is reported, not hand-deleted: the next
-`prepare-worktree` resets it. Close the tabs you opened, and say in the report that the sample was
+`prepare-worktree` resets it. Close the tabs and windows you opened, and say in the report that the sample was
 restored and any key removed.
