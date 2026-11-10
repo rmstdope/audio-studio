@@ -45,6 +45,7 @@ const takeOf = (n: number, over: Partial<PatchWorkView['takes'][number]> = {}) =
   isNew: false,
   look: 'ready' as const,
   model: 'klein' as const,
+  kept: null,
   ...over,
 })
 
@@ -356,6 +357,24 @@ describe('an open patch with takes', () => {
     )
     await open(none.host)
     expect(heading(none.host)).toBe('Looking at Take 2 FLUX.2 klein')
+  })
+
+  it('frames each take’s close-up on what that take keeps, the mark alone for the rest', async () => {
+    const tall = { x: 150, y: 0, width: 40, height: 500 }
+    const { host } = await render([patchRow('a')], () =>
+      view([
+        work('a', {
+          takes: [takeOf(1, { kept: tall }), takeOf(2), takeOf(3, { kept: { ...area } })],
+        }),
+      ]),
+    )
+    await open(host)
+    const ratios = [...host.querySelectorAll<HTMLElement>('.patch-thumb .patch-closeup')].map(
+      (c) => c.style.aspectRatio,
+    )
+    // Take 1: the change runs the picture's height; widened from 300 x 576 to the tallest shape (here in the game's version, half the size).
+    // Takes 2 and 3: the mark and a quarter round it, the same frame.
+    expect(ratios).toEqual(['192 / 288', '150 / 150', '150 / 150'])
   })
 
   it('heads the takes with their count and explains how to look at one', async () => {

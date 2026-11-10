@@ -73,13 +73,14 @@ interface Sources {
   patch: (n: number, look: PatchTakeView['look']) => string | null
 }
 
-/** A close-up of an area: the image's take with a take of the patch laid over it, only the area and a little around it. */
+/** A close-up of a take: the image's take with the patch take laid over it, only the area joined with what the take keeps, and a little around it. */
 function CloseUp({
   sources,
   space,
   look,
   n,
   area,
+  kept,
 }: {
   sources: Sources
   /** The picture it is cut from. */
@@ -89,8 +90,10 @@ function CloseUp({
   /** The patch take laid over the picture; none shows the picture alone (a take still to be made). */
   n: number | null
   area: PatchArea
+  /** The box round what the take keeps, in the model's pixels; none frames the area alone. */
+  kept: PatchArea | null
 }) {
-  const crop = closeUp(space.place(area), space)
+  const crop = closeUp(space.place(area), space, kept && space.place(kept))
   const layer = closeUpLayer(crop, space)
   const over = n === null ? null : sources.patch(n, look)
   if (n !== null && over === null) {
@@ -706,7 +709,14 @@ export function PatchWorkbench({
                       }}
                       onClick={() => pick(t)}
                     >
-                      <CloseUp sources={sources} space={space} look={t.look} n={n} area={t.area} />
+                      <CloseUp
+                        sources={sources}
+                        space={space}
+                        look={t.look}
+                        n={n}
+                        area={t.area}
+                        kept={t.kept}
+                      />
                       <span className="patch-thumb-label">
                         <span className="grow">Take {n}</span>
                         {t.chosen && <span className="chip chip-ok">Chosen</span>}

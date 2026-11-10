@@ -3,7 +3,12 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { EditModelId } from '../core/imageModels'
-import { matchToTake, type ImagePatchesView, type PatchWorkView } from '../core/imagePatches'
+import {
+  keptBox,
+  matchToTake,
+  type ImagePatchesView,
+  type PatchWorkView,
+} from '../core/imagePatches'
 import { createImagePatches } from './imagePatches'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
@@ -246,13 +251,44 @@ describe('takes of a declared patch', () => {
     expect(alpha(60, 60)).toBe(0)
   })
 
+  it('tells the box round what a take keeps, past the mark for an object grown beyond it', async () => {
+    const { root, file, patches, work } = setup({
+      makes: (request) => {
+        const sent = decodePng(new Uint8Array(readFileSync(request.editing!)))
+        for (let y = 106; y < 136; y++) {
+          for (let x = 116; x < 186; x++)
+            sent.data.set([250, 250, 250, 255], (y * sent.width + x) * 4)
+        }
+        return encodePng(sent)
+      },
+    })
+    await patches.make(file, 'inn', 'door', {
+      count: 1,
+      area: { x: 100, y: 100, width: 40, height: 40 },
+    })
+    const kept = (await work()).takes[0]!.kept!
+    const png = decodePng(new Uint8Array(readFileSync(join(root, FOLDER, '1.png'))))
+    expect(kept).toEqual(keptBox(png)!)
+    expect(kept.x + kept.width).toBeGreaterThan(180)
+    expect(kept.x).toBeLessThan(120)
+  })
+
   it('saves the take with its area and the words it was made from', async () => {
     const { root, file, patches, work } = setup()
     await patches.make(file, 'inn', 'door', { count: 1, area })
     expect(await work()).toEqual({
       id: 'door',
       takes: [
-        { n: 1, area, earlier: false, chosen: false, isNew: true, look: 'ready', model: 'klein' },
+        {
+          n: 1,
+          area,
+          earlier: false,
+          chosen: false,
+          isNew: true,
+          look: 'ready',
+          model: 'klein',
+          kept: null,
+        },
       ],
       making: [],
       failed: [],

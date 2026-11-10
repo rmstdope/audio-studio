@@ -67,6 +67,7 @@ const patchView = (patch: ListedPatch): ImagePatchesView['patches'][number] => (
     isNew: false,
     look: 'ready' as const,
     model: 'klein' as const,
+    kept: null,
   })),
   making: [],
   failed: [],

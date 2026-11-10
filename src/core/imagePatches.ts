@@ -94,6 +94,8 @@ export interface PatchTakeView {
   look: 'ready' | 'bringing' | 'old' | 'missing'
   /** The edit model that made it (klein for a take made before there was a choice). */
   model: EditModelId
+  /** The box round what the take keeps, in the model's pixels; none when nothing is kept or its picture cannot be read. */
+  kept: PatchArea | null
 }
 
 /** A take of a patch waiting or being made. */
@@ -916,4 +918,26 @@ export function planRemake(
     else plan.leftOut.push({ id: c.id, title: c.title })
   }
   return plan
+}
+
+/**
+ * The box round everything a patch take keeps: every pixel with any opacity, its soft edge
+ * included, in the take's own pixels. None when nothing is visible.
+ */
+export function keptBox(pixels: Pixels): PatchArea | null {
+  let left = pixels.width
+  let top = pixels.height
+  let right = -1
+  let bottom = -1
+  for (let y = 0; y < pixels.height; y++) {
+    for (let x = 0; x < pixels.width; x++) {
+      if (pixels.data[(y * pixels.width + x) * 4 + 3] === 0) continue
+      if (x < left) left = x
+      if (x > right) right = x
+      if (y < top) top = y
+      if (y > bottom) bottom = y
+    }
+  }
+  if (right < 0) return null
+  return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 }
 }
