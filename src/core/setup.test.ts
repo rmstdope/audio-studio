@@ -465,7 +465,7 @@ describe('the image models check', () => {
     })
   })
 
-  const QWEN = 'uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit'
+  const QWEN = 'uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit-2511'
 
   it('says nothing of the patch model while it is whole', () => {
     expect(row(imageFacts({}))).not.toHaveProperty('notes')
@@ -478,7 +478,7 @@ describe('the image models check', () => {
       'Optional: for patches. Qwen Image Edit is not on this computer.',
     ])
     expect(absent.steps).toEqual({
-      list: [{ parts: ['Download it, once (about 53 GB):'], commands: [QWEN] }],
+      list: [{ parts: ['Download it, once (about 58 GB):'], commands: [QWEN] }],
       note: 'Then press Check again.',
     })
     const partial = row(imageFacts({ patchModel: 'partial' }))

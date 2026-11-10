@@ -330,6 +330,7 @@ export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand
         ...(edit.base ? ['--base-model', edit.base] : []),
         ...(edit.quantize ? ['--quantize', String(edit.quantize)] : []),
         ...(edit.steps ? ['--steps', String(edit.steps)] : []),
+        ...(edit.guidance ? ['--guidance', String(edit.guidance)] : []),
         '--image-paths', request.editing,
         '--prompt', request.prompt,
         '--width', String(request.width),

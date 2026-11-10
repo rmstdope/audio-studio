@@ -172,7 +172,7 @@ describe('imageFailureReason', () => {
 describe('edit models', () => {
   it('knows klein and qwen-edit, klein first', () => {
     expect([...EDIT_MODEL_IDS]).toEqual(['klein', 'qwen-edit'])
-    expect(editModel('qwen-edit').repo).toBe('Qwen/Qwen-Image-Edit')
+    expect(editModel('qwen-edit').repo).toBe('Qwen/Qwen-Image-Edit-2511')
     expect(editModel('klein').command).toBe('mflux-generate-flux2-edit')
   })
 
@@ -212,7 +212,7 @@ describe('edit models', () => {
     expect(
       editFailureReason('qwen-edit', 1, 'FileNotFoundError: x/snapshots/y/model.safetensors'),
     ).toBe(
-      'Qwen Image Edit could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit, then try again.',
+      'Qwen Image Edit could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download Qwen/Qwen-Image-Edit-2511, then try again.',
     )
     expect(editFailureReason('klein', 1, 'error: unrecognized arguments: x')).toMatch(
       /update it with uv tool install --upgrade mflux/,
