@@ -203,25 +203,27 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
             : "Loops and stingers, made by ElevenLabs in the cloud. A track's takes can use another."}
         </span>
         <div className="mmenu">
-          <select
-            ref={menu}
-            aria-label="Music model"
-            value={shown}
-            disabled={pending}
-            onChange={(event) =>
-              dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
-            }
-          >
-            {MUSIC_GROUPS.map((group) => (
-              <optgroup key={group.heading} label={group.heading}>
-                {group.ids.map((id) => (
-                  <option key={id} value={id}>
-                    {menuEntry(id, music.installed[id])}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <MenuFace text={menuEntry(shown, here)}>
+            <select
+              ref={menu}
+              aria-label="Music model"
+              value={shown}
+              disabled={pending}
+              onChange={(event) =>
+                dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
+              }
+            >
+              {MUSIC_GROUPS.map((group) => (
+                <optgroup key={group.heading} label={group.heading}>
+                  {group.ids.map((id) => (
+                    <option key={id} value={id}>
+                      {menuEntry(id, music.installed[id])}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </MenuFace>
           {onThisComputer(shown) ? (
             <span className="free">Free</span>
           ) : (

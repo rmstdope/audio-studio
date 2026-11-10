@@ -107,7 +107,7 @@ describe('the Music row of the Models panel', () => {
       'Stable Audio · short music only',
       'ElevenLabs · in the cloud, paid',
     ])
-    expect(page.menu()!.parentElement!.textContent).toContain('Free')
+    expect(page.menu()!.closest('.mmenu')!.textContent).toContain('Free')
   })
 
   it('says Eleven Music is made in the cloud and paid, and that it needs a key when there is none', () => {
@@ -116,14 +116,31 @@ describe('the Music row of the Models panel', () => {
     expect(text).toContain(
       "Loops and stingers, made by ElevenLabs in the cloud. A track's takes can use another.",
     )
-    expect(page.menu()!.parentElement!.querySelector('.price')!.textContent).toBe('$0.15 a minute')
-    expect(page.menu()!.parentElement!.querySelector('.free')).toBeNull()
+    expect(page.menu()!.closest('.mmenu')!.querySelector('.price')!.textContent).toBe(
+      '$0.15 a minute',
+    )
+    expect(page.menu()!.closest('.mmenu')!.querySelector('.free')).toBeNull()
     expect(page.container.querySelector('.warnline')).toBeNull()
     const keyless = render(
       answer({ model: 'eleven', installed: { ...installed, eleven: false }, loops: [90] }),
     )
     expect(keyless.container.querySelector('.warnline')!.textContent).toBe(
       'needs an ElevenLabs key',
+    )
+  })
+
+  it('wraps its closed words in a face, so its longest entry cannot widen the page', () => {
+    // A native select is as wide as its longest option (Eleven Music's), which pushed Setup
+    // sideways in a narrow window; the face shows the chosen entry and wraps it instead.
+    const page = render(answer({ model: 'balanced', installed, loops: [90, 25] }))
+    const face = page.menu()!.closest('.menu-face')
+    expect(face).not.toBeNull()
+    expect(face!.firstElementChild!.textContent).toBe(
+      'Balanced · XL turbo · 4B — about 3 min a take',
+    )
+    const eleven = render(answer({ model: 'eleven', installed, loops: [90] }))
+    expect(eleven.menu()!.closest('.menu-face')!.firstElementChild!.textContent).toBe(
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take, $0.15 a minute of music',
     )
   })
 
@@ -268,7 +285,7 @@ describe('the Images row of the Models panel', () => {
     expect(menuOf(page.container).closest('.menu-face')!.firstElementChild!.textContent).toBe(
       'FLUX.2 klein 4B — a guess: about 20 s a take',
     )
-    // Only this menu wraps; the other model menus on Setup stay native.
+    // In a project without music, only this menu wraps; the voices' menus stay native.
     expect(page.container.querySelectorAll('.menu-face')).toHaveLength(1)
     expect(page.container.textContent).not.toContain('not on this computer')
   })
