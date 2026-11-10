@@ -207,9 +207,18 @@ On top of verify-bead's *Look*, check what the acceptance touches:
   that the mockup was served on that port because Chrome refused `file://`.
 - **Wide and narrow.** The studio is a desktop tool. Its layout changes at 1100 and 900 pixels and
   wider (the audition brief becomes a side column at 1100) and below 720, 640 and 600. Look at a
-  window at least 1100 wide first, then resize to about 600×900 and look again. A bead that changes
-  a page's layout, a table, a dialog or long text always gets both. Phone width is only looked at
-  when the acceptance names it.
+  window at least 1100 wide first, then a viewport of about 600×900 and look again. A bead that
+  changes a page's layout, a table, a dialog or long text always gets both. Phone width is only
+  looked at when the acceptance names it. The size is set as verify-bead's *The navigator's window*
+  says, never by resizing their window (so never `resize_window`). The extension has no
+  device-emulation tool and cannot drive the developer tools, so here the narrow look is a frame:
+  in the tab you opened on the studio, run with `javascript_tool`
+  `document.body.innerHTML = '<iframe src="/" style="width:600px;height:900px;border:0"></iframe>'`
+  (the studio's own origin, so its requests still pass the Origin check). The frame's media queries
+  answer to its width, so the narrow layout shows while no window changes. Work and screenshot
+  inside the frame, and reload the tab to see the wide layout again. If a check cannot be done in
+  the frame, fall back as verify-bead says: a Chrome window of your own, else a blocker. Say in the
+  report which way the sizes were set.
 - **The theme.** The studio has one theme, dark, with colours from the tokens on `:root` in
   `src/ui/styles.css`. A colour that is not a token is a finding only when this bead introduced it;
   a literal already in the stylesheet is not.
@@ -372,5 +381,5 @@ git -C .cerebro/worktrees/psylocke status --porcelain                   # nothin
 ```
 
 Anything the check found outside the sample is reported, not hand-deleted: the next
-`prepare-worktree` resets it. Close the tabs you opened, and say in the report that the sample was
-restored and any key removed.
+`prepare-worktree` resets it. Close the tabs and windows you opened, and say in the report that the
+sample was restored and any key removed.
