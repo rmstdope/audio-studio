@@ -916,8 +916,11 @@ describe('the point of a box', () => {
     for (const handle of handles) {
       expect(inBox.indexOf(point)).toBeGreaterThan(inBox.indexOf(handle))
       expect(valuesInEveryWindow(handle, 'z-index')).toEqual([])
+      expect(valuesInEveryWindow(handle, 'position')).toContain('.named-area-box .handle: absolute')
     }
     expect(valuesInEveryWindow(point, 'z-index')).toEqual([])
+    expect(valuesInEveryWindow(point, 'position')).toContain('.area-point: absolute')
+    // The order above is the bug; this drag only proves a press on the point still saves the point.
     await drag(stage!, [160, 90], [140, 80], point)
     expect(puts.map((p) => p.body.box)).toEqual([{ ...box, point: { x: 140, y: 80 } }])
   })
