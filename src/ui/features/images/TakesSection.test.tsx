@@ -227,6 +227,27 @@ describe('comparing takes', () => {
     expect(s.left()).toBe('Take 2')
   })
 
+  it('says what a fine-tuned take was fine-tuned from, on the left and on the right', async () => {
+    const from3 = { take: 3, words: 'Add a black cat' }
+    const own = { take: null, words: 'Add a lamp' }
+    const s = await show(
+      view({
+        takes: [
+          take(1, { fineTunedFrom: own }),
+          take(2),
+          take(4, { chosen: true, fineTunedFrom: from3 }),
+        ],
+      }),
+      { chosenTake: 4, status: 'chosen' },
+    )
+    const line = (side: string) =>
+      s.container.querySelector(`[data-side="${side}"] .fine-tuned-from`)?.textContent
+    expect(line('left')).toBe('Fine-tuned from Take 3: “Add a black cat”')
+    expect(s.container.querySelector('[data-side="right"] .fine-tuned-from')).toBeNull()
+    await s.click(s.container.querySelector('[data-strip] button')!)
+    expect(line('right')).toBe("Fine-tuned from the game's own image: “Add a lamp”")
+  })
+
   it('shows "new" on a take not yet shown on the right, and marks the one on the right seen', async () => {
     const s = await show(view({ takes: [take(1, { isNew: true }), take(2, { isNew: true })] }))
     const thumbs = [...s.container.querySelectorAll('[data-strip] button')]
