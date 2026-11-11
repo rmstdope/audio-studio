@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { EDIT_MODEL_IDS } from './imageModels'
-import { PatchAreaSchema } from './imagePatches'
+import { EDIT_MODEL_IDS, type EditModelId, type ImageDownload } from './imageModels'
+import { PatchAreaSchema, type PatchArea } from './imagePatches'
 
 /** How many characters of the words the take's caption keeps. */
 const CAPTION_WORDS = 60
@@ -82,3 +82,61 @@ export function cameAlongLine(
   if (parts.length === 0) return `Take ${take} is in the game now.`
   return `Take ${take} is in the game now. Its ${parts.join(' and ')} came along from Take ${from}.`
 }
+
+/** A fine-tune as the page shows it. */
+export interface FineTuneView {
+  n: number
+  words: string
+  /** The marked area it was made with, in the picture's pixels; null when the whole picture could change. */
+  area: PatchArea | null
+  model: EditModelId
+  /** Not yet laid over the picture. */
+  isNew: boolean
+}
+
+/** A fine-tune waiting or being made. */
+export interface FineTuneMakingView {
+  n: number
+  state: 'waiting' | 'making'
+  /** Seconds since it started; 0 while it waits. */
+  elapsed: number
+  /** Seconds an edit is expected to take (a guess until timed). */
+  expected: number
+  model: EditModelId
+}
+
+/** A fine-tune that failed, kept until it is made again or dropped. */
+export interface FineTuneFailedView {
+  n: number
+  message: string
+  words: string
+  area: PatchArea | null
+  model: EditModelId
+}
+
+/** The picture in the game that fine-tunes are made from, in the pixels fine-tunes and marks use. */
+export type FineTunePicture =
+  | { kind: 'take'; n: number; width: number; height: number }
+  | { kind: 'game'; width: number; height: number }
+  | { kind: 'none' }
+
+/** What the fine-tune panel of an image shows. */
+export interface FineTunesView {
+  ok: true
+  picture: FineTunePicture
+  /** Whether fine-tunes can be made on this computer, and why not if they cannot. */
+  maker: { ok: true } | { ok: false; message: string }
+  /** How much of each edit model's download is on this computer. */
+  models: Record<EditModelId, ImageDownload>
+  /** The fine-tunes of the picture, in order. */
+  tunes: FineTuneView[]
+  making: FineTuneMakingView[]
+  failed: FineTuneFailedView[]
+  /** The edit models whose last fine-tune or patch take failed. */
+  failedModels: EditModelId[]
+}
+
+/** What using a fine-tune answered: the new take and what came along, or why not. */
+export type UseFineTuneAnswer =
+  | { ok: true; take: number; from: number | null; carried: { areas: number; patches: number } }
+  | { ok: false; message: string }
