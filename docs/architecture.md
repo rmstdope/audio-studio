@@ -71,10 +71,6 @@ retroquest/                      ← user runs `content-studio` here
 
 1. `content-studio` walks up from the current directory to find `content-studio.json`. That directory
    becomes the **project root**; every path in the project file is relative to it.
-   A game still on the studio's old names (Audio Studio, renamed Content Studio in as-yag.6) is not
-   opened: the walk also looks for `audio-studio.json`, and the project folder for `.audio-studio/`,
-   and `content-studio` prints the renames left (`core/renames.ts`, `locateProject` in
-   `services/workspace.ts`) and exits before any server starts. The old names are never read.
 2. It validates the project file (a file without `"version": 2` is refused with one problem at
    `version`, saying to convert it as docs/project-files.md describes) and every resource it points
    to, writes the studio folder's `.gitignore` (`cache/`) when it is missing

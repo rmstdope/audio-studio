@@ -6,7 +6,6 @@ import { basename, dirname, join } from 'node:path'
 import { soundAlikes, type SoundAlike } from '../core/align'
 import { capitalisesNouns, languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
-import { noProjectMessage, oldCacheNotice, renameNotice, type FoundNames } from '../core/renames'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import {
   adoptUntracked,
@@ -19,10 +18,8 @@ import {
   CACHE_DIR,
   CAST_FILE,
   narrationFile,
-  OLD_CACHE_DIR,
-  OLD_PROJECT_FILE,
-  OLD_STATE_DIR,
   PROJECT_FILE,
+  noProjectMessage,
   parseProject,
   declaredLanguage,
   partCacheName,
@@ -69,34 +66,18 @@ export type Located = { ok: true; file: string } | { ok: false; message: string 
 
 /**
  * Finds the project file to open: `explicit` when given, else `content-studio.json` in `start` or
- * the nearest folder above it that has it or the old `audio-studio.json`. A game still on the
- * old names is not opened: the message lists the renames left, and nothing is read from them.
+ * the nearest folder above it that has it.
  */
 export function locateProject(start: string, explicit?: string): Located {
-  if (explicit) return opening(dirname(explicit), explicit, { oldFile: false, newFile: true })
+  if (explicit) return { ok: true, file: explicit }
   let dir = start
   for (;;) {
-    const oldFile = isFile(join(dir, OLD_PROJECT_FILE))
-    const newFile = isFile(join(dir, PROJECT_FILE))
-    if (oldFile || newFile) return opening(dir, join(dir, PROJECT_FILE), { oldFile, newFile })
+    const file = join(dir, PROJECT_FILE)
+    if (isFile(file)) return { ok: true, file }
     const parent = dirname(dir)
     if (parent === dir) return { ok: false, message: noProjectMessage(start) }
     dir = parent
   }
-}
-
-/**
- * `file` to open, unless the old names found in `dir` (a leftover old folder too) or a cache still
- * in `.content-studio/` say to stop.
- */
-function opening(dir: string, file: string, found: Omit<FoundNames, 'oldFolder'>): Located {
-  const oldFolder = isDirectory(join(dir, OLD_STATE_DIR))
-  const message =
-    renameNotice({ ...found, oldFolder }) ??
-    (isDirectory(join(dir, OLD_CACHE_DIR))
-      ? oldCacheNotice(isDirectory(join(dir, CACHE_DIR)))
-      : null)
-  return message ? { ok: false, message } : { ok: true, file }
 }
 
 /** Why `path` cannot be used as a project file, or null if it can. */
@@ -675,14 +656,6 @@ function projectPaths(project: Project): [string, string][] {
     }
   }
   return paths
-}
-
-function isDirectory(path: string): boolean {
-  try {
-    return statSync(path).isDirectory()
-  } catch {
-    return false
-  }
 }
 
 function isFile(path: string): boolean {

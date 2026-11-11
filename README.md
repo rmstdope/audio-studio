@@ -56,20 +56,6 @@ export PATH="$HOME/.bun/bin:$PATH"
 There is no need to run `bun link content-studio` in the game repository: the studio is not a
 dependency of the game.
 
-## Renamed
-
-The tool was called Audio Studio and is now Content Studio. The command `audio-studio` is gone:
-use `content-studio`. A game set up for the old name needs three renames, which `content-studio`
-lists when it finds the old names and then stops (it never reads or renames them itself):
-
-```sh
-git mv audio-studio.json content-studio.json
-mkdir -p content-studio && mv .audio-studio content-studio/cache
-# and in .gitignore, remove .audio-studio/
-```
-
-If you linked the old command, remove it: `rm ~/.bun/bin/audio-studio`.
-
 ## Use
 
 ```sh
