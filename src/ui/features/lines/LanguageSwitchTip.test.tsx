@@ -39,7 +39,10 @@ function render() {
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
-  cleanups.push(() => act(() => root.unmount()))
+  cleanups.push(() => {
+    act(() => root.unmount())
+    container.remove()
+  })
   act(() =>
     root.render([createElement(WhyTip, { key: 'tip' }), createElement(Switch, { key: 's' })]),
   )

@@ -55,18 +55,14 @@ export function WhyTip() {
   const shownRef = useRef(shown)
   shownRef.current = shown
   const lingering = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // What showed the tip: the pointer's leaving hides only a tip the pointer (or a tap) showed, since
-  // the browser also reports the pointer over whatever the page moves under it while it rests.
-  const shownBy = useRef<'pointer' | 'focus'>('pointer')
 
   useEffect(() => {
     const cancel = () => {
       if (lingering.current) clearTimeout(lingering.current)
       lingering.current = null
     }
-    const show = (target: HTMLElement, by: 'pointer' | 'focus') => {
+    const show = (target: HTMLElement) => {
       cancel()
-      shownBy.current = by
       const text = target.dataset.why ?? ''
       setShown((now) => (now?.target === target && now.text === text ? now : { target, text }))
     }
@@ -89,9 +85,12 @@ export function WhyTip() {
         'pointerover',
         (e) => {
           const target = tippedIn(e.target)
-          if (target) show(target, 'pointer')
+          if (target) show(target)
           else if (inTip(e.target)) cancel()
-          else if (shownRef.current && shownBy.current === 'pointer') hideSoon()
+          // A control with keyboard focus keeps its tip until focus moves on: the browser also
+          // reports the pointer over whatever a page change moves under it while it rests.
+          else if (shownRef.current && !shownRef.current.target.matches(':focus-visible'))
+            hideSoon()
         },
       ],
       [
@@ -109,14 +108,14 @@ export function WhyTip() {
           const target = tippedIn(e.target)
           if (!target) return
           if (target.matches(GREYED)) stop(e)
-          show(target, 'pointer')
+          show(target)
         },
       ],
       [
         'focusin',
         (e) => {
           const target = tippedIn(e.target)
-          if (target) show(target, 'focus')
+          if (target) show(target)
           else hide()
         },
       ],

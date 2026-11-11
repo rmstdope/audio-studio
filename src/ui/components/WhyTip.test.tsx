@@ -107,6 +107,16 @@ describe('the tip on a greyed control', () => {
     expect(tip()?.textContent).toBe('Wait for the takes.')
   })
 
+  it('keeps a tip shown for focus when the pointer passes over the control and off it', async () => {
+    mount('Wait for the takes.')
+    el('make').focus()
+    fire(el('make'), 'focusin')
+    fire(el('make'), 'pointerover')
+    fire(document.body, 'pointerover')
+    await wait(250)
+    expect(tip()?.textContent).toBe('Wait for the takes.')
+  })
+
   it('still lets a tip shown on a click go when the pointer leaves', async () => {
     mount('Wait for the takes.')
     fire(el('make'), 'focusin')
