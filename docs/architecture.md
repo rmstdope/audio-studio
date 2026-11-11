@@ -648,7 +648,7 @@ An audition is for a character, not for a part: the result applies to every part
    today's rules (a job of kind `check`: Check N weak lines again on the Generate panel).
 3. **Generate** queues one job per line. For each line:
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
-   2. TTS each chunk (WAV), join them with a short gap;
+   2. TTS each chunk (WAV), join them with a 0.25 s pause (`GAP_SECONDS`);
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the share
       of shown words heard; punctuation on its own ("—", "…"), which nobody says, is no word and is
       only timed). Alignment is narrate.py's, with these departures. Words are compared without
@@ -696,7 +696,9 @@ An audition is for a character, not for a part: the result applies to every part
       (`core/numbers.ts`). A title-case word mid-sentence ("The Call") is taken for a name, outside
       German;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
-   5. encode MP3 into the clips folder, update the manifest and lock entries, write both; then
+   5. encode MP3 into the clips folder, update the manifest and lock entries, write both (the
+      manifest exactly as Python's `json.dumps(indent=1)` writes it, `core/pyjson.ts`, so untouched
+      entries keep their bytes); then
       keep what Whisper heard of the take in the cache if it was heard below full (forgotten
       when heard in full). Measuring a clip keeps it the same way. On the lines page, a score
       below 100% opens the line's text with the missed words marked beside what Whisper heard.
@@ -1219,7 +1221,7 @@ only, the fingerprint needs no provider of its own.
   used, plus the allowed overage: none, a number, or without limit) less what running ElevenLabs
   recordings were given, all of which is held back until they end. Each line is charged to its
   provider's budget before it is sent. Whether running music takes draw on the same allowance is
-  checked by hand; they are not counted yet. If ElevenLabs refuses a
+  not yet checked with a real key (as-9u9a); they are not counted yet. If ElevenLabs refuses a
   request (its quota among the reasons), that line fails with ElevenLabs' words.
 - **Page takes and tries.** Fish's are made
   with its free model. ElevenLabs has none, so the cast voice's take on its character's page and
@@ -1326,7 +1328,7 @@ record; while the account is being read none does, and a take that may have adde
 as a slot used until the account is read again, which the server then asks ElevenLabs for afresh,
 as it does after a cast adds one or a free; if that read fails the board says so, with Try again),
 recording by themselves once slots are freed. Whether a library voice can speak before it is added
-is to be checked by hand (no key in CI); if it can, nothing need be added before
+is not yet checked with a real key (as-9u9a, no key in CI); if it can, nothing need be added before
 casting. **Add by id** takes an id from the
 user's own ElevenLabs voices (one made or added on ElevenLabs' site), with the provider chosen
 beside the field; a library voice is found by search. **Design** offers ElevenLabs beside Fish (a switch at the top of the design box): `POST
@@ -2413,7 +2415,7 @@ Planned: the server watches the resource files, so an edit made in the editor (o
 7. **ElevenLabs beside Fish and the local music models, per voice and per model.** Asked for by the
    user (October 2026) for its quality, in narration and in music. A character's voice belongs to
    one provider, so a game can mix them and nothing recorded with Fish changes; each provider has
-   its own stage models. ElevenLabs' plans include characters and bill dollars beyond them, so its recordings are confirmed in characters against what the plan has left, with the
+   its own stage models. ElevenLabs' plans include characters and bill dollars beyond them (checked by hand), so its recordings are confirmed in characters against what the plan has left, with the
    dollars of any overage; music takes show their price but are not confirmed, as each costs cents.
    This reverses decision 4's reason for staying local, not its outcome: the local models stay the
    free default. Music through the API needs a paid plan, and commercial use Starter or above,
@@ -2452,7 +2454,7 @@ Planned: the server watches the resource files, so an edit made in the editor (o
    lettering on signs. Reworded to "soft warm light", "one single full-bleed image with no fold,
    frame or border" and "no text or lettering anywhere", the folds, lettering and stray lanterns
    went and the set still held. The soft, worn-page edges remain; cropping to the game's size can
-   take them off. RetroQuest's rq-mh5r rewords its style text so.
+   take them off. RetroQuest's style text was reworded this way (rq-mh5r).
 
    **Qwen-Image, a third model for takes** (as-epo). `Qwen/Qwen-Image` (the weights `mflux-generate-qwen`
    loads with `--base-model qwen-image`; 54 GB on disk, Apache-2.0), made from words, picked per image

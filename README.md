@@ -9,21 +9,20 @@ game are described in [docs/project-files.md](docs/project-files.md).
 
 ## Status
 
-The studio validates the project,
-shows each part's characters and the state of every line's clip, adopts clips recorded before it,
+The studio validates the project, shows each part's characters and the state of every line's clip, adopts clips recorded before it,
 and casts voices by audition: it searches Fish Audio's library by keywords, records each candidate
 saying the audition phrase in the character's style, and runs keep/drop rounds until one voice is
 left, which it writes to the cast. It records narration: line by line, or a whole part (or one
-character) as a job with a plan, progress and Cancel, removing orphaned clips when asked (step 4).
+character) as a job with a plan, progress and Cancel, removing orphaned clips when asked.
 Each take is checked with Whisper, and recorded again (up to three times) until enough of its
 words are heard; the manifest gets real word timings. A line never heard well enough shows as
 weak: retake it from its row, or from Generate when asked. Clips recorded before the studio (or
 unchecked) can be measured with Whisper without new audio. A character's style is edited on its
 audition page, a line's own cue by clicking it in the lines table, and the pronunciation table on
-All characters (steps 6.1 and 6.2). **Changes** lists what git sees of the studio's files, so
-you know what to commit (step 6.3); the studio itself never commits. **Refresh dialog** runs the
+All characters. **Changes** lists what git sees of the studio's files, so
+you know what to commit; the studio itself never commits. **Refresh dialog** runs the
 project's `refresh.part` command for a part and shows what changed; cues left without a line are
-listed on the part's overview, to give to the reworded line or remove (step 6.4).
+listed on the part's overview, to give to the reworded line or remove.
 
 Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`; with
 `"output": { "lufs": -16 }` each clip is also levelled to that loudness, as RetroQuest's `level.py`
