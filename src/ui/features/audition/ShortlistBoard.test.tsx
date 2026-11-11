@@ -214,7 +214,7 @@ describe('ShortlistBoard', () => {
     await act(() => page.unmount())
   })
 
-  it('says Your voices needs a Fish key, with a link to Setup and no Try again, when there is none', async () => {
+  it('says Your voices needs a Fish Audio key, with a link to Setup and no Try again, when there is none', async () => {
     globalThis.fetch = (async (path: string) =>
       path.endsWith('/own')
         ? Response.json({
@@ -236,7 +236,7 @@ describe('ShortlistBoard', () => {
       ),
     )
     const section = () => container.querySelector('[aria-label="Your voices"]')!
-    await until(() => section().textContent!.includes('no Fish key yet'))
+    await until(() => section().textContent!.includes('no Fish Audio key yet'))
     expect(section().textContent).toContain('FISH_AUDIO_API_KEY')
     expect(section().querySelector('a')!.getAttribute('href')).toBe(routeHref({ view: 'setup' }))
     expect(section().querySelector('[role="alert"]')).toBeNull()
