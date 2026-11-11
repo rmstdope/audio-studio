@@ -367,6 +367,9 @@ export function overlapActLine(pairs: readonly [string, string][]): string {
 /** The reason when a change is on its way to the studio and the control waits for the answer. */
 export const WAIT_FOR_CHANGE = 'Wait for the current change to finish.'
 
+/** The tip on a fine-tune's Use this and Drop in the second after it turns ready. */
+export const JUST_FINISHED = 'Just finished — a moment…'
+
 /** Why a model cannot be used: it is not on this computer. */
 export function modelMissingWhy(name: string): string {
   return `${name} is not on this computer. Setup says how to download it.`

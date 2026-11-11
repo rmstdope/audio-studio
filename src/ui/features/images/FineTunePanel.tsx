@@ -33,13 +33,16 @@ import {
   useUseFineTune,
 } from '../../api'
 import { areaFromDrag } from '../../imagePatchArea'
-import { modelMissingWhy, refusal, WAIT_FOR_CHANGE } from '../../imagesText'
+import { JUST_FINISHED, modelMissingWhy, refusal, WAIT_FOR_CHANGE } from '../../imagesText'
 import { progressOf } from '../../musicTakesText'
 import { off } from '../../off'
 import { EditModelMenu } from './EditModelMenu'
 
 /** How many fine-tunes one press can make. */
 const MAX_AT_ONCE = 6
+
+/** How long a card that has just turned ready keeps Use this and Drop off, in milliseconds. */
+const SETTLE_MS = 1000
 
 /** The keys a fine-tune panel hears when focus is inside it. */
 const KEYS = new Set(['ArrowLeft', 'ArrowRight', 'd', 's'])
@@ -128,6 +131,31 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
 
   const view = query.data && 'picture' in query.data ? query.data : null
   const tunes = view?.tunes ?? []
+  // A card that turns ready while the page is open keeps its buttons off for a second, so a click
+  // meant for its Stop does not land on Use this. Cards there when the picture is first seen do not.
+  const seenReady = useRef<{ picture: string; ns: Set<number> } | null>(null)
+  const readyAt = useRef(new Map<number, number>())
+  const [, tick] = useState(0)
+  if (view) {
+    const pic = view.picture.kind === 'take' ? `take-${view.picture.n}` : view.picture.kind
+    if (seenReady.current?.picture !== pic) {
+      seenReady.current = { picture: pic, ns: new Set(tunes.map((t) => t.n)) }
+      readyAt.current.clear()
+    }
+    for (const t of tunes)
+      if (!seenReady.current.ns.has(t.n)) {
+        seenReady.current.ns.add(t.n)
+        readyAt.current.set(t.n, Date.now())
+      }
+  }
+  const justFinished = (n: number) => Date.now() < (readyAt.current.get(n) ?? 0) + SETTLE_MS
+  useEffect(() => {
+    const ends = [...readyAt.current.values()].map((at) => at + SETTLE_MS - Date.now())
+    const next = Math.max(...ends)
+    if (next <= 0) return
+    const timer = setTimeout(() => tick((n) => n + 1), next)
+    return () => clearTimeout(timer)
+  })
   const strip = tunes.map((t) => t.n)
   const fallback = tunes.at(-1)?.n ?? null
   const lookingAt = looking !== null && strip.includes(looking) ? looking : fallback
@@ -247,7 +275,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   ].sort((a, b) => a.n - b.n)
 
   const onDrop = (n: number) => {
-    if (changing.current) return
+    if (changing.current || justFinished(n)) return
     const next = strip.includes(n) ? rightAfterDrop(strip, n) : lookingAt
     // After a card being made is stopped, the next one to be made is where focus goes.
     const nextMaking = view.making.find((m) => m.n > n && m.state === 'waiting')
@@ -266,7 +294,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     })
   }
   const onUse = (n: number) => {
-    if (changing.current) return
+    if (changing.current || justFinished(n)) return
     use.reset()
     changing.current = true
     use.mutate(n, {
@@ -512,7 +540,10 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
+                    {...off(
+                      (use.isPending || drop.isPending) && WAIT_FOR_CHANGE,
+                      justFinished(n) && JUST_FINISHED,
+                    )}
                     onClick={() => onUse(n)}
                   >
                     Use this
@@ -520,7 +551,10 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
+                    {...off(
+                      (use.isPending || drop.isPending) && WAIT_FOR_CHANGE,
+                      justFinished(n) && JUST_FINISHED,
+                    )}
                     onClick={() => onDrop(n)}
                   >
                     Drop

@@ -430,3 +430,49 @@ describe('looking at, dropping and using fine-tunes', () => {
     expect(cards(host)).toHaveLength(3)
   })
 })
+
+describe('a late click meant for Stop', () => {
+  const making = [
+    { n: 1, state: 'making' as const, elapsed: 5, expected: 25, model: 'klein' as const },
+  ]
+  const finish = async (client: {
+    invalidateQueries: (o: { queryKey: string[] }) => Promise<void>
+  }) => {
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ['image-fine-tunes', 'inn'] })
+    })
+    await settle()
+  }
+  const JUST = 'Just finished — a moment…'
+
+  it('keeps Use this and Drop off for one second on a card that turns ready, then turns them on', async () => {
+    let served = view({ making })
+    const { host, sent, client } = await render(() => served, {
+      status: 200,
+      body: { ok: true, take: 4, from: 3, carried: { areas: 0, patches: 0 } },
+    })
+    served = view({ tunes: [tune(1)], making: [] })
+    await finish(client)
+    const buttons = [button(host, 'Use this')!, button(host, 'Drop')!]
+    expect(buttons.map(isOff)).toEqual([true, true])
+    expect(buttons.map((b) => b.getAttribute('data-why'))).toEqual([JUST, JUST])
+    await act(async () => buttons[0]!.click())
+    await key(buttons[0]!, 'd')
+    expect(sent).toEqual([])
+    await act(async () => await new Promise((r) => setTimeout(r, 1050)))
+    expect(buttons.map(isOff)).toEqual([false, false])
+    await act(async () => buttons[0]!.click())
+    await settle()
+    expect(sent).toMatchObject([{ path: '/api/images/inn/fine-tunes/use', body: { n: 1 } }])
+  })
+
+  it('gives each card its own second, and leaves cards ready at load on', async () => {
+    let served = view({ tunes: [tune(1)], making: [{ ...making[0]!, n: 2 }] })
+    const { host, client } = await render(() => served)
+    expect(isOff(button(host, 'Use this')!)).toBe(false)
+    served = view({ tunes: [tune(1), tune(2)], making: [] })
+    await finish(client)
+    const uses = [...host.querySelectorAll<HTMLButtonElement>('.fine-card .btn-primary')]
+    expect(uses.map(isOff)).toEqual([false, true])
+  })
+})
