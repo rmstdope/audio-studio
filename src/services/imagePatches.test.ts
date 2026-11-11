@@ -572,6 +572,19 @@ describe('takes of a declared patch', () => {
     expect(await bad.patches.view(bad.file, 'inn')).toMatchObject({ take: null, pictureGone: true })
   })
 
+  it('refuses, and queues nothing, when the chosen take reads as a picture but its pixels cannot be', async () => {
+    const { root, file, patches, requests, work } = setup()
+    // The size reads from the header; the body after it is cut off.
+    writeFileSync(join(root, TAKE), fakePng(256, 256, 9).slice(0, 40))
+    const refused = {
+      ok: false,
+      message: "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
+    }
+    expect(await patches.make(file, 'inn', 'door', { count: 2, area })).toEqual(refused)
+    expect((await work()).making).toEqual([])
+    expect(requests).toEqual([])
+  })
+
   it('says in the view why takes cannot be made on this computer', async () => {
     const message = 'mflux is not on the PATH.'
     const none = setup({ ready: { ok: false, reason: 'mflux', message, fix: 'install it' } })
