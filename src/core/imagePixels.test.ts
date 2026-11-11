@@ -246,3 +246,24 @@ describe('cropPixels and pastePixels', () => {
     expect(out.data[(12 * 20 + 12) * 4]).toBe(p.data[(12 * 20 + 12) * 4]!)
   })
 })
+
+describe('layOver', () => {
+  const solid = (r: number, g: number, b: number, a: number, n = 2): Pixels => ({
+    width: n,
+    height: 1,
+    data: new Uint8Array(Array.from({ length: n }, () => [r, g, b, a]).flat()),
+  })
+
+  it('keeps the picture where the part is transparent and shows the part where it is opaque', () => {
+    const part = solid(255, 0, 0, 0)
+    part.data.set([0, 255, 0, 255], 4)
+    expect(Array.from(layOver(solid(10, 20, 30, 255), part).data)).toEqual([
+      10, 20, 30, 255, 0, 255, 0, 255,
+    ])
+  })
+
+  it('mixes by the part’s opacity and leaves the result opaque', () => {
+    const out = layOver(solid(0, 0, 0, 255, 1), solid(200, 100, 50, 128, 1))
+    expect(Array.from(out.data)).toEqual([100, 50, 25, 255])
+  })
+})
