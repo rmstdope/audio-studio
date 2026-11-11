@@ -97,6 +97,35 @@ describe('the tip on a greyed control', () => {
     expect(tip()).toBeNull()
   })
 
+  it('keeps a tip shown for focus when the page moves under a pointer that did not', async () => {
+    mount('Wait for the takes.')
+    el('make').focus()
+    fire(el('make'), 'focusin')
+    // The page changing under a resting pointer: the browser reports it over whatever is now there.
+    fire(document.body, 'pointerover')
+    await wait(250)
+    expect(tip()?.textContent).toBe('Wait for the takes.')
+  })
+
+  it('keeps a tip shown for focus when the pointer passes over the control and off it', async () => {
+    mount('Wait for the takes.')
+    el('make').focus()
+    fire(el('make'), 'focusin')
+    fire(el('make'), 'pointerover')
+    fire(document.body, 'pointerover')
+    await wait(250)
+    expect(tip()?.textContent).toBe('Wait for the takes.')
+  })
+
+  it('still lets a tip shown on a click go when the pointer leaves', async () => {
+    mount('Wait for the takes.')
+    fire(el('make'), 'focusin')
+    fire(el('make'), 'click')
+    fire(document.body, 'pointerover')
+    await wait(250)
+    expect(tip()).toBeNull()
+  })
+
   it('leaves the greyed control focusable, not natively disabled, and reading as dimmed with its reason', () => {
     mount('Wait for the takes.')
     expect((el('make') as HTMLButtonElement).disabled).toBe(false)

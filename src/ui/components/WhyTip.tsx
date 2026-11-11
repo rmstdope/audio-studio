@@ -87,7 +87,10 @@ export function WhyTip() {
           const target = tippedIn(e.target)
           if (target) show(target)
           else if (inTip(e.target)) cancel()
-          else if (shownRef.current) hideSoon()
+          // A control with keyboard focus keeps its tip until focus moves on: the browser also
+          // reports the pointer over whatever a page change moves under it while it rests.
+          else if (shownRef.current && !shownRef.current.target.matches(':focus-visible'))
+            hideSoon()
         },
       ],
       [
