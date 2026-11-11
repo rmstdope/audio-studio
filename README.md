@@ -9,7 +9,7 @@ game are described in [docs/project-files.md](docs/project-files.md).
 
 ## Status
 
-Steps 1 to 5 of the delivery plan (`docs/architecture.md` §12): the studio validates the project,
+The studio validates the project,
 shows each part's characters and the state of every line's clip, adopts clips recorded before it,
 and casts voices by audition: it searches Fish Audio's library by keywords, records each candidate
 saying the audition phrase in the character's style, and runs keep/drop rounds until one voice is

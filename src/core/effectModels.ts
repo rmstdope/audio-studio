@@ -3,7 +3,7 @@ import type { ImageDownload } from './imageModels'
 /** The ids of the sound-effect models the studio makes takes with. */
 export const EFFECT_MODEL_IDS = ['small-sfx', 'open-1'] as const
 
-/** One of the local sound-effect models (§13, decision 9). */
+/** One of the local sound-effect models (§12, decision 9). */
 export type EffectModelId = (typeof EFFECT_MODEL_IDS)[number]
 
 /** The project's main effects model unless its file names another. */
@@ -22,7 +22,7 @@ export interface EffectModel {
   repo: string
   /** About how many GB the weights take on disk. */
   gigabytes: number
-  /** About how long one take takes, in seconds (§13, decision 9). */
+  /** About how long one take takes, in seconds (§12, decision 9). */
   seconds: number
   /** Where the studio looks for the weights. */
   source: EffectModelSource

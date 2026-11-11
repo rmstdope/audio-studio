@@ -3,7 +3,7 @@ import { perTakeText, timeKeyOfEdit, type Figures } from './takeTimes'
 /** The ids of the image models the studio makes takes with. */
 export const IMAGE_MODEL_IDS = ['klein', 'z-image-turbo', 'qwen-image'] as const
 
-/** One of the local image models (§13, decision 8). */
+/** One of the local image models (§12, decision 8). */
 export type ImageModelId = (typeof IMAGE_MODEL_IDS)[number]
 
 /** The project's main model unless its file names another. */

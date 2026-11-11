@@ -8,15 +8,15 @@ inside a checked-out game repository (the _consumer_, first of all RetroQuest), 
 repository's `content-studio.json`, and writes voice files and their metadata in place.
 
 `docs/architecture.md` is the design: read it before changing how the tool works, and keep it up to
-date in the same change when the design moves. Its delivery plan (§12) says what comes next.
+date in the same change when the design moves. What comes next is on the bead board.
 
 ## Work tracking
 
 Planned work is tracked in beads (`bd`), prefix `as`; `skills/beads-workflow` carries the commands.
 GitHub issues are the inbox for outside requests and bug reports only. Every bead is created
 unranked and ranked later with the navigator; a bead is planned in one session and implemented in
-another. `docs/architecture.md` §12 is the design's delivery plan; beads are the work queue, and a
-bead that changes the design updates §12 with it.
+another. Beads are the work queue; a bead that changes the design updates `docs/architecture.md`
+with it.
 
 The board syncs through the Dolt remote on `origin`, not through git. A fresh clone runs
 `bd bootstrap` once (it refuses if a database already exists, so do not run `bd list` first); after
