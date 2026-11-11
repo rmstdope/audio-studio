@@ -58,8 +58,8 @@ export async function editStep(
       signal,
       onStart,
       // The model gets the marked area with some context, not the whole picture: faster, and the
-      // thing to change is larger in its view. Written in its turn, so no await comes before the
-      // edit takes its place in line: edits asked in order are made in that order.
+      // thing to change is larger in its view. Written in its turn, so the edit takes its place
+      // in line with no await of its own: a caller that asks in order (the fine-tunes) is made in order.
       () => writeAtomic(step.root, step.cropFile, encodePng(cropPixels(source, window))),
     )
     if (signal.aborted) return null
