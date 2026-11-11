@@ -55,14 +55,18 @@ export function WhyTip() {
   const shownRef = useRef(shown)
   shownRef.current = shown
   const lingering = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // What showed the tip: the pointer's leaving hides only a tip the pointer (or a tap) showed, since
+  // the browser also reports the pointer over whatever the page moves under it while it rests.
+  const shownBy = useRef<'pointer' | 'focus'>('pointer')
 
   useEffect(() => {
     const cancel = () => {
       if (lingering.current) clearTimeout(lingering.current)
       lingering.current = null
     }
-    const show = (target: HTMLElement) => {
+    const show = (target: HTMLElement, by: 'pointer' | 'focus') => {
       cancel()
+      shownBy.current = by
       const text = target.dataset.why ?? ''
       setShown((now) => (now?.target === target && now.text === text ? now : { target, text }))
     }
@@ -85,9 +89,9 @@ export function WhyTip() {
         'pointerover',
         (e) => {
           const target = tippedIn(e.target)
-          if (target) show(target)
+          if (target) show(target, 'pointer')
           else if (inTip(e.target)) cancel()
-          else if (shownRef.current) hideSoon()
+          else if (shownRef.current && shownBy.current === 'pointer') hideSoon()
         },
       ],
       [
@@ -105,14 +109,14 @@ export function WhyTip() {
           const target = tippedIn(e.target)
           if (!target) return
           if (target.matches(GREYED)) stop(e)
-          show(target)
+          show(target, 'pointer')
         },
       ],
       [
         'focusin',
         (e) => {
           const target = tippedIn(e.target)
-          if (target) show(target)
+          if (target) show(target, 'focus')
           else hide()
         },
       ],

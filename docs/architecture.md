@@ -2394,6 +2394,9 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   only dimmed and still pressable, a language tab with nothing yet, spreads `tipOnly(reason)` instead:
   the same tip, no `aria-disabled`, no inertness, and no browser `title` (as-cls4). `offGuard.test.ts`
   fails on any native `disabled` or hand-written `aria-disabled`.
+  A tip shown by focus stays while the control has it: only a tip the pointer or a tap showed goes when
+  the pointer leaves, since the browser also reports the pointer over whatever a page change moves under
+  it while it rests (arrowing onto a dimmed language tab switches the page, as-4ywm).
 
 ---
 
