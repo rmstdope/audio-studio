@@ -134,7 +134,7 @@ export function designCredit(credit: number | null | undefined): DesignCredit {
     return {
       kind: 'cannot',
       message:
-        'The studio couldn’t read your Fish credit, so it can’t tell whether a design is covered. Check the Fish key on Setup and try again.',
+        'The studio couldn’t read your Fish credit, so it can’t tell whether a design is covered. Check the Fish Audio key on Setup and try again.',
     }
   }
   if (credit + 1e-9 < DESIGN_PRICE) {

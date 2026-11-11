@@ -13,6 +13,8 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
+import { MakeFineTunesBody, UseFineTuneBody } from '../core/imageFineTunes'
+import { createImageFineTunes, type FineTuneAnswer } from '../services/imageFineTunes'
 import { ChoosePatchTakeBody, MakePatchTakesBody, RemakePatchesBody } from '../core/imagePatches'
 import {
   createImagePatches,
@@ -339,7 +341,13 @@ const AreaBoxBody = z.object({
 
 /** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
 function imageAnswer(
-  result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAnswer | ImagePatchAnswer | RemakeAnswer,
+  result:
+    | ImageEditResult
+    | ImageTakesAnswer
+    | ImageMakeAllAnswer
+    | ImagePatchAnswer
+    | RemakeAnswer
+    | FineTuneAnswer,
 ): Response {
   if (!result) return Response.json({ error: 'not found' }, { status: 404 })
   return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -616,6 +624,7 @@ export function startServer({
   const imagePatches = createImagePatches({ generator: imageGenerator })
   const imageHealth = createImageHealth()
   const imageTakes = createImageTakes({ generator: imageGenerator, health: imageHealth })
+  const imageFineTunes = createImageFineTunes({ generator: imageGenerator, takes: imageTakes })
   const musicGenerator = music ?? sharedMusic(projectFile)
   const effectGenerator = effects ?? sharedEffects(musicGenerator)
   const effectHealth = createEffectHealth()
@@ -1814,6 +1823,62 @@ export function startServer({
           const { id, patch } = request.params
           const result = await imagePatches.stop(projectFile, id, patch)
           return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/images/:id/fine-tunes': {
+        GET: guard(async (request) => {
+          const view = await imageFineTunes.view(projectFile, request.params.id)
+          return view ? Response.json(view) : notFound()
+        }),
+        POST: fromOwnPage(async (request) => {
+          const body = MakeFineTunesBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json(
+              { error: 'expected { count, words, area, model? } or { retry }' },
+              { status: 400 },
+            )
+          }
+          return imageAnswer(await imageFineTunes.make(projectFile, request.params.id, body.data))
+        }),
+      },
+      '/api/images/:id/fine-tunes/base': {
+        GET: guard(async (request) => {
+          const png = await imageFineTunes.base(projectFile, request.params.id)
+          return png
+            ? new Response(Buffer.from(png), { headers: { 'content-type': 'image/png' } })
+            : notFound()
+        }),
+      },
+      '/api/images/:id/fine-tunes/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await imageFineTunes.stop(projectFile, request.params.id)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/images/:id/fine-tunes/use': {
+        POST: fromOwnPage(async (request) => {
+          const body = UseFineTuneBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { n }' }, { status: 400 })
+          const result = await imageFineTunes.use(projectFile, request.params.id, body.data.n)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/images/:id/fine-tunes/:n': {
+        GET: guard(async (request) => {
+          const { id, n } = request.params
+          const file = await imageFineTunes.file(projectFile, id, n)
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const { id, n } = request.params
+          return imageAnswer(await imageFineTunes.drop(projectFile, id, Number(n)))
+        }),
+      },
+      '/api/images/:id/fine-tunes/:n/seen': {
+        POST: fromOwnPage(async (request) => {
+          const { id, n } = request.params
+          return imageAnswer(await imageFineTunes.markSeen(projectFile, id, Number(n)))
         }),
       },
       '/api/images/:id/takes': {

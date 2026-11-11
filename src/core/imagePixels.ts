@@ -106,6 +106,22 @@ export function pastePixels(base: Pixels, part: Pixels, window: Window): Pixels 
 }
 
 /**
+ * `part` laid over `base` (the same size) by its opacity, as a patch lies over its take: where the
+ * part is transparent the base shows. The result is opaque.
+ */
+export function layOver(base: Pixels, part: Pixels): Pixels {
+  const data = new Uint8Array(base.data.length)
+  for (let i = 0; i < data.length; i += 4) {
+    const a = part.data[i + 3]! / 255
+    for (let c = 0; c < 3; c++) {
+      data[i + c] = Math.round(part.data[i + c]! * a + base.data[i + c]! * (1 - a))
+    }
+    data[i + 3] = 255
+  }
+  return { width: base.width, height: base.height, data }
+}
+
+/**
  * The picture cropped to the target's shape (the middle kept) and scaled to exactly `size`: each
  * new pixel is the average of the source area it covers, so the result never depends on the machine.
  */
