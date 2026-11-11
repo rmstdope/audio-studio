@@ -763,6 +763,7 @@ export function createImageTakes({
                 ? 'ready'
                 : 'old',
           cropped: isCropped(take, found.row),
+          ...(take.fineTunedFrom ? { fineTunedFrom: take.fineTunedFrom } : {}),
         })
       }
       const secondsOf = await secondsFor(projectFile)

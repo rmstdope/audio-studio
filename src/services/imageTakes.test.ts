@@ -1258,3 +1258,35 @@ describe('the failure of a model’s last take', () => {
     expect(await health(file)).toEqual({})
   })
 })
+
+describe('a fine-tuned take', () => {
+  it('says what it was fine-tuned from, and a take made before says nothing', async () => {
+    const { takes, file, root } = setup(undefined, {
+      'content-studio/cache/images/inn.json': {
+        next: 3,
+        takes: [1, 2].map((n) => ({
+          n,
+          seed: n,
+          model: 'black-forest-labs/FLUX.2-klein-4B',
+          width: 1024,
+          height: 640,
+          madeFrom: { words: 'a low inn', style: 'x', width: 320, height: 200 },
+          ...(n === 2 ? { fineTunedFrom: { take: 1, words: 'Add a cat' } } : {}),
+        })),
+      },
+    })
+    for (const n of [1, 2]) {
+      mkdirSync(join(root, 'content-studio/cache/image-takes/inn'), { recursive: true })
+      writeFileSync(
+        join(root, `content-studio/cache/image-takes/inn/${n}.png`),
+        fakePng(1024, 640, n),
+      )
+    }
+    const view = await takes.view(file, 'inn')
+    if (!view || !('takes' in view)) throw new Error('no view')
+    expect(view.takes.map((t) => t.fineTunedFrom)).toEqual([
+      undefined,
+      { take: 1, words: 'Add a cat' },
+    ])
+  })
+})

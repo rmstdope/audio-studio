@@ -41,6 +41,10 @@ export const BoardTakeSchema = z.object({
   look: z.string().optional(),
   /** It has been shown on the right once; a take that has not shows "new". */
   seen: z.boolean().default(false),
+  /** Set on a take that is a fine-tune: the take it was made from (null: the game's own image) and the words. */
+  fineTunedFrom: z
+    .object({ take: z.number().int().positive().nullable(), words: z.string() })
+    .optional(),
 })
 
 /** An image's board, `content-studio/cache/images/<id>.json`: the takes made, and the next number. */
@@ -94,6 +98,8 @@ export interface ImageTakeView {
   look: 'ready' | 'bringing' | 'old' | 'missing'
   /** The model's picture has another shape than the image, so the game's version cuts its edges. */
   cropped: boolean
+  /** Set on a fine-tuned take: what it was fine-tuned from (null take: the game's own image) and the words. */
+  fineTunedFrom?: { take: number | null; words: string }
 }
 
 /** A take waiting or being made. */
