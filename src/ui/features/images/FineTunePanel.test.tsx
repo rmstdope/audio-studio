@@ -204,8 +204,8 @@ describe('making fine-tunes', () => {
         ],
       }),
     )
-    expect(text(host)).toContain('Fine-tune 1 Being made… about 20 s left')
-    expect(text(host)).toContain('Fine-tune 2 Waiting')
+    expect(text(host)).toContain('Being made… Fine-tune 1 · making, about 20 s left')
+    expect(text(host)).toContain('Waiting Fine-tune 2 · waiting')
     expect(host.querySelector('[role=progressbar]')).not.toBeNull()
     await act(async () => button(host, 'Stop')!.click())
     expect(sent[0]).toMatchObject({ method: 'POST', path: '/api/images/inn/fine-tunes/stop' })
@@ -221,7 +221,7 @@ describe('making fine-tunes', () => {
       }),
     )
     const makingCard = host.querySelector('.patch-thumb-making')!
-    expect(text(makingCard)).toBe('Fine-tune 1 Being made… about 20 s left Stop')
+    expect(text(makingCard)).toBe('Being made… Fine-tune 1 · making, about 20 s left Stop')
     expect(host.querySelectorAll('.patch-thumb-making button')).toHaveLength(1)
     await act(async () => makingCard.querySelector('button')!.click())
     expect(sent[0]).toMatchObject({ method: 'DELETE', path: '/api/images/inn/fine-tunes/1' })

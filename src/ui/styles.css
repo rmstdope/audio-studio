@@ -5645,6 +5645,21 @@ textarea[aria-disabled='true'][data-why] {
   width: 100%;
   resize: vertical;
 }
+/* Wide enough for "Fine-tune 5" and its chip on one line; a card being made has a picture box that says so. */
+.fine-tune .patch-thumbs {
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+}
+.patch-making-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--inset);
+  color: var(--muted);
+  font-size: 12px;
+}
 /* Fine-tune cards in one row line up: the name and its chip on one line, level pictures, buttons at the foot. */
 .fine-tune .fine-card-pick {
   flex: 1 1 auto;
@@ -5660,4 +5675,8 @@ textarea[aria-disabled='true'][data-why] {
 }
 .fine-tune .patch-thumb .patch-controls {
   margin-top: auto;
+}
+.fine-tune .patch-thumb-making .patch-thumb-label {
+  flex-wrap: wrap;
+  white-space: normal;
 }
