@@ -142,6 +142,57 @@ describe('the tip on a greyed control', () => {
     expect(clicks).toEqual({ presses: 0, changes: 0 })
   })
 
+  it('lets keys meant for the page through a greyed button: arrows and browser shortcuts', () => {
+    mount('Wait for the takes.')
+    for (const init of [{ key: 'ArrowLeft' }, { key: 'r', metaKey: true }, { key: 'j' }]) {
+      const event = new Event('keydown', { bubbles: true, cancelable: true })
+      Object.assign(event, init)
+      el('make').dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+    }
+  })
+
+  it('stops the keys that would change a greyed menu, but not a shortcut with Cmd held', () => {
+    mount('Wait for the takes.')
+    const down = new Event('keydown', { bubbles: true, cancelable: true })
+    Object.assign(down, { key: 'ArrowDown' })
+    el('menu').dispatchEvent(down)
+    expect(down.defaultPrevented).toBe(true)
+    const copy = new Event('keydown', { bubbles: true, cancelable: true })
+    Object.assign(copy, { key: 'c', metaKey: true })
+    el('menu').dispatchEvent(copy)
+    expect(copy.defaultPrevented).toBe(false)
+  })
+
+  it('lets Esc through to the page when the tip was only shown by the pointer', () => {
+    mount('Wait for the takes.')
+    fire(el('make'), 'pointerover')
+    const event = new Event('keydown', { bubbles: true, cancelable: true })
+    Object.assign(event, { key: 'Escape' })
+    let reached = false
+    document.body.addEventListener('keydown', () => (reached = true), { once: true })
+    act(() => {
+      el('plain').dispatchEvent(event)
+    })
+    expect(tip()).toBeNull()
+    expect(reached).toBe(true)
+  })
+
+  it('stops a mouse press on a greyed menu, so its list does not open', () => {
+    mount('Wait for the takes.')
+    const event = new Event('mousedown', { bubbles: true, cancelable: true })
+    el('menu').dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('points the control at the tip while it shows', () => {
+    mount('Wait for the takes.')
+    fire(el('make'), 'focusin')
+    expect(el('make').getAttribute('aria-describedby')).toBe(tip()!.id)
+    fire(el('plain'), 'focusin')
+    expect(el('make').hasAttribute('aria-describedby')).toBe(false)
+  })
+
   it('lets Tab through a greyed control', () => {
     mount('Wait for the takes.')
     const event = new Event('keydown', { bubbles: true, cancelable: true })

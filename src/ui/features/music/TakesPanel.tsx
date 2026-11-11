@@ -339,7 +339,7 @@ export function TakesPanel({
                   className="btn btn-ghost"
                   {...off(stop.isPending && WAIT_FOR_CHANGE)}
                   title={
-                    view.making.some((m) => m.paid && m.state === 'making')
+                    !stop.isPending && view.making.some((m) => m.paid && m.state === 'making')
                       ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
                       : undefined
                   }

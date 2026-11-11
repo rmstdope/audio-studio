@@ -124,7 +124,7 @@ export function MakeAllPanel({
           className="btn btn-ghost"
           {...off(stop.isPending && WAIT_FOR_CHANGE)}
           title={
-            paid
+            paid && !stop.isPending
               ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
               : undefined
           }

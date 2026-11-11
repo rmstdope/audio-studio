@@ -3869,6 +3869,11 @@ button.cue-chip[aria-expanded='true'] {
   cursor: default;
 }
 
+input[aria-disabled='true'][data-why],
+textarea[aria-disabled='true'][data-why] {
+  opacity: 0.55;
+}
+
 @media (max-width: 600px) {
   .modal-back {
     padding: 0;

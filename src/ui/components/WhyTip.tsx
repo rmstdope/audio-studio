@@ -14,6 +14,19 @@ const GAP = 6
 /** The keys that still do something on a greyed control: moving on and closing the tip. */
 const LEFT_ALONE = new Set(['Tab', 'Shift', 'Escape'])
 
+/** The id of the tip, which the shown control is described by. */
+const TIP_ID = 'why-tip'
+
+/** Whether a key press would press `target` (a button) or change it (a menu or field). */
+function actsOn(target: HTMLElement, event: KeyboardEvent): boolean {
+  if (event.metaKey || event.ctrlKey || event.altKey || LEFT_ALONE.has(event.key)) return false
+  // A greyed button is only pressed by Enter and Space; every other key is the page's.
+  if (target instanceof HTMLButtonElement || target.tagName === 'A') {
+    return event.key === 'Enter' || event.key === ' '
+  }
+  return true
+}
+
 /** The greyed control an event happened in, if any. */
 function greyedIn(target: EventTarget | null): HTMLElement | null {
   return target instanceof Element ? target.closest<HTMLElement>(GREYED) : null
@@ -71,9 +84,9 @@ export function WhyTip() {
       [
         'pointerdown',
         (e) => {
-          const target = greyedIn(e.target)
-          if (target) stop(e)
-          else if (!inTip(e.target)) hide()
+          // A greyed control's press is stopped on `mousedown` and `click`, not here: cancelling
+          // `pointerdown` would also drop the mouse events that guard is waiting for.
+          if (!greyedIn(e.target) && !inTip(e.target)) hide()
         },
       ],
       ['mousedown', (e) => greyedIn(e.target) && stop(e)],
@@ -99,15 +112,24 @@ export function WhyTip() {
         'keydown',
         (e) => {
           const key = (e as KeyboardEvent).key
+          const on = greyedIn(e.target)
           if (key === 'Escape' && shownRef.current) {
+            // Esc closes the tip; it is the page's too unless the tip's own control has focus.
+            const own = on === shownRef.current.target
             hide()
-            e.stopPropagation()
+            if (own) e.stopPropagation()
             return
           }
-          if (greyedIn(e.target) && !LEFT_ALONE.has(key)) stop(e)
+          if (on && actsOn(on, e as KeyboardEvent)) stop(e)
         },
       ],
-      ['keyup', (e) => greyedIn(e.target) && !LEFT_ALONE.has((e as KeyboardEvent).key) && stop(e)],
+      [
+        'keyup',
+        (e) => {
+          const on = greyedIn(e.target)
+          if (on && actsOn(on, e as KeyboardEvent)) stop(e)
+        },
+      ],
       ['change', (e) => greyedIn(e.target) && stop(e)],
       ['input', (e) => greyedIn(e.target) && stop(e)],
       ['beforeinput', (e) => greyedIn(e.target) && stop(e)],
@@ -141,6 +163,14 @@ export function WhyTip() {
     }
   }, [])
 
+  // The shown control is described by the tip, so a screen reader reads its reason after "dimmed".
+  useEffect(() => {
+    const target = shown?.target
+    if (!target) return
+    target.setAttribute('aria-describedby', TIP_ID)
+    return () => target.removeAttribute('aria-describedby')
+  }, [shown?.target])
+
   // Place the tip once it is drawn and its size is known; again when the window moves under it.
   useLayoutEffect(() => {
     if (!shown) {
@@ -173,6 +203,7 @@ export function WhyTip() {
   return createPortal(
     <div
       ref={tipRef}
+      id={TIP_ID}
       className="why-tip small"
       role="tooltip"
       style={at ? { left: at.left, top: at.top } : { left: 0, top: 0, visibility: 'hidden' }}

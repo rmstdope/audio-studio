@@ -138,7 +138,7 @@ export function MoveTakeDialog({
       const controls = [
         ...(root.current?.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button') ??
           []),
-      ].filter((c) => c.getAttribute('aria-disabled') !== 'true')
+      ]
       const first = controls[0]
       const last = controls.at(-1)
       const outside = !controls.includes(target as HTMLInputElement | HTMLButtonElement)

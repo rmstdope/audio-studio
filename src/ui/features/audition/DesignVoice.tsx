@@ -177,8 +177,10 @@ export function DesignVoice({
             type="button"
             {...off(
               state.tooLong,
-              !state.canSend && 'Describe the voice first. Design voices turns on when you have.',
-              (pending || confirming) && DESIGNING,
+              !state.canSend &&
+                'The description is empty or too short. Design voices turns on when it is long enough.',
+              pending && DESIGNING,
+              confirming && 'The cost is waiting for your answer. Answer it to design voices.',
             )}
             onClick={() => setConfirming(true)}
           >

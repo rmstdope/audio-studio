@@ -346,13 +346,14 @@ describe('the Move dialog', () => {
     const page = render(village, view([take(3)]))
     await click(page.buttons('Move…')[0])
     const input = document.querySelector<HTMLInputElement>('input.filter')!
-    const cancel = page.buttons('Cancel')[0]!
     expect(isOff(page.buttons('Move take 3')[0]!)).toBe(true)
-    cancel.focus()
-    page.key(cancel, 'Tab')
+    // The greyed Move is the last stop, so the keyboard reaches it (and its reason) before the wrap.
+    const move = page.buttons('Move take 3')[0]!
+    move.focus()
+    page.key(move, 'Tab')
     expect(document.activeElement).toBe(input)
     page.key(input, 'Tab', true)
-    expect(document.activeElement).toBe(cancel)
+    expect(document.activeElement).toBe(move)
     // Between the edges Tab is left to the browser.
     input.focus()
     expect(page.key(input, 'Tab').defaultPrevented).toBe(false)
@@ -369,9 +370,12 @@ describe('the Move dialog', () => {
     const moveButton = page.buttons('Move take 1')[0]!
     expect(isOff(moveButton)).toBe(false)
     moveButton.focus()
+    const first = document.querySelector<HTMLElement>(
+      '[role="dialog"] input, [role="dialog"] button',
+    )!
     page.key(moveButton, 'Tab')
-    expect(document.activeElement).toBe(option('Game over'))
-    page.key(option('Game over'), 'Tab', true)
+    expect(document.activeElement).toBe(first)
+    page.key(first, 'Tab', true)
     expect(document.activeElement).toBe(moveButton)
   })
 
@@ -381,8 +385,8 @@ describe('the Move dialog', () => {
     await click(page.buttons('Move…')[0])
     await click(option("Witch's hut"))
     await click(page.buttons('Move take 3')[0])
+    // Greyed controls stay in the Tab ring, so the dialog wraps from the last to the first.
     expect(page.key(page.buttons('Moving…')[0]!, 'Tab').defaultPrevented).toBe(true)
-    expect(page.key(page.buttons('Moving…')[0]!, 'Tab', true).defaultPrevented).toBe(true)
   })
 
   it('puts the focus back on the pick when the move is refused, so Esc still closes it', async () => {

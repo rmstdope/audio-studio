@@ -88,7 +88,7 @@ export function LineTakes({
                   className="btn"
                   {...off(takeUseWhy({ current: t.current, pending: use.isPending }))}
                   title={
-                    t.current
+                    t.current && !takeUseWhy({ current: t.current, pending: use.isPending })
                       ? 'Make this take the line’s clip: encoded and written as a recording is'
                       : undefined
                   }
