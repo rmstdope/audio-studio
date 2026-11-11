@@ -5643,18 +5643,9 @@ textarea[aria-disabled='true'][data-why] {
 .fine-tune .patch-bench-right textarea {
   box-sizing: border-box;
   width: 100%;
-  min-height: 3lh;
-  overflow-y: hidden;
   resize: vertical;
 }
 /* Fine-tune cards in one row line up: the name and its chip on one line, level pictures, buttons at the foot. */
-.fine-tune .patch-thumbs {
-  align-items: stretch;
-}
-.fine-tune .patch-thumb {
-  height: 100%;
-  box-sizing: border-box;
-}
 .fine-tune .fine-card-pick {
   flex: 1 1 auto;
 }
@@ -5664,6 +5655,8 @@ textarea[aria-disabled='true'][data-why] {
 }
 .fine-tune .patch-thumb-label .grow {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .fine-tune .patch-thumb .patch-controls {
   margin-top: auto;

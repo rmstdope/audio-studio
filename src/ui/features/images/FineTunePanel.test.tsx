@@ -282,6 +282,38 @@ describe('the form', () => {
   })
 })
 
+describe('the card Stop and the words box, in detail', () => {
+  it('keeps the height the person dragged the box to', async () => {
+    const { host } = await render(() => view())
+    const box = host.querySelector('textarea')!
+    Object.defineProperty(box, 'scrollHeight', { configurable: true, get: () => 180 })
+    Object.defineProperty(box, 'clientHeight', { configurable: true, get: () => 400 })
+    box.style.height = '400px'
+    await type(box, 'short')
+    expect(box.style.height).toBe('400px')
+  })
+
+  it('moves focus to the next fine-tune being made after a card’s Stop', async () => {
+    let dropped = false
+    const { host } = await render(() =>
+      view({
+        making: dropped
+          ? [{ n: 2, state: 'making', elapsed: 1, expected: 25, model: 'klein' }]
+          : [
+              { n: 1, state: 'making', elapsed: 5, expected: 25, model: 'klein' },
+              { n: 2, state: 'waiting', elapsed: 0, expected: 25, model: 'klein' },
+            ],
+      }),
+    )
+    dropped = true
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('.patch-thumb-making button')!.click(),
+    )
+    await settle()
+    expect(document.activeElement).toBe(host.querySelector('.patch-thumb-making button'))
+  })
+})
+
 describe('looking at, dropping and using fine-tunes', () => {
   const ready = () => view({ tunes: [tune(1), tune(2, { isNew: true }), tune(3)] })
 
