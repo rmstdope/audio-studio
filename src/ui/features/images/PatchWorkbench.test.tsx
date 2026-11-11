@@ -695,6 +695,8 @@ describe('keys and focus around the question and Make', () => {
     })
     await settle()
     expect(asked).toContainEqual(['image-patches', 'inn'])
+    // The fine-tunes belong to the picture in the game, which a choice changes.
+    expect(asked).toContainEqual(['image-fine-tunes', 'inn'])
   })
 })
 
