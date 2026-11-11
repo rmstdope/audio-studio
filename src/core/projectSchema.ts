@@ -3,7 +3,7 @@ import { ProjectSchema } from './project'
 
 /** Where the project file's JSON Schema is published: the `$schema` a project file names. */
 export const PROJECT_SCHEMA_URL =
-  'https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json'
+  'https://raw.githubusercontent.com/rmstdope/content-studio/main/schema/content-studio.schema.json'
 
 /**
  * The JSON Schema of the project file, as the text of `schema/content-studio.schema.json`: made

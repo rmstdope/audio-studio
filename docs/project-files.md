@@ -53,7 +53,7 @@ walking up from the folder it is started in.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rmstdope/content-studio/main/schema/content-studio.schema.json",
   "version": 2,
   "name": "Sample Quest",
   "description": "A tiny project for working on the studio.",

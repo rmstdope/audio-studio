@@ -1,5 +1,5 @@
 ---
-name: verify-audio-studio
+name: verify-content-studio
 description: Content Studio's verification skill, named by `verification_skill` in .cerebro/project.conf. Psylocke verifies merged beads that change what a user sees or hears by running the studio on its own sample project in Chrome, never on a game. She batches related beads into one look, builds the project state each look needs in the verification tree's sample, never spends Fish credit or changes the navigator's Fish account without their yes, checks that the studio only wrote what the consumer rules allow, does the checks herself, hands the navigator the running studio for anything only a person can judge (how a voice or a take sounds, "good enough"), explores near the change, then presents the evidence, a recommended pass or fail per bead, and proposed follow-up beads.
 ---
 

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "audio-studio",
+      "name": "content-studio",
       "dependencies": {
         "@tanstack/react-query": "^5.104.5",
         "react": "^19.3.1",

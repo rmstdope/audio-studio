@@ -68,9 +68,9 @@ describe('createWhisperWorker', () => {
   })
 })
 
-// Live: downloads mlx-whisper and its model (about 1.6 GB) the first time. Opt in with AUDIO_STUDIO_LIVE=1.
+// Live: downloads mlx-whisper and its model (about 1.6 GB) the first time. Opt in with CONTENT_STUDIO_LIVE=1.
 const realWhisper =
-  process.env.AUDIO_STUDIO_LIVE === '1' &&
+  process.env.CONTENT_STUDIO_LIVE === '1' &&
   process.platform === 'darwin' &&
   Boolean(Bun.which('uv') && Bun.which('say') && Bun.which('ffmpeg'))
 
