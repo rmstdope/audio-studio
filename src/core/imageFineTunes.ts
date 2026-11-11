@@ -1,0 +1,84 @@
+import { z } from 'zod'
+import { EDIT_MODEL_IDS } from './imageModels'
+import { PatchAreaSchema } from './imagePatches'
+
+/** How many characters of the words the take's caption keeps. */
+const CAPTION_WORDS = 60
+
+/**
+ * One fine-tune on an image's board: a picture beside the board, as big as the picture it was made
+ * from. It belongs to that picture, `base`: a take's number, or 0 for the game's own image.
+ */
+export const FineTuneSchema = z.strictObject({
+  /** Per image, never reused. */
+  n: z.number().int().positive(),
+  base: z.number().int().nonnegative(),
+  seed: z.number().int(),
+  /** The words it was made from. */
+  words: z.string(),
+  /** The marked area it was made with; null when the whole picture could change. */
+  area: PatchAreaSchema.nullable(),
+  /** It has been laid over the picture once; one that has not shows "new". */
+  seen: z.boolean().default(false),
+  model: z.enum(EDIT_MODEL_IDS),
+})
+
+/** A fine-tune on a board. */
+export type FineTune = z.infer<typeof FineTuneSchema>
+
+/** An image's fine-tunes, `content-studio/cache/image-fine-tunes/<image>/board.json`. */
+export const FineTuneBoardSchema = z.strictObject({
+  next: z.number().int().positive().default(1),
+  tunes: z.array(FineTuneSchema).default([]),
+})
+
+/** An image's board of fine-tunes. */
+export type FineTuneBoard = z.infer<typeof FineTuneBoardSchema>
+
+/** The body of making fine-tunes: 1 to 6 of the words and mark, or the failed one again. */
+export const MakeFineTunesBody = z.union([
+  z.strictObject({
+    count: z.number().int().min(1).max(6),
+    words: z.string().refine((w) => w.trim() !== '', 'Say what to change.'),
+    area: PatchAreaSchema.nullable(),
+    /** The edit model for the new fine-tunes; the default one when left out. */
+    model: z.enum(EDIT_MODEL_IDS).optional(),
+  }),
+  z.strictObject({ retry: z.number().int().positive() }),
+])
+
+/** The body of using a fine-tune. */
+export const UseFineTuneBody = z.strictObject({ n: z.number().int().positive() })
+
+/** The words as a caption shows them: on one line, shortened with an ellipsis. */
+function shortened(words: string): string {
+  const one = words.replace(/\s+/g, ' ').trim()
+  return one.length > CAPTION_WORDS ? `${one.slice(0, CAPTION_WORDS).trimEnd()}…` : one
+}
+
+/** Where a fine-tuned take says it came from; `from` is the take's number, null for the game's own image. */
+export function fineTuneCaption(from: number | null, words: string): string {
+  const source = from === null ? "the game's own image" : `Take ${from}`
+  return `Fine-tuned from ${source}: “${shortened(words)}”`
+}
+
+/**
+ * What the green line says after "Use this": the new take is in the game, and the named areas and
+ * chosen patches that came along, naming only what exists. `from` is the take it was made from,
+ * null for the game's own image.
+ */
+export function cameAlongLine(
+  take: number,
+  carried: { areas: number; patches: number },
+  from: number | null,
+): string {
+  if (from === null) return `Take ${take} is in the game now, fine-tuned from the game's own image.`
+  const parts = [
+    carried.areas > 0 ? `${carried.areas} named area${carried.areas === 1 ? '' : 's'}` : null,
+    carried.patches > 0
+      ? `${carried.patches} chosen patch${carried.patches === 1 ? '' : 'es'}`
+      : null,
+  ].filter((p): p is string => p !== null)
+  if (parts.length === 0) return `Take ${take} is in the game now.`
+  return `Take ${take} is in the game now. Its ${parts.join(' and ')} came along from Take ${from}.`
+}
