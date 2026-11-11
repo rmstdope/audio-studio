@@ -76,6 +76,7 @@ describe('amountProblem', () => {
 describe('cantStart', () => {
   it('says why the credit cannot be read, or is not enough for one take', () => {
     expect(cantStart(null, 0.002, 's2.1-pro')).toMatch(/couldn’t read your Fish credit/)
+    expect(cantStart(null, 0.002, 's2.1-pro')).toMatch(/Check the Fish Audio key on Setup/)
     expect(cantStart(0, 0.002, 's2.1-pro')).toBe(
       'Your Fish credit is $0.00, not enough for a take with s2.1-pro. Add credit on Fish, or set the audition model to the free one.',
     )
