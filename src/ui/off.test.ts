@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { off, tipPlace } from './off'
+import { off, tipOnly, tipPlace } from './off'
 
 describe('off', () => {
   test('a control with no reason against it gets nothing added', () => {
@@ -16,6 +16,19 @@ describe('off', () => {
 
   test('when the first clears, the next one shows', () => {
     expect(off(false, 'Wait for the takes.')['data-why']).toBe('Wait for the takes.')
+  })
+})
+
+describe('tipOnly', () => {
+  test('carries the reason for the tip but leaves the control on', () => {
+    const props = tipOnly(false, 'No dialog yet', 'later')
+    expect(props['data-why']).toBe('No dialog yet')
+    expect(props['aria-description']).toBe('No dialog yet')
+    expect('aria-disabled' in props).toBe(false)
+  })
+
+  test('with no reason it adds nothing', () => {
+    expect(tipOnly(false, '')).toEqual({})
   })
 })
 

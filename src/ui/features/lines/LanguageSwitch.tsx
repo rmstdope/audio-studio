@@ -1,4 +1,5 @@
 import { movedTo } from '../../languages'
+import { tipOnly } from '../../off'
 
 /** One tab of the switch: a language, what it says beside the name, and its hover text. */
 export interface LanguageTab {
@@ -53,7 +54,8 @@ export function LanguageSwitch({
           tabIndex={active === tab.id ? 0 : -1}
           className={tab.dimmed ? 'tab tab-dim' : tab.warn ? 'tab tab-warn' : 'tab'}
           aria-selected={active === tab.id}
-          title={tab.title}
+          title={tab.dimmed ? undefined : tab.title}
+          {...(tab.dimmed ? tipOnly(tab.title) : {})}
           onClick={() => onChoose(tab.id)}
         >
           {tab.name}

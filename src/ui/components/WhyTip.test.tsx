@@ -6,7 +6,7 @@ GlobalRegistrator.register()
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { WhyTip } = await import('./WhyTip')
-const { off } = await import('../off')
+const { off, tipOnly } = await import('../off')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -199,5 +199,36 @@ describe('the tip on a greyed control', () => {
     Object.assign(event, { key: 'Tab' })
     el('make').dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)
+  })
+})
+
+describe('the tip on a control that stays on', () => {
+  it('shows the reason on hover and focus, and the press still goes through', () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let presses = 0
+    act(() =>
+      root.render(
+        createElement(
+          'div',
+          null,
+          createElement(WhyTip),
+          createElement(
+            'button',
+            { id: 'tab', type: 'button', onClick: () => presses++, ...tipOnly('No dialog yet') },
+            'Tab',
+          ),
+        ),
+      ),
+    )
+    cleanups.push(() => {
+      act(() => root.unmount())
+      host.remove()
+    })
+    fire(el('tab'), 'pointerover')
+    expect(tip()?.textContent).toBe('No dialog yet')
+    act(() => el('tab').click())
+    expect(presses).toBe(1)
   })
 })

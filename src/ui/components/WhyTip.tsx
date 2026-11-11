@@ -5,6 +5,9 @@ import { tipPlace } from '../off'
 /** What a greyed control carries: `aria-disabled` and its reason (see `off`). */
 const GREYED = '[aria-disabled="true"][data-why]'
 
+/** What any control with a tip carries: its reason, greyed or only dimmed (see `tipOnly`). */
+const TIPPED = '[data-why]'
+
 /** How long the tip stays after the pointer leaves, so it can be moved onto and read. */
 const LINGER_MS = 150
 
@@ -25,6 +28,11 @@ function actsOn(target: HTMLElement, event: KeyboardEvent): boolean {
     return event.key === 'Enter' || event.key === ' '
   }
   return true
+}
+
+/** The control with a tip (greyed or not) an event happened in, if any. */
+function tippedIn(target: EventTarget | null): HTMLElement | null {
+  return target instanceof Element ? target.closest<HTMLElement>(TIPPED) : null
 }
 
 /** The greyed control an event happened in, if any. */
@@ -75,7 +83,7 @@ export function WhyTip() {
       [
         'pointerover',
         (e) => {
-          const target = greyedIn(e.target)
+          const target = tippedIn(e.target)
           if (target) show(target)
           else if (inTip(e.target)) cancel()
           else if (shownRef.current) hideSoon()
@@ -86,23 +94,23 @@ export function WhyTip() {
         (e) => {
           // A greyed control's press is stopped on `mousedown` and `click`, not here: cancelling
           // `pointerdown` would also drop the mouse events that guard is waiting for.
-          if (!greyedIn(e.target) && !inTip(e.target)) hide()
+          if (!tippedIn(e.target) && !inTip(e.target)) hide()
         },
       ],
       ['mousedown', (e) => greyedIn(e.target) && stop(e)],
       [
         'click',
         (e) => {
-          const target = greyedIn(e.target)
+          const target = tippedIn(e.target)
           if (!target) return
-          stop(e)
+          if (target.matches(GREYED)) stop(e)
           show(target)
         },
       ],
       [
         'focusin',
         (e) => {
-          const target = greyedIn(e.target)
+          const target = tippedIn(e.target)
           if (target) show(target)
           else hide()
         },
@@ -115,7 +123,7 @@ export function WhyTip() {
           const on = greyedIn(e.target)
           if (key === 'Escape' && shownRef.current) {
             // Esc closes the tip; it is the page's too unless the tip's own control has focus.
-            const own = on === shownRef.current.target
+            const own = tippedIn(e.target) === shownRef.current.target
             hide()
             if (own) e.stopPropagation()
             return
@@ -143,7 +151,7 @@ export function WhyTip() {
     const watching = new MutationObserver(() => {
       const now = shownRef.current
       if (!now) return
-      if (!now.target.isConnected || !now.target.matches(GREYED)) hide()
+      if (!now.target.isConnected || !now.target.matches(TIPPED)) hide()
       else {
         const text = now.target.dataset.why ?? ''
         setShown((then) => (then && then.text !== text ? { target: then.target, text } : then))

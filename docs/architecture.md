@@ -2390,7 +2390,9 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   `aria-description` and `data-why` from the first reason that applies, so the reasons are written in the
   order to deal with them (Setup or the computer, then something to do on the page, then something to wait
   for). The one `WhyTip` layer, mounted in `App`, shows that reason in a tip on hover, focus or tap, and
-  makes the control inert (click, keys, change); the control stays reachable with Tab. `offGuard.test.ts`
+  makes the control inert (click, keys, change); the control stays reachable with Tab. A control that is
+  only dimmed and still pressable, a language tab with nothing yet, spreads `tipOnly(reason)` instead:
+  the same tip, no `aria-disabled`, no inertness, and no browser `title` (as-cls4). `offGuard.test.ts`
   fails on any native `disabled` or hand-written `aria-disabled`.
 
 ---
