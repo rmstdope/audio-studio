@@ -576,11 +576,10 @@ describe('takes of a declared patch', () => {
     const { root, file, patches, requests, work } = setup()
     // The size reads from the header; the body after it is cut off.
     writeFileSync(join(root, TAKE), fakePng(256, 256, 9).slice(0, 40))
-    const refused = {
+    expect(await patches.make(file, 'inn', 'door', { count: 2, area })).toEqual({
       ok: false,
       message: "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
-    }
-    expect(await patches.make(file, 'inn', 'door', { count: 2, area })).toEqual(refused)
+    })
     expect((await work()).making).toEqual([])
     expect(requests).toEqual([])
   })
