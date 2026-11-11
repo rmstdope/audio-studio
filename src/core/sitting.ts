@@ -68,7 +68,7 @@ export function amountProblem(text: string, credit: number): string | null {
  */
 export function cantStart(credit: number | null, perTake: number, model: string): string | null {
   if (credit === null) {
-    return `The studio couldn’t read your Fish credit, so it can’t tell whether ${model} takes are covered. Check the Fish key on Setup and try again.`
+    return `The studio couldn’t read your Fish credit, so it can’t tell whether ${model} takes are covered. Check the Fish Audio key on Setup and try again.`
   }
   if (credit + ROUNDING < perTake) {
     return `Your Fish credit is ${usd(credit)}, not enough for a take with ${model}. Add credit on Fish, or set the audition model to the free one.`

@@ -141,7 +141,7 @@ describe('designCredit', () => {
     expect(designCredit(null)).toEqual({
       kind: 'cannot',
       message:
-        'The studio couldn’t read your Fish credit, so it can’t tell whether a design is covered. Check the Fish key on Setup and try again.',
+        'The studio couldn’t read your Fish credit, so it can’t tell whether a design is covered. Check the Fish Audio key on Setup and try again.',
     })
   })
 })
