@@ -21,6 +21,15 @@ export function off(...reasons: Why[]): OffProps {
   return { 'aria-disabled': true, 'aria-description': why, 'data-why': why }
 }
 
+/**
+ * The props that give a control that stays on the studio's tip: its reason shows on hover, focus
+ * or a tap like a greyed control's, but the control is not inert (a dimmed tab is still pressed).
+ */
+export function tipOnly(...reasons: Why[]): OffProps {
+  const { 'aria-disabled': _on, ...rest } = off(...reasons)
+  return rest
+}
+
 /** A rectangle in window coordinates. */
 export type Rect = { left: number; top: number; width: number; height: number }
 /** A width and a height. */
