@@ -122,7 +122,7 @@ bundle breaks.
   scenes' locks, `formatMusicLock` and `formatBriefs` for music's, `formatImageLock` and
   `formatImageEdits` for images', `formatEffectLock` for effects').
 - Never delete clips without the user confirming it in the UI.
-- Only changes from the studio's own page are accepted (the Origin check on POST routes).
+- Only changes from the studio's own page are accepted (the Origin check on every POST, PUT, PATCH and DELETE route).
 
 ## Commands
 

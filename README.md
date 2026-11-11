@@ -14,10 +14,11 @@ Committing them is up to you; the studio never commits.
   library, your own voices, a cloned voice or a designed one. Then it records every line of dialog
   with the cast voice, in each language the game declares. Each take is checked with Whisper and
   made again until enough of its words are heard, and the manifest gets real word timings. Only
-  what is missing or out of date is recorded again. Paid models are held to a spending ceiling
-  you set, and what they cost is logged.
+  what is missing or out of date is recorded again. Paid recordings ask first what they can cost and
+  are held to it, and what they cost is logged.
 - **Music.** Loops and stingers made locally with ACE-Step or Stable Audio Open, or with Eleven
-  Music. You choose between takes, then trim and fade them.
+  Music. You choose between takes; stingers can be trimmed
+  and faded.
 - **Images.** Each image the game lists is made locally with FLUX.2 klein, Z-Image-Turbo or
   Qwen-Image through mflux, in the act's style. Patches paint a change into a chosen picture, and
   named areas are marked for the game.
@@ -31,8 +32,8 @@ Committing them is up to you; the studio never commits.
 missing. In short:
 
 - [ffmpeg](https://ffmpeg.org) (`brew install ffmpeg`)
-- [uv](https://docs.astral.sh/uv/) and an Apple silicon Mac for the local models (Whisper, music,
-  images, sound effects)
+- [uv](https://docs.astral.sh/uv/) for the local models, and an Apple silicon Mac for Whisper,
+  music and images (sound effects' default model runs on any CPU)
 - `FISH_AUDIO_API_KEY` and, to use ElevenLabs, `ELEVENLABS_API_KEY`, in the environment or in the
   project's env file (`.env` unless the project file names another)
 

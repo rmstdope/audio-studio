@@ -2225,16 +2225,52 @@ GET    /api/credit                               the Fish account's API credit (
 GET    /api/setup                                what the machine and project lack (§10)
 GET    /api/spending                             paid recordings: totals per part, running ones live, or the record's problems
 GET    /api/changes                              git status of project paths
+POST   /api/music/tracks/:id/keep-mine           keep the studio's brief over the game's changed one (404 for a track nobody lists)
+GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
+POST   /api/music/tracks/:id/takes               { count } or { retry } queue takes (409 and why if the generator is not ready)
+POST   /api/music/tracks/:id/choose              { file } make a take the track's music: levelled, encoded, manifest and lock written (409 and why if it cannot)
+POST   /api/music/tracks/:id/remove              remove an orphan's music: clip, manifest, lock, board, takes, brief changes (404 if it is not one)
+GET    /api/music/clips/:file                    a music clip (a plain .mp3 in the music clips folder)
+POST   /api/music/tracks/:id/stop                stop the takes: the one being made ends and is discarded, the waiting ones are cancelled
+POST   /api/music/tracks/:id/trim                { file, undo? } cut the near-silence of a stinger take, or give it back as generated; rewrites the game's file when it is the one in the game (409 and why if it cannot)
+POST   /api/music/tracks/:id/move                { file, to } move a take to the track `to` of the same kind: `{ ok, n }` its new number (409 and why if it cannot)
+DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
+GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
+GET    /api/music/tracks/:id/takes/:file         a take's WAV (?seam=1: its seam)
+PUT    /api/music/tracks/:id/takes/:file/fades  save a stinger take's fades (DELETE removes them); GET …/takes/:file?fadeIn&fadeOut&shape hears them
+POST   /api/music/stingers/refresh               run refresh.shared; the stingers added and removed
+POST   /api/effects/refresh                      run refresh.shared; the effect ids added and removed
+PATCH  /api/effects/:id                          the studio's description of a sound effect ({ description }; null or empty: the game's)
+POST   /api/effects/:id/keep-mine                keep the studio's words after the game reworded the effect
+POST   /api/effects/:id/forget                   delete the words of an effect the game no longer lists
+GET    /api/effects/:id/takes                    the effect's takes, those being made and failed
+POST   /api/effects/:id/takes                    make takes ({ count, model? } 1–8, or { retry })
+GET    /api/effects/:id/takes/:file              a take's WAV (?seam=1: its seam, the last 4 seconds then the first 4)
+DELETE /api/effects/:id/takes/:file              drop a take that is not chosen
+PUT    /api/effects/:id/takes/:file/fades        save a one-shot take's fades ({ in, out, shape }; DELETE removes them); GET …/takes/:file?fadeIn&fadeOut&shape hears them
+POST   /api/effects/:id/choose|unchoose|accept|stop   choose a take ({ file }), take it back, accept a changed description, stop the batch
+POST   /api/effects/:id/trim                     { file, undo? } cut the near-silence of a one-shot take, or give it back as generated; rewrites the game's file when it is the one in the game (409 and why if it cannot)
+GET    /api/effects/clips/:file                  a chosen clip (plain `.mp3` only)
+GET    /api/effects/:id/current                  the clip the game plays for the effect
+GET    /api/effects/making                       the batches being made, by effect
+GET    /api/effects/models                       which sound-effects models can run, and the project's
+POST   /api/effects/make-all                     four takes for each listed effect with no chosen take ({ ids })
+POST   /api/effects/stop-all                     stop every take waiting or being made
+GET    /api/effects/batch                        what the latest make-all made, stopped and failed (null: none)
+POST   /api/effects/batch/close                  forgets that summary (Close)
+GET    /api/music/lists/:id/batch                the latest make-all of a list; POST …/batch/close forgets it
+PUT    /api/effect-model                         the project's sound-effects model ({ model, was }; stale `was` 409)
+PATCH  /api/music/tracks/:id                     change one of a track's brief, seconds, bpm or key ({ brief } and the like)
+POST   /api/music/tracks/:id/accept|unchoose     accept a changed brief; take the chosen take back
+GET    /api/music/tracks/:id/current             the clip the game plays for the track
+GET    /api/music/model-state                    whether the music model can make takes, and why not
+POST   /api/music/lists/:id/make-all|stop        make takes for every track of a list with none chosen; stop them
 ```
 
-The other workspaces' routes are described with them:
+Images' and scenes' routes are described with them:
 
-- **Music** (§8.5): `/api/music/tracks/:id/…` (brief, takes, fades, choose, trim, move, accept,
-  remove, stop), `/api/music/lists/:id/…` (make all, stop, batch), `/api/music/clips/:file`,
-  `/api/music/making`, `/api/music/model-state` and `POST /api/music/stingers/refresh`.
 - **Images** (§8.7, its **API** paragraph): `/api/images/…`, `/api/image-acts/:id/…` and
   `PATCH /api/image-style`.
-- **Sound effects** (§8.8–§8.10): `/api/effects/…`, including `POST /api/effects/refresh`.
 - **Scenes** (§8.11): `PUT /api/scenes/:part/:id`, `POST /api/scene-loudness/:part` and
   `GET /api/scene-loudness`.
 
