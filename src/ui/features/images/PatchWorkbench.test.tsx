@@ -667,7 +667,7 @@ describe('keys and focus around the question and Make', () => {
     expect(document.activeElement).toBe(thumbs(host)[0] ?? null)
   })
 
-  it('reloads the patches when a take of the image is chosen, dropped or un-chosen', async () => {
+  it('reloads the patches and the fine-tunes when a take of the image is chosen, dropped or un-chosen', async () => {
     const { useChooseImageTake } = await import('../../api')
     const client = new QueryClient()
     const asked: unknown[] = []
@@ -695,6 +695,8 @@ describe('keys and focus around the question and Make', () => {
     })
     await settle()
     expect(asked).toContainEqual(['image-patches', 'inn'])
+    // The fine-tunes belong to the picture in the game, which a choice changes.
+    expect(asked).toContainEqual(['image-fine-tunes', 'inn'])
   })
 })
 

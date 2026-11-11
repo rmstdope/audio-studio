@@ -79,7 +79,7 @@ async function render(
     act(() => root.unmount())
     host.remove()
   })
-  return { host, sent }
+  return { host, sent, client }
 }
 
 async function settle() {
@@ -308,6 +308,29 @@ describe('looking at, dropping and using fine-tunes', () => {
     expect(wordsBox(host).value).toBe('')
     expect(document.activeElement).toBe(wordsBox(host))
     await act(async () => button(host, 'Close')!.click())
+    expect(host.querySelector('[role=status]')).toBeNull()
+  })
+
+  it('keeps the came-along line on the new take, and puts it away when another take is chosen', async () => {
+    let served = ready()
+    const { host, client } = await render(() => served, {
+      status: 200,
+      body: { ok: true, take: 4, from: 3, carried: { areas: 3, patches: 1 } },
+    })
+    await act(async () => cards(host)[1]!.querySelectorAll('button')[1]!.click())
+    await settle()
+    const follow = async (n: number) => {
+      served = view({ picture: { kind: 'take', n, width: 1024, height: 576 } })
+      await act(async () => {
+        await client.invalidateQueries({ queryKey: ['image-fine-tunes', 'inn'] })
+      })
+      await settle()
+    }
+    await follow(4)
+    expect(host.querySelector('[role=status]')).not.toBeNull()
+    await follow(2)
+    expect(host.querySelector('[role=status]')).toBeNull()
+    await follow(3)
     expect(host.querySelector('[role=status]')).toBeNull()
   })
 

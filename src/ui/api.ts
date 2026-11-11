@@ -1678,6 +1678,8 @@ function useImageTakesChange<Input>(
         client.invalidateQueries({ queryKey: ['image-takes', imageId] }),
         // The patches lie on the image's chosen take, which a choice, un-choice or drop may change.
         client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+        // So do the fine-tunes: they belong to the picture in the game.
+        client.invalidateQueries({ queryKey: ['image-fine-tunes', imageId] }),
         client.invalidateQueries({ queryKey: ['image-making'] }),
         ...(project ? [client.invalidateQueries({ queryKey: ['project'] })] : []),
       ]),
