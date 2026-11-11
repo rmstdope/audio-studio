@@ -240,16 +240,18 @@ describe('making fine-tunes', () => {
     await tunes.make(file, 'inn', { count: 2, words: 'x', area: null })
     for (let i = 0; i < 200; i++) {
       const view = (await tunes.view(file, 'inn')) as FineTunesView
-      if (view.making[0]?.state === 'making') break
+      if (view.making.some((m) => m.state === 'making')) break
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
     const before = (await tunes.view(file, 'inn')) as FineTunesView
-    expect(before.making.map((m) => m.state)).toEqual(['making', 'waiting'])
-    expect(await tunes.drop(file, 'inn', 1)).toEqual({ ok: true })
+    // Which of the two the queue reaches first is not promised (as-cv5f is open for that).
+    const going = before.making.find((m) => m.state === 'making')!.n
+    const other = going === 1 ? 2 : 1
+    expect(await tunes.drop(file, 'inn', going)).toEqual({ ok: true })
     release()
     const done = await settled()
-    expect(done.tunes.map((t) => t.n)).toEqual([2])
-    expect(existsSync(join(root, FOLDER, '1.png'))).toBe(false)
+    expect(done.tunes.map((t) => t.n)).toEqual([other])
+    expect(existsSync(join(root, FOLDER, `${going}.png`))).toBe(false)
   })
 
   it('keeps a failed fine-tune for Try again with its words, mark and model', async () => {

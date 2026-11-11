@@ -63,7 +63,7 @@ export function pictureCaption(picture: FineTunesView['picture']): string {
 
 /** What a fine-tune being made says: its wait, or about how long is left. */
 function leftText(making: FineTuneMakingView): string {
-  if (making.state === 'waiting') return 'Waiting'
+  if (making.state === 'waiting') return 'waiting'
   const left = making.expected - making.elapsed
   return left <= 0 ? 'taking longer than expected' : `about ${timeText(left, 'up')} left`
 }
@@ -529,15 +529,20 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
               </div>
             ) : making ? (
               <div key={n} className="patch-thumb patch-thumb-making">
-                <span className="patch-thumb-label">
-                  <span className="grow">Fine-tune {n}</span>
-                </span>
-                <span className="faint small">
+                <div
+                  className="patch-making-pic"
+                  style={{ aspectRatio: `${picture.width} / ${picture.height}` }}
+                >
                   {making.state === 'making' ? 'Being made…' : 'Waiting'}
+                </div>
+                <span className="patch-thumb-label">
+                  <span>
+                    <b>Fine-tune {n}</b> · {making.state === 'making' ? 'making, ' : ''}
+                    {leftText(making)}
+                  </span>
                 </span>
                 {making.state === 'making' && (
                   <>
-                    <span className="faint small">{leftText(making)}</span>
                     <div className="bar" role="progressbar" aria-label={`Fine-tune ${n}`}>
                       <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
                     </div>
