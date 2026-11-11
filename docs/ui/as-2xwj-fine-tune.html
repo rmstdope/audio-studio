@@ -1,51 +1,1029 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fine-tune the picture — agreed</title><style>:root{--bg:#0b0c10;--side:#0f1116;--panel:#12141a;--raised:#191c24;--inset:#0d0f14;--line:#1f232d;--line2:#2a2e39;--text:#eceef3;--soft:#c7ccd6;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--accent-ink:#1a0a02;--asoft:#2a1b12;--asoft-ink:#ff9a6b;--ok:#3ddc97;--ok-bg:#10291f;--warn:#ffc24b;--warn-bg:#2d2412;--info:#7aa7ff;--dbg:#2e1720;--dink:#ff94a8;color-scheme:dark}
-*{box-sizing:border-box}body{margin:0;background:#07080b;color:var(--text);font:14px/1.45 system-ui,-apple-system,sans-serif;padding:24px}
-.intro,.note{max-width:1180px;margin:0 auto 14px;color:var(--muted)}.intro h1{color:var(--text);font-size:20px;margin:0 0 6px}.note{margin-top:26px;color:var(--soft)}.note b{color:var(--text)}
-.frame{max-width:1180px;margin:0 auto;border:1px solid var(--line2);border-radius:12px;overflow:hidden;display:flex;background:var(--bg)}
-.sidebar{width:200px;background:var(--side);border-right:1px solid var(--line);padding:16px 12px;color:var(--muted);font-size:13px;flex:none}.sidebar div{padding:5px 8px;border-radius:6px}.sidebar .on{background:var(--raised);color:var(--text)}
-.main{flex:1;padding:20px 24px;min-width:0}.crumb{color:var(--faint);font-size:12px}.h1{font-size:20px;font-weight:600;margin:4px 0 2px}.sub{color:var(--muted);font-size:13px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:16px}.panel h2{font-size:15px;margin:0 0 4px}.panel .lead{color:var(--muted);font-size:13px;margin:0 0 12px}
-.dim{opacity:.45}.row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
-.pic{position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--line2);background:var(--inset)}.pic svg{display:block;width:100%;height:auto}
-.mark{position:absolute;border:2px dashed var(--accent);border-radius:2px;box-shadow:0 0 0 9999px rgba(0,0,0,.28)}
-.cap{font-size:12px;color:var(--muted);margin-top:6px}.cap b{color:var(--text);font-weight:600}
-.btn{display:inline-block;background:var(--raised);border:1px solid var(--line2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:13px}.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}.btn.sm{padding:3px 9px;font-size:12px}.btn.off{opacity:.4}.btn.link{background:none;border:none;color:var(--info);padding:0}
-.chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--raised);color:var(--muted);border:1px solid var(--line2)}.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:#1f5a40}.chip.new{background:var(--asoft);color:var(--asoft-ink);border-color:#5a3218}.chip.warn{background:var(--warn-bg);color:var(--warn);border-color:#5a4718}
-textarea{width:100%;background:var(--inset);color:var(--text);border:1px solid var(--line2);border-radius:7px;padding:8px 10px;font:inherit;resize:vertical;min-height:58px}
-select{background:var(--inset);color:var(--text);border:1px solid var(--line2);border-radius:7px;padding:5px 8px;font:inherit;font-size:13px}
-label.f{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
-.err{background:var(--dbg);color:var(--dink);border-radius:7px;padding:8px 10px;font-size:13px}.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:7px;padding:8px 10px;font-size:13px}
-.bar{height:4px;background:var(--line2);border-radius:3px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--accent)}
-.state{max-width:1180px;margin:30px auto 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
-.tk{width:180px}.tk .pic{border-width:2px}.tk.sel .pic{border-color:var(--accent)}.acts{display:flex;gap:6px;margin-top:6px}
-.wait{display:flex;align-items:center;justify-content:center;aspect-ratio:16/10;color:var(--faint);font-size:12px;background:var(--inset)}
-.kbd{font:11px ui-monospace,monospace;border:1px solid var(--line2);border-radius:4px;padding:0 4px;color:var(--muted)}
-</style></head><body><div class="intro"><h1>Fine-tune the picture — agreed</h1><p>A full-width panel “Fine-tune the picture” sits below Takes and above Named areas, the same way “Patches the game asks for” works: the picture in the game is shown large, you may drag an area on it, describe the change, and make 1 to 6 fine-tunes. Each fine-tune can be laid over the big picture to look at, used, or dropped.</p></div><div class="state">Ready, no fine-tunes yet, an area marked</div><div class="frame"><div class="sidebar"><div>Setup</div><div>Narration</div><div>Music</div><div class="on">Images</div><div>Sound effects</div><div>Scenes</div><div>Changes</div></div><div class="main"><div class="crumb">Images › Act I › The Prancing Stag</div><div class="h1">The inn at dusk</div><div class="sub">inn-dusk · 320 × 200 · <span class="chip ok">Chosen: Take 3</span></div><div class="panel"><h2>Takes</h2><p class="lead">Each take is a new image made from the prompt.</p><div class="row">
-<div class="tk sel"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg></div><div class="cap"><b>Take 3</b> <span class="chip ok">Chosen</span></div></div>
-<div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><rect x="224" y="86" width="24" height="20" fill="#3b3b47"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg></div><div class="cap"><b>Take 2</b></div></div>
-<div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg></div><div class="cap"><b>Take 1</b></div></div></div>
-<div class="row" style="margin-top:12px;align-items:center"><select><option>FLUX.2 klein</option></select><select><option>2</option></select><span class="btn">Make takes</span></div></div><div class="panel"><h2>Fine-tune the picture</h2><p class="lead">Change one thing in the picture in the game from words: add, remove or change something. The rest stays as it is. Use one and it replaces the picture; the old one stays among the takes.</p><div class="row"><div style="width:560px;max-width:100%"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg><div class="mark" style="left:56%;top:64%;width:30%;height:22%"></div></div><div class="cap"><b>Take 3</b> — the picture in the game now</div><div class="cap">Marked area: the change is kept to this place. <span class="btn link">Clear the mark</span></div></div>
-<div style="flex:1;min-width:240px"><label class="f">What to change</label><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
-<label class="f">Model for new takes</label><select><option>FLUX.2 klein · about 20 s a take</option><option>Qwen Image Edit · 4 to 9 min a take</option></select>
-<div class="row" style="margin-top:12px;align-items:center"><select aria-label="Number of fine-tunes"><option>3</option></select><span class="btn pri">Make fine-tunes</span></div></div></div>
-<div style="margin-top:14px"><p class="cap">No fine-tunes yet. Describe a change and make a few.</p></div></div><div class="panel dim"><h2>Named areas</h2><p class="lead">3 of 3 placed</p></div><div class="panel dim"><h2>Patches the game asks for</h2><p class="lead">2 patches · 1 chosen</p></div></div></div><div class="state">No area marked</div><div class="frame"><div class="main"><div class="panel" style="margin-top:0"><h2>Fine-tune the picture</h2><p class="lead">…</p><div class="row"><div style="width:560px;max-width:100%"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg></div><div class="cap"><b>Take 3</b> — the picture in the game now</div><div class="cap">No area marked: the whole picture may change. Drag on the picture to keep the change to one place.</div></div>
-<div style="flex:1;min-width:240px"><label class="f">What to change</label><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
-<label class="f">Model for new takes</label><select><option>FLUX.2 klein · about 20 s a take</option><option>Qwen Image Edit · 4 to 9 min a take</option></select>
-<div class="row" style="margin-top:12px;align-items:center"><select aria-label="Number of fine-tunes"><option>3</option></select><span class="btn pri">Make fine-tunes</span></div></div></div>
-<div style="margin-top:14px"><p class="cap">No fine-tunes yet. Describe a change and make a few.</p></div></div></div></div><div class="state">Making 3</div><div class="frame"><div class="main"><div class="panel" style="margin-top:0"><h2>Fine-tune the picture</h2><p class="lead">…</p><div class="row"><div style="width:560px;max-width:100%"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg><div class="mark" style="left:56%;top:64%;width:30%;height:22%"></div></div><div class="cap"><b>Take 3</b> — the picture in the game now</div><div class="cap">Marked area: the change is kept to this place. <span class="btn link">Clear the mark</span></div></div>
-<div style="flex:1;min-width:240px"><label class="f">What to change</label><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
-<label class="f">Model for new takes</label><select><option>FLUX.2 klein · about 20 s a take</option><option>Qwen Image Edit · 4 to 9 min a take</option></select>
-<div class="row" style="margin-top:12px;align-items:center"><select aria-label="Number of fine-tunes"><option>3</option></select><span class="btn">Stop</span><span class="btn pri off">Make fine-tunes</span></div></div></div>
-<div style="margin-top:14px"><div class="row"><div class="tk"><div class="pic"><div class="wait">Being made…</div></div><div class="cap"><b>Fine-tune 1</b> · making, about 20 s left<div class="bar"><i style="width:40%"></i></div></div><div class="acts"><span class="btn sm">Stop</span></div></div><div class="tk"><div class="pic"><div class="wait">Waiting</div></div><div class="cap"><b>Fine-tune 2</b> · waiting</div></div><div class="tk"><div class="pic"><div class="wait">Waiting</div></div><div class="cap"><b>Fine-tune 3</b> · waiting</div></div></div></div></div></div></div><div class="state">Fine-tunes ready, one shown on the picture, one failed</div><div class="frame"><div class="main"><div class="panel" style="margin-top:0"><h2>Fine-tune the picture</h2><p class="lead">…</p><div class="row"><div style="width:560px;max-width:100%"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="225" cy="146" rx="13" ry="7" fill="#111"/><circle cx="214" cy="139" r="6" fill="#111"/></svg><div class="mark" style="left:56%;top:64%;width:30%;height:22%"></div></div><div class="cap"><b>Looking at Fine-tune 2</b> · <label><input type="checkbox" checked> Show the fine-tune</label> <span class="kbd">S</span></div><div class="cap">Marked area: the change is kept to this place. <span class="btn link">Clear the mark</span></div></div>
-<div style="flex:1;min-width:240px"><label class="f">What to change</label><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
-<label class="f">Model for new takes</label><select><option>FLUX.2 klein · about 20 s a take</option><option>Qwen Image Edit · 4 to 9 min a take</option></select>
-<div class="row" style="margin-top:12px;align-items:center"><select aria-label="Number of fine-tunes"><option>3</option></select><span class="btn pri">Make fine-tunes</span></div></div></div>
-<div style="margin-top:14px"><div class="row"><div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="232" cy="145" rx="15" ry="8" fill="#ddd"/><circle cx="219" cy="138" r="7" fill="#ddd"/></svg></div><div class="cap"><b>Fine-tune 1</b> <span class="chip new">new</span></div><div class="acts"><span class="btn sm pri">Use this</span><span class="btn sm">Drop</span></div></div><div class="tk sel"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="225" cy="146" rx="13" ry="7" fill="#111"/><circle cx="214" cy="139" r="6" fill="#111"/></svg></div><div class="cap"><b>Fine-tune 2</b> <span class="chip new">new</span></div><div class="acts"><span class="btn sm pri">Use this</span><span class="btn sm">Drop</span></div></div><div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="250" cy="146" rx="12" ry="7" fill="#7a5a3a"/><circle cx="260" cy="139" r="6" fill="#7a5a3a"/></svg></div><div class="cap"><b>Fine-tune 3</b> <span class="chip new">new</span></div><div class="acts"><span class="btn sm pri">Use this</span><span class="btn sm">Drop</span></div></div><div class="tk"><div class="pic"><div class="wait" style="color:var(--dink)">FLUX.2 klein stopped with exit code 1.</div></div><div class="cap"><b>Fine-tune 4</b></div><div class="acts"><span class="btn sm">Try again</span><span class="btn sm">Drop</span></div></div></div></div></div></div></div><div class="state">After “Use this” on Fine-tune 2</div><div class="frame"><div class="sidebar"><div>Setup</div><div>Narration</div><div>Music</div><div class="on">Images</div><div>Sound effects</div><div>Scenes</div><div>Changes</div></div><div class="main"><div class="crumb">Images › Act I › The Prancing Stag</div><div class="h1">The inn at dusk</div><div class="sub">inn-dusk · 320 × 200 · <span class="chip ok">Chosen: Take 3</span></div><div class="panel"><h2>Takes</h2><p class="lead">Each take is a new image made from the prompt.</p><div class="row">
-<div class="tk sel"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="225" cy="146" rx="13" ry="7" fill="#111"/><circle cx="214" cy="139" r="6" fill="#111"/></svg></div><div class="cap"><b>Take 4</b> <span class="chip ok">Chosen</span><br>Fine-tuned from Take 3: “Add a black cat sleeping…”</div></div>
-<div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg></div><div class="cap"><b>Take 3</b> <span class="chip">was chosen</span></div></div>
-<div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><rect x="224" y="86" width="24" height="20" fill="#3b3b47"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg></div><div class="cap"><b>Take 2</b></div></div></div></div>
-<div class="panel"><h2>Fine-tune the picture</h2><p class="lead">…</p><div class="row"><div style="width:560px;max-width:100%"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/></svg><div class="mark" style="left:56%;top:64%;width:30%;height:22%"></div></div><div class="cap"><b>Take 4</b> — the picture in the game now</div><div class="cap">Marked area: the change is kept to this place. <span class="btn link">Clear the mark</span></div></div>
-<div style="flex:1;min-width:240px"><label class="f">What to change</label><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
-<label class="f">Model for new takes</label><select><option>FLUX.2 klein · about 20 s a take</option><option>Qwen Image Edit · 4 to 9 min a take</option></select>
-<div class="row" style="margin-top:12px;align-items:center"><select aria-label="Number of fine-tunes"><option>3</option></select><span class="btn pri">Make fine-tunes</span></div></div></div>
-<div style="margin-top:14px"><p class="cap">No fine-tunes yet. Describe a change and make a few.</p></div></div><div class="panel"><h2>Named areas</h2><p class="lead">3 of 3 placed</p></div><div class="panel"><h2>Patches the game asks for</h2><p class="lead">2 patches · 1 chosen</p></div></div></div><div class="state">No picture at all (no take chosen and no game’s own image)</div><div class="frame"><div class="main"><div class="panel" style="margin-top:0"><h2>Fine-tune the picture</h2><p class="lead">There's no picture to fine-tune yet. Make takes and choose one, then change it here.</p></div></div></div><div class="state">Looking at a fine-tune: laid over the picture</div><div class="frame"><div class="main"><div class="panel" style="margin-top:0"><h2>Fine-tune the picture</h2><p class="lead">Change one thing in the picture in the game from words: add, remove or change something. The rest stays as it is. Use one and it replaces the picture; the old one stays among the takes.</p><div class="row"><div style="width:560px;max-width:100%"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="225" cy="146" rx="13" ry="7" fill="#111"/><circle cx="214" cy="139" r="6" fill="#111"/></svg><div class="mark" style="left:56%;top:64%;width:30%;height:22%;box-shadow:none;opacity:.5"></div></div><div class="cap"><b>Looking at Fine-tune 2</b> · <label><input type="checkbox" checked> Show the fine-tune</label> <span class="kbd">S</span> — turn it off to flick back to Take 3 and spot what changed.</div></div><div style="flex:1;min-width:240px"><label class="f">What to change</label><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea><label class="f">Model for new takes</label><select><option>FLUX.2 klein · about 20 s a take</option></select><div class="row" style="margin-top:12px;align-items:center"><select><option>3</option></select><span class="btn pri">Make fine-tunes</span></div></div></div><div style="margin-top:14px"><div class="row"><div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="232" cy="145" rx="15" ry="8" fill="#ddd"/><circle cx="219" cy="138" r="7" fill="#ddd"/></svg></div><div class="cap"><b>Fine-tune 1</b> <span class="chip new">new</span></div><div class="acts"><span class="btn sm pri">Use this</span><span class="btn sm">Drop</span></div></div><div class="tk sel"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="225" cy="146" rx="13" ry="7" fill="#111"/><circle cx="214" cy="139" r="6" fill="#111"/></svg></div><div class="cap"><b>Fine-tune 2</b> <span class="chip new">new</span></div><div class="acts"><span class="btn sm pri">Use this</span><span class="btn sm">Drop</span></div></div><div class="tk"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="250" cy="146" rx="12" ry="7" fill="#7a5a3a"/><circle cx="260" cy="139" r="6" fill="#7a5a3a"/></svg></div><div class="cap"><b>Fine-tune 3</b> <span class="chip new">new</span></div><div class="acts"><span class="btn sm pri">Use this</span><span class="btn sm">Drop</span></div></div><div class="tk"><div class="pic"><div class="wait" style="color:var(--dink)">FLUX.2 klein stopped with exit code 1.</div></div><div class="cap"><b>Fine-tune 4</b></div><div class="acts"><span class="btn sm">Try again</span><span class="btn sm">Drop</span></div></div></div></div></div></div></div><div class="state">After “Use this” on Fine-tune 2 — with a line saying what came along</div><div class="frame"><div class="main"><div class="panel" style="margin-top:0"><h2>Fine-tune the picture</h2><div class="warnbox" style="margin-bottom:12px;background:var(--ok-bg);color:var(--ok)">Take 4 is in the game now. Its 3 named areas and 1 chosen patch came along from Take 3. <span class="btn link">Close</span></div><div class="row"><div style="width:560px;max-width:100%"><div class="pic"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#2b2233"/><rect y="130" width="320" height="70" fill="#4a3424"/><rect x="40" y="40" width="120" height="90" fill="#6b4a2e"/><rect x="58" y="62" width="28" height="22" fill="#e9c46a"/><rect x="110" y="80" width="30" height="50" fill="#3a2716"/><polygon points="30,42 100,5 170,42" fill="#7a2f2f"/><rect x="200" y="70" width="70" height="60" fill="#5b5b6b"/><circle cx="236" cy="96" r="14" fill="#ff8a3d"/><rect x="190" y="150" width="90" height="10" fill="#3a2716"/><ellipse cx="225" cy="146" rx="13" ry="7" fill="#111"/><circle cx="214" cy="139" r="6" fill="#111"/></svg></div><div class="cap"><b>Take 4</b> — the picture in the game now</div></div><div style="flex:1;min-width:240px"><label class="f">What to change</label><textarea placeholder="Say what to add, remove or change"></textarea><div class="row" style="margin-top:12px;align-items:center"><select><option>3</option></select><span class="btn pri off">Make fine-tunes</span></div></div></div><p class="cap">No fine-tunes yet. Describe a change and make a few.</p></div></div></div><div class="state">The game’s own image</div><div class="frame"><div class="main"><p class="cap">Caption under the big picture: “The game's own image — the picture in the game now”. After use: “Take 1 is in the game now, fine-tuned from the game's own image.” In Takes: “Fine-tuned from the game's own image: “…””. The game's own file is never changed.</p></div></div></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Fine-tune the picture — agreed</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --side: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line2: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --asoft: #2a1b12;
+        --asoft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --info: #7aa7ff;
+        --dbg: #2e1720;
+        --dink: #ff94a8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1180px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 26px;
+        color: var(--soft);
+      }
+      .note b {
+        color: var(--text);
+      }
+      .frame {
+        max-width: 1180px;
+        margin: 0 auto;
+        border: 1px solid var(--line2);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        background: var(--bg);
+      }
+      .sidebar {
+        width: 200px;
+        background: var(--side);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        color: var(--muted);
+        font-size: 13px;
+        flex: none;
+      }
+      .sidebar div {
+        padding: 5px 8px;
+        border-radius: 6px;
+      }
+      .sidebar .on {
+        background: var(--raised);
+        color: var(--text);
+      }
+      .main {
+        flex: 1;
+        padding: 20px 24px;
+        min-width: 0;
+      }
+      .crumb {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 4px 0 2px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-top: 16px;
+      }
+      .panel h2 {
+        font-size: 15px;
+        margin: 0 0 4px;
+      }
+      .panel .lead {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 12px;
+      }
+      .dim {
+        opacity: 0.45;
+      }
+      .row {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .pic {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--line2);
+        background: var(--inset);
+      }
+      .pic svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .mark {
+        position: absolute;
+        border: 2px dashed var(--accent);
+        border-radius: 2px;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.28);
+      }
+      .cap {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .cap b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .btn {
+        display: inline-block;
+        background: var(--raised);
+        border: 1px solid var(--line2);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+      .btn.pri {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.sm {
+        padding: 3px 9px;
+        font-size: 12px;
+      }
+      .btn.off {
+        opacity: 0.4;
+      }
+      .btn.link {
+        background: none;
+        border: none;
+        color: var(--info);
+        padding: 0;
+      }
+      .chip {
+        display: inline-block;
+        font-size: 11px;
+        padding: 1px 7px;
+        border-radius: 999px;
+        background: var(--raised);
+        color: var(--muted);
+        border: 1px solid var(--line2);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+        border-color: #1f5a40;
+      }
+      .chip.new {
+        background: var(--asoft);
+        color: var(--asoft-ink);
+        border-color: #5a3218;
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-color: #5a4718;
+      }
+      textarea {
+        width: 100%;
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line2);
+        border-radius: 7px;
+        padding: 8px 10px;
+        font: inherit;
+        resize: vertical;
+        min-height: 58px;
+      }
+      select {
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line2);
+        border-radius: 7px;
+        padding: 5px 8px;
+        font: inherit;
+        font-size: 13px;
+      }
+      label.f {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 10px 0 4px;
+      }
+      .err {
+        background: var(--dbg);
+        color: var(--dink);
+        border-radius: 7px;
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+      .warnbox {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-radius: 7px;
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+      .bar {
+        height: 4px;
+        background: var(--line2);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .state {
+        max-width: 1180px;
+        margin: 30px auto 8px;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .tk {
+        width: 180px;
+      }
+      .tk .pic {
+        border-width: 2px;
+      }
+      .tk.sel .pic {
+        border-color: var(--accent);
+      }
+      .acts {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .wait {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 16/10;
+        color: var(--faint);
+        font-size: 12px;
+        background: var(--inset);
+      }
+      .kbd {
+        font:
+          11px ui-monospace,
+          monospace;
+        border: 1px solid var(--line2);
+        border-radius: 4px;
+        padding: 0 4px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Fine-tune the picture — agreed</h1>
+      <p>
+        A full-width panel “Fine-tune the picture” sits below Takes and above Named areas, the same
+        way “Patches the game asks for” works: the picture in the game is shown large, you may drag
+        an area on it, describe the change, and make 1 to 6 fine-tunes. Each fine-tune can be laid
+        over the big picture to look at, used, or dropped.
+      </p>
+    </div>
+    <div class="state">Ready, no fine-tunes yet, an area marked</div>
+    <div class="frame">
+      <div class="sidebar">
+        <div>Setup</div>
+        <div>Narration</div>
+        <div>Music</div>
+        <div class="on">Images</div>
+        <div>Sound effects</div>
+        <div>Scenes</div>
+        <div>Changes</div>
+      </div>
+      <div class="main">
+        <div class="crumb">Images › Act I › The Prancing Stag</div>
+        <div class="h1">The inn at dusk</div>
+        <div class="sub">inn-dusk · 320 × 200 · <span class="chip ok">Chosen: Take 3</span></div>
+        <div class="panel">
+          <h2>Takes</h2>
+          <p class="lead">Each take is a new image made from the prompt.</p>
+          <div class="row">
+            <div class="tk sel">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+              </div>
+              <div class="cap"><b>Take 3</b> <span class="chip ok">Chosen</span></div>
+            </div>
+            <div class="tk">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <rect x="224" y="86" width="24" height="20" fill="#3b3b47" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+              </div>
+              <div class="cap"><b>Take 2</b></div>
+            </div>
+            <div class="tk">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+              </div>
+              <div class="cap"><b>Take 1</b></div>
+            </div>
+          </div>
+          <div class="row" style="margin-top: 12px; align-items: center">
+            <select>
+              <option>FLUX.2 klein</option></select
+            ><select>
+              <option>2</option></select
+            ><span class="btn">Make takes</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Fine-tune the picture</h2>
+          <p class="lead">
+            Change one thing in the picture in the game from words: add, remove or change something.
+            The rest stays as it is. Use one and it replaces the picture; the old one stays among
+            the takes.
+          </p>
+          <div class="row">
+            <div style="width: 560px; max-width: 100%">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+                <div class="mark" style="left: 56%; top: 64%; width: 30%; height: 22%"></div>
+              </div>
+              <div class="cap"><b>Take 3</b> — the picture in the game now</div>
+              <div class="cap">
+                Marked area: the change is kept to this place.
+                <span class="btn link">Clear the mark</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 240px">
+              <label class="f">What to change</label
+              ><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
+              <label class="f">Model for new takes</label
+              ><select>
+                <option>FLUX.2 klein · about 20 s a take</option>
+                <option>Qwen Image Edit · 4 to 9 min a take</option>
+              </select>
+              <div class="row" style="margin-top: 12px; align-items: center">
+                <select aria-label="Number of fine-tunes">
+                  <option>3</option></select
+                ><span class="btn pri">Make fine-tunes</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 14px">
+            <p class="cap">No fine-tunes yet. Describe a change and make a few.</p>
+          </div>
+        </div>
+        <div class="panel dim">
+          <h2>Named areas</h2>
+          <p class="lead">3 of 3 placed</p>
+        </div>
+        <div class="panel dim">
+          <h2>Patches the game asks for</h2>
+          <p class="lead">2 patches · 1 chosen</p>
+        </div>
+      </div>
+    </div>
+    <div class="state">No area marked</div>
+    <div class="frame">
+      <div class="main">
+        <div class="panel" style="margin-top: 0">
+          <h2>Fine-tune the picture</h2>
+          <p class="lead">…</p>
+          <div class="row">
+            <div style="width: 560px; max-width: 100%">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+              </div>
+              <div class="cap"><b>Take 3</b> — the picture in the game now</div>
+              <div class="cap">
+                No area marked: the whole picture may change. Drag on the picture to keep the change
+                to one place.
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 240px">
+              <label class="f">What to change</label
+              ><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
+              <label class="f">Model for new takes</label
+              ><select>
+                <option>FLUX.2 klein · about 20 s a take</option>
+                <option>Qwen Image Edit · 4 to 9 min a take</option>
+              </select>
+              <div class="row" style="margin-top: 12px; align-items: center">
+                <select aria-label="Number of fine-tunes">
+                  <option>3</option></select
+                ><span class="btn pri">Make fine-tunes</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 14px">
+            <p class="cap">No fine-tunes yet. Describe a change and make a few.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="state">Making 3</div>
+    <div class="frame">
+      <div class="main">
+        <div class="panel" style="margin-top: 0">
+          <h2>Fine-tune the picture</h2>
+          <p class="lead">…</p>
+          <div class="row">
+            <div style="width: 560px; max-width: 100%">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+                <div class="mark" style="left: 56%; top: 64%; width: 30%; height: 22%"></div>
+              </div>
+              <div class="cap"><b>Take 3</b> — the picture in the game now</div>
+              <div class="cap">
+                Marked area: the change is kept to this place.
+                <span class="btn link">Clear the mark</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 240px">
+              <label class="f">What to change</label
+              ><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
+              <label class="f">Model for new takes</label
+              ><select>
+                <option>FLUX.2 klein · about 20 s a take</option>
+                <option>Qwen Image Edit · 4 to 9 min a take</option>
+              </select>
+              <div class="row" style="margin-top: 12px; align-items: center">
+                <select aria-label="Number of fine-tunes">
+                  <option>3</option></select
+                ><span class="btn">Stop</span><span class="btn pri off">Make fine-tunes</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 14px">
+            <div class="row">
+              <div class="tk">
+                <div class="pic"><div class="wait">Being made…</div></div>
+                <div class="cap">
+                  <b>Fine-tune 1</b> · making, about 20 s left
+                  <div class="bar"><i style="width: 40%"></i></div>
+                </div>
+                <div class="acts"><span class="btn sm">Stop</span></div>
+              </div>
+              <div class="tk">
+                <div class="pic"><div class="wait">Waiting</div></div>
+                <div class="cap"><b>Fine-tune 2</b> · waiting</div>
+              </div>
+              <div class="tk">
+                <div class="pic"><div class="wait">Waiting</div></div>
+                <div class="cap"><b>Fine-tune 3</b> · waiting</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="state">Fine-tunes ready, one shown on the picture, one failed</div>
+    <div class="frame">
+      <div class="main">
+        <div class="panel" style="margin-top: 0">
+          <h2>Fine-tune the picture</h2>
+          <p class="lead">…</p>
+          <div class="row">
+            <div style="width: 560px; max-width: 100%">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                  <ellipse cx="225" cy="146" rx="13" ry="7" fill="#111" />
+                  <circle cx="214" cy="139" r="6" fill="#111" />
+                </svg>
+                <div class="mark" style="left: 56%; top: 64%; width: 30%; height: 22%"></div>
+              </div>
+              <div class="cap">
+                <b>Looking at Fine-tune 2</b> ·
+                <label><input type="checkbox" checked /> Show the fine-tune</label>
+                <span class="kbd">S</span>
+              </div>
+              <div class="cap">
+                Marked area: the change is kept to this place.
+                <span class="btn link">Clear the mark</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 240px">
+              <label class="f">What to change</label
+              ><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
+              <label class="f">Model for new takes</label
+              ><select>
+                <option>FLUX.2 klein · about 20 s a take</option>
+                <option>Qwen Image Edit · 4 to 9 min a take</option>
+              </select>
+              <div class="row" style="margin-top: 12px; align-items: center">
+                <select aria-label="Number of fine-tunes">
+                  <option>3</option></select
+                ><span class="btn pri">Make fine-tunes</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 14px">
+            <div class="row">
+              <div class="tk">
+                <div class="pic">
+                  <svg viewBox="0 0 320 200">
+                    <rect width="320" height="200" fill="#2b2233" />
+                    <rect y="130" width="320" height="70" fill="#4a3424" />
+                    <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                    <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                    <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                    <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                    <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                    <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                    <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                    <ellipse cx="232" cy="145" rx="15" ry="8" fill="#ddd" />
+                    <circle cx="219" cy="138" r="7" fill="#ddd" />
+                  </svg>
+                </div>
+                <div class="cap"><b>Fine-tune 1</b> <span class="chip new">new</span></div>
+                <div class="acts">
+                  <span class="btn sm pri">Use this</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+              <div class="tk sel">
+                <div class="pic">
+                  <svg viewBox="0 0 320 200">
+                    <rect width="320" height="200" fill="#2b2233" />
+                    <rect y="130" width="320" height="70" fill="#4a3424" />
+                    <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                    <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                    <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                    <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                    <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                    <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                    <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                    <ellipse cx="225" cy="146" rx="13" ry="7" fill="#111" />
+                    <circle cx="214" cy="139" r="6" fill="#111" />
+                  </svg>
+                </div>
+                <div class="cap"><b>Fine-tune 2</b> <span class="chip new">new</span></div>
+                <div class="acts">
+                  <span class="btn sm pri">Use this</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+              <div class="tk">
+                <div class="pic">
+                  <svg viewBox="0 0 320 200">
+                    <rect width="320" height="200" fill="#2b2233" />
+                    <rect y="130" width="320" height="70" fill="#4a3424" />
+                    <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                    <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                    <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                    <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                    <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                    <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                    <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                    <ellipse cx="250" cy="146" rx="12" ry="7" fill="#7a5a3a" />
+                    <circle cx="260" cy="139" r="6" fill="#7a5a3a" />
+                  </svg>
+                </div>
+                <div class="cap"><b>Fine-tune 3</b> <span class="chip new">new</span></div>
+                <div class="acts">
+                  <span class="btn sm pri">Use this</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+              <div class="tk">
+                <div class="pic">
+                  <div class="wait" style="color: var(--dink)">
+                    FLUX.2 klein stopped with exit code 1.
+                  </div>
+                </div>
+                <div class="cap"><b>Fine-tune 4</b></div>
+                <div class="acts">
+                  <span class="btn sm">Try again</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="state">After “Use this” on Fine-tune 2</div>
+    <div class="frame">
+      <div class="sidebar">
+        <div>Setup</div>
+        <div>Narration</div>
+        <div>Music</div>
+        <div class="on">Images</div>
+        <div>Sound effects</div>
+        <div>Scenes</div>
+        <div>Changes</div>
+      </div>
+      <div class="main">
+        <div class="crumb">Images › Act I › The Prancing Stag</div>
+        <div class="h1">The inn at dusk</div>
+        <div class="sub">inn-dusk · 320 × 200 · <span class="chip ok">Chosen: Take 3</span></div>
+        <div class="panel">
+          <h2>Takes</h2>
+          <p class="lead">Each take is a new image made from the prompt.</p>
+          <div class="row">
+            <div class="tk sel">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                  <ellipse cx="225" cy="146" rx="13" ry="7" fill="#111" />
+                  <circle cx="214" cy="139" r="6" fill="#111" />
+                </svg>
+              </div>
+              <div class="cap">
+                <b>Take 4</b> <span class="chip ok">Chosen</span><br />Fine-tuned from Take 3: “Add
+                a black cat sleeping…”
+              </div>
+            </div>
+            <div class="tk">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+              </div>
+              <div class="cap"><b>Take 3</b> <span class="chip">was chosen</span></div>
+            </div>
+            <div class="tk">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <rect x="224" y="86" width="24" height="20" fill="#3b3b47" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+              </div>
+              <div class="cap"><b>Take 2</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Fine-tune the picture</h2>
+          <p class="lead">…</p>
+          <div class="row">
+            <div style="width: 560px; max-width: 100%">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                </svg>
+                <div class="mark" style="left: 56%; top: 64%; width: 30%; height: 22%"></div>
+              </div>
+              <div class="cap"><b>Take 4</b> — the picture in the game now</div>
+              <div class="cap">
+                Marked area: the change is kept to this place.
+                <span class="btn link">Clear the mark</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 240px">
+              <label class="f">What to change</label
+              ><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea>
+              <label class="f">Model for new takes</label
+              ><select>
+                <option>FLUX.2 klein · about 20 s a take</option>
+                <option>Qwen Image Edit · 4 to 9 min a take</option>
+              </select>
+              <div class="row" style="margin-top: 12px; align-items: center">
+                <select aria-label="Number of fine-tunes">
+                  <option>3</option></select
+                ><span class="btn pri">Make fine-tunes</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 14px">
+            <p class="cap">No fine-tunes yet. Describe a change and make a few.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Named areas</h2>
+          <p class="lead">3 of 3 placed</p>
+        </div>
+        <div class="panel">
+          <h2>Patches the game asks for</h2>
+          <p class="lead">2 patches · 1 chosen</p>
+        </div>
+      </div>
+    </div>
+    <div class="state">No picture at all (no take chosen and no game’s own image)</div>
+    <div class="frame">
+      <div class="main">
+        <div class="panel" style="margin-top: 0">
+          <h2>Fine-tune the picture</h2>
+          <p class="lead">
+            There's no picture to fine-tune yet. Make takes and choose one, then change it here.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="state">Looking at a fine-tune: laid over the picture</div>
+    <div class="frame">
+      <div class="main">
+        <div class="panel" style="margin-top: 0">
+          <h2>Fine-tune the picture</h2>
+          <p class="lead">
+            Change one thing in the picture in the game from words: add, remove or change something.
+            The rest stays as it is. Use one and it replaces the picture; the old one stays among
+            the takes.
+          </p>
+          <div class="row">
+            <div style="width: 560px; max-width: 100%">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                  <ellipse cx="225" cy="146" rx="13" ry="7" fill="#111" />
+                  <circle cx="214" cy="139" r="6" fill="#111" />
+                </svg>
+                <div
+                  class="mark"
+                  style="
+                    left: 56%;
+                    top: 64%;
+                    width: 30%;
+                    height: 22%;
+                    box-shadow: none;
+                    opacity: 0.5;
+                  "
+                ></div>
+              </div>
+              <div class="cap">
+                <b>Looking at Fine-tune 2</b> ·
+                <label><input type="checkbox" checked /> Show the fine-tune</label>
+                <span class="kbd">S</span> — turn it off to flick back to Take 3 and spot what
+                changed.
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 240px">
+              <label class="f">What to change</label
+              ><textarea>Add a black cat sleeping on the hearth rug in front of the fire.</textarea
+              ><label class="f">Model for new takes</label
+              ><select>
+                <option>FLUX.2 klein · about 20 s a take</option>
+              </select>
+              <div class="row" style="margin-top: 12px; align-items: center">
+                <select>
+                  <option>3</option></select
+                ><span class="btn pri">Make fine-tunes</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 14px">
+            <div class="row">
+              <div class="tk">
+                <div class="pic">
+                  <svg viewBox="0 0 320 200">
+                    <rect width="320" height="200" fill="#2b2233" />
+                    <rect y="130" width="320" height="70" fill="#4a3424" />
+                    <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                    <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                    <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                    <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                    <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                    <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                    <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                    <ellipse cx="232" cy="145" rx="15" ry="8" fill="#ddd" />
+                    <circle cx="219" cy="138" r="7" fill="#ddd" />
+                  </svg>
+                </div>
+                <div class="cap"><b>Fine-tune 1</b> <span class="chip new">new</span></div>
+                <div class="acts">
+                  <span class="btn sm pri">Use this</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+              <div class="tk sel">
+                <div class="pic">
+                  <svg viewBox="0 0 320 200">
+                    <rect width="320" height="200" fill="#2b2233" />
+                    <rect y="130" width="320" height="70" fill="#4a3424" />
+                    <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                    <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                    <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                    <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                    <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                    <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                    <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                    <ellipse cx="225" cy="146" rx="13" ry="7" fill="#111" />
+                    <circle cx="214" cy="139" r="6" fill="#111" />
+                  </svg>
+                </div>
+                <div class="cap"><b>Fine-tune 2</b> <span class="chip new">new</span></div>
+                <div class="acts">
+                  <span class="btn sm pri">Use this</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+              <div class="tk">
+                <div class="pic">
+                  <svg viewBox="0 0 320 200">
+                    <rect width="320" height="200" fill="#2b2233" />
+                    <rect y="130" width="320" height="70" fill="#4a3424" />
+                    <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                    <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                    <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                    <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                    <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                    <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                    <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                    <ellipse cx="250" cy="146" rx="12" ry="7" fill="#7a5a3a" />
+                    <circle cx="260" cy="139" r="6" fill="#7a5a3a" />
+                  </svg>
+                </div>
+                <div class="cap"><b>Fine-tune 3</b> <span class="chip new">new</span></div>
+                <div class="acts">
+                  <span class="btn sm pri">Use this</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+              <div class="tk">
+                <div class="pic">
+                  <div class="wait" style="color: var(--dink)">
+                    FLUX.2 klein stopped with exit code 1.
+                  </div>
+                </div>
+                <div class="cap"><b>Fine-tune 4</b></div>
+                <div class="acts">
+                  <span class="btn sm">Try again</span><span class="btn sm">Drop</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="state">After “Use this” on Fine-tune 2 — with a line saying what came along</div>
+    <div class="frame">
+      <div class="main">
+        <div class="panel" style="margin-top: 0">
+          <h2>Fine-tune the picture</h2>
+          <div
+            class="warnbox"
+            style="margin-bottom: 12px; background: var(--ok-bg); color: var(--ok)"
+          >
+            Take 4 is in the game now. Its 3 named areas and 1 chosen patch came along from Take 3.
+            <span class="btn link">Close</span>
+          </div>
+          <div class="row">
+            <div style="width: 560px; max-width: 100%">
+              <div class="pic">
+                <svg viewBox="0 0 320 200">
+                  <rect width="320" height="200" fill="#2b2233" />
+                  <rect y="130" width="320" height="70" fill="#4a3424" />
+                  <rect x="40" y="40" width="120" height="90" fill="#6b4a2e" />
+                  <rect x="58" y="62" width="28" height="22" fill="#e9c46a" />
+                  <rect x="110" y="80" width="30" height="50" fill="#3a2716" />
+                  <polygon points="30,42 100,5 170,42" fill="#7a2f2f" />
+                  <rect x="200" y="70" width="70" height="60" fill="#5b5b6b" />
+                  <circle cx="236" cy="96" r="14" fill="#ff8a3d" />
+                  <rect x="190" y="150" width="90" height="10" fill="#3a2716" />
+                  <ellipse cx="225" cy="146" rx="13" ry="7" fill="#111" />
+                  <circle cx="214" cy="139" r="6" fill="#111" />
+                </svg>
+              </div>
+              <div class="cap"><b>Take 4</b> — the picture in the game now</div>
+            </div>
+            <div style="flex: 1; min-width: 240px">
+              <label class="f">What to change</label
+              ><textarea placeholder="Say what to add, remove or change"></textarea>
+              <div class="row" style="margin-top: 12px; align-items: center">
+                <select>
+                  <option>3</option></select
+                ><span class="btn pri off">Make fine-tunes</span>
+              </div>
+            </div>
+          </div>
+          <p class="cap">No fine-tunes yet. Describe a change and make a few.</p>
+        </div>
+      </div>
+    </div>
+    <div class="state">The game’s own image</div>
+    <div class="frame">
+      <div class="main">
+        <p class="cap">
+          Caption under the big picture: “The game's own image — the picture in the game now”. After
+          use: “Take 1 is in the game now, fine-tuned from the game's own image.” In Takes:
+          “Fine-tuned from the game's own image: “…””. The game's own file is never changed.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
