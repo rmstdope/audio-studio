@@ -1841,6 +1841,14 @@ export function startServer({
           return imageAnswer(await imageFineTunes.make(projectFile, request.params.id, body.data))
         }),
       },
+      '/api/images/:id/fine-tunes/base': {
+        GET: guard(async (request) => {
+          const png = await imageFineTunes.base(projectFile, request.params.id)
+          return png
+            ? new Response(Buffer.from(png), { headers: { 'content-type': 'image/png' } })
+            : notFound()
+        }),
+      },
       '/api/images/:id/fine-tunes/stop': {
         POST: fromOwnPage(async (request) => {
           const result = await imageFineTunes.stop(projectFile, request.params.id)

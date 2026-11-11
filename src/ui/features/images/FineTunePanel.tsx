@@ -168,7 +168,9 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const model = pick ?? startEditModel(view.models)
   const id = encodeURIComponent(row.id)
   const baseSrc =
-    picture.kind === 'take' ? `/api/images/${id}/takes/${picture.n}` : `/api/images/${id}/current`
+    picture.kind === 'take'
+      ? `/api/images/${id}/takes/${picture.n}`
+      : `/api/images/${id}/fine-tunes/base`
   const tuneSrc = (n: number) => `/api/images/${id}/fine-tunes/${n}`
   const busy = view.making.length > 0
   const modelHere = view.models[model] === 'whole'
@@ -512,7 +514,12 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
                     >
                       Try again
                     </button>
-                    <button type="button" className="btn btn-ghost" onClick={() => onDrop(n)}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
+                      onClick={() => onDrop(n)}
+                    >
                       Drop
                     </button>
                   </div>

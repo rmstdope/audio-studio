@@ -25,12 +25,12 @@ import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_TAKES_DIR, readImages } from './imageLists'
 import { carryImageAreas } from './imageEdits'
 import { editStep } from './imageEditStep'
-import { changePatchBoard } from './imagePatchGame'
+import { changePatchBoard, patchGameOf, patchPictureOf } from './imagePatchGame'
 import { downloadOf, type ImageGenerator } from './images'
 import { describeFailure, type ImageTakes } from './imageTakes'
 import { gameFilePath } from './musicLists'
 import { boardQueue, isSafeId } from './musicTakes'
-import { decodePng, encodePng } from './png'
+import { decodePng, encodePng, pngSize } from './png'
 import type { Serial } from './serial'
 import { recordTakeTime, readTakeTimes } from './takeTimes'
 import { openProject, type ProjectFailure } from './workspace'
@@ -59,6 +59,8 @@ export interface ImageFineTunes {
   markSeen(projectFile: string, id: string, n: number): Promise<FineTuneAnswer>
   /** The path of a fine-tune's picture, or null for an image not listed or a name that is not a number. */
   file(projectFile: string, id: string, name: string): Promise<string | null>
+  /** The picture the fine-tunes are made from, as a PNG (the game's own image fitted to the take size); null when there is none. */
+  base(projectFile: string, id: string): Promise<Uint8Array | null>
   /**
    * Makes a fine-tune a new take of the image, chosen, with the named areas and chosen patches of
    * the picture it came from, and drops every fine-tune of the image.
@@ -191,6 +193,25 @@ export function createImageFineTunes({
     }
   }
 
+  /** The size of the picture in the game as `pictureOf` gives it, without decoding it; null when it cannot be read. */
+  async function pictureSize(image: Image): Promise<{ width: number; height: number } | null> {
+    try {
+      if (image.row.chosenTake !== null) {
+        const path = resolveInRoot(
+          image.root,
+          `${IMAGE_TAKES_DIR}/${image.id}/${image.row.chosenTake}.png`,
+        )
+        return pngSize(new Uint8Array(await Bun.file(path).slice(0, 33).arrayBuffer()))
+      }
+      const own = image.row.gameFile
+        ? await gameFilePath(image.root, image.row.gameFile.file)
+        : null
+      return own ? takeSize(image.row) : null
+    } catch {
+      return null
+    }
+  }
+
   /** Why fine-tunes cannot be made on this computer, or null when they can. */
   async function makerProblem(model?: EditModelId): Promise<string | null> {
     const ready = await generator.ready()
@@ -265,7 +286,9 @@ export function createImageFineTunes({
       }
       entries.delete(entry.n)
       failedModels.get(image.key)?.delete(entry.model)
-      if (took !== null) await recordTakeTime(image.projectFile, timeKeyOfEdit(entry.model), took)
+      // A whole-picture edit takes far longer than a patch's window, so only marked ones are timed under the edit keys.
+      if (took !== null && entry.area)
+        await recordTakeTime(image.projectFile, timeKeyOfEdit(entry.model), took)
     } catch (error) {
       if (stop.signal.aborted) return
       const failed = failedModels.get(image.key) ?? new Set<EditModelId>()
@@ -365,7 +388,7 @@ export function createImageFineTunes({
       const entries = entriesOf(image.key).filter((e) => e.base === image.base)
       const board = await readBoard(image)
       if ('ok' in board) return board
-      const picture = await pictureOf(image)
+      const picture = await pictureSize(image)
       const figures = figuresOf(await readTakeTimes(projectFile))
       const problem = await makerProblem()
       const downloads = Object.fromEntries(
@@ -483,74 +506,131 @@ export function createImageFineTunes({
       return (await Bun.file(file).exists()) ? file : null
     },
 
-    async use(projectFile, id, n) {
+    async base(projectFile, id) {
       const image = await resolve(projectFile, id)
-      if (!image || 'ok' in image) return image
-      const board = await readBoard(image)
-      if ('ok' in board) return board
-      const tune = board.tunes.find((t) => t.n === n)
-      if (!tune) return { ok: false, message: 'That fine-tune is not on the board.' }
-      if (tune.base !== image.base) {
-        return { ok: false, message: 'That fine-tune was made from another picture.' }
+      if (!image || 'ok' in image) return null
+      const pixels = await pictureOf(image)
+      return pixels ? encodePng(pixels) : null
+    },
+
+    use(projectFile, id, n) {
+      // One use at a time per image: a second, at once, finds the board already emptied.
+      return boardQueue().run(`fine-tune-use\0${projectFile}\0${id}`, () =>
+        useOne(projectFile, id, n),
+      )
+    },
+  }
+
+  /**
+   * Gives patch `patch` its chosen take on picture `from` also on the new take `to`: the patch
+   * take is copied (the picture and its game version) as a take painted on `to`, so the patch's
+   * workbench shows and can choose it there. Null when the patch has none chosen on `from`.
+   */
+  async function carryPatch(image: Image, patch: string, from: number, to: number) {
+    const where = { projectFile: image.projectFile, root: image.root, image: image.id, patch }
+    const made = await changePatchBoard(where, async (b) => {
+      const chosen = b.chosen[String(from)]
+      const old = b.takes.find((t) => t.n === chosen)
+      if (chosen === undefined || !old) return null
+      const n = b.next
+      for (const [source, copy] of [
+        [patchPictureOf(image.id, patch, old.n), patchPictureOf(image.id, patch, n)],
+        [patchGameOf(image.id, patch, old.n), patchGameOf(image.id, patch, n)],
+      ] as const) {
+        const bytes = await Bun.file(resolveInRoot(image.root, source))
+          .bytes()
+          .catch(() => null)
+        if (bytes) await writeAtomic(image.root, copy, bytes)
       }
-      const source = await pictureOf(image)
-      const part = await Bun.file(resolveInRoot(image.root, `${image.folder}/${n}.png`))
-        .bytes()
-        .catch(() => null)
-      if (!source || !part) {
+      b.next = n + 1
+      b.takes = [...b.takes, { ...old, n, base: to }]
+      b.chosen[String(to)] = n
+      if (b.inGame[String(from)] !== undefined) b.inGame[String(to)] = n
+      return n
+    })
+    return typeof made === 'number' ? { patch, n: made } : null
+  }
+
+  /** Undoes `carryPatch` for the take `to`: the copied patch take, its files and its choices. */
+  async function uncarryPatch(image: Image, patch: string, n: number, to: number) {
+    const where = { projectFile: image.projectFile, root: image.root, image: image.id, patch }
+    await changePatchBoard(where, (b) => {
+      b.takes = b.takes.filter((t) => t.n !== n)
+      delete b.chosen[String(to)]
+      delete b.inGame[String(to)]
+    })
+    for (const file of [patchPictureOf(image.id, patch, n), patchGameOf(image.id, patch, n)]) {
+      await rm(resolveInRoot(image.root, file), { force: true })
+    }
+  }
+
+  async function useOne(
+    projectFile: string,
+    id: string,
+    n: number,
+  ): Promise<UseFineTuneAnswer | ProjectFailure | null> {
+    const image = await resolve(projectFile, id)
+    if (!image || 'ok' in image) return image
+    const board = await readBoard(image)
+    if ('ok' in board) return board
+    const tune = board.tunes.find((t) => t.n === n)
+    if (!tune) return { ok: false, message: 'That fine-tune is not on the board.' }
+    if (tune.base !== image.base) {
+      return { ok: false, message: 'That fine-tune was made from another picture.' }
+    }
+    const source = await pictureOf(image)
+    const part = await Bun.file(resolveInRoot(image.root, `${image.folder}/${n}.png`))
+      .bytes()
+      .catch(() => null)
+    if (!source || !part) {
+      return {
+        ok: false,
+        message: 'The picture of that fine-tune or the one it came from is gone.',
+      }
+    }
+    const edited = decodePng(part)
+    // A marked fine-tune keeps only what changed: the rest is the picture it was made from.
+    const png = encodePng(tune.area ? layOver(source, edited) : edited)
+    const from = image.row.chosenTake
+    const added = await takes.addTake(projectFile, id, {
+      png,
+      model: editModel(tune.model).mflux,
+      seed: tune.seed,
+      words: tune.words,
+      from,
+    })
+    if (!added || !added.ok) return added
+    // What the picture had comes along to the new take before it is chosen, so the game gets it in the same save.
+    let areas = 0
+    let patches = 0
+    const carriedPatches: { patch: string; n: number }[] = []
+    if (from !== null) {
+      const carried = await carryImageAreas(projectFile, id, from, added.n)
+      if (!carried.ok) {
+        await takes.drop(projectFile, id, added.n)
         return {
           ok: false,
-          message: 'The picture of that fine-tune or the one it came from is gone.',
+          message: `The named areas could not be carried over: ${carried.problems[0]?.message ?? ''}`,
         }
       }
-      const edited = decodePng(part)
-      // A marked fine-tune keeps only what changed: the rest is the picture it was made from.
-      const png = encodePng(tune.area ? layOver(source, edited) : edited)
-      const from = image.row.chosenTake
-      const added = await takes.addTake(projectFile, id, {
-        png,
-        model: editModel(tune.model).mflux,
-        seed: tune.seed,
-        words: tune.words,
-        from,
-      })
-      if (!added || !added.ok) return added
-      // What the picture had comes along to the new take before it is chosen, so the game gets it in the same save.
-      let areas = 0
-      let patches = 0
-      if (from !== null) {
-        const carried = await carryImageAreas(projectFile, id, from, added.n)
-        if (!carried.ok) {
-          await takes.drop(projectFile, id, added.n)
-          return {
-            ok: false,
-            message: `The named areas could not be carried over: ${carried.problems[0]?.message ?? ''}`,
-          }
-        }
-        areas = carried.areas
-        for (const patch of image.row.patches) {
-          const counted = await changePatchBoard(
-            { projectFile, root: image.root, image: id, patch: patch.id },
-            (b) => {
-              const chosen = b.chosen[String(from)]
-              if (chosen === undefined) return 0
-              b.chosen[String(added.n)] = chosen
-              const inGame = b.inGame[String(from)]
-              if (inGame !== undefined) b.inGame[String(added.n)] = inGame
-              return 1
-            },
-          )
-          if (typeof counted === 'number') patches += counted
+      areas = carried.areas
+      for (const patch of image.row.patches) {
+        const copy = await carryPatch(image, patch.id, from, added.n)
+        if (copy) {
+          patches++
+          carriedPatches.push(copy)
         }
       }
-      const chosen = await takes.choose(projectFile, id, added.n)
-      if (!chosen || !chosen.ok) {
-        // The take is not left behind: the fine-tunes stay, and pressing again makes it once more.
-        await takes.drop(projectFile, id, added.n)
-        return chosen
-      }
-      await clear(image)
-      return { ok: true, take: added.n, from, carried: { areas, patches } }
-    },
+    }
+    const chosen = await takes.choose(projectFile, id, added.n)
+    if (!chosen || !chosen.ok) {
+      // The take is not left behind: the fine-tunes stay, and pressing again makes it once more.
+      // The patch takes copied for it go too; its named-area boxes stay on the dropped take, as those of any dropped take do.
+      for (const copy of carriedPatches) await uncarryPatch(image, copy.patch, copy.n, added.n)
+      await takes.drop(projectFile, id, added.n)
+      return chosen
+    }
+    await clear(image)
+    return { ok: true, take: added.n, from, carried: { areas, patches } }
   }
 }

@@ -5,7 +5,9 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import type { EditModelId } from '../core/imageModels'
 import type { FineTunesView } from '../core/imageFineTunes'
 import { createImageFineTunes } from './imageFineTunes'
+import { createImagePatches } from './imagePatches'
 import { createImageTakes } from './imageTakes'
+import type { ImagePatchesView } from '../core/imagePatches'
 import type { ImageGenerator, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
 import { decodePng, encodePng } from './png'
@@ -96,6 +98,7 @@ function setup({
   let seed = 10
   const deps = { generator, queue, free: () => {}, newSeed: () => seed++ }
   const takes = createImageTakes(deps)
+  const patches = createImagePatches(deps)
   const tunes = createImageFineTunes({ ...deps, takes })
   async function settled(): Promise<FineTunesView> {
     for (let i = 0; i < 400; i++) {
@@ -107,7 +110,7 @@ function setup({
     throw new Error('never finished')
   }
   const read = (path: string) => readFileSync(join(root, path), 'utf8')
-  return { root, file, tunes, takes, requests, settled, read }
+  return { root, file, tunes, takes, patches, requests, settled, read }
 }
 
 describe('making fine-tunes', () => {
@@ -281,7 +284,7 @@ describe('looking at and dropping fine-tunes', () => {
 
 describe('using a fine-tune', () => {
   it('makes it a new chosen take, keeps the old one, drops the other fine-tunes, and carries what the old one had', async () => {
-    const { file, tunes, takes, settled, read, root } = setup({
+    const { file, tunes, takes, patches, settled, read, root } = setup({
       extra: {
         [EDITS]: {
           style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
@@ -322,8 +325,18 @@ describe('using a fine-tune', () => {
       fountain: { x: 1, y: 2, width: 30, height: 40 },
     })
     const patchBoard = JSON.parse(read('content-studio/cache/image-patches/inn/door/board.json'))
-    expect(patchBoard.chosen).toEqual({ '3': 1, '4': 1 })
-    expect(patchBoard.inGame).toEqual({ '3': 1, '4': 1 })
+    // The patch's take is copied as one painted on the new take, so the patch can show and choose it there.
+    expect(patchBoard.chosen).toEqual({ '3': 1, '4': 2 })
+    expect(patchBoard.inGame).toEqual({ '3': 1, '4': 2 })
+    expect(patchBoard.takes.map((t: { n: number; base: number }) => [t.n, t.base])).toEqual([
+      [1, 3],
+      [2, 4],
+    ])
+    expect(existsSync(join(root, 'content-studio/cache/image-patches/inn/door/2.game.png'))).toBe(
+      true,
+    )
+    const door = ((await patches.view(file, 'inn')) as ImagePatchesView).patches[0]!
+    expect(door.takes).toMatchObject([{ n: 2, chosen: true }])
     expect(JSON.parse(read(MANIFEST)).inn.patches.door).toBeDefined()
     // The others are gone, with their files.
     const after = (await tunes.view(file, 'inn')) as FineTunesView
@@ -333,17 +346,38 @@ describe('using a fine-tune', () => {
     expect(existsSync(join(root, FOLDER, '3.png'))).toBe(false)
   })
 
-  it('stops what is still waiting or being made', async () => {
+  it('stops what is still waiting or being made, and nothing of it lands afterwards', async () => {
     let release = () => {}
+    let gated = false
     const gate = new Promise<void>((resolve) => (release = resolve))
-    const { file, tunes, settled } = setup({ queue: gatedQueue(gate) })
-    await tunes.make(file, 'inn', { count: 2, words: 'x', area: null })
-    // Nothing is made yet, so there is nothing to use.
-    expect(await tunes.use(file, 'inn', 1)).toMatchObject({ ok: false })
-    release()
+    const inner = createSerial()
+    const queue: Serial = {
+      run: (key, job) => inner.run(key, async () => (gated && (await gate), job())),
+    }
+    const { file, tunes, settled, root } = setup({ queue })
+    await tunes.make(file, 'inn', { count: 1, words: 'x', area: null })
     await settled()
+    gated = true
+    await tunes.make(file, 'inn', { count: 2, words: 'y', area: null })
+    expect(((await tunes.view(file, 'inn')) as FineTunesView).making).toHaveLength(2)
     expect(await tunes.use(file, 'inn', 1)).toMatchObject({ ok: true })
     expect(((await tunes.view(file, 'inn')) as FineTunesView).making).toEqual([])
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(((await tunes.view(file, 'inn')) as FineTunesView).tunes).toEqual([])
+    expect(existsSync(join(root, FOLDER, '2.png'))).toBe(false)
+    expect(existsSync(join(root, FOLDER, '3.png'))).toBe(false)
+  })
+
+  it('makes one take when two uses come at once', async () => {
+    const { file, tunes, settled, takes } = setup()
+    await tunes.make(file, 'inn', { count: 2, words: 'x', area: null })
+    await settled()
+    const [one, two] = await Promise.all([tunes.use(file, 'inn', 1), tunes.use(file, 'inn', 2)])
+    expect([one, two].filter((a) => a && a.ok)).toHaveLength(1)
+    const view = await takes.view(file, 'inn')
+    if (!view || !('takes' in view)) throw new Error('no view')
+    expect(view.takes.map((t) => t.n)).toEqual([3, 4])
   })
 
   it('lays a marked fine-tune over the picture, so the new take is whole', async () => {
@@ -399,6 +433,28 @@ describe('using a fine-tune', () => {
     expect(existsSync(join(root, 'content-studio/cache/image-takes/inn/4.png'))).toBe(false)
   })
 
+  it('takes the patch copies away again when the take cannot be chosen', async () => {
+    const { file, tunes, settled, read, root } = setup({
+      extra: {
+        [MANIFEST]: '{ not json',
+        'content-studio/cache/image-patches/inn/door/board.json': {
+          next: 2,
+          takes: [{ n: 1, base: 3, seed: 1, words: 'the door is gone', area, seen: true }],
+          chosen: { '3': 1 },
+          inGame: { '3': 1 },
+        },
+      },
+    })
+    await tunes.make(file, 'inn', { count: 1, words: 'x', area: null })
+    await settled()
+    expect(await tunes.use(file, 'inn', 1)).toMatchObject({ ok: false })
+    const board = JSON.parse(read('content-studio/cache/image-patches/inn/door/board.json'))
+    expect(board.takes.map((t: { n: number }) => t.n)).toEqual([1])
+    expect(board.chosen).toEqual({ '3': 1 })
+    expect(board.inGame).toEqual({ '3': 1 })
+    expect(existsSync(join(root, 'content-studio/cache/image-patches/inn/door/2.png'))).toBe(false)
+  })
+
   it('refuses a fine-tune that is not on the board', async () => {
     const { file, tunes } = setup()
     expect(await tunes.use(file, 'inn', 9)).toMatchObject({ ok: false })
@@ -415,3 +471,27 @@ function gatedQueue(gate: Promise<void>): Serial {
 function rmGame(root: string) {
   rmSync(join(root, 'web/images/inn-own.png'))
 }
+
+describe('the picture fine-tunes are made from', () => {
+  it('is the chosen take, or the game’s own image fitted to the take size', async () => {
+    const take = setup()
+    expect(decodePng((await take.tunes.base(take.file, 'inn'))!)).toMatchObject({
+      width: 256,
+      height: 256,
+    })
+    const own = setup({ chosen: false })
+    expect(decodePng((await own.tunes.base(own.file, 'inn'))!)).toMatchObject({
+      width: 1024,
+      height: 640,
+    })
+    rmGame(own.root)
+    expect(await own.tunes.base(own.file, 'inn')).toBeNull()
+  })
+
+  it('times only marked fine-tunes, whose window is a patch’s', async () => {
+    const { file, tunes, settled, root } = setup()
+    await tunes.make(file, 'inn', { count: 1, words: 'x', area: null })
+    await settled()
+    expect(existsSync(join(root, 'content-studio/cache/take-times.json'))).toBe(false)
+  })
+})

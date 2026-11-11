@@ -154,7 +154,7 @@ describe('the states of the panel', () => {
     )
     expect(text(host)).toContain("The game's own image — the picture in the game now")
     expect(host.querySelector('img.patch-take')?.getAttribute('src')).toBe(
-      '/api/images/inn/current',
+      '/api/images/inn/fine-tunes/base',
     )
   })
 
