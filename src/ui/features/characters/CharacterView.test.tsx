@@ -268,4 +268,52 @@ describe('CharacterView', () => {
 
     await act(() => page.unmount())
   })
+
+  it('says the missing Fish key on the greyed Record in the words Clone a voice uses', async () => {
+    const cast: CharacterLanguage = { ...uncast, voice: 'f1', voiceName: 'Ada' }
+    const castSummary: ProjectSummary = {
+      ...summary,
+      characters: summary.characters.map((c) => ({
+        ...c,
+        voice: 'f1',
+        voiceName: 'Ada',
+        languages: { en: cast },
+      })),
+    }
+    globalThis.fetch = (async (path: string) => {
+      if (path.startsWith('/api/characters/keeper/voice')) {
+        return Response.json({
+          ok: true,
+          id: 'f1',
+          voice: null,
+          lookup: { reason: 'no-key', message: 'Set the key.' },
+          take: null,
+          audition: { spoken: 'Come in.', phrase: 'Come in.', from: 'own', standard: false },
+          language: 'en',
+          eleven: null,
+        })
+      }
+      return studio(path)
+    }) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(CharacterView, { summary: castSummary, characterId: 'keeper' }),
+        ),
+      ),
+    )
+    const record = () =>
+      [...container.querySelectorAll('button')].find((b) => b.textContent === 'Record')
+    await until(() => record()?.getAttribute('data-why') !== 'Wait for the take to be made.')
+    expect(record()!.getAttribute('data-why')).toBe(
+      'There is no Fish Audio key. Setup says how to add it.',
+    )
+
+    await act(() => page.unmount())
+  })
 })

@@ -657,7 +657,7 @@ function VoicePanel({
               type="button"
               {...off(
                 answer?.lookup?.reason === 'no-key' &&
-                  'There is no Fish key. Setup says how to add it.',
+                  'There is no Fish Audio key. Setup says how to add it.',
                 (recorder.recording.has(id) || !answer) && 'Wait for the take to be made.',
               )}
               onClick={() => void record(id)}
