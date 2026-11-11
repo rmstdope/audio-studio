@@ -19,7 +19,8 @@ import {
   type SceneRow,
 } from '../../../core/scenes'
 import type { Moved } from '../../sceneDraft'
-import { changeWord, limitLine, measuredLine, suggestionLine } from '../../scenesText'
+import { off } from '../../off'
+import { changeWord, limitLine, measuredLine, measureWhy, suggestionLine } from '../../scenesText'
 
 /** How far a measure of the act has got. */
 export interface Running {
@@ -173,12 +174,7 @@ export function LoudnessPanel({
             <span className="scene-loud-warn"> · with your unsaved changes</span>
           )}
         </h2>
-        <button
-          className="btn"
-          type="button"
-          aria-disabled={running ? true : undefined}
-          onClick={press}
-        >
+        <button className="btn" type="button" {...off(measureWhy(!!running))} onClick={press}>
           {running
             ? `Measuring ${Math.min(running.done + 1, running.total)} of ${running.total}…`
             : 'Measure loudness'}
@@ -252,9 +248,8 @@ export function LoudnessPanel({
             <button
               className="btn"
               type="button"
-              aria-disabled={running ? true : undefined}
+              {...off(measureWhy(!!running))}
               onClick={() => {
-                if (running) return
                 onApply(scaleDraft(draft, suggestion.db), {
                   db: suggestion.db,
                   measuredAt: kept.measuredAt,

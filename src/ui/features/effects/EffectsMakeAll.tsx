@@ -1,3 +1,5 @@
+import { off } from '../../off'
+import { EFFECTS_PENDING } from '../../effectsText'
 import { useEffect, useRef, useState } from 'react'
 import type { EffectsSummary } from '../../../core/effects'
 import {
@@ -118,8 +120,8 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
             ref={stopButton}
             className="btn"
             type="button"
-            aria-disabled={stopAll.isPending || undefined}
-            onClick={() => !stopAll.isPending && stopAll.mutate()}
+            {...off(stopAll.isPending && EFFECTS_PENDING)}
+            onClick={() => stopAll.mutate()}
             {...stopFocus}
           >
             Stop all
@@ -272,14 +274,19 @@ function Question({
         </p>
       ))}
       <div className="confirm-actions">
-        <button className="btn btn-ghost" type="button" disabled={pending} onClick={onCancel}>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          {...off(pending && EFFECTS_PENDING)}
+          onClick={onCancel}
+        >
           Cancel
         </button>
         <button
           ref={make}
           className="btn btn-primary"
           type="button"
-          disabled={pending}
+          {...off(pending && EFFECTS_PENDING)}
           onClick={onMake}
         >
           Make {takes} takes

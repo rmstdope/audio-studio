@@ -16,8 +16,12 @@ const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { EffectsView } = await import('./EffectsView')
+const { WhyTip } = await import('../../components/WhyTip')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+/** Whether a control is greyed: `aria-disabled`, so it still takes focus and shows its reason. */
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 
 const realFetch = globalThis.fetch
 const cleanups: (() => void)[] = []
@@ -91,7 +95,12 @@ function render(
       createElement(
         QueryClientProvider,
         { client },
-        createElement(EffectsView, { summary, route }),
+        createElement(
+          'div',
+          null,
+          createElement(WhyTip),
+          createElement(EffectsView, { summary, route }),
+        ),
       ),
     ),
   )
@@ -377,7 +386,7 @@ describe('Refresh from the game', () => {
     )
     act(() => button('Refresh from the game').click())
     await settle()
-    expect(button('Refreshing from the game…').disabled).toBe(true)
+    expect(isOff(button('Refreshing from the game…'))).toBe(true)
     finish(Response.json({ ok: true, effects: 2, change: null, output: '' }))
     await settle()
   })
@@ -607,7 +616,7 @@ describe("an effect's page", () => {
       const { button, takesAsked, finish } = await typedAndPressed(() =>
         Response.json({ ok: true }),
       )
-      expect(button('Make 4 takes').disabled).toBe(true)
+      expect(isOff(button('Make 4 takes'))).toBe(true)
       await act(async () => button('Make 4 takes').click())
       await finish()
       expect(takesAsked()).toHaveLength(1)
@@ -616,7 +625,7 @@ describe("an effect's page", () => {
     it('keeps the menus still while it waits, so the press makes what it showed', async () => {
       const { container, finish } = await typedAndPressed(() => Response.json({ ok: true }))
       const menus = [...container.querySelectorAll('select')]
-      expect(menus.map((m) => m.disabled)).toEqual([true, true])
+      expect(menus.map(isOff)).toEqual([true, true])
       await finish()
     })
 
@@ -630,7 +639,7 @@ describe("an effect's page", () => {
       await finish()
       expect(takesAsked()).toEqual([])
       expect(text()).toContain('Too long')
-      expect(button('Make 4 takes').disabled).toBe(false)
+      expect(isOff(button('Make 4 takes'))).toBe(false)
     })
 
     it('makes nothing when the save itself failed', async () => {
@@ -639,7 +648,7 @@ describe("an effect's page", () => {
       )
       await finish()
       expect(takesAsked()).toEqual([])
-      expect(button('Make 4 takes').disabled).toBe(false)
+      expect(isOff(button('Make 4 takes'))).toBe(false)
     })
 
     it('saves the words again on another press after a failed save, then asks for the takes', async () => {
@@ -681,7 +690,7 @@ describe("an effect's page", () => {
         'Make 4 takes',
         oneFailed,
       )
-      expect(button('Try again').disabled).toBe(true)
+      expect(isOff(button('Try again'))).toBe(true)
       await finish()
     })
 
@@ -761,7 +770,7 @@ describe("an effect's page", () => {
     act(() => button('Keep mine').click())
     await settle()
     expect(text()).toContain('disk is full')
-    expect(button('Keep mine').disabled).toBe(false)
+    expect(isOff(button('Keep mine'))).toBe(false)
   })
 
   it('has no notice when the game did not reword it', () => {
@@ -1064,7 +1073,7 @@ describe('Make all, on the Sound effects list', () => {
       act(() => button('Stop all').click())
       await settle()
       expect(button('Stop all').getAttribute('aria-disabled')).toBe('true')
-      expect(button('Stop all').disabled).toBe(false)
+      expect((button('Stop all') as HTMLButtonElement).disabled).toBe(false)
       expect(document.activeElement).toBe(button('Stop all'))
       await act(async () => release())
       act(() => client.setQueryData(['effects-making'], {}))

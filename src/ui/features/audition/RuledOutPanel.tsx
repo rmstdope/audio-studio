@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAllowVoices, useRuledOut } from '../../api'
 import { plural } from '../../format'
+import { off } from '../../off'
+import { CHANGING } from '../../voiceOffText'
 
 /** How many ruled-out voices are listed before "Show all". */
 const SHOWN = 3
@@ -51,7 +53,7 @@ export function RuledOutPanel({
               <button
                 className="btn btn-ghost btn-small"
                 type="button"
-                disabled={allow.isPending}
+                {...off(allow.isPending && CHANGING)}
                 onClick={() => allow.mutate(voice.id)}
               >
                 {pending === voice.id ? 'Allowing…' : 'Allow again'}
@@ -71,7 +73,7 @@ export function RuledOutPanel({
             <button
               className="btn"
               type="button"
-              disabled={allow.isPending}
+              {...off(allow.isPending && CHANGING)}
               onClick={() => allow.mutate(null, { onSettled: () => setConfirming(false) })}
             >
               {pending === null ? 'Forgetting…' : `Forget all ${voices.length}`}
@@ -84,7 +86,7 @@ export function RuledOutPanel({
           <button
             className="btn"
             type="button"
-            disabled={allow.isPending}
+            {...off(allow.isPending && CHANGING)}
             onClick={() => setConfirming(true)}
           >
             Forget all ruled-out voices

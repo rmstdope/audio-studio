@@ -18,6 +18,8 @@ import { longTitle, plural, shortTitle } from '../../format'
 import { sceneOfKey } from '../../../core/resources'
 import { cueTargets, type CueTarget } from '../../cueTargets'
 import { notShown } from '../../problems'
+import { off } from '../../off'
+import { refreshRunningWhy } from '../../linesText'
 import { routeHref } from '../../route'
 import { REASON, STATUS, reasonCounts } from '../../status'
 
@@ -79,8 +81,12 @@ export function PartOverview({
               <button
                 className="btn"
                 type="button"
-                disabled={refresh.pending}
-                title="Runs the project’s refresh.part command to extract this dialog from the game"
+                {...off(refreshRunningWhy(refresh.pending))}
+                title={
+                  refresh.pending
+                    ? undefined
+                    : 'Runs the project’s refresh.part command to extract this dialog from the game'
+                }
                 onClick={refresh.start}
               >
                 {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
@@ -168,7 +174,12 @@ function NoLanguageDialog({
       <h2>{panel.heading}</h2>
       <p className="muted">{panel.text}</p>
       {panel.refresh && (
-        <button className="btn" type="button" disabled={refresh.pending} onClick={refresh.start}>
+        <button
+          className="btn"
+          type="button"
+          {...off(refreshRunningWhy(refresh.pending))}
+          onClick={refresh.start}
+        >
           {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
         </button>
       )}
@@ -254,7 +265,7 @@ export function AdoptBanner({ part, language }: { part: PartDetail; language?: s
       <button
         className="btn btn-primary"
         type="button"
-        disabled={adopt.isPending}
+        {...off(adopt.isPending && 'The clips are being adopted. Wait for it to finish.')}
         onClick={() => adopt.mutate()}
       >
         {adopt.isPending ? 'Adopting…' : `Adopt ${plural(count, 'clip')}`}
@@ -503,7 +514,10 @@ function OrphanSceneCue({
         <button
           className="btn"
           type="button"
-          disabled={!to || move.isPending}
+          {...off(
+            !to && 'No scene is picked yet. Pick a scene to give the cue to first.',
+            move.isPending && 'The cue is being moved. Wait for it to finish.',
+          )}
           onClick={() => move.mutate({ from: scene, to })}
         >
           Give
@@ -511,7 +525,7 @@ function OrphanSceneCue({
         <button
           className="btn"
           type="button"
-          disabled={move.isPending}
+          {...off(move.isPending && 'The cue is being moved. Wait for it to finish.')}
           onClick={() => move.mutate({ from: scene, to: null })}
         >
           Remove
@@ -569,7 +583,10 @@ function OrphanCue({
         <button
           className="btn"
           type="button"
-          disabled={!to || move.isPending}
+          {...off(
+            !to && 'No line is picked yet. Pick a line to move the cue to first.',
+            move.isPending && 'The cue is being moved. Wait for it to finish.',
+          )}
           onClick={() => move.mutate({ key: orphan.key, to })}
         >
           Move
@@ -577,7 +594,7 @@ function OrphanCue({
         <button
           className="btn"
           type="button"
-          disabled={move.isPending}
+          {...off(move.isPending && 'The cue is being moved. Wait for it to finish.')}
           onClick={() => move.mutate({ key: orphan.key, to: null })}
         >
           Remove

@@ -17,6 +17,10 @@ import { useCredit, useDesigns, useDesignVoices, useElevenAccount } from '../../
 import { designFailureLine } from '../../board'
 import { Confirm } from '../../components/Confirm'
 import { planLeftLine } from '../../sitting'
+import { off } from '../../off'
+
+/** Why the design box waits while voices are being designed. */
+const DESIGNING = 'Voices are being designed. Wait for them to finish.'
 
 /**
  * The box that designs voices from a description, on the character page and on the audition
@@ -116,7 +120,7 @@ export function DesignVoice({
                 type="radio"
                 name={`design-with-${characterId}`}
                 checked={provider === who}
-                disabled={pending}
+                {...off(pending && DESIGNING)}
                 onChange={() => {
                   setProvider(who)
                   design.reset()
@@ -137,7 +141,7 @@ export function DesignVoice({
           aria-label="Description of the voice"
           rows={4}
           value={text}
-          disabled={pending}
+          {...off(pending && DESIGNING)}
           aria-invalid={state.tooLong !== null}
           onChange={(event) => {
             setTyped(event.target.value)
@@ -171,12 +175,23 @@ export function DesignVoice({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={!state.canSend || pending || confirming}
+            {...off(
+              state.tooLong,
+              !state.canSend &&
+                'The description is empty or too short. Design voices turns on when it is long enough.',
+              pending && DESIGNING,
+              confirming && 'The cost is waiting for your answer. Answer it to design voices.',
+            )}
             onClick={() => setConfirming(true)}
           >
             {pending ? 'Designing…' : 'Design voices…'}
           </button>
-          <button className="btn btn-ghost" type="button" disabled={pending} onClick={onClose}>
+          <button
+            className="btn btn-ghost"
+            type="button"
+            {...off(pending && DESIGNING)}
+            onClick={onClose}
+          >
             Cancel
           </button>
         </div>
@@ -198,7 +213,7 @@ export function DesignVoice({
               ref={retry}
               className="btn"
               type="button"
-              disabled={designs.isFetching}
+              {...off(designs.isFetching && 'Wait for the previews to be read again.')}
               onClick={() => void designs.refetch()}
             >
               Try again
@@ -220,7 +235,7 @@ export function DesignVoice({
               ref={pay}
               className="btn btn-primary"
               type="button"
-              disabled={!plan}
+              {...off(!plan && 'Wait for what the previews would say to be read.')}
               onClick={send}
             >
               {plan?.text === null
@@ -242,7 +257,7 @@ export function DesignVoice({
               ref={retry}
               className="btn"
               type="button"
-              disabled={credit.isFetching}
+              {...off(credit.isFetching && 'Wait for your credit to be read again.')}
               onClick={() => void refetch()}
             >
               Try again
@@ -262,7 +277,7 @@ export function DesignVoice({
               ref={pay}
               className="btn btn-primary"
               type="button"
-              disabled={money.kind !== 'ask'}
+              {...off(money.kind !== 'ask' && 'Wait for your credit to be read.')}
               onClick={send}
             >
               Pay up to {usd(DESIGN_PRICE)}

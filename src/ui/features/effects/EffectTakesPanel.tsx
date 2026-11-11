@@ -1,3 +1,10 @@
+import {
+  EFFECTS_LOCK_UNREAD,
+  EFFECTS_PENDING,
+  effectFadesOpenWhy,
+  effectsMakeWhy,
+} from '../../effectsText'
+import { off } from '../../off'
 import { useEffect, useRef, useState } from 'react'
 import type { EffectRow } from '../../../core/effects'
 import {
@@ -135,6 +142,9 @@ export function EffectTakesPanel({
       if (wordsSaved) ask()
     })
   }
+  const makeState = { canMake, busy, waitingForWords, pending: make.isPending }
+  const makeWhy = effectsMakeWhy(makeState)
+  const countWhy = effectsMakeWhy({ ...makeState, pending: false })
   const makeBatch = () => afterWordsSaved(() => make.mutate({ count, model }))
   const menu = (
     <>
@@ -142,7 +152,7 @@ export function EffectTakesPanel({
         className="takes-model"
         aria-label="Model for new takes"
         value={model}
-        disabled={busy || make.isPending || waitingForWords || !canMake}
+        {...off(makeWhy)}
         onChange={(event) => setPicked(event.target.value as EffectModelId)}
       >
         {EFFECT_MODEL_IDS.map((id) => (
@@ -155,7 +165,7 @@ export function EffectTakesPanel({
         className="takes-count"
         aria-label="Number of new takes"
         value={count}
-        disabled={busy || waitingForWords || !canMake}
+        {...off(countWhy)}
         onChange={(event) => setCount(Number(event.target.value))}
       >
         {Array.from({ length: MAX_EFFECT_TAKES }, (_, i) => i + 1).map((n) => (
@@ -167,12 +177,7 @@ export function EffectTakesPanel({
     </>
   )
   const button = (hasTakes: boolean) => (
-    <button
-      type="button"
-      className="btn btn-primary"
-      disabled={!canMake || make.isPending || busy || waitingForWords}
-      onClick={makeBatch}
-    >
+    <button type="button" className="btn btn-primary" {...off(makeWhy)} onClick={makeBatch}>
       {makeEffectTakesLabel(count, hasTakes)}
     </button>
   )
@@ -212,7 +217,9 @@ export function EffectTakesPanel({
           <button
             type="button"
             className="btn"
-            disabled={make.isPending || waitingForWords || !canMake}
+            {...off(
+              effectsMakeWhy({ canMake, busy: false, waitingForWords, pending: make.isPending }),
+            )}
             onClick={() => afterWordsSaved(() => make.mutate({ retry: failed.n }))}
           >
             Try again
@@ -228,7 +235,7 @@ export function EffectTakesPanel({
               <button
                 type="button"
                 className="btn btn-small"
-                disabled={accept.isPending}
+                {...off(accept.isPending && EFFECTS_PENDING)}
                 onClick={() => accept.mutate()}
               >
                 Accept
@@ -263,7 +270,7 @@ export function EffectTakesPanel({
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={stop.isPending}
+                  {...off(stop.isPending && EFFECTS_PENDING)}
                   onClick={() => stop.mutate()}
                 >
                   Stop
@@ -433,11 +440,8 @@ function TakeCard({
                 type="button"
                 ref={fadesOpener}
                 className="btn btn-small"
-                disabled={locked}
-                aria-disabled={otherOpen ? true : undefined}
-                title={otherOpen ? `Close the fades of Take ${fading} first.` : undefined}
+                {...off(locked && EFFECTS_LOCK_UNREAD, otherOpen && effectFadesOpenWhy(fading!))}
                 onClick={() => {
-                  if (otherOpen) return
                   if (playing || comparing) player.stop()
                   onFades(take.n)
                 }}
@@ -449,7 +453,10 @@ function TakeCard({
             <button
               type="button"
               className="btn btn-ghost btn-small"
-              disabled={locked || drop.isPending || choose.isPending}
+              {...off(
+                locked && EFFECTS_LOCK_UNREAD,
+                (drop.isPending || choose.isPending) && EFFECTS_PENDING,
+              )}
               onClick={() => {
                 if (playing || comparing || seamPlaying) player.stop()
                 drop.mutate(take.file)
@@ -461,7 +468,10 @@ function TakeCard({
               <button
                 type="button"
                 className="btn btn-small"
-                disabled={locked || choose.isPending || drop.isPending}
+                {...off(
+                  locked && EFFECTS_LOCK_UNREAD,
+                  (choose.isPending || drop.isPending) && EFFECTS_PENDING,
+                )}
                 onClick={() => choose.mutate(take.file)}
               >
                 {choose.isPending ? 'Choosing…' : 'Choose'}

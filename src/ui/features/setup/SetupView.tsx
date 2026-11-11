@@ -5,6 +5,7 @@ import { PlayingPanel } from './PlayingPanel'
 import { AlertIcon, CheckIcon } from '../../components/icons'
 import { dollars } from '../../format'
 import { SETTINGS_FILE } from '../../../core/settings'
+import { off } from '../../off'
 
 const STATE: Record<SetupCheck['state'], string> = {
   ok: 'Ready',
@@ -35,7 +36,7 @@ export function SetupView() {
           <button
             className="btn"
             type="button"
-            disabled={setup.isFetching}
+            {...off(setup.isFetching && 'Wait for the check to finish.')}
             onClick={() => void Promise.all([setup.refetch(), models.refetch()])}
           >
             {setup.isFetching ? 'Checking…' : 'Check again'}

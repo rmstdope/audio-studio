@@ -4,6 +4,8 @@ import { useSetKeywords, useSetPhrase, useSetSpeed, useSetStyle } from '../../ap
 import { SPEED } from '../../../core/resources'
 import { speedDraft } from '../../speedDraft'
 import { Problems } from '../../components/Problems'
+import { off } from '../../off'
+import { NOTHING_TO_SAVE, SAVING } from '../../voiceOffText'
 import { addKeyword } from '../../keywords'
 import { noPhraseText, phraseNote } from '../../castLanguages'
 
@@ -60,7 +62,11 @@ export function KeywordsEditor({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <button className="btn" type="submit" disabled={!draft.trim()}>
+        <button
+          className="btn"
+          type="submit"
+          {...off(!draft.trim() && 'Type a keyword first. Add turns on when there is one.')}
+        >
           Add
         </button>
       </div>
@@ -184,14 +190,18 @@ export function PhraseEditor({
             onChange={(e) => setDraft(e.target.value)}
           />
           <div className="keyword-add">
-            <button className="btn" type="submit" disabled={!changed || save.isPending}>
+            <button
+              className="btn"
+              type="submit"
+              {...off(!changed && NOTHING_TO_SAVE, save.isPending && SAVING)}
+            >
               {save.isPending ? 'Saving…' : 'Save phrase'}
             </button>
             {audition.from === 'own' && (
               <button
                 className="btn"
                 type="button"
-                disabled={save.isPending}
+                {...off(save.isPending && SAVING)}
                 onClick={() => save.mutate(null, { onSuccess: done })}
               >
                 {audition.standard ? 'Use the standard phrase' : 'Remove her phrase'}
@@ -263,7 +273,11 @@ export function StyleEditor({ characterId, style }: { characterId: string; style
         }}
       />
       <div className="keyword-add">
-        <button className="btn" type="submit" disabled={!changed || save.isPending}>
+        <button
+          className="btn"
+          type="submit"
+          {...off(!changed && NOTHING_TO_SAVE, save.isPending && SAVING)}
+        >
           {save.isPending ? 'Saving…' : 'Save style'}
         </button>
       </div>
@@ -351,7 +365,11 @@ function SpeedField({
         <button
           className="btn"
           type="submit"
-          disabled={!parsed.ok || !parsed.changed || save.isPending}
+          {...off(
+            !parsed.ok && parsed.message,
+            parsed.ok && !parsed.changed && NOTHING_TO_SAVE,
+            save.isPending && SAVING,
+          )}
         >
           {save.isPending ? 'Saving…' : 'Save speed'}
         </button>
@@ -359,7 +377,7 @@ function SpeedField({
           <button
             className="btn"
             type="button"
-            disabled={save.isPending}
+            {...off(save.isPending && SAVING)}
             onClick={() => save.mutate(null, { onSuccess: done })}
           >
             Use the project’s

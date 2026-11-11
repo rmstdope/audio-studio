@@ -5,6 +5,7 @@ import type { ImageTakeView, ImageTakesView } from '../../../core/imageTakes'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
@@ -428,8 +429,8 @@ describe('patches set aside', () => {
     expect(document.activeElement?.textContent).toBe('Choose take 4')
     // the take on the right stays in view with Drop and Choose off
     expect(s.right()).toBe('Take 4')
-    expect(s.button('Drop').disabled).toBe(true)
-    expect(s.button('Choose').disabled).toBe(true)
+    expect(isOff(s.button('Drop'))).toBe(true)
+    expect(isOff(s.button('Choose'))).toBe(true)
   })
 
   it('chooses on the yes and not before', async () => {
@@ -572,7 +573,7 @@ describe('patches set aside', () => {
   it('switches Un-choose off while a question is open', async () => {
     const s = await inGame([patch('Bread taken', [4])])
     await s.click(s.button('Drop'))
-    expect(s.button('Un-choose').disabled).toBe(true)
+    expect(isOff(s.button('Un-choose'))).toBe(true)
   })
 
   it('drops at once a take with no patches set aside', async () => {
@@ -647,7 +648,7 @@ describe('named areas set aside', () => {
     expect(q(s)!.querySelector('h4')).toBeNull()
     expect(s.text()).toContain('Choosing take 2 again brings them all back.')
     expect(document.activeElement?.textContent).toBe('Choose take 4')
-    expect(s.button('Drop').disabled).toBe(true)
+    expect(isOff(s.button('Drop'))).toBe(true)
     await s.click(s.button('Choose take 4'))
     expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose', body: { n: 4 } })
   })
@@ -738,9 +739,9 @@ describe('making takes', () => {
     expect(s.text()).toContain('making · about 50 s left')
     expect(s.text()).toContain('waiting')
     expect(s.container.querySelectorAll('[role="progressbar"]')).toHaveLength(2)
-    expect(s.button('Stop').disabled).toBe(false)
-    expect(s.container.querySelector<HTMLSelectElement>('select')!.disabled).toBe(true)
-    expect(s.button('Make 2 more takes').disabled).toBe(true)
+    expect(isOff(s.button('Stop'))).toBe(false)
+    expect(isOff(s.container.querySelector<HTMLSelectElement>('select')!)).toBe(true)
+    expect(isOff(s.button('Make 2 more takes'))).toBe(true)
     await s.click(s.button('Stop'))
     expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/stop', method: 'POST' })
   })
@@ -840,19 +841,19 @@ describe('what can go wrong', () => {
       'No image model can run on this computer. Setup says what is missing.',
     )
     expect(s.container.querySelector('a')?.getAttribute('href')).toBe('#/setup')
-    expect(s.button('Make 2 more takes').disabled).toBe(true)
-    expect(s.container.querySelector<HTMLSelectElement>('select')!.disabled).toBe(true)
-    expect(s.button('Choose').disabled).toBe(false)
-    expect(s.button('Drop').disabled).toBe(false)
+    expect(isOff(s.button('Make 2 more takes'))).toBe(true)
+    expect(isOff(s.container.querySelector<HTMLSelectElement>('select')!)).toBe(true)
+    expect(isOff(s.button('Choose'))).toBe(false)
+    expect(isOff(s.button('Drop'))).toBe(false)
   })
 
   it('while the lock cannot be read, nothing is chosen, dropped or un-chosen', async () => {
     const s = await show(view({ takes: [take(1, { chosen: true }), take(2)], lockUnread: true }), {
       chosenTake: 1,
     })
-    expect(s.button('Choose').disabled).toBe(true)
-    expect(s.button('Drop').disabled).toBe(true)
-    expect(s.button('Un-choose').disabled).toBe(true)
+    expect(isOff(s.button('Choose'))).toBe(true)
+    expect(isOff(s.button('Drop'))).toBe(true)
+    expect(isOff(s.button('Un-choose'))).toBe(true)
   })
 
   it('shows only the latest action’s refusal', async () => {
@@ -1107,7 +1108,7 @@ describe('the Takes section’s model menu', () => {
     const s = await show(
       view({ takes: three, making: [{ n: 4, state: 'making', elapsed: 1, expected: 8 }] }),
     )
-    expect(modelMenu(s).disabled).toBe(true)
+    expect(isOff(modelMenu(s))).toBe(true)
   })
 
   it('names the model after each take on the two sides, and not in the strip', async () => {
@@ -1149,12 +1150,13 @@ describe('the Takes section’s model menu', () => {
       'No image model can run on this computer. Setup says what is missing.',
     )
     expect(s.text()).toContain('Open Setup')
-    expect(modelMenu(s).disabled).toBe(true)
+    expect(isOff(modelMenu(s))).toBe(true)
     expect(
-      s.container.querySelector<HTMLSelectElement>('select[aria-label="Number of new takes"]')!
-        .disabled,
+      isOff(
+        s.container.querySelector<HTMLSelectElement>('select[aria-label="Number of new takes"]')!,
+      ),
     ).toBe(true)
-    expect(s.button('Make 2 more takes').disabled).toBe(true)
+    expect(isOff(s.button('Make 2 more takes'))).toBe(true)
     expect(s.text()).not.toContain("isn't on this computer")
   })
 })
@@ -1294,7 +1296,7 @@ describe('a take’s picture', () => {
     expect(s.text()).toContain("Bringing to the game's look…")
     expect(imgs(s, 'right')).toHaveLength(0)
     expect(sources(s, '[data-strip]')).toEqual([])
-    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
+    expect(isOff(s.button('Choose'))).toBe(true)
     await s.click(box(s))
     expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/5'])
     expect(s.text()).not.toContain("Bringing to the game's look…")
@@ -1307,19 +1309,19 @@ describe('a take’s picture', () => {
     expect(s.container.querySelector('[role="alert"]')?.textContent).toBe(message)
     expect(imgs(s, 'right')).toHaveLength(0)
     expect(s.text()).toContain('Fix the style to choose this take.')
-    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
+    expect(isOff(s.button('Choose'))).toBe(true)
   })
 
   it('shows a place for a take never brought to the look, instead of a missing picture', async () => {
     const s = await show(view({ takes: [take(2, { look: 'missing' })] }))
     expect(imgs(s, 'right')).toHaveLength(0)
     expect(s.text()).toContain("Not brought to the game's look yet.")
-    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(false)
+    expect(isOff(s.button('Choose'))).toBe(false)
   })
 
   it('leaves Choose on when the game’s version is ready', async () => {
     const s = await show(view({ takes: [take(3)] }))
-    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(false)
+    expect(isOff(s.button('Choose'))).toBe(false)
     expect(s.text()).not.toContain('Fix the game')
   })
 

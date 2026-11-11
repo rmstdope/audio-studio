@@ -363,3 +363,103 @@ export function overlapOpenLine(titles: string[]): string {
 export function overlapActLine(pairs: readonly [string, string][]): string {
   return `patches overlap: ${pairs.map(overlapPairLine).join('; ')}`
 }
+
+/** The reason when a change is on its way to the studio and the control waits for the answer. */
+export const WAIT_FOR_CHANGE = 'Wait for the current change to finish.'
+
+/** Why a model cannot be used: it is not on this computer. */
+export function modelMissingWhy(name: string): string {
+  return `${name} is not on this computer. Setup says how to download it.`
+}
+
+/** What keeps a patch's take count and model menu off, the first to deal with; null when nothing. */
+export function patchMenuWhy(now: {
+  makerMessage: string | null
+  making: boolean
+  savingWords: boolean
+}): string | null {
+  if (now.makerMessage) return now.makerMessage
+  if (now.making)
+    return 'Takes are being made for this patch. Change this when they are done, or Stop.'
+  if (now.savingWords) return 'The patch’s words are being saved. This turns on when they are.'
+  return null
+}
+
+/**
+ * What keeps a patch's Make button off, the first to deal with: the maker, the model, the patch's
+ * place, then the waiting. `mark` is `none` when the patch has no mark; null when nothing does.
+ */
+export function patchMakeWhy(now: {
+  makerMessage: string | null
+  modelName: string
+  modelHere: boolean
+  mark: 'placed' | 'none'
+  /** The patch's named area, when it has one. */
+  areaTitle: string | null
+  making: boolean
+  savingWords: boolean
+}): string | null {
+  if (now.makerMessage) return now.makerMessage
+  if (!now.modelHere) return modelMissingWhy(now.modelName)
+  if (now.mark === 'none')
+    return now.areaTitle !== null
+      ? `“${now.areaTitle}” has no place yet. Mark it under Named areas, or drag over the picture to mark this patch.`
+      : 'This patch has no mark yet. Drag over the picture to mark where it goes.'
+  if (now.making)
+    return 'Takes are being made for this patch. Make more when they are done, or Stop.'
+  if (now.savingWords) return 'The patch’s words are being saved. Make turns on when they are.'
+  return null
+}
+
+/** Why an image's take count and model menu are off: the generator, takes being made, words saving. */
+export function imageMenuWhy(now: {
+  generatorOk: boolean
+  making: boolean
+  savingWords: boolean
+}): string | null {
+  if (!now.generatorOk) return GENERATOR_MISSING
+  if (now.making)
+    return 'Takes are being made for this image. Change this when they are done, or Stop.'
+  if (now.savingWords) return 'The image’s words are being saved. This turns on when they are.'
+  return null
+}
+
+/** Why an image's Make button is off, in the same order. */
+export function imageMakeWhy(now: {
+  generatorOk: boolean
+  making: boolean
+  savingWords: boolean
+}): string | null {
+  if (!now.generatorOk) return GENERATOR_MISSING
+  if (now.making)
+    return 'Takes are being made for this image. Make more when they are done, or Stop.'
+  if (now.savingWords) return 'The image’s words are being saved. Make turns on when they are.'
+  return null
+}
+
+/** Why nothing can be made: no image model can run here. */
+const GENERATOR_MISSING = 'No image model can run on this computer. Setup says what is missing.'
+
+/** Why choosing, dropping and un-choosing wait: the images lock cannot be read. */
+export const IMAGES_LOCK_WHY =
+  'The images lock cannot be read, so choosing, dropping and un-choosing wait. Fix the lock file, then reload.'
+
+/** Why a take cannot be chosen: the style has a problem. */
+export const STYLE_BROKEN_WHY = 'The style needs fixing first. Fix it to choose this take.'
+
+/** Why a take cannot be chosen yet: it is still being brought to the game's look. */
+export const BRINGING_WHY =
+  'This take is still being brought to the game’s look. Choose it when that is done.'
+
+/** Why a take's buttons are off while a question about it is open. */
+export const QUESTION_OPEN_WHY = 'Answer or cancel the question first.'
+
+/** Why a named area cannot be picked yet, by what its picture is doing; null when it can be. */
+export function areaRowWhy(state: 'loading' | 'gone' | 'none' | 'ready'): string | null {
+  if (state === 'loading') return 'The picture is still loading. Pick an area when it has.'
+  if (state === 'gone')
+    return "The chosen take's picture is missing or cannot be read, so areas cannot be placed on it."
+  if (state === 'none')
+    return 'Choose a take of the image first. Areas are placed on the take the game shows.'
+  return null
+}

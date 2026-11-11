@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { payWords } from '../../agreed'
+import { off } from '../../off'
+import { takeUseWhy } from '../../linesText'
 import { lineTakeUrl, useLineTakeActions, useLineTakes } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
@@ -84,11 +86,11 @@ export function LineTakes({
                 <button
                   type="button"
                   className="btn"
-                  disabled={!t.current || use.isPending}
+                  {...off(takeUseWhy({ current: t.current, pending: use.isPending }))}
                   title={
-                    t.current
+                    t.current && !takeUseWhy({ current: t.current, pending: use.isPending })
                       ? 'Make this take the line’s clip: encoded and written as a recording is'
-                      : 'The line’s cue, text, voice or settings changed since; take it again'
+                      : undefined
                   }
                   onClick={() => use.mutate(t.id)}
                 >
@@ -97,7 +99,7 @@ export function LineTakes({
                 <button
                   type="button"
                   className="btn"
-                  disabled={drop.isPending}
+                  {...off(drop.isPending && 'A take is being dropped. Wait for it to finish.')}
                   onClick={() => {
                     if (playing === playId(t.id)) toggle(playId(t.id), '')
                     drop.mutate(t.id)
@@ -143,8 +145,8 @@ export function LineTakes({
             ref={another}
             type="button"
             className="btn"
-            disabled={take.isPending}
-            title={words.hover}
+            {...off(take.isPending && 'A take is being recorded. Wait for it to finish.')}
+            title={take.isPending ? undefined : words.hover}
             onClick={() => take.mutate(undefined)}
           >
             {take.isPending ? 'Recording…' : 'Another take'}

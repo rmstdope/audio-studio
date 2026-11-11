@@ -43,7 +43,17 @@ import { Failure } from '../../components/Failure'
 import { openTracking } from '../../components/openTracking'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
-import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
+import {
+  failureLine,
+  closeFadesFirst,
+  makeWaitWhy,
+  MUSIC_LOCK_UNREAD,
+  musicMakeWhy,
+  progressOf,
+  timeLeftText,
+  WAIT_FOR_CHANGE,
+} from '../../musicTakesText'
+import { off } from '../../off'
 import { routeHref } from '../../route'
 import { FadesEditor } from './FadesEditor'
 import { InTheGame, Wave } from './InTheGame'
@@ -145,7 +155,15 @@ export function TakesPanel({
   const here = view.models.find((m) => m.id === model)?.installed ?? false
   const length = { kind: view.kind, seconds: track.seconds }
   const tooLong = tooLongOnTrack(model, length.kind, length.seconds)
-  const canMake = generator.ok && here && !tooLong
+  const waitWhy = makeWaitWhy({ making: view.making.length > 0, savingBrief: waitingForBrief })
+  const makeWhy = musicMakeWhy({
+    generator: generator.ok ? null : generator.message,
+    tooLong,
+    missing: here ? null : missingOnTrack(model),
+    pending: make.isPending,
+    making: view.making.length > 0,
+    savingBrief: waitingForBrief,
+  })
   // Only when some other model could be picked: with none installed, Setup is the answer above.
   // A model too short for the track says so first: downloading it would not help.
   const missing =
@@ -159,7 +177,7 @@ export function TakesPanel({
       className="takes-model"
       aria-label="Model for new takes"
       value={model}
-      disabled={view.making.length > 0 || waitingForBrief}
+      {...off(waitWhy)}
       onChange={(event) => {
         setPicked(event.target.value as MusicModelId)
         setListOpen(false)
@@ -194,7 +212,7 @@ export function TakesPanel({
       className="takes-count"
       aria-label="Number of new takes"
       value={count}
-      disabled={view.making.length > 0 || waitingForBrief}
+      {...off(waitWhy)}
       onChange={(event) => {
         setCount(Number(event.target.value))
         setCountOpen(false)
@@ -253,7 +271,11 @@ export function TakesPanel({
           <button
             type="button"
             className="btn"
-            disabled={make.isPending || waitingForBrief || !generator.ok}
+            {...off(
+              !generator.ok && `${generator.message} Setup says what is missing.`,
+              make.isPending && WAIT_FOR_CHANGE,
+              waitingForBrief && 'The brief is being saved. Try again turns on when it is.',
+            )}
             onClick={() => afterBriefSaved(() => make.mutate({ retry: failed.n }))}
           >
             {takesButton('Try again', failed.modelId, length, 1)}
@@ -275,7 +297,7 @@ export function TakesPanel({
               <button
                 type="button"
                 className="btn btn-small"
-                disabled={accept.isPending}
+                {...off(accept.isPending && WAIT_FOR_CHANGE)}
                 onClick={() => {
                   actions.press('accept')
                   accept.mutate()
@@ -315,9 +337,9 @@ export function TakesPanel({
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={stop.isPending}
+                  {...off(stop.isPending && WAIT_FOR_CHANGE)}
                   title={
-                    view.making.some((m) => m.paid && m.state === 'making')
+                    !stop.isPending && view.making.some((m) => m.paid && m.state === 'making')
                       ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
                       : undefined
                   }
@@ -334,7 +356,7 @@ export function TakesPanel({
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={!canMake || make.isPending || waitingForBrief || view.making.length > 0}
+                {...off(makeWhy)}
                 onClick={makeBatch}
               >
                 {takesButton(makeTakesWords(count, true), model, length, count)}
@@ -399,7 +421,7 @@ export function TakesPanel({
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={!canMake || make.isPending || waitingForBrief}
+                {...off(makeWhy)}
                 onClick={makeBatch}
               >
                 {takesButton(makeTakesWords(count, false), model, length, count)}
@@ -574,14 +596,10 @@ function TakeCard({
                 type="button"
                 ref={fadesOpener}
                 className="btn btn-small"
-                disabled={locked}
-                aria-disabled={otherOpen ? true : undefined}
-                title={otherOpen ? `Close the fades of Take ${fading} first.` : undefined}
+                {...off(locked && MUSIC_LOCK_UNREAD, otherOpen && closeFadesFirst(fading))}
                 onClick={() => {
-                  if (!otherOpen) {
-                    if (playing) player.stop()
-                    onFades(take.n)
-                  }
+                  if (playing) player.stop()
+                  onFades(take.n)
                 }}
               >
                 Fades…
@@ -597,30 +615,22 @@ function TakeCard({
               </button>
             )}
             <span className="grow" />
-            <span className="move-wrap">
-              <button
-                type="button"
-                ref={opener}
-                className="btn btn-ghost btn-small"
-                disabled={locked}
-                aria-disabled={nowhere ? true : undefined}
-                aria-describedby={nowhere ? `${id}-nowhere` : undefined}
-                onClick={() => {
-                  if (!nowhere) onMove()
-                }}
-              >
-                Move…
-              </button>
-              {nowhere && (
-                <span className="move-tip small" role="tooltip" id={`${id}-nowhere`}>
-                  {nowhere}
-                </span>
-              )}
-            </span>
+            <button
+              type="button"
+              ref={opener}
+              className="btn btn-ghost btn-small"
+              {...off(locked && MUSIC_LOCK_UNREAD, nowhere)}
+              onClick={onMove}
+            >
+              Move…
+            </button>
             <button
               type="button"
               className="btn btn-ghost btn-small"
-              disabled={locked || drop.isPending || choose.isPending}
+              {...off(
+                locked && MUSIC_LOCK_UNREAD,
+                (drop.isPending || choose.isPending) && WAIT_FOR_CHANGE,
+              )}
               onClick={() => {
                 if (playing || seamPlaying) player.stop()
                 actions.press(`drop:${take.n}`)
@@ -632,7 +642,7 @@ function TakeCard({
             <button
               type="button"
               className="btn btn-small"
-              disabled={locked || choose.isPending}
+              {...off(locked && MUSIC_LOCK_UNREAD, choose.isPending && WAIT_FOR_CHANGE)}
               onClick={() => {
                 actions.press(`choose:${take.n}`)
                 choose.mutate(take.file)

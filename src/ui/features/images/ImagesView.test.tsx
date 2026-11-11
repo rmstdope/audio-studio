@@ -10,7 +10,9 @@ import { ProjectSchema } from '../../../core/project'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
+const { WhyTip } = await import('../../components/WhyTip')
 const act_ = act
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
@@ -188,6 +190,7 @@ function render(
       createElement(
         QueryClientProvider,
         { client },
+        createElement(WhyTip),
         createElement(ImagesView, { summary: shown, route }),
       ),
     ),
@@ -445,7 +448,7 @@ describe('an image’s page', () => {
 
     it('keeps Make off while it waits, so a second press asks for nothing more', async () => {
       const { page, release } = await typedAndPressed(() => Response.json({ ok: true }))
-      expect(button(page, 'Make 2 takes').disabled).toBe(true)
+      expect(isOff(button(page, 'Make 2 takes'))).toBe(true)
       await act(async () => button(page, 'Make 2 takes').click())
       await act(async () => release())
       await settle()
@@ -463,7 +466,7 @@ describe('an image’s page', () => {
       await settle()
       expect(takesAsked()).toEqual([])
       expect(text(page)).toContain('Too long')
-      expect(button(page, 'Make 2 takes').disabled).toBe(false)
+      expect(isOff(button(page, 'Make 2 takes'))).toBe(false)
     })
 
     it('makes nothing when the save itself failed', async () => {
@@ -471,7 +474,7 @@ describe('an image’s page', () => {
       await act(async () => release())
       await settle()
       expect(takesAsked()).toEqual([])
-      expect(button(page, 'Make 2 takes').disabled).toBe(false)
+      expect(isOff(button(page, 'Make 2 takes'))).toBe(false)
     })
 
     describe('Try again on a failed take, which is made from the prompt as it stands', () => {
@@ -507,7 +510,7 @@ describe('an image’s page', () => {
           'Make 2 takes',
           oneFailed,
         )
-        expect(button(page, 'Try again').disabled).toBe(true)
+        expect(isOff(button(page, 'Try again'))).toBe(true)
         await act(async () => release())
         await settle()
       })

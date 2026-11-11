@@ -1,6 +1,8 @@
 import type { Recorded } from '../../../core/summary'
 import type { useRefreshDialog } from '../../api'
 import { dialogGonePanel } from '../../languages'
+import { refreshRunningWhy } from '../../linesText'
+import { off } from '../../off'
 
 /**
  * The amber panel for a dialog file that is gone while recordings were made with it: the studio
@@ -44,7 +46,12 @@ export function DialogGonePanel({
       )}
       {panel.refresh && (
         <div>
-          <button className="btn" type="button" disabled={refresh.pending} onClick={refresh.start}>
+          <button
+            className="btn"
+            type="button"
+            {...off(refreshRunningWhy(refresh.pending))}
+            onClick={refresh.start}
+          >
             {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
           </button>
         </div>

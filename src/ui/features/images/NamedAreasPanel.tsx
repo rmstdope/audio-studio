@@ -1,3 +1,4 @@
+import { off } from '../../off'
 import {
   useEffect,
   useRef,
@@ -27,6 +28,7 @@ import {
 } from '../../imageAreaBox'
 import {
   areaLineText,
+  areaRowWhy,
   areaSaveFailedText,
   areaTagText,
   areasCountText,
@@ -423,7 +425,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                   ref={(el) => {
                     rowButtons.current[area.id] = el
                   }}
-                  disabled={!ready}
+                  {...off(areaRowWhy(state))}
                   aria-pressed={isSelected}
                   onClick={() => select(area.id)}
                 >

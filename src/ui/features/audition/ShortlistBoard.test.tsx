@@ -141,17 +141,17 @@ describe('ShortlistBoard', () => {
     expect(document.activeElement).toBe(button('Bring in more') ?? null)
 
     await act(() => button('Bring in more')!.click())
-    await until(() => button('Searching Fish Audio…')?.disabled === true)
+    await until(() => button('Searching Fish Audio…')?.getAttribute('aria-disabled') === 'true')
     expect(toHear()).toContain('No voices to hear yet')
     await act(async () =>
       answer(Response.json({ ok: false, reason: 'exhausted', message: 'None.' })),
     )
-    await until(() => button('Bring in more')?.disabled === false)
+    await until(() => button('Bring in more')?.getAttribute('aria-disabled') !== 'true')
 
     const eleven = [...container.querySelectorAll('[aria-label="Whose library"] input')][1]!
     await act(() => (eleven as HTMLInputElement).click())
     await act(() => button('Bring in more')!.click())
-    await until(() => button('Searching ElevenLabs…')?.disabled === true)
+    await until(() => button('Searching ElevenLabs…')?.getAttribute('aria-disabled') === 'true')
 
     await act(() => page.unmount())
   })
@@ -323,7 +323,7 @@ describe('ShortlistBoard', () => {
 
     await act(() => design().click())
     await act(() => button('Design voices…')!.click())
-    await until(() => button('Pay up to')?.disabled === false)
+    await until(() => button('Pay up to')?.getAttribute('aria-disabled') !== 'true')
     await act(() => button('Pay up to')!.click())
     // Focus comes back once the box is gone and the button is enabled again.
     await until(

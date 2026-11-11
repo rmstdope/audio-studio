@@ -1,3 +1,5 @@
+import { EFFECTS_LOCK_UNREAD, EFFECTS_PENDING, effectFadesOpenWhy } from '../../effectsText'
+import { off } from '../../off'
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { effectSeconds, type EffectRow } from '../../../core/effects'
 import {
@@ -100,7 +102,7 @@ export function EffectInTheGame({
             className="btn btn-primary"
             type="button"
             autoFocus
-            disabled={unchoose.isPending}
+            {...off(unchoose.isPending && EFFECTS_PENDING)}
             onClick={() =>
               unchoose.mutate(undefined, {
                 onSuccess: (result) => {
@@ -217,11 +219,11 @@ export function EffectInTheGame({
               type="button"
               className="btn btn-small"
               ref={fadesOpener(take.n)}
-              disabled={view.lockUnread}
-              aria-disabled={fading !== null ? true : undefined}
-              title={fading !== null ? `Close the fades of Take ${fading} first.` : undefined}
+              {...off(
+                view.lockUnread && EFFECTS_LOCK_UNREAD,
+                fading !== null && effectFadesOpenWhy(fading),
+              )}
               onClick={() => {
-                if (fading !== null) return
                 if (player.playing === takePlayId(row.id, take.n)) player.stop()
                 onFades(take.n)
               }}
@@ -235,7 +237,7 @@ export function EffectInTheGame({
             type="button"
             className="btn btn-small"
             ref={opener}
-            disabled={unchoose.isPending}
+            {...off(unchoose.isPending && EFFECTS_PENDING)}
             onClick={() => {
               unchoose.reset()
               setAsked(state.take)
@@ -248,7 +250,7 @@ export function EffectInTheGame({
             <button
               type="button"
               className="btn btn-primary btn-small"
-              disabled={choose.isPending}
+              {...off(choose.isPending && EFFECTS_PENDING)}
               onClick={() =>
                 choose.mutate(take.file, {
                   onSuccess: (result) => {

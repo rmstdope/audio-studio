@@ -3,6 +3,8 @@ import { useFreeableVoices, useFreeVoices } from '../../api'
 import { freeEffects, slotsLine } from '../../board'
 import { Confirm } from '../../components/Confirm'
 import { plural } from '../../format'
+import { off } from '../../off'
+import { CHANGING } from '../../voiceOffText'
 
 /**
  * The plan's ElevenLabs voice slots on the audition board: how many are used, and a button that
@@ -53,7 +55,7 @@ export function VoiceSlots({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={free.isPending}
+            {...off(free.isPending && CHANGING)}
             onClick={() =>
               free.mutate(
                 voices.map((v) => v.voice),

@@ -5,7 +5,9 @@ import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
+const { WhyTip } = await import('../../components/WhyTip')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { TakesPanel } = await import('./TakesPanel')
@@ -70,6 +72,7 @@ function render(kind: 'loop' | 'stinger', takes: TakeView[], lockUnread = false)
       createElement(
         QueryClientProvider,
         { client },
+        createElement(WhyTip),
         createElement(TakesPanel, { track, lists: [] }),
       ),
     ),
@@ -128,7 +131,7 @@ describe('fading a stinger take on its page', () => {
     expect(rest).toHaveLength(2)
     for (const other of rest) {
       expect(other.getAttribute('aria-disabled')).toBe('true')
-      expect(other.title).toBe('Close the fades of Take 2 first.')
+      expect(other.dataset.why).toBe('Close the fades of Take 2 first.')
     }
     // A greyed button opens nothing.
     act(() => three.click())
@@ -213,7 +216,7 @@ describe('fading a stinger take on its page', () => {
 
   it('greys Fades… while the music lock cannot be read, and says so', () => {
     const { container, fadesButtons } = render('stinger', [take(2), take(3)], true)
-    expect(fadesButtons().every((b) => b.disabled)).toBe(true)
+    expect(fadesButtons().every((b) => isOff(b))).toBe(true)
     expect(container.textContent).toContain(
       'Choosing, dropping, moving, trimming and fading wait until the music lock can be read. You can still listen and make more takes.',
     )

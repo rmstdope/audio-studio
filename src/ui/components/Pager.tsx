@@ -1,3 +1,4 @@
+import { off } from '../off'
 import { useEffect, useRef } from 'react'
 import { pagerStep } from '../pager'
 
@@ -82,9 +83,14 @@ export function Pager({ place, previous, next, keys = true }: PagerProps) {
         }}
         className="btn pager-btn"
         type="button"
-        title={step && keys ? `${label} (${side === 'previous' ? '←' : '→'})` : label}
+        title={step ? (keys ? `${label} (${side === 'previous' ? '←' : '→'})` : label) : undefined}
         aria-label={label}
-        aria-disabled={step ? undefined : 'true'}
+        {...off(
+          !step &&
+            (side === 'previous'
+              ? 'This is the first. There is nothing before it.'
+              : 'This is the last. There is nothing after it.'),
+        )}
         onClick={() => go(side, step, true)}
       >
         {side === 'previous' ? '‹' : '›'}

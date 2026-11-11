@@ -161,3 +161,14 @@ export function planLeftLine(account: ElevenAnswer | Error | undefined, held: nu
   const besides = held ? ', besides what recordings and auditions running now hold' : ''
   return `${credits(left)} left on your plan${besides}`
 }
+
+/**
+ * Why Pay is off in the spend box, in the order to deal with it: the credit still being read, the
+ * amount typed being wrong, the audition already starting; null when it can be paid.
+ */
+export function payWhy(state: BoxState, busy: boolean): string | null {
+  if (state.kind !== 'ask') return 'Your credit is still being read. Pay turns on when it has been.'
+  if (state.problem !== null) return `${state.problem} Pay turns on when the amount is right.`
+  if (busy) return 'The audition is starting. Wait for it.'
+  return null
+}

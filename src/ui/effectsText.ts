@@ -52,3 +52,36 @@ export function effectsRefreshSummary(
 export function effectLengthLine(seconds: number, loops: boolean): string {
   return `${effectSeconds(seconds)} · ${loops ? 'loops · ' : ''}set by the game`
 }
+
+/** Why a control waits for a change that is already under way. */
+export const EFFECTS_PENDING = 'Wait for the current change to finish.'
+
+/** Why the sound effects lock being unreadable keeps choosing, dropping and fading off. */
+export const EFFECTS_LOCK_UNREAD =
+  'The sound effects lock cannot be read. Choosing, dropping and fading wait until it can be.'
+
+/** Why Fades… is off while another take's fades are open. */
+export function effectFadesOpenWhy(fading: number): string {
+  return `Close the fades of Take ${fading} first.`
+}
+
+/**
+ * Why making sound-effect takes (the Make button, the model menu, Try again) is off, in the order
+ * to deal with it: Setup first, then the words being saved, takes being made, a change under way;
+ * null when it is on.
+ */
+export function effectsMakeWhy(state: {
+  canMake: boolean
+  busy: boolean
+  waitingForWords: boolean
+  pending: boolean
+}): string | null {
+  if (!state.canMake)
+    return 'Neither sound-effects model can run on this computer. Setup says what is missing.'
+  if (state.waitingForWords)
+    return 'The effect’s words are being saved. This turns on when they are.'
+  if (state.busy)
+    return 'Takes are being made for this effect. Make more when they are done, or Stop.'
+  if (state.pending) return EFFECTS_PENDING
+  return null
+}

@@ -1,3 +1,5 @@
+import { EFFECTS_LOCK_UNREAD } from '../../effectsText'
+import { off } from '../../off'
 import { useEffect, useId, type ReactNode } from 'react'
 import { effectCutLine } from '../../../core/effectTrim'
 import type { EffectTakeView } from '../../../core/effectTakes'
@@ -82,12 +84,13 @@ export function useEffectTrimControl({
       <button
         type="button"
         className="btn btn-small"
-        disabled={greyed || locked}
-        // Not `disabled` while it works: that would take the keyboard focus off the button.
-        aria-disabled={working ? true : undefined}
+        {...off(
+          locked && EFFECTS_LOCK_UNREAD,
+          greyed && note,
+          working && 'Wait for the trim to finish.',
+        )}
         aria-describedby={note ? noteId : undefined}
         onClick={() => {
-          if (working) return
           onPress()
           trim.mutate({ file: take.file, undo })
         }}

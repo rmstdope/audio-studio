@@ -5,7 +5,9 @@ import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
+const { WhyTip } = await import('../../components/WhyTip')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { TakesPanel } = await import('./TakesPanel')
@@ -90,6 +92,7 @@ function render(data: MusicTakesView, row: TrackRow = track) {
       createElement(
         QueryClientProvider,
         { client },
+        createElement(WhyTip),
         createElement(TakesPanel, { track: row, lists: [] }),
       ),
     ),
@@ -132,7 +135,7 @@ describe('Trim silence on a stinger’s takes', () => {
 
   it('waits while the music lock cannot be read, like Choose', () => {
     const { buttons } = render({ ...view([take(1)]), lockUnread: true })
-    expect(buttons('Trim silence')[0]!.disabled).toBe(true)
+    expect(isOff(buttons('Trim silence')[0]!)).toBe(true)
   })
 
   it('asks the server to trim the take, and stays on the button that now reads Undo trim', async () => {
@@ -198,10 +201,10 @@ describe('Trim silence on a stinger’s takes', () => {
   it('is greyed out with the reason when there is nothing to cut, and when it is near-silent throughout', () => {
     const nothing = render(view([take(1, { trimmable: 'nothing' })]))
     const a = nothing.buttons('Trim silence')[0]!
-    expect(a.disabled).toBe(true)
+    expect(isOff(a)).toBe(true)
     expect(nothing.container.textContent).toContain('Starts and ends on its sound: nothing to cut.')
     const silent = render(view([take(2, { trimmable: 'silent' })]))
-    expect(silent.buttons('Trim silence')[0]!.disabled).toBe(true)
+    expect(isOff(silent.buttons('Trim silence')[0]!)).toBe(true)
     expect(silent.container.textContent).toContain(
       'Near-silent throughout: there is no sound to keep.',
     )

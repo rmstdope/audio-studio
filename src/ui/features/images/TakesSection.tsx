@@ -33,18 +33,26 @@ import {
   useUnchooseImageTake,
 } from '../../api'
 import { Confirm } from '../../components/Confirm'
+import { off } from '../../off'
 import { MenuFace } from '../../components/MenuFace'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import {
+  BRINGING_WHY,
+  IMAGES_LOCK_WHY,
+  imageMakeWhy,
+  imageMenuWhy,
   lookZoom,
   makeTakesText,
+  QUESTION_OPEN_WHY,
   refusal,
   pictureRendering,
   setAsideDim,
   setAsideLead,
   setAsideTitle,
+  STYLE_BROKEN_WHY,
   takeCountText,
   unchooseNote,
+  WAIT_FOR_CHANGE,
 } from '../../imagesText'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { imageTimeLeftText } from '../../imageTakesText'
@@ -294,7 +302,13 @@ export function TakesSection({
   const rightTake = takes.find((t) => t.n === onRight)
   const none = takes.length === 0 && making.length === 0
   const busy = making.length > 0
-  const canMake = generator.ok && !busy && !make.isPending && !waitingForWords
+  const why = {
+    generatorOk: generator.ok,
+    making: busy || make.isPending,
+    savingWords: waitingForWords,
+  }
+  const menuWhy = imageMenuWhy(why)
+  const makeWhy = imageMakeWhy(why)
   const size = { width: row.width, height: row.height }
   // The two sides sit side by side at the largest whole size at which both fit, else shrunk side by
   // side down to half the game's size, else one above the other (lookZoom).
@@ -316,6 +330,15 @@ export function TakesSection({
     lookError === null &&
     t.look !== 'bringing'
   const canDrop = !lockUnread && !drop.isPending && !choose.isPending
+  const dropWhy = lockUnread ? IMAGES_LOCK_WHY : WAIT_FOR_CHANGE
+  const chooseWhy = (t: ImageTakeView) =>
+    !canDrop
+      ? dropWhy
+      : lookError !== null
+        ? STYLE_BROKEN_WHY
+        : t.look === 'bringing'
+          ? BRINGING_WHY
+          : WAIT_FOR_CHANGE
   /** Chooses take `n`; `confirmed` is after the question, which waits for the save before it closes. */
   const onChoose = (n: number, confirmed = false) => {
     const before = chosen?.n ?? null
@@ -445,7 +468,7 @@ export function TakesSection({
           className="takes-model"
           aria-label="Model for new takes"
           value={model}
-          disabled={busy || make.isPending || waitingForWords || !generator.ok}
+          {...off(menuWhy)}
           onChange={(event) => setPicked(event.target.value as ImageModelId)}
         >
           {IMAGE_MODEL_IDS.map((id) => (
@@ -459,7 +482,7 @@ export function TakesSection({
         className="takes-count"
         aria-label="Number of new takes"
         value={count}
-        disabled={busy || make.isPending || waitingForWords || !generator.ok}
+        {...off(menuWhy)}
         onChange={(event) => setCount(Number(event.target.value))}
       >
         {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
@@ -471,7 +494,7 @@ export function TakesSection({
       <button
         type="button"
         className="btn btn-primary"
-        disabled={!canMake}
+        {...off(makeWhy)}
         onClick={() => {
           // The button is off while takes are made, and the browser drops focus from it; focus
           // goes to the take on the right in the grid, so ← and → keep stepping it.
@@ -516,7 +539,11 @@ export function TakesSection({
           <button
             type="button"
             className="btn"
-            disabled={make.isPending || waitingForWords || !generator.ok}
+            {...off(
+              !generator.ok && imageMakeWhy({ ...why, making: false, savingWords: false }),
+              make.isPending && WAIT_FOR_CHANGE,
+              waitingForWords && imageMakeWhy({ ...why, making: false }),
+            )}
             onClick={() => afterWordsSaved(() => make.mutate({ retry: f.n }))}
           >
             Try again
@@ -533,7 +560,7 @@ export function TakesSection({
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={stop.isPending}
+                  {...off(stop.isPending && WAIT_FOR_CHANGE)}
                   onClick={() => stop.mutate()}
                 >
                   Stop
@@ -666,7 +693,7 @@ export function TakesSection({
                     className="btn btn-primary"
                     type="button"
                     autoFocus
-                    disabled={answering.isPending}
+                    {...off(answering.isPending && WAIT_FOR_CHANGE)}
                     onClick={() => {
                       if (asking.kind === 'choose') {
                         onChoose(asking.n, true)
@@ -748,7 +775,7 @@ export function TakesSection({
                         className="btn btn-primary"
                         type="button"
                         autoFocus
-                        disabled={drop.isPending}
+                        {...off(drop.isPending && WAIT_FOR_CHANGE)}
                         onClick={() => onDrop(asking.n, true)}
                       >
                         {drop.isPending ? 'Dropping…' : `Drop take ${asking.n}`}
@@ -769,7 +796,7 @@ export function TakesSection({
                       type="button"
                       ref={dropButton}
                       className="btn btn-ghost btn-small"
-                      disabled={!canDrop || open}
+                      {...off(!canDrop && dropWhy, open && QUESTION_OPEN_WHY)}
                       onClick={() => request({ kind: 'drop', n: rightTake.n })}
                     >
                       Drop
@@ -778,7 +805,10 @@ export function TakesSection({
                       type="button"
                       ref={chooseButton}
                       className="btn btn-primary btn-small"
-                      disabled={!canChoose(rightTake) || open}
+                      {...off(
+                        !canChoose(rightTake) && chooseWhy(rightTake),
+                        open && QUESTION_OPEN_WHY,
+                      )}
                       onClick={() => request({ kind: 'choose', n: rightTake.n })}
                     >
                       Choose
@@ -879,7 +909,7 @@ function LeftSide({
             type="button"
             ref={opener}
             className="btn btn-small"
-            disabled={lockUnread || unchoosing}
+            {...off(lockUnread && IMAGES_LOCK_WHY, unchoosing && WAIT_FOR_CHANGE)}
             onClick={onUnchoose}
           >
             Un-choose

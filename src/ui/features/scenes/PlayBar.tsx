@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import type { SceneRow } from '../../../core/scenes'
 import { PlayIcon, StopIcon } from '../../components/icons'
+import { off } from '../../off'
 import { clock, muteSoloText } from '../../sceneNow'
 import type { ScenePlay } from '../../sceneRun'
 
@@ -28,8 +29,12 @@ export function PlayBar({
         className={running ? 'icon-btn music-stop' : 'icon-btn'}
         type="button"
         aria-label={running ? 'Stop the scene' : 'Start the scene'}
-        aria-disabled={(nothing && !running) || undefined}
-        onClick={() => !(nothing && !running) && play.toggle()}
+        {...off(
+          nothing &&
+            !running &&
+            'Nothing in this scene makes a sound yet. Add a track or an effect to it, then start it.',
+        )}
+        onClick={() => play.toggle()}
       >
         {running ? <StopIcon /> : <PlayIcon />}
       </button>
@@ -66,8 +71,11 @@ export function PlayBar({
               key={trigger}
               type="button"
               className="btn sm"
-              aria-disabled={play.phase !== 'playing' || undefined}
-              onClick={() => play.phase === 'playing' && play.fire(trigger)}
+              {...off(
+                play.phase !== 'playing' &&
+                  'A trigger only fires while the scene is playing. Start the scene first.',
+              )}
+              onClick={() => play.fire(trigger)}
             >
               {trigger} ⚡
             </button>

@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { usd } from '../../core/spend'
 import type { CreditResult } from '../../services/fish'
-import { boxState, payLabel } from '../sitting'
+import { off } from '../off'
+import { boxState, payLabel, payWhy } from '../sitting'
 
 /**
  * The box that asks how much a paid audition may spend before it does: the points about what is
@@ -128,11 +129,7 @@ export function SpendConfirm({
         <button className="btn btn-ghost" type="button" onClick={cancel}>
           Cancel
         </button>
-        <button
-          className="btn btn-primary"
-          type="submit"
-          disabled={state.kind !== 'ask' || !state.canPay || busy}
-        >
+        <button className="btn btn-primary" type="submit" {...off(payWhy(state, busy))}>
           {payLabel(text)}
         </button>
       </div>

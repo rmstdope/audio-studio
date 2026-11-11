@@ -1,10 +1,12 @@
 import { EditModelMenu } from './EditModelMenu'
-import { EDIT_SETUP_LINE, type EditModelId } from '../../../core/imageModels'
+import { EDIT_SETUP_LINE, editModel, type EditModelId } from '../../../core/imageModels'
 import { useEffect, useRef, useState } from 'react'
 import { planRemake, remakeCovered, tieOf, type ImagePatchesView } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
 import type { PatchArea } from '../../../core/imagePatches'
 import { useCloseRemake, useRemakePatches, useStopRemake } from '../../api'
+import { off } from '../../off'
+import { modelMissingWhy, WAIT_FOR_CHANGE } from '../../imagesText'
 import { useStopFocus } from '../../components/useStopFocus'
 import {
   leftOutLine,
@@ -73,7 +75,7 @@ export function RemakeLine({
             ref={stopButton}
             className="btn"
             type="button"
-            disabled={stop.isPending}
+            {...off(stop.isPending && WAIT_FOR_CHANGE)}
             {...stopFocus}
             onClick={() => stop.mutate()}
           >
@@ -107,7 +109,7 @@ export function RemakeLine({
           ref={closeButton}
           className="btn"
           type="button"
-          disabled={close.isPending}
+          {...off(close.isPending && WAIT_FOR_CHANGE)}
           onClick={() =>
             close.mutate(undefined, {
               onSuccess: () => {
@@ -142,7 +144,7 @@ export function RemakeLine({
       )
     : { make: covered.map((p) => ({ id: p.id, title: p.title })), leftOut: [] }
   const modelHere = view.models[model] === 'whole'
-  const off = view.pictureGone
+  const blocked = view.pictureGone
     ? "The chosen take's picture is missing or cannot be read, so it cannot be patched."
     : view.maker.ok
       ? null
@@ -174,7 +176,6 @@ export function RemakeLine({
           downloads={view.models}
           failed={view.remake.failedModels}
           label="Model for the new takes of each patch"
-          disabled={false}
         />
         <select
           aria-label="Takes of each patch"
@@ -190,13 +191,17 @@ export function RemakeLine({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={off !== null || make.isPending || !modelHere}
+          {...off(
+            blocked,
+            !modelHere && modelMissingWhy(editModel(model).name),
+            make.isPending && WAIT_FOR_CHANGE,
+          )}
           onClick={remake}
         >
           Remake patches on this take
         </button>
       </div>
-      {off && <span className="muted small">{off}</span>}
+      {blocked && <span className="muted small">{blocked}</span>}
       {!modelHere && <span className="faint small">{EDIT_SETUP_LINE}</span>}
       <span className="faint small">{REMAKE_USES}</span>
       {plan.leftOut.length > 0 && <span className="faint small">{left}</span>}

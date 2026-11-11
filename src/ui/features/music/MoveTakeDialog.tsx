@@ -11,7 +11,11 @@ import {
 import type { MakingSummary, TakeView } from '../../../core/musicTake'
 import type { MoveResult } from '../../../services/musicTakes'
 import { useMoveTake } from '../../api'
+import { off } from '../../off'
 import { useTrackActions } from './trackActions'
+
+/** Why the dialog's controls wait: the move is on its way. */
+const MOVING_WHY = 'Wait for the move to finish.'
 
 /**
  * The dialog that moves a take to another track of the same kind: a search box (loops only), the
@@ -64,8 +68,9 @@ export function MoveTakeDialog({
     if (loops) search.current?.focus()
     else
       (
-        root.current?.querySelector<HTMLElement>('button[role="option"]:not([disabled])') ??
-        root.current?.querySelector<HTMLElement>('.modal-actions .btn-ghost')
+        root.current?.querySelector<HTMLElement>(
+          'button[role="option"]:not([aria-disabled="true"])',
+        ) ?? root.current?.querySelector<HTMLElement>('.modal-actions .btn-ghost')
       )?.focus()
   }
 
@@ -133,7 +138,7 @@ export function MoveTakeDialog({
       const controls = [
         ...(root.current?.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button') ??
           []),
-      ].filter((c) => !c.disabled)
+      ]
       const first = controls[0]
       const last = controls.at(-1)
       const outside = !controls.includes(target as HTMLInputElement | HTMLButtonElement)
@@ -160,8 +165,9 @@ export function MoveTakeDialog({
     // The search box, then each row that can be picked, in the order drawn.
     const stops = [
       ...(loops && search.current ? [search.current as HTMLElement] : []),
-      ...(root.current?.querySelectorAll<HTMLElement>('button[role="option"]:not([disabled])') ??
-        []),
+      ...(root.current?.querySelectorAll<HTMLElement>(
+        'button[role="option"]:not([aria-disabled="true"])',
+      ) ?? []),
     ]
     const at = stops.indexOf(target)
     const next =
@@ -190,7 +196,7 @@ export function MoveTakeDialog({
             placeholder="Find a loop"
             aria-label="Find a loop"
             value={query}
-            disabled={pending}
+            {...off(pending && MOVING_WHY)}
             onChange={(event) => setQuery(event.target.value)}
           />
         )}
@@ -207,7 +213,10 @@ export function MoveTakeDialog({
                   role="option"
                   data-track={target.id}
                   aria-selected={selected === target.id}
-                  disabled={target.here || pending}
+                  {...off(
+                    target.here && 'The take is on this track already. Pick another one.',
+                    pending && MOVING_WHY,
+                  )}
                   className={`dest${selected === target.id ? ' sel' : ''}${target.here ? ' off' : ''}`}
                   onClick={() => setSelected(target.id)}
                 >
@@ -227,13 +236,18 @@ export function MoveTakeDialog({
         )}
         <div className="modal-actions">
           <span className="grow" />
-          <button type="button" className="btn btn-ghost" disabled={pending} onClick={onClose}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            {...off(pending && MOVING_WHY)}
+            onClick={onClose}
+          >
             Cancel
           </button>
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!selected || pending}
+            {...off(!selected && 'Pick where to move it first.', pending && MOVING_WHY)}
             onClick={() => void submit()}
           >
             {pending ? 'Moving…' : `Move take ${take.n}`}

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  closeFadesFirst,
+  makeWaitWhy,
+  musicMakeWhy,
   failureLine,
   makingStatusText,
   progressOf,
@@ -152,5 +155,60 @@ describe('makingStatusText', () => {
   })
   it('says one take in the singular, and never less than a minute', () => {
     expect(makingStatusText({ takes: 1, left: 0 })).toBe('making 1 take · about 1 min')
+  })
+})
+
+describe('makeWaitWhy', () => {
+  it('names the takes being made, then the brief saving, else nothing', () => {
+    expect(makeWaitWhy({ making: false, savingBrief: false })).toBeNull()
+    expect(makeWaitWhy({ making: true, savingBrief: true })).toBe(
+      'Takes are being made for this track. Change this when they are done, or Stop.',
+    )
+    expect(makeWaitWhy({ making: false, savingBrief: true })).toBe(
+      'The brief is being saved. This turns on when it is.',
+    )
+  })
+})
+
+describe('musicMakeWhy', () => {
+  const free = {
+    generator: null,
+    tooLong: null,
+    missing: null,
+    pending: false,
+    making: false,
+    savingBrief: false,
+  }
+  it('is nothing while Make can be pressed', () => {
+    expect(musicMakeWhy(free)).toBeNull()
+  })
+  it('puts what Setup fixes first, then the model, then the waiting', () => {
+    const all = {
+      generator: 'No music model can run.',
+      tooLong: 'Too long for this model.',
+      missing: 'Not on this computer.',
+      pending: true,
+      making: true,
+      savingBrief: true,
+    }
+    expect(musicMakeWhy(all)).toBe('No music model can run. Setup says what is missing.')
+    expect(musicMakeWhy({ ...all, generator: null })).toBe('Too long for this model.')
+    expect(musicMakeWhy({ ...all, generator: null, tooLong: null })).toBe('Not on this computer.')
+    const waiting = { ...all, generator: null, tooLong: null, missing: null }
+    expect(musicMakeWhy(waiting)).toBe(
+      'Takes are being made for this track. Make more when they are done, or Stop.',
+    )
+    expect(musicMakeWhy({ ...waiting, making: false, pending: false })).toBe(
+      'The brief is being saved. Make turns on when it is.',
+    )
+    expect(musicMakeWhy({ ...waiting, making: false, savingBrief: false })).toBe(
+      'Wait for the current change to finish.',
+    )
+  })
+})
+
+describe('closeFadesFirst', () => {
+  it('names the take whose fades are open', () => {
+    expect(closeFadesFirst(2)).toBe('Close the fades of Take 2 first.')
   })
 })

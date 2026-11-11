@@ -62,7 +62,9 @@ import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { Pager } from '../../components/Pager'
+import { off } from '../../off'
 import { pagerFor } from '../../pager'
+import { CHANGING } from '../../voiceOffText'
 import { CloneVoice } from './CloneVoice'
 import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefEditors'
 
@@ -222,8 +224,11 @@ export function CharacterView({
             className="btn"
             type="button"
             // Only once it is known whether an audition is going on: paying starts one if not.
-            disabled={!view || designing || blocked !== null}
-            title={blocked ?? undefined}
+            {...off(
+              blocked,
+              designing && 'The voice design box is open. Close it to start another.',
+              !view && 'Wait for the audition to be read.',
+            )}
             onClick={() => setDesigning(true)}
           >
             <SparkIcon /> Design a voice…
@@ -246,13 +251,11 @@ export function CharacterView({
                 className="btn btn-primary"
                 type="button"
                 // While the audition is read again, one may have been started elsewhere.
-                disabled={
-                  start.isPending ||
-                  session.isFetching ||
-                  sittingQuery.isPending ||
-                  blocked !== null
-                }
-                title={blocked ?? undefined}
+                {...off(
+                  blocked,
+                  (start.isPending || session.isFetching || sittingQuery.isPending) &&
+                    'Wait for the audition to be read.',
+                )}
                 onClick={beginAudition}
               >
                 <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
@@ -652,7 +655,11 @@ function VoicePanel({
             <button
               className="btn btn-small"
               type="button"
-              disabled={recorder.recording.has(id) || !answer || answer.lookup?.reason === 'no-key'}
+              {...off(
+                answer?.lookup?.reason === 'no-key' &&
+                  'There is no Fish key. Setup says how to add it.',
+                (recorder.recording.has(id) || !answer) && 'Wait for the take to be made.',
+              )}
               onClick={() => void record(id)}
             >
               {recorder.recording.has(id) ? 'Recording…' : 'Record'}
@@ -817,7 +824,7 @@ function InTheGame({
           <button
             className="btn"
             type="button"
-            disabled={!player.inTurn && !view.canPlayAll}
+            {...off(!player.inTurn && !view.canPlayAll && 'Wait for the lines to load.')}
             onClick={() => {
               if (player.inTurn) return player.stop()
               // Every line shows while they play, and stays shown after.
@@ -912,7 +919,7 @@ function InProgress({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={act.isPending}
+            {...off(act.isPending && CHANGING)}
             onClick={() => act.mutate({ action: 'discard' })}
           >
             Stop audition

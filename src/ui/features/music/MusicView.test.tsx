@@ -319,15 +319,12 @@ describe('Refresh from the game while takes are made', () => {
   it('is greyed with its reason while a stinger is making takes, and open otherwise', () => {
     const idle = render('stingers').container
     expect(refresh(idle).getAttribute('aria-disabled')).toBeNull()
-    expect(refresh(idle).title).toBe('')
+    expect(refresh(idle).dataset.why).toBeUndefined()
     const busy = render('stingers', undefined, [], { roof: { takes: 2, left: 60, failed: 0 } })
     const button = refresh(busy.container)
     expect(button.getAttribute('aria-disabled')).toBe('true')
-    expect(button.title).toBe(
+    expect(button.dataset.why).toBe(
       'Takes are being made for the stingers. Refresh when they are done, or Stop all.',
-    )
-    expect(document.getElementById(button.getAttribute('aria-describedby')!)!.textContent).toBe(
-      button.title,
     )
   })
 

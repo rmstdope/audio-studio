@@ -7,13 +7,14 @@ import type {
 } from '../../../services/refresh'
 import { useMusicMaking, useRefreshDialog, useRefreshShared } from '../../api'
 import { STATUS_LABEL, tracksDone, type TrackStatus } from '../../../core/musicChoose'
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { Problems } from '../../components/Problems'
 import { PlayIcon, StopIcon } from '../../components/icons'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { canPlay, playLabel, playsText, type PlayFailure } from '../../musicPlays'
 import { clock, shortTitle } from '../../format'
 import { makingStatusText } from '../../musicTakesText'
+import { off } from '../../off'
 import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import { routeHref, type MusicRoute } from '../../route'
 import { REFRESH_BLOCKED_BY_TAKES, type Noun } from '../../musicMakeAllText'
@@ -148,7 +149,6 @@ function ListPage({
   const notice = listNotice(list, name)
   const making = useMusicMaking().data ?? {}
   const noun: Noun = list.kind === 'stingers' ? 'stinger' : 'track'
-  const refreshReasonId = useId()
   // On the Stingers page the refresh and the making of takes cannot run together, and it shows.
   const takesBlockRefresh =
     list.kind === 'stingers' && list.tracks.some((t) => (making[t.id]?.takes ?? 0) > 0)
@@ -177,19 +177,14 @@ function ListPage({
             <button
               className="btn"
               type="button"
-              disabled={refresh.pending}
-              aria-disabled={takesBlockRefresh || undefined}
-              aria-describedby={takesBlockRefresh ? refreshReasonId : undefined}
-              title={takesBlockRefresh ? REFRESH_BLOCKED_BY_TAKES : undefined}
-              onClick={takesBlockRefresh ? undefined : refresh.start}
+              {...off(
+                takesBlockRefresh && REFRESH_BLOCKED_BY_TAKES,
+                refresh.pending && 'Wait for the refresh from the game to finish.',
+              )}
+              onClick={refresh.start}
             >
               {refresh.pending ? 'Refreshing from the game…' : 'Refresh from the game'}
             </button>
-            {takesBlockRefresh && (
-              <span id={refreshReasonId} hidden>
-                {REFRESH_BLOCKED_BY_TAKES}
-              </span>
-            )}
           </div>
         )}
       </header>

@@ -11,6 +11,8 @@ import {
   startDraft,
   type SoundAlikeDraft,
 } from '../../soundAlikeDraft'
+import { off } from '../../off'
+import { SAVING, saveReasons } from '../../voiceOffText'
 
 /**
  * The project's own words that sound the same, a group each: Whisper writing one for another
@@ -72,7 +74,7 @@ export function SoundAlikePanel({
         </span>
       </div>
       {/* Edits wait while a save is under way, so none is dropped when it lands. */}
-      <fieldset className="pronounce-fields" disabled={save.isPending}>
+      <fieldset className="pronounce-fields">
         {rows.length > 0 && (
           <ol className="pronounce-rows">
             {rows.map(({ id, text }, i) => (
@@ -81,6 +83,7 @@ export function SoundAlikePanel({
                   className="mono"
                   aria-label={`Words, group ${i + 1}`}
                   placeholder="Lyria, Liria"
+                  {...off(save.isPending && SAVING)}
                   value={text}
                   onChange={(e) => edit((d) => editGroup(d, i, e.target.value))}
                 />
@@ -89,6 +92,7 @@ export function SoundAlikePanel({
                     className="btn"
                     type="button"
                     aria-label={`Remove group ${i + 1}`}
+                    {...off(save.isPending && SAVING)}
                     onClick={() => edit((d) => removeGroup(d, i))}
                   >
                     Remove
@@ -103,7 +107,7 @@ export function SoundAlikePanel({
         <button
           className="btn"
           type="button"
-          disabled={save.isPending}
+          {...off(save.isPending && SAVING)}
           onClick={() => edit(addGroup)}
         >
           Add group
@@ -117,7 +121,7 @@ export function SoundAlikePanel({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={!changed || moved || problem !== null || save.isPending}
+          {...off(...saveReasons({ changed, moved, problem, pending: save.isPending }))}
           onClick={() =>
             save.mutate(
               { groups: edited, was: draft!.base },

@@ -849,7 +849,6 @@ a.stat-link:focus-visible .stat-more {
   filter: brightness(1.08);
 }
 
-.btn:disabled,
 .btn[aria-disabled='true'] {
   opacity: 0.55;
   cursor: default;
@@ -3011,7 +3010,7 @@ button.cue-chip[aria-expanded='true'] {
   min-height: 36px;
   padding: 0 10px;
 }
-.mmenu select:disabled {
+.mmenu select[aria-disabled='true'] {
   opacity: 0.55;
 }
 .mmenu .price {
@@ -3038,7 +3037,7 @@ button.cue-chip[aria-expanded='true'] {
   max-width: 100%;
   accent-color: var(--accent);
 }
-.voice-settings input[type='range']:disabled {
+.voice-settings input[type='range'][aria-disabled='true'] {
   opacity: 0.55;
 }
 @media (max-width: 700px) {
@@ -3295,8 +3294,8 @@ button.cue-chip[aria-expanded='true'] {
   min-height: 36px;
   padding: 0 10px;
 }
-.takes-model:disabled,
-.takes-count:disabled {
+.takes-model[aria-disabled='true'],
+.takes-count[aria-disabled='true'] {
   opacity: 0.55;
 }
 .takes-count {
@@ -3634,7 +3633,7 @@ button.cue-chip[aria-expanded='true'] {
 .editor .field input.invalid {
   border-color: var(--danger-ink);
 }
-.editor .field input:disabled {
+.editor .field input[aria-disabled='true'] {
   opacity: 0.5;
 }
 .editor .errline {
@@ -3812,7 +3811,7 @@ button.cue-chip[aria-expanded='true'] {
   cursor: pointer;
 }
 
-.dest:hover:not(:disabled),
+.dest:hover:not([aria-disabled='true']),
 .dest.sel {
   background: var(--raised);
 }
@@ -3821,7 +3820,7 @@ button.cue-chip[aria-expanded='true'] {
   outline: 1px solid var(--accent);
 }
 
-.dest:disabled {
+.dest[aria-disabled='true'] {
   cursor: default;
 }
 
@@ -3851,35 +3850,28 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--text-soft);
 }
 
-.move-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.move-wrap button[aria-disabled='true'] {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.move-tip {
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  z-index: 2;
-  display: none;
+/* The one tip for every greyed control (WhyTip). */
+.why-tip {
+  position: fixed;
+  z-index: 50;
   width: max-content;
-  max-width: 240px;
-  margin-bottom: 4px;
+  max-width: min(280px, calc(100vw - 16px));
   padding: 6px 8px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: var(--raised);
   color: var(--text-soft);
+  overflow-wrap: break-word;
 }
 
-.move-wrap:hover .move-tip,
-.move-wrap:focus-within .move-tip {
-  display: block;
+/* A greyed control keeps its place and look, takes focus, and does nothing when pressed. */
+[aria-disabled='true'][data-why] {
+  cursor: default;
+}
+
+input[aria-disabled='true'][data-why],
+textarea[aria-disabled='true'][data-why] {
+  opacity: 0.55;
 }
 
 @media (max-width: 600px) {
@@ -5303,7 +5295,7 @@ button.cue-chip[aria-expanded='true'] {
   text-align: left;
   cursor: pointer;
 }
-.named-area-main:disabled {
+.named-area-main[aria-disabled='true'] {
   cursor: default;
 }
 .named-area-text {
@@ -5601,7 +5593,7 @@ button.cue-chip[aria-expanded='true'] {
   opacity: 0;
   cursor: pointer;
 }
-.menu-face select:disabled {
+.menu-face select[aria-disabled='true'] {
   opacity: 0;
   cursor: default;
 }
@@ -5609,7 +5601,7 @@ button.cue-chip[aria-expanded='true'] {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.menu-face:has(select:disabled) {
+.menu-face:has(select[aria-disabled='true']) {
   opacity: 0.55;
 }
 .mmenu .menu-face {

@@ -8,7 +8,8 @@ import { pagerFor } from '../../pager'
 import { Problems } from '../../components/Problems'
 import { shortTitle } from '../../format'
 import { routeHref, type ScenesRoute } from '../../route'
-import { currentScene, statesLine } from '../../scenesText'
+import { off } from '../../off'
+import { currentScene, refreshWhy, saveWhy, statesLine } from '../../scenesText'
 import { useSceneClip } from '../../sceneClip'
 import { useScenePlay } from '../../sceneRun'
 import { useLeaveGuard, useSceneEditor, type Leaving } from '../../sceneDraft'
@@ -69,7 +70,7 @@ export function ScenesPage({
       <button
         className={primary ? 'btn btn-primary' : 'btn'}
         type="button"
-        disabled={run.pending}
+        {...off(refreshWhy(run.pending))}
         onClick={() => {
           const go = () => {
             play.reset()
@@ -185,8 +186,11 @@ export function ScenesPage({
           <button
             className="btn"
             type="button"
-            aria-disabled={!editor.dirty || undefined}
-            onClick={() => editor.dirty && editor.discard()}
+            {...off(
+              !editor.dirty &&
+                'There are no changes to discard. Change something in the scene first.',
+            )}
+            onClick={editor.discard}
           >
             Discard
           </button>
@@ -194,7 +198,7 @@ export function ScenesPage({
             ref={saveButton}
             className="btn btn-primary"
             type="button"
-            aria-disabled={!editor.dirty || red || saving || undefined}
+            {...off(saveWhy({ dirty: editor.dirty, red, saving }))}
             onClick={save}
           >
             {saving ? 'Saving…' : 'Save'}

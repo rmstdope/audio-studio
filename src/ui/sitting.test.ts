@@ -7,6 +7,7 @@ import {
   creditsUsedUpLine,
   creditsWaitLine,
   meterLine,
+  payWhy,
   planLeftLine,
   needsResumeBox,
   takeCaches,
@@ -174,5 +175,28 @@ describe('the words of an audition’s credits', () => {
     expect(planLeftLine(new Error('the studio answered 500'), 0)).toBe(
       'What is left on your plan is unknown: the studio answered 500',
     )
+  })
+})
+
+describe('payWhy', () => {
+  it('is nothing when the amount can be paid', () => {
+    const ask = boxState(5, { model: 'm', perTake: 0.01 }, '1.00')
+    expect(payWhy(ask, false)).toBeNull()
+  })
+
+  it('says the credit is still being read before anything else', () => {
+    const reading = boxState(undefined, { model: 'm', perTake: 0.01 }, 'x')
+    expect(payWhy(reading, true)).toBe(
+      'Your credit is still being read. Pay turns on when it has been.',
+    )
+  })
+
+  it('names the problem with the amount, then the audition starting', () => {
+    const bad = boxState(5, { model: 'm', perTake: 0.01 }, 'x')
+    expect(payWhy(bad, true)).toBe(
+      'Enter an amount in dollars, like 0.10. Pay turns on when the amount is right.',
+    )
+    const ok = boxState(5, { model: 'm', perTake: 0.01 }, '1.00')
+    expect(payWhy(ok, true)).toBe('The audition is starting. Wait for it.')
   })
 })

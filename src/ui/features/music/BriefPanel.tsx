@@ -3,6 +3,8 @@ import { fieldSource, type BriefChange, type BriefField, type TrackRow } from '.
 import type { MusicListSummary } from '../../../core/music'
 import { Problems } from '../../components/Problems'
 import { useKeepMyBrief, useSetTrackBrief } from '../../api'
+import { WAIT_FOR_CHANGE } from '../../musicTakesText'
+import { off } from '../../off'
 import { fieldTag, fieldText, parseField } from '../../musicText'
 import type { SaveWordsNow } from '../images/WordsField'
 
@@ -107,12 +109,17 @@ function GameChanged({ track }: { track: TrackRow }) {
         <button
           className="btn"
           type="button"
-          disabled={busy}
+          {...off(busy && WAIT_FOR_CHANGE)}
           onClick={() => save.mutate({ brief: track.game.brief })}
         >
           Use the game&apos;s
         </button>
-        <button className="btn" type="button" disabled={busy} onClick={() => keep.mutate()}>
+        <button
+          className="btn"
+          type="button"
+          {...off(busy && WAIT_FOR_CHANGE)}
+          onClick={() => keep.mutate()}
+        >
           Keep mine
         </button>
       </div>

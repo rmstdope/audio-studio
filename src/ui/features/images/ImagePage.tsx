@@ -9,7 +9,8 @@ import { Pager } from '../../components/Pager'
 import { Problems } from '../../components/Problems'
 import { useAcceptImageChange, useImageCompare, useSetImageWords } from '../../api'
 import { shortTitle } from '../../format'
-import { outOfDateText } from '../../imagesText'
+import { off } from '../../off'
+import { outOfDateText, WAIT_FOR_CHANGE } from '../../imagesText'
 import { pagerFor } from '../../pager'
 import { routeHref } from '../../route'
 import { ActStyleBox } from './ActStyleBox'
@@ -109,7 +110,7 @@ export function ImagePage({
               <button
                 className="btn"
                 type="button"
-                disabled={accept.isPending}
+                {...off(accept.isPending && WAIT_FOR_CHANGE)}
                 onClick={() => accept.mutate()}
               >
                 Accept
@@ -143,7 +144,7 @@ export function ImagePage({
             <button
               className="btn"
               type="button"
-              disabled={compare.isPending}
+              {...off(compare.isPending && WAIT_FOR_CHANGE)}
               onClick={() => settle('game')}
             >
               Use the game&apos;s
@@ -151,7 +152,7 @@ export function ImagePage({
             <button
               className="btn btn-primary"
               type="button"
-              disabled={compare.isPending}
+              {...off(compare.isPending && WAIT_FOR_CHANGE)}
               onClick={() => settle('keep')}
             >
               Keep mine

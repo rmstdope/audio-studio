@@ -14,6 +14,7 @@ import { imageMakingStatusText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { showingAttentionText } from '../../status'
 import { MakeAllPanel } from './MakeAllPanel'
+import { off } from '../../off'
 import { DoneStat } from '../../components/DoneStat'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
 
@@ -78,7 +79,12 @@ export function ActPage({
         </div>
         {act.canRefresh && (
           <div className="header-actions">
-            <button className="btn" type="button" disabled={run.pending} onClick={run.start}>
+            <button
+              className="btn"
+              type="button"
+              {...off(run.pending && 'Wait for the refresh from the game to finish.')}
+              onClick={run.start}
+            >
               {run.pending ? 'Refreshing from the game…' : 'Refresh from the game'}
             </button>
           </div>

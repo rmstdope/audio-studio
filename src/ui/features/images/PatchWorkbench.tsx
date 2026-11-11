@@ -29,12 +29,20 @@ import {
 } from '../../api'
 import { Confirm } from '../../components/Confirm'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
+import { off } from '../../off'
 import { areaFromDrag, sameArea } from '../../imagePatchArea'
 import {
   areaNoPlaceText,
   backToAreaText,
+  BRINGING_WHY,
+  IMAGES_LOCK_WHY,
   makeTakesText,
+  STYLE_BROKEN_WHY,
   modelCaption,
+  modelMissingWhy,
+  patchMakeWhy,
+  patchMenuWhy,
+  WAIT_FOR_CHANGE,
   markedFromAreaText,
   refusal,
   takeCountText,
@@ -305,11 +313,25 @@ export function PatchWorkbench({
   const busy = making.length > 0
   const hasTakes = takes.length > 0 || busy
   const modelHere = view.models[model] === 'whole'
-  const canMake =
-    marked !== null && !busy && !make.isPending && !waitingForWords && view.maker.ok && modelHere
   const absentLine = modelHere ? null : EDIT_SETUP_LINE
+  const menuWhy = patchMenuWhy({
+    makerMessage: view.maker.ok ? null : view.maker.message,
+    making: busy || make.isPending,
+    savingWords: waitingForWords,
+  })
+  const makeWhy = patchMakeWhy({
+    makerMessage: view.maker.ok ? null : view.maker.message,
+    modelName: editModel(model).name,
+    modelHere,
+    mark: marked === null ? 'none' : 'placed',
+    areaTitle: tie ? tie.title : null,
+    making: busy || make.isPending,
+    savingWords: waitingForWords,
+  })
   const canChange = !lockUnread && !choose.isPending && !drop.isPending
+  const changeWhy = lockUnread ? IMAGES_LOCK_WHY : WAIT_FOR_CHANGE
   const canChoose = canChange && lookError === null && shown !== null && shown.look !== 'bringing'
+  const chooseWhy = !canChange ? changeWhy : lookError !== null ? STYLE_BROKEN_WHY : BRINGING_WHY
   const overlaid = showing ? shown : null
   const showMark = marked !== null && !(overlaid && sameArea(marked, overlaid.area))
   const problem =
@@ -407,7 +429,7 @@ export function PatchWorkbench({
           className="btn btn-primary"
           type="button"
           autoFocus
-          disabled={unchoose.isPending}
+          {...off(unchoose.isPending && WAIT_FOR_CHANGE)}
           onClick={() =>
             unchoose.mutate(undefined, {
               onSuccess: (answer) => {
@@ -518,7 +540,7 @@ export function PatchWorkbench({
                 type="button"
                 className="btn"
                 ref={unchooseButton}
-                disabled={!canChange}
+                {...off(!canChange && changeWhy)}
                 onClick={() => {
                   unchoose.reset()
                   setAsking(true)
@@ -531,7 +553,7 @@ export function PatchWorkbench({
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={!canChange}
+                  {...off(!canChange && changeWhy)}
                   onClick={() => onDrop(shown.n)}
                 >
                   Drop
@@ -539,7 +561,7 @@ export function PatchWorkbench({
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={!canChoose}
+                  {...off(!canChoose && chooseWhy)}
                   onClick={() => onChoose(shown.n)}
                 >
                   Choose
@@ -578,7 +600,11 @@ export function PatchWorkbench({
               onClick={() => {
                 onBackToArea()
                 // Make may be off (no model, takes being made): focus then goes to the heading.
-                if (makeButton.current && !makeButton.current.disabled) makeButton.current.focus()
+                if (
+                  makeButton.current &&
+                  makeButton.current.getAttribute('aria-disabled') !== 'true'
+                )
+                  makeButton.current.focus()
                 else setPendingFocus('heading')
               }}
             >
@@ -593,14 +619,14 @@ export function PatchWorkbench({
           downloads={view.models}
           failed={work.failedModels}
           label="Model for new takes"
-          disabled={busy || make.isPending || waitingForWords || !view.maker.ok}
+          why={menuWhy}
         />
         <div className="patch-make">
           <select
             className="takes-count"
             aria-label="Number of new takes"
             value={count}
-            disabled={busy || make.isPending || waitingForWords || !view.maker.ok}
+            {...off(menuWhy)}
             onChange={(event) => setCount(Number(event.target.value))}
           >
             {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
@@ -612,7 +638,7 @@ export function PatchWorkbench({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!canMake}
+            {...off(makeWhy)}
             ref={makeButton}
             onClick={() => {
               if (!marked) return
@@ -636,7 +662,7 @@ export function PatchWorkbench({
             <button
               type="button"
               className="btn btn-ghost"
-              disabled={stop.isPending}
+              {...off(stop.isPending && WAIT_FOR_CHANGE)}
               onClick={() => stop.mutate(undefined, { onSuccess: () => setLandOnMake(true) })}
             >
               Stop
@@ -663,7 +689,11 @@ export function PatchWorkbench({
             <button
               type="button"
               className="btn"
-              disabled={make.isPending || !view.maker.ok || view.models[f.model] !== 'whole'}
+              {...off(
+                !view.maker.ok && view.maker.message,
+                view.models[f.model] !== 'whole' && modelMissingWhy(editModel(f.model).name),
+                make.isPending && WAIT_FOR_CHANGE,
+              )}
               onClick={() => make.mutate({ retry: f.n })}
             >
               Try again

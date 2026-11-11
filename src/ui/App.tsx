@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { retiringTakes } from '../core/retirement'
 import { useProject } from './api'
+import { WhyTip } from './components/WhyTip'
 import { Problems } from './components/Problems'
 import { RetirementNotice } from './components/RetirementNotice'
 import { Sidebar } from './components/Sidebar'
@@ -75,6 +76,7 @@ export function App() {
 
   return (
     <div className="shell">
+      <WhyTip />
       <Sidebar summary={summary} route={route} activePart={part.id} />
       <main className="content">
         {!notNow && (
