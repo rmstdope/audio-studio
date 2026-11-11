@@ -1296,14 +1296,14 @@ describe('adding a fine-tuned take', () => {
     png: fakePng(1024, 640, 9),
     model: 'black-forest-labs/FLUX.2-klein-4B',
     seed: 9,
-    fineTunedFrom: { take: null, words: 'Add a cat' },
+    words: 'Add a cat',
   }
   it('adds the next take with its picture and what it came from, made from the image’s words now', async () => {
     const { takes, file, read, row, root } = setup()
     await takes.make(file, 'inn', { count: 1 })
     const first = await takes.view(file, 'inn')
     if (!first || !('takes' in first)) throw new Error('no view')
-    const answer = await takes.addTake(file, 'inn', { ...made, madeFrom: (await row()).madeFrom })
+    const answer = await takes.addTake(file, 'inn', { ...made, from: null })
     expect(answer).toEqual({ ok: true, n: 2 })
     expect(read('content-studio/cache/image-takes/inn/2.png')).toBe(bytes(made.png))
     const board = JSON.parse(read('content-studio/cache/images/inn.json'))
@@ -1319,13 +1319,17 @@ describe('adding a fine-tuned take', () => {
     })
     expect(existsSync(join(root, 'content-studio/cache/image-takes/inn/1.png'))).toBe(true)
   })
+  it('copies the words and style of the take it came from, not the image’s now', async () => {
+    const { takes, file, read } = setup()
+    await takes.make(file, 'inn', { count: 1 })
+    await setImageWords(file, 'inn', 'a high inn')
+    expect(await takes.addTake(file, 'inn', { ...made, from: 1 })).toEqual({ ok: true, n: 2 })
+    const board = JSON.parse(read('content-studio/cache/images/inn.json'))
+    expect(board.takes[1].madeFrom).toEqual(board.takes[0].madeFrom)
+    expect(board.takes[1].fineTunedFrom).toEqual({ take: 1, words: 'Add a cat' })
+  })
   it('is null for an image the game does not list', async () => {
     const { takes, file } = setup()
-    expect(
-      await takes.addTake(file, 'nowhere', {
-        ...made,
-        madeFrom: { words: '', style: '', width: 1, height: 1 },
-      }),
-    ).toBeNull()
+    expect(await takes.addTake(file, 'nowhere', { ...made, from: null })).toBeNull()
   })
 })

@@ -102,8 +102,10 @@ export interface AddedTake {
   /** The `--model` name of the model that edited it. */
   model: string
   seed: number
-  madeFrom: ImageRow['madeFrom']
-  fineTunedFrom: { take: number | null; words: string }
+  /** The words of the fine-tune. */
+  words: string
+  /** The take it was fine-tuned from; null for the game's own image. */
+  from: number | null
 }
 
 /** What the takes of an image are made of. */
@@ -119,7 +121,8 @@ export interface ImageTakes {
   ): Promise<{ ok: true; stopped: number } | ProjectFailure | null>
   /**
    * Adds a take that was not made from the prompt, a fine-tune: its picture as the next number
-   * and the board entry, made from `madeFrom`. Null for an image not listed.
+   * and the board entry, made from the same words and style as the take it was fine-tuned from
+   * (the image's own now when that is the game's own image). Null for an image not listed.
    */
   addTake(
     projectFile: string,
@@ -917,9 +920,9 @@ export function createImageTakes({
             model: made.model,
             width: size.width,
             height: size.height,
-            madeFrom: made.madeFrom,
+            madeFrom: board.takes.find((t) => t.n === made.from)?.madeFrom ?? found.row.madeFrom,
             seen: false,
-            fineTunedFrom: made.fineTunedFrom,
+            fineTunedFrom: { take: made.from, words: made.words },
           },
         ]
         return { ok: true as const, n }
