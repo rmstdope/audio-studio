@@ -597,26 +597,15 @@ function TakeCard({
               </button>
             )}
             <span className="grow" />
-            <span className="move-wrap">
-              <button
-                type="button"
-                ref={opener}
-                className="btn btn-ghost btn-small"
-                disabled={locked}
-                aria-disabled={nowhere ? true : undefined}
-                aria-describedby={nowhere ? `${id}-nowhere` : undefined}
-                onClick={() => {
-                  if (!nowhere) onMove()
-                }}
-              >
-                Move…
-              </button>
-              {nowhere && (
-                <span className="move-tip small" role="tooltip" id={`${id}-nowhere`}>
-                  {nowhere}
-                </span>
-              )}
-            </span>
+            <button
+              type="button"
+              ref={opener}
+              className="btn btn-ghost btn-small"
+              {...off(locked && LOCK_UNREAD, nowhere)}
+              onClick={onMove}
+            >
+              Move…
+            </button>
             <button
               type="button"
               className="btn btn-ghost btn-small"
