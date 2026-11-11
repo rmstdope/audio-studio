@@ -157,7 +157,8 @@ describe('the Music row of the Models panel', () => {
     await page.pick('quick')
     expect(put).toEqual([{ model: 'quick', was: 'balanced' }])
     expect(page.menu()!.value).toBe('quick')
-    expect(page.menu()!.disabled).toBe(true)
+    expect(page.menu()!.getAttribute('aria-disabled')).toBe('true')
+    expect(page.menu()!.getAttribute('data-why')).toBe('Wait for the save to finish.')
     expect(page.container.textContent).toContain('Saving…')
     await act(async () => finish(new Response(JSON.stringify({ ok: true }))))
     expect(page.container.textContent).not.toContain('Saving…')
@@ -195,7 +196,7 @@ describe('the Music row of the Models panel', () => {
     expect(careful.textContent).toBe(
       'Careful · XL sft · 4B — about 7 min a take — not on this computer',
     )
-    expect(careful.disabled).toBe(false)
+    expect(careful.getAttribute('aria-disabled')).toBe(null)
     expect(page.container.querySelector('.warnline')!.textContent).toBe('not on this computer')
     await page.pick('quick')
     expect(put).toEqual([{ model: 'quick', was: 'careful' }])
@@ -226,7 +227,7 @@ describe('the Music row of the Models panel', () => {
     expect(short.textContent).toBe(
       'Short · Stable Audio Open 1.0 — about 100 s a take — not on this computer',
     )
-    expect(short.disabled).toBe(false)
+    expect(short.getAttribute('aria-disabled')).toBe(null)
     await page.pick('short')
     expect(put).toEqual([{ model: 'short', was: 'balanced' }])
   })
@@ -357,7 +358,7 @@ describe('the Images row of the Models panel', () => {
     await pickImage(page.container, 'z-image-turbo')
     expect(imagePuts).toEqual([{ model: 'z-image-turbo', was: 'klein' }])
     expect(menuOf(page.container).value).toBe('z-image-turbo')
-    expect(menuOf(page.container).disabled).toBe(true)
+    expect(menuOf(page.container).getAttribute('aria-disabled')).toBe('true')
     expect(page.container.textContent).toContain('Saving…')
     await act(async () => finish(new Response(JSON.stringify({ ok: true }))))
     expect(page.container.textContent).not.toContain('Saving…')
@@ -492,7 +493,7 @@ describe('the Sound effects row of the Models panel', () => {
     const page = render(answer(null, null, effects('small-sfx')))
     await pickEffect(page.container, 'open-1')
     expect(puts).toEqual([{ model: 'open-1', was: 'small-sfx' }])
-    expect(menuOf(page.container).disabled).toBe(true)
+    expect(menuOf(page.container).getAttribute('aria-disabled')).toBe('true')
     expect(page.container.textContent).toContain('Saving…')
     await act(async () => finish(new Response(JSON.stringify({ ok: true }))))
     expect(page.container.textContent).not.toContain('Saving…')
@@ -832,7 +833,7 @@ describe('the ElevenLabs voice row of the Models panel', () => {
     })
     expect(page.container.textContent).not.toContain('Change how ElevenLabs voices speak?')
     const stability = field<HTMLSelectElement>(page.container, 'stability')
-    expect(stability.disabled).toBe(false)
+    expect(stability.getAttribute('aria-disabled')).toBe(null)
     expect(document.activeElement).toBe(stability)
   })
 
@@ -867,7 +868,14 @@ describe('the ElevenLabs voice row of the Models panel', () => {
       ...withEleven(),
       busy: { kind: 'recording', name: 'Act I' },
     } as ModelsAnswer)
-    expect(field<HTMLSelectElement>(page.container, 'stability').disabled).toBe(true)
-    expect(field<HTMLInputElement>(page.container, 'style').disabled).toBe(true)
+    expect(
+      field<HTMLSelectElement>(page.container, 'stability').getAttribute('aria-disabled'),
+    ).toBe('true')
+    expect(field<HTMLInputElement>(page.container, 'style').getAttribute('aria-disabled')).toBe(
+      'true',
+    )
+    expect(field<HTMLSelectElement>(page.container, 'stability').getAttribute('data-why')).toBe(
+      'Another model is being saved. Wait for it to finish.',
+    )
   })
 })

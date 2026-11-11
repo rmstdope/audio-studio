@@ -17,7 +17,9 @@ import { castInLanguage, type Language } from '../../castLanguages'
 import { Confirm } from '../../components/Confirm'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { recordedLinesOf } from '../../inGame'
+import { off } from '../../off'
 import { routeHref } from '../../route'
+import { CLONING, cloneReasons } from '../../voiceOffText'
 
 /** A file chosen for the voice, with its length read in the browser (null: not audio). */
 interface Chosen extends Recording {
@@ -223,7 +225,7 @@ export function CloneVoice({
       id={OPENER_ID}
       className="btn"
       type="button"
-      disabled={noKey}
+      {...off(noKey && 'There is no Fish Audio key. Setup says how to add it.')}
       onClick={() => setMode('form')}
     >
       Clone a voice from recordings
@@ -257,7 +259,12 @@ export function CloneVoice({
               {playing === `clone:${made.id}` ? <PauseIcon /> : <PlayIcon />}
             </button>
           ) : (
-            <button type="button" className="icon-btn" aria-label="Play" disabled>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Play"
+              {...off('There is no sample to play yet.')}
+            >
               <PlayIcon />
             </button>
           )}
@@ -334,7 +341,7 @@ export function CloneVoice({
           ref={nameField}
           className="search"
           value={title}
-          disabled={cloning}
+          {...off(cloning && CLONING)}
           onChange={(event) => setTitle(event.target.value)}
         />
       </label>
@@ -358,7 +365,7 @@ export function CloneVoice({
               ref={chooseButton}
               className="btn btn-small"
               type="button"
-              disabled={cloning}
+              {...off(cloning && CLONING)}
               onClick={() => picker.current?.click()}
             >
               Choose files…
@@ -386,7 +393,7 @@ export function CloneVoice({
                   className="icon-btn clone-remove"
                   title={`Remove ${c.name}`}
                   aria-label={`Remove ${c.name}`}
-                  disabled={cloning}
+                  {...off(cloning && CLONING)}
                   onClick={() => remove(i)}
                 >
                   ✕
@@ -402,7 +409,7 @@ export function CloneVoice({
         <input
           type="checkbox"
           checked={permitted}
-          disabled={cloning}
+          {...off(cloning && CLONING)}
           onChange={(event) => setPermitted(event.target.checked)}
         />
         <span>These recordings are mine, or I have permission to clone this voice.</span>
@@ -421,7 +428,19 @@ export function CloneVoice({
         </span>
       )}
       <div className="clone-actions">
-        <button className="btn btn-primary" type="submit" disabled={!state.canClone || cloning}>
+        <button
+          className="btn btn-primary"
+          type="submit"
+          {...off(
+            ...cloneReasons({
+              note: state.note,
+              sendable: state.sendable.length,
+              name: title,
+              permitted,
+              cloning,
+            }),
+          )}
+        >
           {cloning ? 'Cloning…' : 'Clone voice'}
         </button>
         {!cloning && (
@@ -490,7 +509,7 @@ function CardButtons({
         <button
           className="btn"
           type="button"
-          disabled={session.isPending || !sessionKnown}
+          {...off((session.isPending || !sessionKnown) && 'Wait for the audition to be read.')}
           onClick={() => void bring()}
         >
           Bring into the audition
@@ -584,7 +603,7 @@ function CastOwnConfirm({
       <button
         className="btn btn-primary"
         type="button"
-        disabled={cast.isPending}
+        {...off(cast.isPending && 'Wait for the casting to finish.')}
         onClick={() => cast.mutate(voice, { onSuccess: (r) => r.ok && onCast() })}
       >
         {cast.isPending ? 'Casting…' : `Cast ${voice.name}`}

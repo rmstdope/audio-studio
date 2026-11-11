@@ -4,6 +4,7 @@ import type { TakeView } from '../../../core/musicTake'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
@@ -97,7 +98,7 @@ describe('the fades editor', () => {
     expect(e.box('Fade in').value).toBe('0')
     expect(e.box('Fade out').value).toBe('0')
     expect((e.q('select') as HTMLSelectElement).value).toBe('smooth')
-    expect(e.button('Save fades')?.disabled).toBe(true)
+    expect(isOff(e.button('Save fades')!)).toBe(true)
     expect(e.button('Remove fades')).toBeUndefined()
     expect(e.container.textContent).toContain('Hear it with the fades')
     expect(e.container.textContent).toContain('Drag the handles or type a length; 0 is no fade.')
@@ -114,7 +115,7 @@ describe('the fades editor', () => {
     expect(e.box('Fade out').value).toBe('1.5')
     expect((e.q('select') as HTMLSelectElement).value).toBe('straight')
     expect(e.button('Remove fades')).toBeDefined()
-    expect(e.button('Save fades')?.disabled).toBe(true)
+    expect(isOff(e.button('Save fades')!)).toBe(true)
   })
 
   it('says why lengths cannot be used and greys Save', () => {
@@ -124,13 +125,13 @@ describe('the fades editor', () => {
     expect(e.container.textContent).toContain(
       "The fades together can't be longer than the take (4.2 s).",
     )
-    expect(e.button('Save fades')?.disabled).toBe(true)
+    expect(isOff(e.button('Save fades')!)).toBe(true)
     expect(e.box('Fade in').getAttribute('aria-invalid')).toBe('true')
     e.type(e.box('Fade out'), '')
     expect(e.container.textContent).toContain('Type a length of 0 s or more.')
     e.type(e.box('Fade out'), '-1')
     expect(e.container.textContent).toContain('Type a length of 0 s or more.')
-    expect(e.button('Save fades')?.disabled).toBe(true)
+    expect(isOff(e.button('Save fades')!)).toBe(true)
   })
 
   it('reddens only the box that is empty or negative, but both when together they are too long', () => {
@@ -149,7 +150,7 @@ describe('the fades editor', () => {
     const e = open()
     e.type(e.box('Fade in'), '0.3')
     e.type(e.box('Fade out'), '1.5')
-    expect(e.button('Save fades')?.disabled).toBe(false)
+    expect(isOff(e.button('Save fades')!)).toBe(false)
     await act(async () => e.button('Save fades')!.click())
     expect(sent).toHaveLength(1)
     expect(sent[0]!.url).toBe('/api/music/tracks/victory/takes/abc.3.wav/fades')

@@ -217,3 +217,22 @@ export function suggestionLine(
     button,
   }
 }
+
+/** Why Save is greyed on an open scene, or false when it is on. */
+export function saveWhy(now: { dirty: boolean; red: boolean; saving: boolean }): string | false {
+  if (now.red)
+    return 'Something in this scene needs fixing first. Fix the rows marked red, then save.'
+  if (!now.dirty) return 'There is nothing to save yet. Change something in the scene first.'
+  if (now.saving) return 'The scene is being saved. Wait for it to finish.'
+  return false
+}
+
+/** Why Refresh from the game is greyed on the Scenes page, or false when it is on. */
+export function refreshWhy(pending: boolean): string | false {
+  return pending && 'Wait for the refresh from the game to finish.'
+}
+
+/** Why the loudness buttons are greyed while a measurement runs, or false when they are on. */
+export function measureWhy(running: boolean): string | false {
+  return running && 'Loudness is being measured. Wait for it to finish.'
+}

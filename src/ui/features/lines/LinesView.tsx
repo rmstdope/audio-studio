@@ -2,6 +2,14 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { triedNote } from '../../takes'
 import { unspokenCueNote } from '../../cueTargets'
 import { payWords } from '../../agreed'
+import { off } from '../../off'
+import {
+  checkingWhy,
+  fieldSaveWhy,
+  hearWhy,
+  recordingWhy,
+  refreshRunningWhy,
+} from '../../linesText'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import {
@@ -293,7 +301,7 @@ export function LinesView({
             <button
               className="btn"
               type="button"
-              disabled={refresh.pending}
+              {...off(refreshRunningWhy(refresh.pending))}
               onClick={refresh.start}
             >
               {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
@@ -611,7 +619,7 @@ export function LinesView({
                             <button
                               type="button"
                               className="btn row-record"
-                              disabled={recorder.recording.has(line.key)}
+                              {...off(recordingWhy(recorder.recording.has(line.key)))}
                               // A final clip is recorded again with the final model, never downgraded.
                               onClick={() =>
                                 void recorder.record(
@@ -636,7 +644,7 @@ export function LinesView({
                                 type="button"
                                 className="btn row-accept"
                                 title="Keep this take as it is: the line no longer shows as weak, until it is recorded again"
-                                disabled={checking.has(line.key)}
+                                {...off(checkingWhy(checking.has(line.key)))}
                                 onClick={() => void onRow(line.key, accept.mutateAsync, 'accepted')}
                               >
                                 Accept
@@ -645,7 +653,7 @@ export function LinesView({
                                 type="button"
                                 className="btn"
                                 title="Have Whisper hear this take again with today's rules, without recording anything"
-                                disabled={checking.has(line.key)}
+                                {...off(checkingWhy(checking.has(line.key)))}
                                 onClick={() => void checkAgain(line.key)}
                               >
                                 {checking.has(line.key) ? 'Checking…' : 'Check again'}
@@ -892,14 +900,20 @@ function CueCell({
       />
       {hint && <span className="cue-hint muted">{hint}</span>}
       <div className="cue-actions">
-        <button className="btn" type="submit" disabled={save.isPending || draft.trim() === own}>
+        <button
+          className="btn"
+          type="submit"
+          {...off(
+            fieldSaveWhy('cue', { pending: save.isPending, unchanged: draft.trim() === own }),
+          )}
+        >
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
         {line.cueFrom === 'own' && (
           <button
             className="btn"
             type="button"
-            disabled={save.isPending}
+            {...off(save.isPending && 'The cue is being saved. Wait for it to finish.')}
             onClick={() => save.mutate({ key: line.key, cue: '' }, { onSuccess: done })}
           >
             {names && line.sourceCue
@@ -916,7 +930,7 @@ function CueCell({
           className="btn"
           type="button"
           title="Hear the line said with this cue, without saving anything (free with a Fish voice, a few credits with an ElevenLabs one)"
-          disabled={hear.isPending}
+          {...off(hearWhy(hear.isPending))}
           onClick={tryIt}
         >
           {hear.isPending ? 'Recording…' : playing === tryId ? 'Stop' : 'Hear it'}
@@ -1012,14 +1026,20 @@ function NoteCell({
         onKeyDown={(e) => e.key === 'Escape' && close()}
       />
       <div className="cue-actions">
-        <button className="btn" type="submit" disabled={save.isPending || draft.trim() === note}>
+        <button
+          className="btn"
+          type="submit"
+          {...off(
+            fieldSaveWhy('note', { pending: save.isPending, unchanged: draft.trim() === note }),
+          )}
+        >
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
         {note && (
           <button
             className="btn"
             type="button"
-            disabled={save.isPending}
+            {...off(save.isPending && 'The note is being saved. Wait for it to finish.')}
             onClick={() =>
               save.mutate({ key: lineKey, note: '' }, { onSuccess: (r) => r.ok && close() })
             }

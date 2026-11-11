@@ -5,6 +5,7 @@ import type { MakingView, MusicTakesView } from '../../../core/musicTake'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
@@ -79,8 +80,8 @@ describe('the Takes panel’s Stop', () => {
           expected: 180,
           paid: false,
         },
-      ])?.disabled,
-    ).toBe(false)
+      ])?.getAttribute('aria-disabled'),
+    ).toBeNull()
   })
 
   it('can stop takes waiting behind the one being made', () => {
@@ -102,7 +103,7 @@ describe('the Takes panel’s Stop', () => {
         paid: false,
       },
     ]
-    expect(stopButton(making)?.disabled).toBe(false)
+    expect(isOff(stopButton(making)!)).toBe(false)
   })
 })
 

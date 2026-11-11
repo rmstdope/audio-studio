@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { MusicListSummary } from '../../../core/music'
 import { planMakeAll, TAKES_EACH } from '../../../core/musicMakeAll'
 import { musicModel } from '../../../core/musicModels'
@@ -27,6 +27,8 @@ import {
   summaryStopped,
   tooLongLine,
 } from '../../musicMakeAllText'
+import { WAIT_FOR_CHANGE } from '../../musicTakesText'
+import { off } from '../../off'
 import { useStopFocus } from '../../components/useStopFocus'
 import { routeHref } from '../../route'
 
@@ -51,7 +53,6 @@ export function MakeAllPanel({
   refreshing?: boolean
   children: ReactNode
 }) {
-  const reasonId = useId()
   const making = useMusicMaking().data ?? {}
   const state = useMusicModelState().data
   const make = useMakeAll(list.id)
@@ -121,13 +122,13 @@ export function MakeAllPanel({
           ref={stopButton}
           type="button"
           className="btn btn-ghost"
-          aria-disabled={stop.isPending || undefined}
+          {...off(stop.isPending && WAIT_FOR_CHANGE)}
           title={
             paid
               ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
               : undefined
           }
-          onClick={() => !stop.isPending && stop.mutate()}
+          onClick={() => stop.mutate()}
           {...stopFocus}
         >
           Stop all
@@ -207,11 +208,8 @@ export function MakeAllPanel({
           ref={button}
           type="button"
           className="btn btn-primary"
-          aria-disabled={refreshing || undefined}
-          aria-describedby={refreshing ? reasonId : undefined}
-          title={refreshing ? MAKE_BLOCKED_BY_REFRESH : undefined}
+          {...off(refreshing && MAKE_BLOCKED_BY_REFRESH)}
           onClick={() => {
-            if (refreshing) return
             make.reset()
             setOpen(true)
             setFocus('make')
@@ -265,12 +263,8 @@ export function MakeAllPanel({
             ref={makeButton}
             type="button"
             className="btn btn-primary"
-            disabled={make.isPending}
-            aria-disabled={refreshing || undefined}
-            aria-describedby={refreshing ? reasonId : undefined}
-            title={refreshing ? MAKE_BLOCKED_BY_REFRESH : undefined}
+            {...off(refreshing && MAKE_BLOCKED_BY_REFRESH, make.isPending && WAIT_FOR_CHANGE)}
             onClick={() =>
-              !refreshing &&
               make.mutate(undefined, {
                 onSuccess: () => {
                   setOpen(false)
@@ -300,11 +294,6 @@ export function MakeAllPanel({
         {action}
       </div>
       {question}
-      {refreshing && (
-        <span id={reasonId} hidden>
-          {MAKE_BLOCKED_BY_REFRESH}
-        </span>
-      )}
       {stop.isError && busy && (
         <p className="make-all-error" role="alert">
           The takes could not be stopped. They are still being made; try again.

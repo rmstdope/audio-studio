@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { makeAgainOf, overlappingPatches, tieOf } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
+import { off } from '../../off'
+import { WAIT_FOR_CHANGE } from '../../imagesText'
 import { Problems } from '../../components/Problems'
 import {
   makeAgainOpenLine,
@@ -106,7 +108,7 @@ function PatchBody({
             <button
               className="btn"
               type="button"
-              disabled={compare.isPending}
+              {...off(compare.isPending && WAIT_FOR_CHANGE)}
               onClick={() => settle('game')}
             >
               Use the game&apos;s
@@ -114,7 +116,7 @@ function PatchBody({
             <button
               className="btn btn-primary"
               type="button"
-              disabled={compare.isPending}
+              {...off(compare.isPending && WAIT_FOR_CHANGE)}
               onClick={() => settle('keep')}
             >
               Keep mine

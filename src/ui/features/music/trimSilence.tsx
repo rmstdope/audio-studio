@@ -8,6 +8,8 @@ import {
   trimFailure,
 } from '../../../core/musicTrim'
 import { useTrimTake } from '../../api'
+import { MUSIC_LOCK_UNREAD, NOT_TRIMMABLE_WHY, WAIT_FOR_TRIM } from '../../musicTakesText'
+import { off } from '../../off'
 import { clock } from '../../format'
 import { useTrackActions } from './trackActions'
 
@@ -105,12 +107,13 @@ export function useTrimControl({
       <button
         type="button"
         className="btn btn-small"
-        disabled={greyed || locked}
-        // Not `disabled` while it works: that would take the keyboard focus off the button.
-        aria-disabled={working ? true : undefined}
+        {...off(
+          locked && MUSIC_LOCK_UNREAD,
+          greyed && (note ?? NOT_TRIMMABLE_WHY),
+          working && WAIT_FOR_TRIM,
+        )}
         aria-describedby={note ? noteId : undefined}
         onClick={() => {
-          if (working) return
           onPress()
           actions.press(`trim:${take.n}`)
           trim.mutate({ file: take.file, undo })

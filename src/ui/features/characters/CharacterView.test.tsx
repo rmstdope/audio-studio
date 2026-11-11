@@ -100,7 +100,7 @@ describe('CharacterView', () => {
       [...container.querySelectorAll('button')].find((b) =>
         b.textContent?.includes('Design a voice…'),
       )!
-    await until(() => !design().disabled)
+    await until(() => design().getAttribute('aria-disabled') !== 'true')
 
     await act(() => design().click())
     const box = () => container.querySelector('[aria-label="Description of the voice"]')

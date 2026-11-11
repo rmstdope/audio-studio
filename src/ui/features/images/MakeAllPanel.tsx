@@ -23,7 +23,8 @@ import {
   summaryLead,
   summaryStopped,
 } from '../../imagesMakeAllText'
-import { listSeparator } from '../../imagesText'
+import { off } from '../../off'
+import { listSeparator, WAIT_FOR_CHANGE } from '../../imagesText'
 import { useStopFocus } from '../../components/useStopFocus'
 import { routeHref } from '../../route'
 
@@ -107,8 +108,8 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
           ref={stopButton}
           type="button"
           className="btn btn-ghost"
-          aria-disabled={stop.isPending || undefined}
-          onClick={() => !stop.isPending && stop.mutate()}
+          {...off(stop.isPending && WAIT_FOR_CHANGE)}
+          onClick={() => stop.mutate()}
           {...stopFocus}
         >
           Stop all
@@ -248,7 +249,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
             ref={makeButton}
             type="button"
             className="btn btn-primary"
-            disabled={make.isPending}
+            {...off(make.isPending && WAIT_FOR_CHANGE)}
             onClick={() =>
               make.mutate(undefined, {
                 onSuccess: () => {

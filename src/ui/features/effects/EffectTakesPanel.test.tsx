@@ -13,6 +13,9 @@ const { EffectTakesPanel } = await import('./EffectTakesPanel')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+/** Whether a control is greyed: `aria-disabled`, so it still takes focus and shows its reason. */
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
+
 const realFetch = globalThis.fetch
 const cleanups: (() => void)[] = []
 afterEach(() => {
@@ -136,7 +139,7 @@ describe('a new effect', () => {
       'Each take is a new sound made from the description, about 2 seconds each.',
     )
     expect(text()).toContain('Make a few, listen, and choose the one the game plays.')
-    expect(button('Make 4 takes').disabled).toBe(false)
+    expect(isOff(button('Make 4 takes'))).toBe(false)
     const menu = container.querySelector<HTMLSelectElement>(
       'select[aria-label="Number of new takes"]',
     )!
@@ -372,8 +375,8 @@ describe('takes being made', () => {
       expect.stringContaining('Take 4making · about 2 s left'),
       expect.stringContaining('Take 5waiting'),
     ])
-    expect(container.querySelector<HTMLSelectElement>('select')!.disabled).toBe(true)
-    expect(button('Make 4 more takes').disabled).toBe(true)
+    expect(isOff(container.querySelector<HTMLSelectElement>('select')!)).toBe(true)
+    expect(isOff(button('Make 4 more takes'))).toBe(true)
     expect(text()).toContain('Stop')
     await click(button('Stop'))
     expect(calls[0]).toMatchObject({ url: '/api/effects/chest-open/stop', method: 'POST' })
@@ -417,10 +420,10 @@ describe('the model is not ready', () => {
       'Neither sound-effects model can run on this computer. Setup says what is missing.',
     )
     expect(container.querySelector('a.btn')!.getAttribute('href')).toBe('#/setup')
-    expect(button('Make 4 more takes').disabled).toBe(true)
+    expect(isOff(button('Make 4 more takes'))).toBe(true)
     for (const label of ['Model for new takes', 'Number of new takes']) {
       expect(
-        container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!.disabled,
+        isOff(container.querySelector<HTMLSelectElement>(`select[aria-label=\"${label}\"]`)!),
       ).toBe(true)
     }
     expect(text()).toContain('Open Setup')
@@ -460,10 +463,10 @@ describe('the lock cannot be read', () => {
     expect(text()).toContain(
       'Choosing, dropping and fading wait until the sound effects lock can be read. You can still listen and make more takes.',
     )
-    expect(buttons('Choose').every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
-    expect(buttons('Drop').every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
+    expect(buttons('Choose').every(isOff)).toBe(true)
+    expect(buttons('Drop').every(isOff)).toBe(true)
     expect(container.querySelectorAll('.play').length).toBe(2)
-    expect(buttons('Make 4 more takes')[0]!.hasAttribute('disabled')).toBe(false)
+    expect(isOff(buttons('Make 4 more takes')[0]!)).toBe(false)
   })
 })
 
@@ -739,7 +742,7 @@ describe('the model for new takes', () => {
       model: MODEL,
     }
     const { container } = render(row(), view({ takes: [take(1)], making: [making] }))
-    expect(modelMenu(container).disabled).toBe(true)
+    expect(isOff(modelMenu(container))).toBe(true)
   })
 
   it('shows an Open 1.0 take waiting for the graphics chip, what uses it, and the takes behind it waiting', () => {
@@ -881,7 +884,7 @@ describe('Trim silence', () => {
       row({ status: 'not-chosen' }),
       view({ takes: [take(1, { trimmable: 'nothing' }), take(2, { trimmable: 'silent' })] }),
     )
-    expect(buttons('Trim silence').every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
+    expect(buttons('Trim silence').every(isOff)).toBe(true)
     expect(text()).toContain('Starts and ends on its sound: nothing to cut.')
     expect(text()).toContain('Near-silent throughout: there is no sound to keep.')
   })
@@ -891,8 +894,8 @@ describe('Trim silence', () => {
       row({ status: 'unknown', current: { kind: 'unknown' } }),
       view({ takes: [trimmable(1), take(2, { trim: cut })], lockUnread: true }),
     )
-    expect(buttons('Trim silence')[0]!.disabled).toBe(true)
-    expect(buttons('Undo trim')[0]!.disabled).toBe(true)
+    expect(isOff(buttons('Trim silence')[0]!)).toBe(true)
+    expect(isOff(buttons('Undo trim')[0]!)).toBe(true)
     expect(text()).toContain(
       'Choosing, dropping and fading wait until the sound effects lock can be read.',
     )
@@ -913,7 +916,7 @@ describe('Trim silence', () => {
     expect(text()).toContain(
       'Take 6 could not be trimmed: the take’s sound file could not be read. The take is as it was.',
     )
-    expect(buttons('Trim silence')[0]!.disabled).toBe(false)
+    expect(isOff(buttons('Trim silence')[0]!)).toBe(false)
   })
 
   it('on the take in the game: the button at the left of the actions row, Un-choose at the right', () => {

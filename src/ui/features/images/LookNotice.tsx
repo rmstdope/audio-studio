@@ -2,7 +2,8 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ImagesSummary } from '../../../core/images'
 import { useBringAll, useLookRun } from '../../api'
-import { bringFailureText, bringingText, lookNoticeText } from '../../imagesText'
+import { off } from '../../off'
+import { bringFailureText, bringingText, lookNoticeText, WAIT_FOR_CHANGE } from '../../imagesText'
 
 /**
  * The one notice above an act's images when the game's look changed: one button brings every take
@@ -45,7 +46,7 @@ export function LookNotice({ notice }: { notice: ImagesSummary['lookNotice'] }) 
           <button
             className="btn"
             type="button"
-            disabled={bring.isPending}
+            {...off(bring.isPending && WAIT_FOR_CHANGE)}
             onClick={() => bring.mutate()}
           >
             Try again
@@ -71,7 +72,7 @@ export function LookNotice({ notice }: { notice: ImagesSummary['lookNotice'] }) 
         <button
           className="btn btn-primary"
           type="button"
-          disabled={bring.isPending}
+          {...off(bring.isPending && WAIT_FOR_CHANGE)}
           onClick={() => bring.mutate()}
         >
           Bring all to the new look

@@ -52,7 +52,7 @@ describe("the Takes panel's model menu fills a narrow panel", () => {
 
   it('keeps the count menu at its own width beside the model menu, which takes the spare room', () => {
     expect(rule(css, '.takes-count')).toContain('flex: 0 0 auto')
-    expect(rule(css, '.takes-count:disabled')).toContain('opacity')
+    expect(rule(css, ".takes-count[aria-disabled='true']")).toContain('opacity')
   })
 
   it('no longer keys the menu on the window width, which left it capped beside a gap', () => {

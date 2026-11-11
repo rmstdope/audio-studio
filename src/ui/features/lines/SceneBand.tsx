@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { triedNote } from '../../takes'
+import { off } from '../../off'
+import { fieldSaveWhy, sceneHearWhy } from '../../linesText'
 import type { SceneState } from '../../../core/planner'
 import { takeUrl, useSetSceneCue, useTryCue } from '../../api'
 import { Problems } from '../../components/Problems'
@@ -170,14 +172,18 @@ export function SceneBand({
           />
           {warning && <span className="scene-warning">{warning}</span>}
           <div className="cue-actions">
-            <button className="btn btn-primary" type="submit" disabled={save.isPending || !changed}>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              {...off(fieldSaveWhy('cue', { pending: save.isPending, unchanged: !changed }))}
+            >
               {save.isPending ? 'Saving…' : 'Save'}
             </button>
             {scene.cueFrom === 'own' && (
               <button
                 className="btn"
                 type="button"
-                disabled={save.isPending}
+                {...off(save.isPending && 'The cue is being saved. Wait for it to finish.')}
                 onClick={() => save.mutate({ scene: band.scene!, cue: '' }, { onSuccess: done })}
               >
                 {names && scene.sourceCue ? `Follow ${names.source}` : 'Remove cue'}
@@ -194,7 +200,7 @@ export function SceneBand({
                   ? 'Hear the first line that follows the cue said with it, without saving anything (free with a Fish voice, a few credits with an ElevenLabs one)'
                   : 'No line in this scene follows the cue'
               }
-              disabled={hear.isPending || !scene.firstFollowing}
+              {...off(sceneHearWhy({ following: !!scene.firstFollowing, pending: hear.isPending }))}
               onClick={tryIt}
             >
               {hear.isPending ? 'Recording…' : playing === tryId ? 'Stop' : 'Hear it'}

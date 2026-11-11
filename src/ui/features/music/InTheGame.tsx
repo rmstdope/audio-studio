@@ -4,6 +4,8 @@ import { envelopePoints, fadesLine, heardAs, type Fades } from '../../../core/fa
 import { inTheGame, unchooseFailure, unchooseQuestion } from '../../../core/musicChoose'
 import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 import { useChooseTake, useUnchooseTake } from '../../api'
+import { closeFadesFirst, WAIT_FOR_CHANGE } from '../../musicTakesText'
+import { off } from '../../off'
 import { Confirm } from '../../components/Confirm'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
@@ -178,7 +180,7 @@ export function InTheGame({
             className="btn btn-primary"
             type="button"
             autoFocus
-            disabled={unchoose.isPending}
+            {...off(unchoose.isPending && WAIT_FOR_CHANGE)}
             onClick={() => {
               // Opening the question changed nothing; confirming it is the action.
               actions.press('unchoose')
@@ -326,12 +328,7 @@ export function InTheGame({
               type="button"
               className="btn btn-small"
               ref={fadesOpener(take.n)}
-              aria-disabled={fading !== null && fading !== take.n ? true : undefined}
-              title={
-                fading !== null && fading !== take.n
-                  ? `Close the fades of Take ${fading} first.`
-                  : undefined
-              }
+              {...off(fading !== null && fading !== take.n && closeFadesFirst(fading))}
               onClick={() => {
                 if (fading !== null) return
                 if (player.playing === `music-take-${track.id}-${take.n}`) player.stop()
@@ -346,7 +343,7 @@ export function InTheGame({
             type="button"
             className="btn btn-small"
             ref={opener}
-            disabled={unchoose.isPending}
+            {...off(unchoose.isPending && WAIT_FOR_CHANGE)}
             onClick={() => {
               setAsking(true)
             }}
@@ -357,7 +354,7 @@ export function InTheGame({
             <button
               type="button"
               className="btn btn-primary btn-small"
-              disabled={choose.isPending}
+              {...off(choose.isPending && WAIT_FOR_CHANGE)}
               onClick={() => {
                 actions.press(`choose:${take.n}`)
                 choose.mutate(take.file)

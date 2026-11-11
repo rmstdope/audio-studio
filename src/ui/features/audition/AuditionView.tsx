@@ -18,6 +18,7 @@ import { routeHref } from '../../route'
 import { PhraseEditor, StyleEditor } from '../characters/BriefEditors'
 import { ShortlistBoard } from './ShortlistBoard'
 import { SittingBox } from './SittingBox'
+import { off } from '../../off'
 
 /**
  * A character's audition: the board while one is in progress, with the phrase and style the takes
@@ -191,7 +192,10 @@ export function AuditionView({
                   <button
                     className="btn btn-primary"
                     type="button"
-                    disabled={start.isPending || sittingQuery.isPending}
+                    {...off(
+                      (start.isPending || sittingQuery.isPending) &&
+                        'Wait for the audition to be read.',
+                    )}
                     onClick={() =>
                       money?.paid ? setAsking(true) : start.mutate({ action: 'start' })
                     }

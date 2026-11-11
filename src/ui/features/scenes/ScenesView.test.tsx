@@ -18,8 +18,11 @@ const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { summarizeScenes } = await import('../../../core/scenes')
 const { ScenesView } = await import('./ScenesView')
+const { WhyTip } = await import('../../components/WhyTip')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+// The layer that makes a greyed control do nothing when pressed, as in the studio.
 
 const cleanups: (() => void)[] = []
 afterAll(() => {
@@ -50,6 +53,9 @@ afterEach(async () => {
   window.history.replaceState(null, '', '#')
 })
 beforeEach(() => {
+  const tipRoot = createRoot(document.createElement('div'))
+  act(() => tipRoot.render(createElement(WhyTip)))
+  cleanups.push(() => act(() => tipRoot.unmount()))
   asked.length = 0
   gains.length = 0
   loops.length = 0

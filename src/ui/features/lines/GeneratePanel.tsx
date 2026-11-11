@@ -9,6 +9,8 @@ import { elevenPlanFacts, planPayWords } from '../../agreed'
 import { aboutDollars, centsUp, plural } from '../../format'
 import { castNote, generateLabel, planHeadline, translatedNote } from '../../languages'
 import { REASON } from '../../status'
+import { off } from '../../off'
+import { cancelRunWhy, generateWhy } from '../../linesText'
 import { notShown } from '../../problems'
 
 /** How a job of each kind is told: while it runs, a line in it, and a line done. */
@@ -98,9 +100,13 @@ export function GeneratePanel({
             <button
               className="btn"
               type="button"
-              disabled={
-                current.status === 'cancelling' || current.removingOrphans || cancel.isPending
-              }
+              {...off(
+                cancelRunWhy({
+                  cancelling: current.status === 'cancelling',
+                  removingOrphans: !!current.removingOrphans,
+                  pending: cancel.isPending,
+                }),
+              )}
               onClick={() => cancel.mutate(current.id)}
             >
               {current.status === 'cancelling' ? 'Finishing lines under way…' : 'Cancel'}
@@ -202,7 +208,7 @@ export function GeneratePanel({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={nothing || waiting || start.isPending}
+            {...off(generateWhy({ nothing, waiting, starting: start.isPending }))}
             title={
               paid
                 ? agreedCredits
@@ -300,7 +306,7 @@ export function GeneratePanel({
           <button
             className="btn"
             type="button"
-            disabled={waiting || start.isPending}
+            {...off(generateWhy({ nothing: false, waiting, starting: start.isPending }))}
             onClick={() =>
               start.mutate(
                 { kind: 'measure', speaker, keys: p.unmeasured, orphans: [] },
@@ -322,7 +328,7 @@ export function GeneratePanel({
           <button
             className="btn"
             type="button"
-            disabled={waiting || start.isPending}
+            {...off(generateWhy({ nothing: false, waiting, starting: start.isPending }))}
             onClick={() =>
               start.mutate(
                 { kind: 'check', speaker, keys: p.recheck, orphans: [] },

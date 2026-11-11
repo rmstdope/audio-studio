@@ -6,6 +6,7 @@ import { valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register({ url: 'http://localhost/' })
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
@@ -252,7 +253,7 @@ describe('the named areas panel', () => {
       )
       expect(host.querySelector('.named-area-line')).toBeNull()
       expect(selectedIds(host)).toEqual([])
-      expect(mainOf(host, 0).disabled).toBe(true)
+      expect(isOff(mainOf(host, 0))).toBe(true)
       expect(host.querySelector('.named-areas-head')!.textContent).toContain('0 of 1 placed')
     })
 
@@ -265,7 +266,7 @@ describe('the named areas panel', () => {
         "The chosen take's picture is missing or cannot be read, so the areas cannot be marked on it.",
       )
       expect(rows(host)[0]!.querySelector('.chip')!.textContent).toBe('Placed')
-      expect(mainOf(host, 0).disabled).toBe(true)
+      expect(isOff(mainOf(host, 0))).toBe(true)
     })
 
     it('says so too when the picture cannot be read once asked for', async () => {
@@ -567,9 +568,7 @@ describe('the named areas panel', () => {
       const patches = [{ id: 'p1', title: 'Bread taken', takes: [{ n: 7, chosen: true }] }]
       const { host } = await render([placedAt('a', box)], { patches })
       await act(async () => mainOf(host, 0).click())
-      const order = [...host.querySelectorAll('button, input')].filter(
-        (e) => !(e as HTMLButtonElement).disabled,
-      )
+      const order = [...host.querySelectorAll('button, input')].filter((e) => !isOff(e))
       expect(order.map((e) => e.className || e.tagName)).toEqual([
         'named-area-main',
         'btn named-area-clear',
@@ -579,7 +578,7 @@ describe('the named areas panel', () => {
 
     it('reaches the rows, then the Clear button of the selected row, by Tab', async () => {
       const { host } = await setup()
-      const tabbable = [...host.querySelectorAll('button')].filter((b) => !b.disabled)
+      const tabbable = [...host.querySelectorAll('button')].filter((b) => !isOff(b))
       expect(tabbable.map((b) => b.className)).toEqual(['named-area-main', 'btn named-area-clear'])
       expect(host.querySelector('.named-area-stage')!.hasAttribute('tabindex')).toBe(false)
     })
@@ -794,7 +793,7 @@ describe('areas to place again', () => {
       answer: view({ take: null }),
     })
     expect(chips(host)).toEqual(['Place again', 'Place again'])
-    expect(mainOf(host, 0).disabled).toBe(true)
+    expect(isOff(mainOf(host, 0))).toBe(true)
     expect(host.textContent).toContain('Choose a take to mark the areas on it.')
     expect(note(host)).toBe(
       'Placed on take 2 of the image, so the game does not use them now. Choose take 2 again to bring them back.',

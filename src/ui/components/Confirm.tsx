@@ -1,3 +1,4 @@
+import { off } from '../off'
 import { useEffect, useRef, type ReactNode } from 'react'
 
 /**
@@ -51,7 +52,12 @@ export function Confirm({
       )}
       {note && <span className="muted">{note}</span>}
       <div className="confirm-actions">
-        <button className="btn btn-ghost" type="button" onClick={onBack} disabled={backDisabled}>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={onBack}
+          {...off(backDisabled && 'Wait for the current change to finish.')}
+        >
           {back}
         </button>
         {children}

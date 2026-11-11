@@ -6,6 +6,7 @@ import { sampleClip, takeClip } from '../../board'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { compact } from '../../format'
 import { providerWords } from '../../voiceId'
+import { off } from '../../off'
 
 /** What a card says while its take waits. */
 const WAITS = {
@@ -139,7 +140,12 @@ export function VoiceCard({
         ) : waits ? (
           <span className="muted take-waits">{WAITS[waits]}</span>
         ) : (
-          <button className="btn" type="button" disabled={recording} onClick={onRecord}>
+          <button
+            className="btn"
+            type="button"
+            {...off(recording && 'Wait for the take to be made.')}
+            onClick={onRecord}
+          >
             {recording ? 'Recording take…' : 'Record take'}
           </button>
         )}

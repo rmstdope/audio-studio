@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { triedNote } from '../../takes'
+import { off } from '../../off'
+import { cueGapSaveWhy, hearWhy } from '../../linesText'
 import {
   WORDS_CHANGED,
   normalizeCue,
@@ -258,7 +260,7 @@ function CueBox({
           <button
             className="btn btn-primary"
             type="submit"
-            disabled={save.isPending || changed || !cue || cue === placed}
+            {...off(cueGapSaveWhy({ changed, cue, placed, pending: save.isPending }))}
           >
             {placed === null ? 'Add' : 'Save'}
           </button>
@@ -266,7 +268,7 @@ function CueBox({
             <button
               className="btn"
               type="button"
-              disabled={save.isPending}
+              {...off(save.isPending && 'The cue is being saved. Wait for it to finish.')}
               onClick={() => write('')}
             >
               Remove
@@ -279,7 +281,10 @@ function CueBox({
             className="btn"
             type="button"
             title="Hear the whole line said with this cue, without saving anything (free with a Fish voice, a few credits with an ElevenLabs one)"
-            disabled={hear.isPending || (placed === null && !cue)}
+            {...off(
+              placed === null && !cue && 'There is no cue yet. Type a cue first, then hear it.',
+              hearWhy(hear.isPending),
+            )}
             onClick={tryIt}
           >
             {hear.isPending ? 'Recording…' : playing === tryId ? 'Stop' : 'Hear it'}

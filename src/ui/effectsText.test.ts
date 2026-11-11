@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import type { EffectsSummary } from '../core/effects'
 import {
+  EFFECTS_PENDING,
   effectLengthLine,
+  effectsMakeWhy,
   effectsNotice,
   effectsRefreshSummary,
   effectsSubtitle,
@@ -127,5 +129,29 @@ describe('effectLengthLine', () => {
   it('says a loop loops, and a one-shot nothing more than the game sets it', () => {
     expect(effectLengthLine(10, true)).toBe('10 s · loops · set by the game')
     expect(effectLengthLine(3, false)).toBe('3 s · set by the game')
+  })
+})
+
+describe('effectsMakeWhy', () => {
+  const free = { canMake: true, busy: false, waitingForWords: false, pending: false }
+
+  it('is nothing when new takes can be made', () => {
+    expect(effectsMakeWhy(free)).toBeNull()
+  })
+
+  it('names what only Setup can fix before anything else', () => {
+    expect(effectsMakeWhy({ ...free, canMake: false, busy: true, waitingForWords: true })).toBe(
+      'Neither sound-effects model can run on this computer. Setup says what is missing.',
+    )
+  })
+
+  it('then the words being saved, then takes being made, then a change under way', () => {
+    expect(effectsMakeWhy({ ...free, waitingForWords: true, busy: true, pending: true })).toBe(
+      'The effect’s words are being saved. This turns on when they are.',
+    )
+    expect(effectsMakeWhy({ ...free, busy: true, pending: true })).toBe(
+      'Takes are being made for this effect. Make more when they are done, or Stop.',
+    )
+    expect(effectsMakeWhy({ ...free, pending: true })).toBe(EFFECTS_PENDING)
   })
 })

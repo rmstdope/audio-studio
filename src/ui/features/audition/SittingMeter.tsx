@@ -11,6 +11,8 @@ import {
   payLabel,
   usedUpLine,
 } from '../../sitting'
+import { off } from '../../off'
+import { CHANGING } from '../../voiceOffText'
 
 /** What each unit of a sitting's money says and reads. */
 const UNITS = {
@@ -98,7 +100,14 @@ export function SittingMeter({
             />
             {words.suffix && <span aria-hidden="true">{words.suffix}</span>}
           </span>
-          <button className="btn btn-primary" type="submit" disabled={amount === null || busy}>
+          <button
+            className="btn btn-primary"
+            type="submit"
+            {...off(
+              amount === null && 'Type an amount to add. The button turns on when there is one.',
+              busy && CHANGING,
+            )}
+          >
             {words.button(text, true)}
           </button>
         </span>

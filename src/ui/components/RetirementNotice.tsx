@@ -1,3 +1,4 @@
+import { off } from '../off'
 import { useEffect, useReducer, useRef, type ReactNode } from 'react'
 import {
   bannerWords,
@@ -182,7 +183,7 @@ export function RetirementNotice({
             ref={confirmButton}
             className="btn btn-primary"
             type="button"
-            disabled={saving}
+            {...off(saving && 'Wait for the switch to finish.')}
             onClick={() => save(state.takes)}
           >
             {saving ? 'Switching…' : 'Switch to s2.1-pro'}

@@ -5,7 +5,9 @@ import type { ImageRow, PatchRow } from '../../../core/images'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
+const { WhyTip } = await import('../../components/WhyTip')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { GamePatchesPanel } = await import('./GamePatchesPanel')
@@ -103,6 +105,7 @@ async function render(
       createElement(
         QueryClientProvider,
         { client },
+        createElement(WhyTip),
         createElement(GamePatchesPanel, {
           row: { id: 'inn', width: 1024, height: 576, areas: [], patches, ...imageRow } as ImageRow,
         }),
@@ -121,6 +124,7 @@ async function render(
         createElement(
           QueryClientProvider,
           { client },
+          createElement(WhyTip),
           createElement(GamePatchesPanel, {
             row: { id: 'inn', width: 1024, height: 576, areas: [], patches, ...row } as ImageRow,
           }),
@@ -239,7 +243,10 @@ describe('an open patch with no takes', () => {
     expect(base.getAttribute('src')).toStartWith('/api/images/inn/takes/3/game')
     expect(host.querySelector('img.patch-over')).toBeNull()
     expect(text(host)).toContain('Drag over the picture to mark what should change.')
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(true)
+    expect(button(host, 'Make 2 takes')!.dataset.why).toBe(
+      'This patch has no mark yet. Drag over the picture to mark where it goes.',
+    )
     expect(text(host)).toContain(
       'No takes yet. Each take is a new try at this change, painted with the part of the picture around the mark in view.',
     )
@@ -252,7 +259,7 @@ describe('an open patch with no takes', () => {
     await open(host)
     await drag(stageOf(host), [100, 50], [300, 250])
     expect(host.querySelector('.patch-mark')).not.toBeNull()
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(false)
     expect(text(host)).not.toContain('Drag over the picture')
   })
 
@@ -330,7 +337,8 @@ describe('an open patch with no takes', () => {
     await open(host)
     await drag(stageOf(host), [100, 50], [300, 250])
     expect(text(host)).toContain(message)
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(true)
+    expect(button(host, 'Make 2 takes')!.dataset.why).toBe(message)
   })
 })
 
@@ -711,7 +719,7 @@ describe('takes being made and failed', () => {
       'Take 3 FLUX.2 klein',
     ])
     expect(host.querySelectorAll('[role="progressbar"]').length).toBe(2)
-    expect(button(host, 'Make 2 more takes')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Make 2 more takes')!)).toBe(true)
     await act(async () => button(host, 'Stop')!.click())
     expect(sent.map((s) => [s.method, s.path])).toEqual([
       ['POST', '/api/images/inn/patches/a/stop'],
@@ -810,7 +818,7 @@ describe('a patch tied to a named area', () => {
     expect(mark.style.width).toBe(grown.width)
     expect(text(host)).toContain(LINE)
     expect(text(host)).not.toContain(HINT)
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(false)
     expect(button(host, 'Back to “Bucket”')).toBeUndefined()
   })
 
@@ -853,9 +861,12 @@ describe('a patch tied to a named area', () => {
     expect(host.querySelector('.patch-mark')).toBeNull()
     expect(text(host)).toContain(NOPLACE)
     expect(text(host)).not.toContain(HINT)
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(true)
+    expect(button(host, 'Make 2 takes')!.dataset.why).toBe(
+      '“Bucket” has no place yet. Mark it under Named areas, or drag over the picture to mark this patch.',
+    )
     await drag(stageOf(host), [400, 300], [500, 380])
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(false)
     expect(button(host, 'Back to “Bucket”')).toBeUndefined()
     expect(text(host)).not.toContain(NOPLACE)
   })
@@ -871,7 +882,7 @@ describe('a patch tied to a named area', () => {
     await r.rerender({ areas: [unplaced] })
     expect(r.host.querySelector('.patch-mark')).toBeNull()
     expect(text(r.host)).toContain(NOPLACE)
-    expect(button(r.host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(isOff(button(r.host, 'Make 2 takes')!)).toBe(true)
   })
 
   it('keeps the person’s own mark when the area moves, offering Back to the new place; clearing removes the button', async () => {
@@ -910,7 +921,7 @@ describe('a patch tied to a named area', () => {
     await open(host)
     expect(markLeft(host)).toBe(grown.left)
     expect(text(host)).toContain(LINE)
-    expect(button(host, 'Make 2 more takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 more takes')!)).toBe(false)
   })
 
   it('reads as before for a patch with no tie', async () => {
@@ -944,7 +955,7 @@ describe('a patch tied to a named area', () => {
     await open(host)
     expect(markLeft(host)).toBe(grown.left)
     expect(text(host)).toContain(LINE)
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(true)
   })
 
   it('steps the dashes aside, with the line and Make on, for a take that covers the same place', async () => {
@@ -954,7 +965,7 @@ describe('a patch tied to a named area', () => {
     await open(host)
     expect(host.querySelector('.patch-mark')).toBeNull()
     expect(text(host)).toContain(LINE)
-    expect(button(host, 'Make 2 more takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 more takes')!)).toBe(false)
   })
 
   it('stops the mark at the picture’s edge for an area on it', async () => {
@@ -1084,10 +1095,10 @@ describe('what the game gets', () => {
     )
     await open(host)
     expect(text(host.querySelector('.look-empty'))).toBe("Bringing to the game's look…")
-    expect(button(host, 'Choose')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Choose')!)).toBe(true)
     await act(async () => box(host).click())
     expect(host.querySelector('.look-empty')).toBeNull()
-    expect(button(host, 'Choose')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Choose')!)).toBe(true)
   })
 
   it('says a take has not been brought', async () => {
@@ -1106,8 +1117,8 @@ describe('what the game gets', () => {
       "Can't bring this take to the game's look: x.",
     )
     expect(text(host)).toContain('Fix the style to choose this take.')
-    expect(button(host, 'Choose')!.disabled).toBe(true)
-    expect(button(host, 'Drop')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Choose')!)).toBe(true)
+    expect(isOff(button(host, 'Drop')!)).toBe(false)
   })
 
   it('turns Choose, Drop and Un-choose off while the lock cannot be read, and says why', async () => {
@@ -1120,8 +1131,8 @@ describe('what the game gets', () => {
       'Choosing, dropping and un-choosing wait until the images lock can be read. You can still look and make more takes.',
     )
     await act(async () => thumbs(host)[0]!.click())
-    expect(button(host, 'Choose')!.disabled).toBe(true)
-    expect(button(host, 'Drop')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Choose')!)).toBe(true)
+    expect(isOff(button(host, 'Drop')!)).toBe(true)
   })
 
   it('wears “Old look” on the closed row and above the picture of a chosen patch in an old look', async () => {
@@ -1178,7 +1189,7 @@ describe('Make pressed straight after typing the words (as-d3b)', () => {
 
   it('keeps Make off while it waits, so a second press asks for nothing more', async () => {
     const { host, sent, release } = await typedAndLeft(() => Response.json({ ok: true }))
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(true)
     await act(async () => button(host, 'Make 2 takes')!.click())
     await act(async () => release())
     await settle()
@@ -1196,7 +1207,7 @@ describe('Make pressed straight after typing the words (as-d3b)', () => {
     await settle()
     expect(madeIn(sent)).toEqual([])
     expect(text(host)).toContain('Too long')
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(false)
   })
 
   it('tries the words again on the next press, and makes takes only once they are saved', async () => {
@@ -1228,7 +1239,7 @@ describe('Make pressed straight after typing the words (as-d3b)', () => {
     await act(async () => release())
     await settle()
     expect(madeIn(sent)).toEqual([])
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(false)
   })
 })
 
@@ -1302,7 +1313,7 @@ describe('the model of new takes', () => {
     await open(host)
     await drag(stageOf(host), [100, 50], [300, 250])
     expect(menuOf(host).value).toBe('qwen-edit')
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(false)
   })
 
   for (const qwen of ['absent', 'partial'] as const) {
@@ -1315,7 +1326,7 @@ describe('the model of new takes', () => {
       expect(menuOf(host).value).toBe('klein')
       expect(text(host)).not.toContain('so these takes use')
       expect(text(host)).not.toContain('Setup says how')
-      expect(button(host, 'Make 2 takes')!.disabled).toBe(false)
+      expect(isOff(button(host, 'Make 2 takes')!)).toBe(false)
     })
   }
 
@@ -1329,7 +1340,7 @@ describe('the model of new takes', () => {
     expect(text(menuOf(host).closest('.edit-model'))).toContain('not on this computer')
     expect(text(host)).toContain('Setup says how to download it.')
     expect(text(host)).not.toContain('so these takes use FLUX.2 klein')
-    expect(button(host, 'Make 2 takes')!.disabled).toBe(true)
+    expect(isOff(button(host, 'Make 2 takes')!)).toBe(true)
     expect(sent).toEqual([])
   })
 
@@ -1371,8 +1382,12 @@ describe('the model of new takes', () => {
     )
     await open(host, 0)
     await open(host, 1)
-    expect(menuOf(host, 0).disabled).toBe(true)
-    expect(menuOf(host, 1).disabled).toBe(false)
+    expect(isOff(menuOf(host, 0))).toBe(true)
+    expect(menuOf(host, 0).dataset.why).toBe(
+      'Takes are being made for this patch. Change this when they are done, or Stop.',
+    )
+    expect(isOff(menuOf(host, 1))).toBe(false)
+    expect(menuOf(host, 1).dataset.why).toBeUndefined()
     const making = host.querySelectorAll('.patch-thumb-making')
     expect(text(making[0])).toContain('Take 2 Qwen Image Edit making · about 5 min left')
     expect(text(making[1])).toContain('Take 3 Qwen Image Edit waiting')
@@ -1413,7 +1428,7 @@ describe('the model of new takes', () => {
       withModels([work('a', { failed })], { 'qwen-edit': 'absent', klein: 'whole' }),
     )
     await open(gone.host)
-    expect(button(gone.host, 'Try again')!.disabled).toBe(true)
+    expect(isOff(button(gone.host, 'Try again')!)).toBe(true)
   })
 
   it('does not hear the patch keys typed in the menu', async () => {

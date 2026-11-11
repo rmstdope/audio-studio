@@ -5,7 +5,9 @@ import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
+const { WhyTip } = await import('../../components/WhyTip')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { TakesPanel } = await import('./TakesPanel')
@@ -121,6 +123,7 @@ function render(
         createElement(
           QueryClientProvider,
           { client },
+          createElement(WhyTip),
           createElement(TakesPanel, { track: trackRow, lists: shown }),
         ),
       ),
@@ -172,7 +175,7 @@ describe('Move… on a take card', () => {
 
   it('waits with Choose and Drop while the music lock cannot be read', () => {
     const page = render(village, view([take(1)], { lockUnread: true }))
-    expect(page.buttons('Move…')[0]!.disabled).toBe(true)
+    expect(isOff(page.buttons('Move…')[0]!)).toBe(true)
     expect(document.body.textContent).toContain(
       'Choosing, dropping, moving, trimming and fading wait until the music lock can be read. You can still listen and make more takes.',
     )
@@ -183,14 +186,14 @@ describe('Move… on a take card', () => {
     const page = render(village, view([take(1)]), only)
     const button = page.buttons('Move…')[0]!
     expect(button.getAttribute('aria-disabled')).toBe('true')
-    expect(document.body.textContent).toContain('There is no other loop to move it to.')
+    expect(button.dataset.why).toBe('There is no other loop to move it to.')
     return click(button).then(() => expect(dialog()).toBeNull())
   })
 
   it('says there is no other stinger for a stinger alone', () => {
     const only = [list('stingers', 'stingers', 'Stingers', [row('win', 'Victory')])]
-    render(row('win', 'Victory'), view([take(1)], { kind: 'stinger' }), only)
-    expect(document.body.textContent).toContain('There is no other stinger to move it to.')
+    const page = render(row('win', 'Victory'), view([take(1)], { kind: 'stinger' }), only)
+    expect(page.buttons('Move…')[0]!.dataset.why).toBe('There is no other stinger to move it to.')
   })
 })
 
@@ -206,9 +209,12 @@ describe('the Move dialog', () => {
     expect(text).toContain('Act 1')
     expect(text).toContain('The game has not listed the loops for Act 3 yet.')
     expect(text).toContain('chosen · 1:00')
-    expect(option('Willowbrook village').disabled).toBe(true)
+    expect(isOff(option('Willowbrook village'))).toBe(true)
+    expect(option('Willowbrook village').dataset.why).toBe(
+      'The take is on this track already. Pick another one.',
+    )
     expect(option('Willowbrook village').textContent).toContain('this track')
-    expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
+    expect(isOff(page.buttons('Move take 3')[0]!)).toBe(true)
     expect(document.activeElement?.getAttribute('placeholder')).toBe('Find a loop')
   })
 
@@ -279,13 +285,13 @@ describe('the Move dialog', () => {
     const page = render(village, view([take(3)]))
     await click(page.buttons('Move…')[0])
     await click(option("Witch's hut"))
-    expect(page.buttons('Move take 3')[0]!.disabled).toBe(false)
+    expect(isOff(page.buttons('Move take 3')[0]!)).toBe(false)
     page.rerender([lists[0]!, list('act2', 'act', 'Act 2: The Wood', []), lists[2]!, lists[3]!])
-    expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
+    expect(isOff(page.buttons('Move take 3')[0]!)).toBe(true)
     // It does not come back selected when the track returns.
     page.rerender(lists)
     expect(option("Witch's hut").getAttribute('aria-selected')).toBe('false')
-    expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
+    expect(isOff(page.buttons('Move take 3')[0]!)).toBe(true)
   })
 
   it('keeps the keyboard in the dialog when the pick is dropped, so Esc still closes it', async () => {
@@ -341,7 +347,7 @@ describe('the Move dialog', () => {
     await click(page.buttons('Move…')[0])
     const input = document.querySelector<HTMLInputElement>('input.filter')!
     const cancel = page.buttons('Cancel')[0]!
-    expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
+    expect(isOff(page.buttons('Move take 3')[0]!)).toBe(true)
     cancel.focus()
     page.key(cancel, 'Tab')
     expect(document.activeElement).toBe(input)
@@ -361,7 +367,7 @@ describe('the Move dialog', () => {
     await click(page.buttons('Move…')[0])
     await click(option('Game over'))
     const moveButton = page.buttons('Move take 1')[0]!
-    expect(moveButton.disabled).toBe(false)
+    expect(isOff(moveButton)).toBe(false)
     moveButton.focus()
     page.key(moveButton, 'Tab')
     expect(document.activeElement).toBe(option('Game over'))
@@ -434,8 +440,8 @@ describe('the Move dialog', () => {
     await click(page.buttons('Move…')[0])
     await click(option("Witch's hut"))
     await click(page.buttons('Move take 3')[0])
-    expect(page.buttons('Moving…')[0]!.disabled).toBe(true)
-    expect(page.buttons('Cancel')[0]!.disabled).toBe(true)
+    expect(isOff(page.buttons('Moving…')[0]!)).toBe(true)
+    expect(isOff(page.buttons('Cancel')[0]!)).toBe(true)
     await act(async () => {
       finish(new Response(JSON.stringify({ ok: true, n: 5 })))
       await new Promise((resolve) => setTimeout(resolve, 0))

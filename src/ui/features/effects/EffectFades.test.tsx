@@ -13,6 +13,9 @@ const { EffectTakesPanel } = await import('./EffectTakesPanel')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+/** Whether a control is greyed: `aria-disabled`, so it still takes focus and shows its reason. */
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
+
 const realFetch = globalThis.fetch
 const cleanups: (() => void)[] = []
 afterEach(() => {
@@ -180,7 +183,7 @@ describe('Fades… on a sound effect take', () => {
     expect(active.type).toBe('number')
     for (const other of buttons('Fades…')) {
       expect(other.getAttribute('aria-disabled')).toBe('true')
-      expect(other.title).toBe('Close the fades of Take 1 first.')
+      expect(other.dataset.why).toBe('Close the fades of Take 1 first.')
     }
     act(() => one.click())
     expect(container.querySelectorAll('.editor')).toHaveLength(1)
@@ -216,7 +219,7 @@ describe('Fades… on a sound effect take', () => {
     )
     await click(buttons('Fades…')[1]!)
     const box = container.querySelector<HTMLInputElement>('.editor input[type="number"]')!
-    expect(buttons('Save fades')[0]!.disabled).toBe(true)
+    expect(buttons('Save fades')[0]!.getAttribute('aria-disabled')).toBe('true')
     expect(buttons('Remove fades')).toHaveLength(0)
     await act(async () => {
       const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
@@ -357,7 +360,7 @@ describe('Fades… on a sound effect take', () => {
       chosenRow(),
       view({ takes: [take(1), take(3)], lockUnread: true }),
     )
-    expect(buttons('Fades…').every((b) => b.disabled)).toBe(true)
+    expect(buttons('Fades…').every(isOff)).toBe(true)
     expect(text()).toContain(
       'Choosing, dropping and fading wait until the sound effects lock can be read. You can still listen and make more takes.',
     )

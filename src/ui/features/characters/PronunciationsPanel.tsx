@@ -18,6 +18,8 @@ import {
   tableOf,
   type PronounceDraft,
 } from '../../pronounceDraft'
+import { off } from '../../off'
+import { SAVING, saveReasons } from '../../voiceOffText'
 
 /**
  * The project's pronunciation table: how words are said, applied to every line in the order
@@ -71,7 +73,7 @@ export function PronunciationsPanel({
         </span>
       </div>
       {/* Edits wait while a save is under way, so none is dropped when it lands. */}
-      <fieldset className="pronounce-fields" disabled={save.isPending}>
+      <fieldset className="pronounce-fields">
         {rows.length > 0 && (
           <ol className="pronounce-rows">
             {rows.map(({ id, entry: [written, said] }, i) => {
@@ -82,6 +84,7 @@ export function PronunciationsPanel({
                     className="mono"
                     aria-label={`Written, entry ${i + 1}`}
                     placeholder="Written"
+                    {...off(save.isPending && SAVING)}
                     value={written}
                     onChange={(e) => edit((d) => editRow(d, i, 0, e.target.value))}
                   />
@@ -92,6 +95,7 @@ export function PronunciationsPanel({
                     className="mono"
                     aria-label={`Said, entry ${i + 1}`}
                     placeholder="Said (empty: left out)"
+                    {...off(save.isPending && SAVING)}
                     value={said}
                     onChange={(e) => edit((d) => editRow(d, i, 1, e.target.value))}
                   />
@@ -100,7 +104,7 @@ export function PronunciationsPanel({
                       className="btn"
                       type="button"
                       aria-label={`Move entry ${i + 1} up`}
-                      disabled={i === 0}
+                      {...off(save.isPending && SAVING, i === 0 && 'This entry is already first.')}
                       onClick={() => edit((d) => moveRow(d, i, -1))}
                     >
                       ↑
@@ -109,7 +113,10 @@ export function PronunciationsPanel({
                       className="btn"
                       type="button"
                       aria-label={`Move entry ${i + 1} down`}
-                      disabled={i === rows.length - 1}
+                      {...off(
+                        save.isPending && SAVING,
+                        i === rows.length - 1 && 'This entry is already last.',
+                      )}
                       onClick={() => edit((d) => moveRow(d, i, 1))}
                     >
                       ↓
@@ -118,6 +125,7 @@ export function PronunciationsPanel({
                       className="btn"
                       type="button"
                       aria-label={`Remove entry ${i + 1}`}
+                      {...off(save.isPending && SAVING)}
                       onClick={() => edit((d) => removeRow(d, i))}
                     >
                       Remove
@@ -141,7 +149,7 @@ export function PronunciationsPanel({
         <button
           className="btn"
           type="button"
-          disabled={save.isPending}
+          {...off(save.isPending && SAVING)}
           onClick={() => edit(addRow)}
         >
           Add entry
@@ -155,7 +163,9 @@ export function PronunciationsPanel({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={!changed || moved || tableProblem !== null || save.isPending}
+          {...off(
+            ...saveReasons({ changed, moved, problem: tableProblem, pending: save.isPending }),
+          )}
           onClick={() =>
             save.mutate(
               { table: edited, was: draft!.base },

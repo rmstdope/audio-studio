@@ -45,6 +45,8 @@ import { SittingBox, sittingFailure } from './SittingBox'
 import { SittingMeter } from './SittingMeter'
 import { VoiceSlots } from './VoiceSlots'
 import { VoiceCard } from './VoiceCard'
+import { off } from '../../off'
+import { CHANGING } from '../../voiceOffText'
 
 /** What the board is asking about before it acts: casting a voice, or stopping the audition. */
 type Asking = { kind: 'cast'; voice: string } | { kind: 'stop' } | null
@@ -281,7 +283,7 @@ export function ShortlistBoard({
             <button
               type="button"
               className="btn btn-drop"
-              disabled={act.isPending}
+              {...off(act.isPending && CHANGING)}
               onClick={() => move(id, 'drop')}
             >
               <CrossIcon /> Drop
@@ -291,7 +293,7 @@ export function ShortlistBoard({
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={act.isPending}
+                  {...off(act.isPending && CHANGING)}
                   onClick={() => move(id, 'unlist')}
                 >
                   Unlist
@@ -299,7 +301,7 @@ export function ShortlistBoard({
                 <button
                   type="button"
                   className={`btn${isCurrent ? '' : ' btn-primary'}`}
-                  disabled={cast.isPending}
+                  {...off(cast.isPending && 'Wait for the casting to finish.')}
                   onClick={() => setAsking({ kind: 'cast', voice: id })}
                 >
                   {saving
@@ -319,7 +321,7 @@ export function ShortlistBoard({
               <button
                 type="button"
                 className="btn btn-shortlist"
-                disabled={act.isPending}
+                {...off(act.isPending && CHANGING)}
                 onClick={() => move(id, 'shortlist')}
               >
                 <CheckIcon /> Shortlist
@@ -475,7 +477,7 @@ export function ShortlistBoard({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={cast.isPending}
+            {...off(cast.isPending && 'Wait for the casting to finish.')}
             onClick={() => cast.mutate(casting, { onSettled: () => setAsking(null) })}
           >
             {cast.isPending
@@ -507,7 +509,7 @@ export function ShortlistBoard({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={act.isPending}
+            {...off(act.isPending && CHANGING)}
             onClick={() => run({ action: 'discard' })}
           >
             Stop audition
@@ -565,7 +567,7 @@ export function ShortlistBoard({
             <button
               className="btn btn-small"
               type="button"
-              disabled={own.pending}
+              {...off(own.pending && 'Wait for your own voices to be fetched.')}
               onClick={own.fetch}
             >
               Try again
@@ -659,7 +661,7 @@ export function ShortlistBoard({
           ref={moreButton}
           className="btn"
           type="button"
-          disabled={act.isPending}
+          {...off(act.isPending && CHANGING)}
           onClick={() => {
             const none = session.keywords.length === 0
             setNoKeywords(none)
@@ -675,7 +677,7 @@ export function ShortlistBoard({
           ref={designButton}
           className="btn"
           type="button"
-          disabled={designing}
+          {...off(designing && 'The voice design box is open. Close it to design another.')}
           onClick={() => setDesigning(true)}
         >
           <SparkIcon /> Design a voice…
@@ -706,7 +708,15 @@ export function ShortlistBoard({
               setIdError(null)
             }}
           />
-          <button className="btn" type="submit" disabled={!voiceId.trim() || act.isPending}>
+          <button
+            className="btn"
+            type="submit"
+            {...off(
+              !voiceId.trim() &&
+                'Type a voice id or URL first. Bring in turns on when there is one.',
+              act.isPending && CHANGING,
+            )}
+          >
             Bring in
           </button>
         </form>
@@ -749,7 +759,7 @@ export function ShortlistBoard({
           <button
             className="btn btn-small"
             type="button"
-            disabled={act.isPending}
+            {...off(act.isPending && CHANGING)}
             onClick={() => run({ action: 'undo' }, () => setDroppedHere(null))}
           >
             Undo

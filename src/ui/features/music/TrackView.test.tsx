@@ -5,7 +5,9 @@ import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
+const { WhyTip } = await import('../../components/WhyTip')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { TrackView } = await import('./TrackView')
@@ -104,6 +106,7 @@ function render(answer: () => Response, takes: Partial<MusicTakesView> = {}, fai
       createElement(
         QueryClientProvider,
         { client },
+        createElement(WhyTip),
         createElement(TrackView, { list, lists: [list], track }),
       ),
     ),
@@ -197,7 +200,7 @@ describe('Make pressed straight after typing the brief', () => {
   it('keeps Make off while it waits, so a second press asks for nothing more', async () => {
     const shown = render(saved)
     await typeAndPress(shown, BRIEF, 'A new brief', 'Make 2 takes')
-    expect(shown.button('Make 2 takes').disabled).toBe(true)
+    expect(isOff(shown.button('Make 2 takes'))).toBe(true)
     await act(async () => shown.button('Make 2 takes').click())
     await shown.finish()
     expect(shown.takesAsked()).toHaveLength(1)
@@ -207,9 +210,9 @@ describe('Make pressed straight after typing the brief', () => {
     const shown = render(saved)
     await typeAndPress(shown, BRIEF, 'A new brief', 'Make 2 takes')
     const menus = [...shown.container.querySelectorAll('select')]
-    expect(menus.map((m) => m.disabled)).toEqual([true, true])
+    expect(menus.map((m) => isOff(m))).toEqual([true, true])
     await shown.finish()
-    expect([...shown.container.querySelectorAll('select')].map((m) => m.disabled)).toEqual([
+    expect([...shown.container.querySelectorAll('select')].map((m) => isOff(m))).toEqual([
       false,
       false,
     ])
@@ -226,7 +229,7 @@ describe('Make pressed straight after typing the brief', () => {
     await shown.finish()
     expect(shown.takesAsked()).toEqual([])
     expect(shown.container.textContent).toContain('Too long')
-    expect(shown.button('Make 2 takes').disabled).toBe(false)
+    expect(isOff(shown.button('Make 2 takes'))).toBe(false)
   })
 
   it('makes nothing when the save itself failed', async () => {
@@ -234,7 +237,7 @@ describe('Make pressed straight after typing the brief', () => {
     await typeAndPress(shown, BRIEF, 'A new brief', 'Make 2 takes')
     await shown.finish()
     expect(shown.takesAsked()).toEqual([])
-    expect(shown.button('Make 2 takes').disabled).toBe(false)
+    expect(isOff(shown.button('Make 2 takes'))).toBe(false)
   })
 
   it('saves the brief again on another press after a failed save, then asks for the takes', async () => {
@@ -256,7 +259,7 @@ describe('Make pressed straight after typing the brief', () => {
     await shown.settle()
     expect(shown.asked()).toEqual([])
     expect(shown.container.textContent).toContain('Use minutes and seconds, like 1:20.')
-    expect(shown.button('Make 2 takes').disabled).toBe(false)
+    expect(isOff(shown.button('Make 2 takes'))).toBe(false)
   })
 
   it('makes nothing when the brief saves but another field still cannot be read', async () => {
@@ -315,7 +318,7 @@ describe('Try again pressed straight after typing the brief', () => {
   it('is off while a press of Make waits for the brief', async () => {
     const shown = render(saved, oneFailed)
     await typeAndPress(shown, BRIEF, 'A new brief', 'Make 2 takes')
-    expect(shown.button('Try again').disabled).toBe(true)
+    expect(isOff(shown.button('Try again'))).toBe(true)
     await shown.finish()
   })
 })

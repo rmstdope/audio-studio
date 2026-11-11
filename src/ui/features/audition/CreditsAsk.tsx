@@ -2,6 +2,8 @@ import { useId, useState, type FormEvent } from 'react'
 import { parseCredits } from '../../../core/sitting'
 import { useElevenAccount } from '../../api'
 import { creditsLabel, creditsPoints, creditsWaitLine, planLeftLine } from '../../sitting'
+import { off } from '../../off'
+import { CHANGING } from '../../voiceOffText'
 
 /**
  * The bar above the voices that asks for ElevenLabs credits, while ElevenLabs voices on the board
@@ -66,7 +68,14 @@ export function CreditsAsk({
         <span className="muted">
           {planLeftLine(account.error ?? account.data?.account, account.data?.held ?? 0)}
         </span>
-        <button className="btn btn-primary" type="submit" disabled={given === null || busy}>
+        <button
+          className="btn btn-primary"
+          type="submit"
+          {...off(
+            given === null && 'Type a whole number of credits. Pay turns on when there is one.',
+            busy && CHANGING,
+          )}
+        >
           {creditsLabel(text)}
         </button>
       </div>

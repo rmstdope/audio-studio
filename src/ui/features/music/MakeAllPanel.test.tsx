@@ -8,6 +8,7 @@ import type { MakeAllBatch } from '../../api'
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
 const { act, createElement } = await import('react')
+const { WhyTip } = await import('../../components/WhyTip')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { MakeAllPanel } = await import('./MakeAllPanel')
@@ -106,6 +107,7 @@ function render(subject: MusicListSummary, options: Options = {}) {
       createElement(
         QueryClientProvider,
         { client },
+        createElement(WhyTip),
         createElement(MakeAllPanel, {
           list: subject,
           noun: subject.kind === 'stingers' ? 'stinger' : 'track',
@@ -130,6 +132,7 @@ function render(subject: MusicListSummary, options: Options = {}) {
         createElement(
           QueryClientProvider,
           { client },
+          createElement(WhyTip),
           createElement(MakeAllPanel, {
             list: subject,
             noun: subject.kind === 'stingers' ? 'stinger' : 'track',
@@ -433,11 +436,7 @@ describe('Make takes for every stinger with no chosen take', () => {
     const page = render(three, { refreshing: true })
     const button = page.button('Make 4 takes each')
     expect(button.getAttribute('aria-disabled')).toBe('true')
-    expect(button.title).toBe('Wait for the refresh from the game to finish.')
-    const described = button.getAttribute('aria-describedby')!
-    expect(document.getElementById(described)!.textContent).toBe(
-      'Wait for the refresh from the game to finish.',
-    )
+    expect(button.dataset.why).toBe('Wait for the refresh from the game to finish.')
     await page.press('Make 4 takes each')
     expect(page.text()).not.toContain('Make 12 takes for')
   })
@@ -448,7 +447,7 @@ describe('Make takes for every stinger with no chosen take', () => {
     page.rerender({ refreshing: true })
     const make = page.button('Make 12 takes')
     expect(make.getAttribute('aria-disabled')).toBe('true')
-    expect(make.title).toBe('Wait for the refresh from the game to finish.')
+    expect(make.dataset.why).toBe('Wait for the refresh from the game to finish.')
     await page.press('Make 12 takes')
     expect(page.requests).toEqual([])
     page.rerender({ refreshing: false })

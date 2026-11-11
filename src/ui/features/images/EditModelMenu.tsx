@@ -7,6 +7,7 @@ import {
   type ImageDownload,
 } from '../../../core/imageModels'
 import { useFigures } from '../../api'
+import { off } from '../../off'
 import { MenuFace } from '../../components/MenuFace'
 
 /**
@@ -21,7 +22,7 @@ export function EditModelMenu({
   downloads,
   failed,
   label,
-  disabled,
+  why,
 }: {
   value: EditModelId
   onChange: (model: EditModelId) => void
@@ -30,7 +31,8 @@ export function EditModelMenu({
   failed: EditModelId[]
   /** The menu's name for screen readers. */
   label: string
-  disabled: boolean
+  /** Why the menu is off; null or false when it is on. */
+  why?: string | false | null
 }) {
   const figures = useFigures()
   const stateOf = (id: EditModelId) => ({ download: downloads[id], failed: failed.includes(id) })
@@ -42,7 +44,7 @@ export function EditModelMenu({
           className="takes-model"
           aria-label={label}
           value={value}
-          disabled={disabled}
+          {...off(why)}
           onChange={(event) => onChange(event.target.value as EditModelId)}
         >
           {EDIT_MODEL_IDS.map((id) => (

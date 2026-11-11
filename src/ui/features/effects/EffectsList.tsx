@@ -1,3 +1,4 @@
+import { off } from '../../off'
 import { useRef, useState } from 'react'
 import type { DroppedEffect, EffectsSummary } from '../../../core/effects'
 import { effectSeconds } from '../../../core/effects'
@@ -14,7 +15,12 @@ import { Problems } from '../../components/Problems'
 import { PlayIcon, StopIcon } from '../../components/icons'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
-import { effectsNotice, effectsRefreshSummary, effectsSubtitle } from '../../effectsText'
+import {
+  EFFECTS_PENDING,
+  effectsNotice,
+  effectsRefreshSummary,
+  effectsSubtitle,
+} from '../../effectsText'
 import { routeHref } from '../../route'
 import { showingAttentionText } from '../../status'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
@@ -76,7 +82,12 @@ export function EffectsList({
         </div>
         {effects.canRefresh && (
           <div className="header-actions">
-            <button className="btn" type="button" disabled={run.pending} onClick={run.start}>
+            <button
+              className="btn"
+              type="button"
+              {...off(run.pending && 'Wait for the refresh from the game to finish.')}
+              onClick={run.start}
+            >
               {run.pending ? 'Refreshing from the game…' : 'Refresh from the game'}
             </button>
           </div>
@@ -288,7 +299,7 @@ function ForgetConfirm({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={forget.isPending}
+          {...off(forget.isPending && EFFECTS_PENDING)}
           onClick={() => forget.mutate(undefined, { onSuccess: (r) => r.ok && onForgotten() })}
         >
           Forget

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  areaRowWhy,
+  imageMakeWhy,
+  imageMenuWhy,
+  modelMissingWhy,
+  patchMakeWhy,
+  patchMenuWhy,
   bringFailureText,
   bringingText,
   chosenLine,
@@ -416,6 +422,112 @@ describe('the line over the areas to place again', () => {
     )
     expect(placeAgainLine([], null, 3)).toBe(
       'Placed on an earlier take of the image, so the game does not use them now.',
+    )
+  })
+})
+
+describe('patchMenuWhy', () => {
+  const free = { makerMessage: null, making: false, savingWords: false }
+  it('is nothing while the patch can take new takes', () => {
+    expect(patchMenuWhy(free)).toBeNull()
+  })
+  it('names the maker first, then the takes being made, then the words saving', () => {
+    const all = { makerMessage: 'mflux is not installed.', making: true, savingWords: true }
+    expect(patchMenuWhy(all)).toBe('mflux is not installed.')
+    expect(patchMenuWhy({ ...all, makerMessage: null })).toBe(
+      'Takes are being made for this patch. Change this when they are done, or Stop.',
+    )
+    expect(patchMenuWhy({ ...all, makerMessage: null, making: false })).toBe(
+      'The patch’s words are being saved. This turns on when they are.',
+    )
+  })
+})
+
+describe('patchMakeWhy', () => {
+  const free = {
+    makerMessage: null,
+    modelName: 'Flux Fill',
+    modelHere: true,
+    mark: 'placed' as const,
+    areaTitle: null,
+    making: false,
+    savingWords: false,
+  }
+  it('is nothing while Make can be pressed', () => {
+    expect(patchMakeWhy(free)).toBeNull()
+  })
+  it('puts what Setup fixes first, then the mark, then the waiting', () => {
+    const all = {
+      ...free,
+      makerMessage: 'The maker is not ready.',
+      modelHere: false,
+      mark: 'none' as const,
+      areaTitle: 'Locket appears',
+      making: true,
+      savingWords: true,
+    }
+    expect(patchMakeWhy(all)).toBe('The maker is not ready.')
+    const noMaker = { ...all, makerMessage: null }
+    expect(patchMakeWhy(noMaker)).toBe(
+      'Flux Fill is not on this computer. Setup says how to download it.',
+    )
+    const here = { ...noMaker, modelHere: true }
+    expect(patchMakeWhy(here)).toBe(
+      '“Locket appears” has no place yet. Mark it under Named areas, or drag over the picture to mark this patch.',
+    )
+    expect(patchMakeWhy({ ...here, areaTitle: null })).toBe(
+      'This patch has no mark yet. Drag over the picture to mark where it goes.',
+    )
+    const marked = { ...here, mark: 'placed' as const }
+    expect(patchMakeWhy(marked)).toBe(
+      'Takes are being made for this patch. Make more when they are done, or Stop.',
+    )
+    expect(patchMakeWhy({ ...marked, making: false })).toBe(
+      'The patch’s words are being saved. Make turns on when they are.',
+    )
+  })
+  it('names the model in the words Setup uses', () => {
+    expect(modelMissingWhy('Klein')).toBe(
+      'Klein is not on this computer. Setup says how to download it.',
+    )
+  })
+})
+
+describe('imageMenuWhy and imageMakeWhy', () => {
+  const none = { generatorOk: true, making: false, savingWords: false }
+  it('are nothing while the image can take new takes', () => {
+    expect(imageMenuWhy(none)).toBeNull()
+    expect(imageMakeWhy(none)).toBeNull()
+  })
+  it('put the generator first, then the takes being made, then the words saving', () => {
+    const all = { generatorOk: false, making: true, savingWords: true }
+    expect(imageMakeWhy(all)).toBe(
+      'No image model can run on this computer. Setup says what is missing.',
+    )
+    expect(imageMenuWhy({ ...all, generatorOk: true })).toBe(
+      'Takes are being made for this image. Change this when they are done, or Stop.',
+    )
+    expect(imageMakeWhy({ ...all, generatorOk: true })).toBe(
+      'Takes are being made for this image. Make more when they are done, or Stop.',
+    )
+    expect(imageMakeWhy({ ...all, generatorOk: true, making: false })).toBe(
+      'The image’s words are being saved. Make turns on when they are.',
+    )
+    expect(imageMenuWhy({ ...all, generatorOk: true, making: false })).toBe(
+      'The image’s words are being saved. This turns on when they are.',
+    )
+  })
+})
+
+describe('areaRowWhy', () => {
+  it('says what keeps a named area from being picked, nothing when the picture is ready', () => {
+    expect(areaRowWhy('ready')).toBeNull()
+    expect(areaRowWhy('loading')).toBe('The picture is still loading. Pick an area when it has.')
+    expect(areaRowWhy('gone')).toBe(
+      "The chosen take's picture is missing or cannot be read, so areas cannot be placed on it.",
+    )
+    expect(areaRowWhy('none')).toBe(
+      'Choose a take of the image first. Areas are placed on the take the game shows.',
     )
   })
 })

@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import type { OrphanRow } from '../../../core/music'
 import { useRemoveOrphan } from '../../api'
+import { WAIT_FOR_CHANGE } from '../../musicTakesText'
+import { off } from '../../off'
 import { Confirm } from '../../components/Confirm'
 import { Failure } from '../../components/Failure'
 import { PauseIcon, PlayIcon } from '../../components/icons'
@@ -50,8 +52,10 @@ export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
                     <button
                       className="icon-btn"
                       type="button"
-                      disabled={!row.fileExists}
-                      title={row.fileExists ? undefined : 'Music file missing'}
+                      {...off(
+                        !row.fileExists &&
+                          'The music file is missing, so there is nothing to play.',
+                      )}
                       aria-label={
                         row.fileExists
                           ? `${playing ? 'Stop' : 'Play'} ${row.title}`
@@ -120,7 +124,7 @@ function RemoveConfirm({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={remove.isPending}
+          {...off(remove.isPending && WAIT_FOR_CHANGE)}
           onClick={() => remove.mutate(undefined, { onSuccess: (r) => r.ok && onRemoved() })}
         >
           {remove.isPending ? 'Removing…' : 'Remove'}

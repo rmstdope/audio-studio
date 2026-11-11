@@ -5,7 +5,8 @@ import { Failure } from '../../components/Failure'
 import { Pager, type PagerProps } from '../../components/Pager'
 import { pagerFor } from '../../pager'
 import { WordsField, type SaveWordsNow } from '../images/WordsField'
-import { effectLengthLine } from '../../effectsText'
+import { EFFECTS_PENDING, effectLengthLine } from '../../effectsText'
+import { off } from '../../off'
 import { routeHref } from '../../route'
 import { EffectTakesPanel } from './EffectTakesPanel'
 
@@ -76,7 +77,7 @@ function Found({ row, pager }: { row: EffectRow; pager: PagerProps | null }) {
             <button
               className="btn"
               type="button"
-              disabled={save.isPending || keep.isPending}
+              {...off((save.isPending || keep.isPending) && EFFECTS_PENDING)}
               onClick={() => save.mutate(null)}
             >
               Use the game&apos;s
@@ -84,7 +85,7 @@ function Found({ row, pager }: { row: EffectRow; pager: PagerProps | null }) {
             <button
               className="btn"
               type="button"
-              disabled={save.isPending || keep.isPending}
+              {...off((save.isPending || keep.isPending) && EFFECTS_PENDING)}
               onClick={() => keep.mutate()}
             >
               Keep mine

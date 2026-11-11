@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import type { SceneRow } from '../core/scenes'
 import {
+  measureWhy,
+  refreshWhy,
+  saveWhy,
   changeWord,
   suggestionLine,
   limitLine,

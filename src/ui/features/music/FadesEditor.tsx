@@ -16,7 +16,11 @@ import type { TakeView } from '../../../core/musicTake'
 import { cutShares, playedSeconds, takeSoundUrl } from './trimSilence'
 import { useTrackActions, type TrackActions } from './trackActions'
 import { useSetFades } from '../../api'
+import { off } from '../../off'
 import type { useClipPlayer } from '../../components/useClipPlayer'
+
+/** Why the editor's controls wait: the fades are being saved. */
+const SAVING_WHY = 'Wait for the fades to be saved.'
 
 /** One clip at a time, shared with the takes around the editor. */
 type Player = ReturnType<typeof useClipPlayer>
@@ -272,7 +276,7 @@ export function FadesEditorBody({
           min={0}
           value={text}
           ref={label === 'Fade in' ? inBox : undefined}
-          disabled={saving}
+          {...off(saving && SAVING_WHY)}
           aria-invalid={bad && problem !== null ? true : undefined}
           className={bad && problem !== null ? 'invalid' : undefined}
           onChange={(event) => onText(event.target.value)}
@@ -321,7 +325,7 @@ export function FadesEditorBody({
           Shape
           <select
             value={shape}
-            disabled={saving}
+            {...off(saving && SAVING_WHY)}
             onChange={(event) => setShape(event.target.value as Fades['shape'])}
           >
             {FADE_SHAPES.map((name) => (
@@ -356,7 +360,7 @@ export function FadesEditorBody({
           <button
             type="button"
             className="btn btn-ghost btn-small"
-            disabled={saving}
+            {...off(saving && SAVING_WHY)}
             onClick={() => {
               setRemoving(true)
               actions.press(`fades:${take.n}`)
@@ -367,13 +371,21 @@ export function FadesEditorBody({
           </button>
         )}
         <span className="grow" />
-        <button type="button" className="btn btn-small" disabled={saving} onClick={close}>
+        <button
+          type="button"
+          className="btn btn-small"
+          {...off(saving && SAVING_WHY)}
+          onClick={close}
+        >
           Cancel
         </button>
         <button
           type="button"
           className="btn btn-primary btn-small"
-          disabled={!canSave}
+          {...off(
+            saving && SAVING_WHY,
+            !changed && 'Nothing has changed yet. Change a fade, then save.',
+          )}
           onClick={save}
         >
           {saving ? 'Saving…' : 'Save fades'}

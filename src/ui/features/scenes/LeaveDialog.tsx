@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { off } from '../../off'
 
 /**
  * The question asked when something would leave a scene with unsaved changes. Focus starts on
@@ -51,8 +52,11 @@ export function LeaveDialog({
             ref={save}
             className="btn btn-primary"
             type="button"
-            aria-disabled={!canSave || undefined}
-            onClick={() => canSave && onSave()}
+            {...off(
+              !canSave &&
+                'Something in this scene needs fixing first. Go back and fix the rows marked red, then save.',
+            )}
+            onClick={onSave}
           >
             Save
           </button>

@@ -5,6 +5,7 @@ import type { ImageRow, PatchRow } from '../../../core/images'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
+const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
@@ -223,11 +224,11 @@ describe('the Remake patches line', () => {
         message: 'FLUX.2 klein 4B is not on this computer, and patches are made with it.',
       },
     })
-    expect(button(off.host, 'Remake patches on this take').disabled).toBe(true)
+    expect(isOff(button(off.host, 'Remake patches on this take'))).toBe(true)
     expect(lines(off.host)).toContain('FLUX.2 klein 4B is not on this computer')
     expect(lines(off.host)).toContain('3 patches to make again on take 4')
     const gone = await render({ pictureGone: true })
-    expect(button(gone.host, 'Remake patches on this take').disabled).toBe(true)
+    expect(isOff(button(gone.host, 'Remake patches on this take'))).toBe(true)
     expect(lines(gone.host)).toContain(
       "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
     )
@@ -390,7 +391,7 @@ describe('the model of the remake', () => {
   it('starts on Qwen when klein is not here and Qwen is', async () => {
     const { host } = await render({ models: { 'qwen-edit': 'whole', klein: 'absent' } })
     expect(menu(host).value).toBe('qwen-edit')
-    expect(button(host, 'Remake patches on this take').disabled).toBe(false)
+    expect(isOff(button(host, 'Remake patches on this take'))).toBe(false)
   })
 
   it('starts on klein with no line about Qwen when Qwen is absent', async () => {
@@ -398,7 +399,7 @@ describe('the model of the remake', () => {
     expect(menu(host).value).toBe('klein')
     expect(text(host)).not.toContain('so these takes use')
     expect(text(host)).not.toContain('Setup says how')
-    expect(button(host, 'Remake patches on this take').disabled).toBe(false)
+    expect(isOff(button(host, 'Remake patches on this take'))).toBe(false)
   })
 
   it('turns the button off and points to Setup when the model picked is not here', async () => {
@@ -406,7 +407,7 @@ describe('the model of the remake', () => {
     await pick(menu(host), 'qwen-edit')
     expect(text(menu(host).closest('.edit-model'))).toContain('not on this computer')
     expect(text(host)).toContain('Setup says how to download it.')
-    expect(button(host, 'Remake patches on this take').disabled).toBe(true)
+    expect(isOff(button(host, 'Remake patches on this take'))).toBe(true)
   })
 
   it('warns that the last take failed', async () => {

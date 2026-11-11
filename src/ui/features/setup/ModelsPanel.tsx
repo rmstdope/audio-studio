@@ -65,6 +65,8 @@ import {
 import { ELEVEN_TTS, elevenModelName, readsCues } from '../../../core/elevenSpeech'
 import type { ElevenTts } from '../../../core/project'
 import { Confirm } from '../../components/Confirm'
+import { off, type Why } from '../../off'
+import { OTHER_ROW, SAVING } from '../../voiceOffText'
 import { markSwitched } from '../../retirementSwitched'
 import { focusAfter, rowReducer, startRow } from '../../modelsRow'
 
@@ -208,7 +210,7 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
               ref={menu}
               aria-label="Music model"
               value={shown}
-              disabled={pending}
+              {...off(pending && SAVING)}
               onChange={(event) =>
                 dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
               }
@@ -388,7 +390,7 @@ function LocalModelRow<Id extends string>({
       ref={menu}
       aria-label={menuLabel}
       value={shown}
-      disabled={pending}
+      {...off(pending && SAVING)}
       onChange={(event) =>
         dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
       }
@@ -523,7 +525,7 @@ function StageRow({
             aria-label={`${name} model`}
             className="mono"
             value={shown}
-            disabled={locked || pending || state.phase === 'asking'}
+            {...off(locked && OTHER_ROW, (pending || state.phase === 'asking') && SAVING)}
             onChange={(event) => {
               const to = event.target.value
               startedFrom.current = current
@@ -653,7 +655,7 @@ function Question({
           ref={confirm}
           className="btn btn-primary"
           type="button"
-          disabled={switching}
+          {...off(switching && SAVING)}
           onClick={onConfirm}
         >
           {switching ? 'Switching…' : words.confirm}
@@ -762,7 +764,7 @@ function ElevenRow({
             ref={menu}
             aria-label={`${name} model`}
             value={shown}
-            disabled={locked || pending || state.phase === 'asking'}
+            {...off(locked && OTHER_ROW, (pending || state.phase === 'asking') && SAVING)}
             onChange={(event) => {
               const to = event.target.value
               dispatch({
@@ -807,7 +809,7 @@ function ElevenRow({
                     ref={confirm}
                     className="btn btn-primary"
                     type="button"
-                    disabled={state.phase === 'switching'}
+                    {...off(state.phase === 'switching' && SAVING)}
                     onClick={() => dispatch({ type: 'confirm' })}
                   >
                     {state.phase === 'switching' ? 'Switching…' : words.confirm}
@@ -889,7 +891,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
   const previous = useRef(state.phase)
   const shown = edited ?? saved
   const changed = !sameSettings(shown, saved)
-  const disabled = locked || state.phase !== 'editing'
+  const waiting = (locked && OTHER_ROW) || (state.phase !== 'editing' && SAVING)
 
   useEffect(() => {
     const was = previous.current
@@ -949,7 +951,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
               id="eleven-stability"
               aria-label="ElevenLabs stability"
               value={String(shown.stability)}
-              disabled={disabled}
+              {...off(waiting)}
               onChange={(event) =>
                 set({ stability: Number(event.target.value) as ElevenTts['stability'] })
               }
@@ -968,7 +970,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
               hint={hint}
               value={shown[key]}
               shown={settingWords(key, shown[key])}
-              disabled={disabled}
+              waiting={waiting}
               onChange={(value) => set({ [key]: value })}
             />
           ))}
@@ -976,10 +978,10 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
         <div className="mmenu">
           {changed && (
             <>
-              <button className="btn btn-ghost" type="button" disabled={disabled} onClick={keep}>
+              <button className="btn btn-ghost" type="button" {...off(waiting)} onClick={keep}>
                 Undo changes
               </button>
-              <button className="btn btn-primary" type="button" disabled={disabled} onClick={offer}>
+              <button className="btn btn-primary" type="button" {...off(waiting)} onClick={offer}>
                 Save voice settings
               </button>
             </>
@@ -988,7 +990,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
             <button
               className="btn btn-ghost"
               type="button"
-              disabled={disabled}
+              {...off(waiting)}
               onClick={() => setEdited({ ...ELEVEN_TTS })}
             >
               Use ElevenLabs' defaults
@@ -1013,7 +1015,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
                 ref={confirm}
                 className="btn btn-primary"
                 type="button"
-                disabled={state.phase === 'saving'}
+                {...off(state.phase === 'saving' && SAVING)}
                 onClick={() => state.phase === 'asking' && send(shown, state.was, words)}
               >
                 {state.phase === 'saving' ? 'Saving…' : words.confirm}
@@ -1056,14 +1058,15 @@ function SettingSlider({
   hint,
   value,
   shown,
-  disabled,
+  waiting,
   onChange,
 }: {
   name: string
   hint: string
   value: number
   shown: string
-  disabled: boolean
+  /** Why the slider is off, or false when it is on. */
+  waiting: Why
   onChange: (value: number) => void
 }) {
   const id = `eleven-${name.toLowerCase()}`
@@ -1079,7 +1082,7 @@ function SettingSlider({
           max={1}
           step={0.05}
           value={value}
-          disabled={disabled}
+          {...off(waiting)}
           onChange={(event) => onChange(Number(event.target.value))}
         />
         <span className="mono">{shown}</span>
