@@ -8,6 +8,7 @@ import {
   editWindow,
   fitToSize,
   isCropped,
+  layOver,
   pastePixels,
   type Pixels,
 } from './imagePixels'
