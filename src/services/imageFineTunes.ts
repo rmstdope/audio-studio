@@ -53,7 +53,7 @@ export interface ImageFineTunes {
     projectFile: string,
     id: string,
   ): Promise<{ ok: true; stopped: number } | ProjectFailure | null>
-  /** Takes a fine-tune off the board (a failed one too) and deletes its picture. */
+  /** Takes a fine-tune off the board (a failed one too) and deletes its picture; one waiting or being made is stopped and removed. */
   drop(projectFile: string, id: string, n: number): Promise<FineTuneAnswer>
   /** Records that a fine-tune has been laid over the picture once. */
   markSeen(projectFile: string, id: string, n: number): Promise<FineTuneAnswer>
@@ -472,8 +472,11 @@ export function createImageFineTunes({
       const image = await resolve(projectFile, id)
       if (!image || 'ok' in image) return image
       const entries = active.get(image.key)
-      if (entries?.get(n)?.state === 'failed') {
-        entries.delete(n)
+      const entry = entries?.get(n)
+      // A failed one is only forgotten; one waiting or being made is stopped first, and the next waiting one starts.
+      if (entry && (entry.state === 'failed' || entry.base === image.base)) {
+        entry.stop?.abort()
+        entries!.delete(n)
         return { ok: true }
       }
       const outcome = await changeBoard(image, (board): FineTuneAnswer | { dropped: true } => {

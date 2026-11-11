@@ -5628,3 +5628,36 @@ textarea[aria-disabled='true'][data-why] {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* The fine-tune form is one column: each label above its field, the words box as wide as the column and as tall as its words. */
+.fine-tune .patch-bench-right .field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.fine-tune .patch-bench-right .lbl,
+.fine-tune .edit-model .lbl {
+  font-size: 13px;
+  color: var(--muted);
+}
+.fine-tune .patch-bench-right textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+/* Fine-tune cards in one row line up: the name and its chip on one line, level pictures, buttons at the foot. */
+.fine-tune .fine-card-pick {
+  flex: 1 1 auto;
+}
+.fine-tune .patch-thumb-label {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.fine-tune .patch-thumb-label .grow {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fine-tune .patch-thumb .patch-controls {
+  margin-top: auto;
+}

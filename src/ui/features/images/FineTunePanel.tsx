@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from 'react'
 import {
   cameAlongLine,
   type FineTuneFailedView,
@@ -111,12 +118,13 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     answer: Extract<UseFineTuneAnswer, { ok: true }>
     from: string
   } | null>(null)
-  const [pendingFocus, setPendingFocus] = useState<number | 'words' | null>(null)
+  const [pendingFocus, setPendingFocus] = useState<number | 'words' | { stop: number } | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
   const changing = useRef(false)
   const wordsBox = useRef<HTMLTextAreaElement>(null)
   const cards = useRef(new Map<number, HTMLButtonElement>())
+  const stops = useRef(new Map<number, HTMLButtonElement>())
 
   const view = query.data && 'picture' in query.data ? query.data : null
   const tunes = view?.tunes ?? []
@@ -138,12 +146,30 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   useEffect(() => {
     if (lookingAt !== null) cards.current.get(lookingAt)?.scrollIntoView?.({ block: 'nearest' })
   }, [lookingAt])
+  // The words box grows with its words, so none are out of view; a height dragged taller stays.
+  useLayoutEffect(() => {
+    const box = wordsBox.current
+    if (!box) return
+    if (words === '') {
+      box.style.height = ''
+      return
+    }
+    if (box.scrollHeight > box.clientHeight)
+      box.style.height = `${box.scrollHeight + (box.offsetHeight - box.clientHeight)}px`
+  }, [words, view?.picture.kind])
   useEffect(() => {
     if (pendingFocus === null) return
-    const target = pendingFocus === 'words' ? wordsBox.current : cards.current.get(pendingFocus)
+    const target =
+      pendingFocus === 'words'
+        ? wordsBox.current
+        : typeof pendingFocus === 'number'
+          ? cards.current.get(pendingFocus)
+          : stops.current.get(pendingFocus.stop)
+    // A Stop that is not there yet waits for the page to show the next fine-tune being made.
+    if (!target && typeof pendingFocus === 'object') return
     target?.focus()
     setPendingFocus(null)
-  }, [pendingFocus])
+  }, [pendingFocus, query.data])
 
   // Another take chosen in Takes ends the line about the last use (not the new take it made).
   const shownKey = !view
@@ -223,13 +249,19 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const onDrop = (n: number) => {
     if (changing.current) return
     const next = strip.includes(n) ? rightAfterDrop(strip, n) : lookingAt
+    // After a card being made is stopped, the next one to be made is where focus goes.
+    const nextMaking = view.making.find((m) => m.n > n && m.state === 'waiting')
     drop.reset()
     setLooking(next)
     changing.current = true
     drop.mutate(n, {
       onSettled: () => {
         changing.current = false
-        setPendingFocus(next ?? 'words')
+        setPendingFocus(
+          view.making.some((m) => m.n === n) && nextMaking
+            ? { stop: nextMaking.n }
+            : (next ?? 'words'),
+        )
       },
     })
   }
@@ -394,6 +426,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
             downloads={view.models}
             failed={view.failedModels}
             label="Model for new takes"
+            visible
             why={menuWhy}
           />
           <div className="patch-make">
@@ -507,6 +540,20 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
                     <span className="faint small">{leftText(making)}</span>
                     <div className="bar" role="progressbar" aria-label={`Fine-tune ${n}`}>
                       <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
+                    </div>
+                    <div className="patch-controls">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        ref={(el) => {
+                          if (el) stops.current.set(n, el)
+                          else stops.current.delete(n)
+                        }}
+                        {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
+                        onClick={() => onDrop(n)}
+                      >
+                        Stop
+                      </button>
                     </div>
                   </>
                 )}

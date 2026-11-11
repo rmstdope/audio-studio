@@ -64,12 +64,15 @@ function setup({
   queue = createSerial(),
   makes = (request: ImageRequest) => fakePng(request.width, request.height, 1),
   extra = {},
+  hold,
 }: {
   chosen?: boolean
   here?: Partial<Record<EditModelId, boolean>>
   queue?: Serial
   makes?: (request: ImageRequest) => Uint8Array
   extra?: Record<string, unknown>
+  /** Holds each request of the fake generator until it resolves. */
+  hold?: (request: ImageRequest) => Promise<void>
 } = {}) {
   const root = tempRepo({
     'content-studio.json': projectJson({ images }),
@@ -92,6 +95,7 @@ function setup({
     installed: (model) => here[model as EditModelId] ?? true,
     async generate(request) {
       requests.push(request)
+      await hold?.(request)
       return { png: makes(request), seed: request.seed }
     },
   }
@@ -210,6 +214,42 @@ describe('making fine-tunes', () => {
     expect(await tunes.stop(file, 'inn')).toEqual({ ok: true, stopped: 2 })
     release()
     expect((await settled()).tunes).toEqual([])
+  })
+
+  it('drops one that is waiting or being made: only it stops, nothing of it lands, the rest go on', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, tunes, settled, root } = setup({
+      makes: (request) => fakePng(request.width, request.height, 1),
+      queue: gatedQueue(gate),
+    })
+    await tunes.make(file, 'inn', { count: 2, words: 'x', area: null })
+    expect(await tunes.drop(file, 'inn', 1)).toEqual({ ok: true })
+    const view = (await tunes.view(file, 'inn')) as FineTunesView
+    expect(view.making.map((m) => m.n)).toEqual([2])
+    release()
+    const done = await settled()
+    expect(done.tunes.map((t) => t.n)).toEqual([2])
+    expect(existsSync(join(root, FOLDER, '1.png'))).toBe(false)
+  })
+
+  it('drops one being made: it is stopped and nothing of it lands, and the next one still does', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, tunes, settled, root } = setup({ hold: () => gate })
+    await tunes.make(file, 'inn', { count: 2, words: 'x', area: null })
+    for (let i = 0; i < 200; i++) {
+      const view = (await tunes.view(file, 'inn')) as FineTunesView
+      if (view.making[0]?.state === 'making') break
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    const before = (await tunes.view(file, 'inn')) as FineTunesView
+    expect(before.making.map((m) => m.state)).toEqual(['making', 'waiting'])
+    expect(await tunes.drop(file, 'inn', 1)).toEqual({ ok: true })
+    release()
+    const done = await settled()
+    expect(done.tunes.map((t) => t.n)).toEqual([2])
+    expect(existsSync(join(root, FOLDER, '1.png'))).toBe(false)
   })
 
   it('keeps a failed fine-tune for Try again with its words, mark and model', async () => {
