@@ -377,6 +377,25 @@ describe('takes of a declared patch', () => {
     ).toEqual([11, 12, 13])
   })
 
+  it('puts every take of one press in line in number order before it answers, so they are made in that order', async () => {
+    const serial = createSerial()
+    let turns = 0
+    const queue: Serial = {
+      run: (key, job) => {
+        turns++
+        return serial.run(key, job)
+      },
+    }
+    const { root, file, patches, requests, work } = setup({ queue })
+    await patches.make(file, 'inn', 'door', { count: 3, area })
+    // In line already: no take waits on a read of its own first, which could finish out of order.
+    expect(turns).toBe(3)
+    await work()
+    expect(requests.map((r) => r.editing)).toEqual(
+      [1, 2, 3].map((n) => join(root, FOLDER, `editing-${n}.png`)),
+    )
+  })
+
   it("times a finished patch take under the model's own key, klein's patches apart from its takes", async () => {
     let clock = 0
     const { root, file, patches, work } = setup({ now: () => (clock += 3000) })

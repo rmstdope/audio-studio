@@ -9,7 +9,7 @@ import {
   type EditModelId,
   type ImageDownload,
 } from '../core/imageModels'
-import { isCropped } from '../core/imagePixels'
+import { isCropped, type Pixels } from '../core/imagePixels'
 import { ImageLockSchema } from '../core/images'
 import { ImageManifestSchema, type ImageManifest } from '../core/imageTakes'
 import {
@@ -298,7 +298,7 @@ export function createImagePatches({
   async function run(
     found: Found,
     entry: Entry,
-    take: { path: string; width: number; height: number },
+    around: Pixels,
     entries: Map<number, Entry>,
   ): Promise<void> {
     if (entries.get(entry.n) !== entry || entry.state !== 'waiting') return
@@ -306,7 +306,6 @@ export function createImagePatches({
     entry.stop = stop
     const seed = newSeed() // before any await, so the takes of one press take their seeds in order
     try {
-      const around = decodePng(new Uint8Array(await Bun.file(take.path).arrayBuffer()))
       let began: number | null = null
       const made = await editStep(
         { generator, queue, free },
@@ -414,6 +413,16 @@ export function createImagePatches({
         : DEFAULT_EDIT_MODEL
     const problem = await makerProblem(model)
     if (problem) return { ok: false, message: problem }
+    // Read once for all the takes, before any is queued.
+    let around: Pixels
+    try {
+      around = decodePng(new Uint8Array(await Bun.file(picture.path).arrayBuffer()))
+    } catch {
+      return {
+        ok: false,
+        message: "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
+      }
+    }
     const queued: Entry[] = []
     if (failed) {
       failed.state = 'waiting'
@@ -442,7 +451,8 @@ export function createImagePatches({
         queued.push(entry)
       }
     }
-    for (const entry of queued) void run(found, entry, picture, entries)
+    // No await from here until every take is in line, so the takes of one press are made in number order.
+    for (const entry of queued) void run(found, entry, around, entries)
     return { ok: true }
   }
 
