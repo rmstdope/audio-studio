@@ -576,7 +576,7 @@ export function ShortlistBoard({
         )}
         {ownState === 'noKey' && (
           <p className="muted">
-            Your voices come from your Fish account, and there is no Fish key yet. Add
+            Your voices come from your Fish account, and there is no Fish Audio key yet. Add
             FISH_AUDIO_API_KEY in <a href={routeHref({ view: 'setup' })}>Setup</a>.
           </p>
         )}
