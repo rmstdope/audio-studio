@@ -322,3 +322,21 @@ describe('limitLine', () => {
     )
   })
 })
+
+describe('the reasons a scene control is greyed', () => {
+  it('Save names the thing to fix before the thing to wait for, and nothing to save last of the page’s own', () => {
+    expect(saveWhy({ dirty: true, red: true, saving: true })).toContain('needs fixing')
+    expect(saveWhy({ dirty: true, red: false, saving: true })).toBe(
+      'The scene is being saved. Wait for it to finish.',
+    )
+    expect(saveWhy({ dirty: false, red: false, saving: false })).toContain('nothing to save')
+    expect(saveWhy({ dirty: true, red: false, saving: false })).toBe(false)
+  })
+
+  it('Refresh from the game and the loudness buttons name what to wait for', () => {
+    expect(refreshWhy(true)).toBe('Wait for the refresh from the game to finish.')
+    expect(refreshWhy(false)).toBe(false)
+    expect(measureWhy(true)).toBe('Loudness is being measured. Wait for it to finish.')
+    expect(measureWhy(false)).toBe(false)
+  })
+})

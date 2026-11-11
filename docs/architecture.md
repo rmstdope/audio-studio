@@ -2385,6 +2385,14 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   file itself before it imports React, so the other suites run without one (first:
   `SpeedEditor.test.tsx`).
 
+- **Greyed controls explain themselves** (as-6v7r). No control uses the native `disabled` attribute
+  (an `<option>` may): it is spread `off(reason, …)` from `src/ui/off.ts`, which writes `aria-disabled`,
+  `aria-description` and `data-why` from the first reason that applies, so the reasons are written in the
+  order to deal with them (Setup or the computer, then something to do on the page, then something to wait
+  for). The one `WhyTip` layer, mounted in `App`, shows that reason in a tip on hover, focus or tap, and
+  makes the control inert (click, keys, change); the control stays reachable with Tab. `offGuard.test.ts`
+  fails on any native `disabled` or hand-written `aria-disabled`.
+
 ---
 
 ## 12. Delivery plan
