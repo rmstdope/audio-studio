@@ -45,9 +45,6 @@ export async function editStep(
     ? editWindow(area, source)
     : { x: 0, y: 0, width: source.width, height: source.height }
   try {
-    // The model gets the marked area with some context, not the whole picture: faster, and the
-    // thing to change is larger in its view.
-    await writeAtomic(step.root, step.cropFile, encodePng(cropPixels(source, window)))
     const made = await makeImageTake(
       deps,
       {
@@ -60,6 +57,10 @@ export async function editStep(
       },
       signal,
       onStart,
+      // The model gets the marked area with some context, not the whole picture: faster, and the
+      // thing to change is larger in its view. Written in its turn, so no await comes before the
+      // edit takes its place in line: edits asked in order are made in that order.
+      () => writeAtomic(step.root, step.cropFile, encodePng(cropPixels(source, window))),
     )
     if (signal.aborted) return null
     const part = decodePng(made.png)

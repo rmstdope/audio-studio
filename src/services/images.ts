@@ -474,6 +474,8 @@ export async function makeImageTake(
   signal?: AbortSignal,
   /** Called when the take's turn comes, before the other workers are freed (the page shows "making" from then). */
   onTurn?: () => void,
+  /** Run in its turn, after `onTurn` and before the model starts: what the request needs on disk (an edit's working file). */
+  prepare?: () => void | Promise<void>,
 ): Promise<GeneratedImage> {
   const problem = checkImageRequest(request)
   if (problem) throw new Error(problem)
@@ -482,6 +484,7 @@ export async function makeImageTake(
     if (signal?.aborted) throw new Error('The image generator was stopped.')
     return holdGpu('image', async () => {
       onTurn?.()
+      await prepare?.()
       await free()
       return generator.generate(request, signal)
     })
