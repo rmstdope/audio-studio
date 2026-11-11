@@ -150,9 +150,12 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   }
   const justFinished = (n: number) => Date.now() < (readyAt.current.get(n) ?? 0) + SETTLE_MS
   useEffect(() => {
-    const ends = [...readyAt.current.values()].map((at) => at + SETTLE_MS - Date.now())
-    const next = Math.max(...ends)
-    if (next <= 0) return
+    // The soonest card still settling is the next to turn on; this effect runs again after it.
+    const ends = [...readyAt.current.values()]
+      .map((at) => at + SETTLE_MS - Date.now())
+      .filter((left) => left > 0)
+    if (ends.length === 0) return
+    const next = Math.min(...ends)
     const timer = setTimeout(() => tick((n) => n + 1), next)
     return () => clearTimeout(timer)
   })

@@ -475,4 +475,31 @@ describe('a late click meant for Stop', () => {
     const uses = [...host.querySelectorAll<HTMLButtonElement>('.fine-card .btn-primary')]
     expect(uses.map(isOff)).toEqual([false, true])
   })
+
+  it('turns each card on at its own second when two finish a moment apart', async () => {
+    let served = view({
+      making: [making[0]!, { ...making[0]!, n: 2 }],
+    })
+    const { host, client } = await render(() => served)
+    served = view({ tunes: [tune(1)], making: [{ ...making[0]!, n: 2 }] })
+    await finish(client)
+    await act(async () => await new Promise((r) => setTimeout(r, 400)))
+    served = view({ tunes: [tune(1), tune(2)], making: [] })
+    await finish(client)
+    const uses = () => [...host.querySelectorAll<HTMLButtonElement>('.fine-card .btn-primary')]
+    expect(uses().map(isOff)).toEqual([true, true])
+    await act(async () => await new Promise((r) => setTimeout(r, 750)))
+    expect(uses().map(isOff)).toEqual([false, true])
+    await act(async () => await new Promise((r) => setTimeout(r, 400)))
+    expect(uses().map(isOff)).toEqual([false, false])
+  })
+
+  it('does nothing on Enter in the dimmed second', async () => {
+    let served = view({ making })
+    const { host, sent, client } = await render(() => served)
+    served = view({ tunes: [tune(1)], making: [] })
+    await finish(client)
+    await key(button(host, 'Use this')!, 'Enter')
+    expect(sent).toEqual([])
+  })
 })
