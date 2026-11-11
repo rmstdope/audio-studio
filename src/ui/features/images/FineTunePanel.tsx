@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from 'react'
 import {
   cameAlongLine,
   type FineTuneFailedView,
@@ -138,6 +145,13 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   useEffect(() => {
     if (lookingAt !== null) cards.current.get(lookingAt)?.scrollIntoView?.({ block: 'nearest' })
   }, [lookingAt])
+  // The words box is as tall as its words, so none are out of view; dragging its corner makes it taller.
+  useLayoutEffect(() => {
+    const box = wordsBox.current
+    if (!box) return
+    box.style.height = 'auto'
+    box.style.height = `${box.scrollHeight + (box.offsetHeight - box.clientHeight)}px`
+  }, [words, view?.picture.kind])
   useEffect(() => {
     if (pendingFocus === null) return
     const target = pendingFocus === 'words' ? wordsBox.current : cards.current.get(pendingFocus)
@@ -394,6 +408,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
             downloads={view.models}
             failed={view.failedModels}
             label="Model for new takes"
+            heading="Model for new takes"
             why={menuWhy}
           />
           <div className="patch-make">
@@ -507,6 +522,16 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
                     <span className="faint small">{leftText(making)}</span>
                     <div className="bar" role="progressbar" aria-label={`Fine-tune ${n}`}>
                       <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
+                    </div>
+                    <div className="patch-controls">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
+                        onClick={() => onDrop(n)}
+                      >
+                        Stop
+                      </button>
                     </div>
                   </>
                 )}

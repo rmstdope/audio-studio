@@ -211,6 +211,36 @@ describe('making fine-tunes', () => {
     expect(sent[0]).toMatchObject({ method: 'POST', path: '/api/images/inn/fine-tunes/stop' })
   })
 
+  it('puts Stop under the card being made, which stops only that one; waiting cards have no buttons', async () => {
+    const { host, sent } = await render(() =>
+      view({
+        making: [
+          { n: 1, state: 'making', elapsed: 5, expected: 25, model: 'klein' },
+          { n: 2, state: 'waiting', elapsed: 0, expected: 25, model: 'klein' },
+        ],
+      }),
+    )
+    const makingCard = host.querySelector('.patch-thumb-making')!
+    expect(text(makingCard)).toBe('Fine-tune 1 Being made… about 20 s left Stop')
+    expect(host.querySelectorAll('.patch-thumb-making button')).toHaveLength(1)
+    await act(async () => makingCard.querySelector('button')!.click())
+    expect(sent[0]).toMatchObject({ method: 'DELETE', path: '/api/images/inn/fine-tunes/1' })
+    // The shared Stop beside Make fine-tunes still stops them all.
+    await act(async () => button(host.querySelector('.patch-make')!, 'Stop')!.click())
+    expect(sent[1]).toMatchObject({ method: 'POST', path: '/api/images/inn/fine-tunes/stop' })
+  })
+
+  it('moves focus to the words box after a card’s Stop when nothing is left', async () => {
+    const { host } = await render(() =>
+      view({ making: [{ n: 1, state: 'making', elapsed: 5, expected: 25, model: 'klein' }] }),
+    )
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('.patch-thumb-making button')!.click(),
+    )
+    await settle()
+    expect(document.activeElement).toBe(host.querySelector('textarea'))
+  })
+
   it('shows a failed one with its reason and makes it again, or drops it', async () => {
     const { host, sent } = await render(() =>
       view({
@@ -230,6 +260,25 @@ describe('making fine-tunes', () => {
     expect(sent[0]!.body).toEqual({ retry: 4 })
     await act(async () => button(host, 'Drop')!.click())
     expect(sent[1]).toMatchObject({ method: 'DELETE', path: '/api/images/inn/fine-tunes/4' })
+  })
+})
+
+describe('the form', () => {
+  it('has its labels above its fields, the model label visible', async () => {
+    const { host } = await render(() => view())
+    const form = host.querySelector('.patch-bench-right')!
+    const labels = [...form.querySelectorAll('.lbl')].map((l) => text(l))
+    expect(labels).toEqual(['What to change', 'Model for new takes'])
+    const box = form.querySelector('textarea')!
+    expect(box.closest('label')!.firstElementChild!.className).toContain('lbl')
+  })
+
+  it('grows the words box with the words', async () => {
+    const { host } = await render(() => view())
+    const box = host.querySelector('textarea')!
+    Object.defineProperty(box, 'scrollHeight', { configurable: true, get: () => 180 })
+    await type(box, 'a very long description '.repeat(20))
+    expect(box.style.height).toBe('180px')
   })
 })
 
