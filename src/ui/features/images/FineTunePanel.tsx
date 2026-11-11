@@ -529,7 +529,10 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
               </div>
             ) : making ? (
               <div key={n} className="patch-thumb patch-thumb-making">
-                <div className="patch-making-pic">
+                <div
+                  className="patch-making-pic"
+                  style={{ aspectRatio: `${picture.width} / ${picture.height}` }}
+                >
                   {making.state === 'making' ? 'Being made…' : 'Waiting'}
                 </div>
                 <span className="patch-thumb-label">

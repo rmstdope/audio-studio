@@ -221,6 +221,10 @@ describe('making fine-tunes', () => {
       }),
     )
     const makingCard = host.querySelector('.patch-thumb-making')!
+    expect(text(makingCard.querySelector('.patch-making-pic')!)).toBe('Being made…')
+    expect(
+      text(host.querySelectorAll('.patch-thumb-making')[1]!.querySelector('.patch-making-pic')!),
+    ).toBe('Waiting')
     expect(text(makingCard)).toBe('Being made… Fine-tune 1 · making, about 20 s left Stop')
     expect(host.querySelectorAll('.patch-thumb-making button')).toHaveLength(1)
     await act(async () => makingCard.querySelector('button')!.click())

@@ -2900,7 +2900,6 @@ button.cue-chip[aria-expanded='true'] {
 
 .design-text {
   width: 100%;
-  min-height: 96px;
   resize: vertical;
   font: inherit;
   line-height: 1.5;
@@ -5647,13 +5646,12 @@ textarea[aria-disabled='true'][data-why] {
 }
 /* Wide enough for "Fine-tune 5" and its chip on one line; a card being made has a picture box that says so. */
 .fine-tune .patch-thumbs {
-  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(176px, 100%), 1fr));
 }
 .patch-making-pic {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 96px;
   border: 1px solid var(--line);
   border-radius: 5px;
   background: var(--inset);
