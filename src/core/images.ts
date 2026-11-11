@@ -689,6 +689,18 @@ export function adoptAreas(edits: ImageEdits, id: string, take: number): ImageEd
 }
 
 /**
+ * The edits with the boxes of take `from` (the legacy boxes of no take yet among them) also on take
+ * `to`, as a fine-tuned take keeps the named areas of the take it came from.
+ */
+export function carryAreas(edits: ImageEdits, id: string, from: number, to: number): ImageEdits {
+  const adopted = adoptAreas(edits, id, from)
+  const { takeAreas, ...rest } = adopted.images[id] ?? {}
+  const mine = takeAreas?.[String(from)]
+  if (!mine || Object.keys(mine).length === 0) return adopted
+  return withImage(adopted, id, { ...rest, takeAreas: { ...takeAreas, [String(to)]: { ...mine } } })
+}
+
+/**
  * The edits with the box of one named area of an image set, replaced or (null) taken away: on
  * `take` (the boxes of no take yet go onto it first), or among the boxes of no take yet when
  * there is none.

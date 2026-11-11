@@ -12,6 +12,7 @@ import {
   type SetAsideAsk,
   type SetAsideQuestion,
 } from '../../../core/imagePatches'
+import { fineTuneCaption } from '../../../core/imageFineTunes'
 import type { ImageRow } from '../../../core/images'
 import {
   IMAGE_MODEL_IDS,
@@ -754,6 +755,7 @@ export function TakesSection({
                     <b>Take {rightTake.n}</b>
                     <ModelName id={rightTake.model} />
                     {rightTake.earlier && <span className="faint small">earlier words</span>}
+                    <FineTunedFrom take={rightTake} />
                   </>
                 ) : (
                   <b>{chosen ? 'No other takes yet' : 'No takes yet'}</b>
@@ -841,6 +843,16 @@ export function TakesSection({
   )
 }
 
+/** Where a fine-tuned take came from and the words used; nothing for a take made from the prompt. */
+function FineTunedFrom({ take }: { take: ImageTakeView }) {
+  if (!take.fineTunedFrom) return null
+  return (
+    <span className="faint small fine-tuned-from">
+      {fineTuneCaption(take.fineTunedFrom.take, take.fineTunedFrom.words)}
+    </span>
+  )
+}
+
 /** The model that made a take, in faint text after its name; nothing for a model the studio does not know. */
 function ModelName({ id }: { id: ImageModelId | null }) {
   return id ? <span className="faint small">{imageModel(id).short}</span> : null
@@ -892,6 +904,7 @@ function LeftSide({
           <span className="chip chip-ok">Chosen</span>
           {row.looksOld && <span className="chip chip-warn">Old look</span>}
           <ModelName id={chosen.model} />
+          <FineTunedFrom take={chosen} />
         </div>
         <TakePicture
           id={id}

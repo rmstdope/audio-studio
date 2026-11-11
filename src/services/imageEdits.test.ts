@@ -13,6 +13,7 @@ import {
   setImageAreaBox,
   setImagePatchWords,
   setImageWords,
+  carryImageAreas,
   setStyleField,
   type ImageEditResult,
 } from './imageEdits'
@@ -469,5 +470,25 @@ describe('the box of a named area', () => {
     })
     expect(await setImageAreaBox(broken.file, 'inn', 'fountain', box)).toMatchObject({ ok: false })
     expect(broken.read(EDITS)).toBe('{nope')
+  })
+})
+
+describe('carrying the boxes of a take to a new one', () => {
+  const box = { x: 10, y: 20, width: 30, height: 40 }
+  it('copies the boxes of the take and says how many', async () => {
+    const { file, read } = repo({
+      [EDITS]: { style, images: { inn: { takeAreas: { '2': { fountain: box, notice: box } } } } },
+    })
+    expect(await carryImageAreas(file, 'inn', 2, 5)).toEqual({ ok: true, areas: 2 })
+    expect(JSON.parse(read(EDITS)).images.inn.takeAreas).toEqual({
+      '2': { fountain: box, notice: box },
+      '5': { fountain: box, notice: box },
+    })
+  })
+  it('writes nothing when the take has no boxes', async () => {
+    const { file, read } = repo()
+    const before = read(EDITS)
+    expect(await carryImageAreas(file, 'inn', 2, 5)).toEqual({ ok: true, areas: 0 })
+    expect(read(EDITS)).toBe(before)
   })
 })

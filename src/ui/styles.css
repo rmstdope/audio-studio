@@ -5611,3 +5611,20 @@ textarea[aria-disabled='true'][data-why] {
   flex-basis: 100%;
   max-width: none;
 }
+
+/* A fine-tune's card: the picture is a button that lays it over the big picture, Use this and Drop beside it. */
+.fine-card-pick {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+.fine-card[data-looking='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.fine-card-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
