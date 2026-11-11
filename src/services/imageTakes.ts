@@ -56,7 +56,7 @@ import {
   patchGameOf,
   renderPatchGame,
 } from './imagePatchGame'
-import { decodePng, encodePng } from './png'
+import { decodePng, encodePng, pngSize } from './png'
 import { choices, sorted } from './musicClips'
 import { gameFilePath } from './musicLists'
 import { boardQueue, isSafeId } from './musicTakes'
@@ -96,6 +96,16 @@ interface Entry {
   stop?: AbortController
 }
 
+/** A fine-tuned take to add to an image's board. */
+export interface AddedTake {
+  png: Uint8Array
+  /** The `--model` name of the model that edited it. */
+  model: string
+  seed: number
+  madeFrom: ImageRow['madeFrom']
+  fineTunedFrom: { take: number | null; words: string }
+}
+
 /** What the takes of an image are made of. */
 export interface ImageTakes {
   /** The image's board and the takes being made. */
@@ -107,6 +117,15 @@ export interface ImageTakes {
     projectFile: string,
     id: string,
   ): Promise<{ ok: true; stopped: number } | ProjectFailure | null>
+  /**
+   * Adds a take that was not made from the prompt, a fine-tune: its picture as the next number
+   * and the board entry, made from `madeFrom`. Null for an image not listed.
+   */
+  addTake(
+    projectFile: string,
+    id: string,
+    made: AddedTake,
+  ): Promise<{ ok: true; n: number } | ProjectFailure | null>
   /** Makes a take the image the game uses: its picture, the manifest entry, then the lock. */
   choose(projectFile: string, id: string, n: number): Promise<ImageTakesAnswer>
   /** Takes the chosen take back: the manifest entry, the picture, then the lock entry; the take stays. */
@@ -879,6 +898,32 @@ export function createImageTakes({
       }
       if (stopped) stoppedCount.set(found.key, (stoppedCount.get(found.key) ?? 0) + stopped)
       return { ok: true, stopped }
+    },
+
+    async addTake(projectFile, id, made) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('row' in found)) return found
+      return changeBoard(found, async (board) => {
+        const n = board.next
+        const size = pngSize(made.png.subarray(0, 33))
+        // The picture first: a take is on the board only once its file is there.
+        await writeAtomic(found.root, pictureOf(id, n), made.png)
+        board.next = n + 1
+        board.takes = [
+          ...board.takes,
+          {
+            n,
+            seed: made.seed,
+            model: made.model,
+            width: size.width,
+            height: size.height,
+            madeFrom: made.madeFrom,
+            seen: false,
+            fineTunedFrom: made.fineTunedFrom,
+          },
+        ]
+        return { ok: true as const, n }
+      })
     },
 
     async choose(projectFile, id, n) {

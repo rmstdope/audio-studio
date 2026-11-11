@@ -1290,3 +1290,42 @@ describe('a fine-tuned take', () => {
     ])
   })
 })
+
+describe('adding a fine-tuned take', () => {
+  const made = {
+    png: fakePng(1024, 640, 9),
+    model: 'black-forest-labs/FLUX.2-klein-4B',
+    seed: 9,
+    fineTunedFrom: { take: null, words: 'Add a cat' },
+  }
+  it('adds the next take with its picture and what it came from, made from the image’s words now', async () => {
+    const { takes, file, read, row, root } = setup()
+    await takes.make(file, 'inn', { count: 1 })
+    const first = await takes.view(file, 'inn')
+    if (!first || !('takes' in first)) throw new Error('no view')
+    const answer = await takes.addTake(file, 'inn', { ...made, madeFrom: (await row()).madeFrom })
+    expect(answer).toEqual({ ok: true, n: 2 })
+    expect(read('content-studio/cache/image-takes/inn/2.png')).toBe(bytes(made.png))
+    const board = JSON.parse(read('content-studio/cache/images/inn.json'))
+    expect(board.next).toBe(3)
+    expect(board.takes[1]).toMatchObject({
+      n: 2,
+      seed: 9,
+      width: 1024,
+      height: 640,
+      madeFrom: (await row()).madeFrom,
+      fineTunedFrom: { take: null, words: 'Add a cat' },
+      seen: false,
+    })
+    expect(existsSync(join(root, 'content-studio/cache/image-takes/inn/1.png'))).toBe(true)
+  })
+  it('is null for an image the game does not list', async () => {
+    const { takes, file } = setup()
+    expect(
+      await takes.addTake(file, 'nowhere', {
+        ...made,
+        madeFrom: { words: '', style: '', width: 1, height: 1 },
+      }),
+    ).toBeNull()
+  })
+})
