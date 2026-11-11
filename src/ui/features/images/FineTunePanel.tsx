@@ -105,7 +105,12 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const [count, setCount] = useState(2)
   const [looking, setLooking] = useState<number | null>(null)
   const [showing, setShowing] = useState(true)
-  const [came, setCame] = useState<Extract<UseFineTuneAnswer, { ok: true }> | null>(null)
+  // What a use brought along, with the picture it was made from: the line is about the picture in
+  // the game then or the new take, and goes quiet when another take is chosen.
+  const [came, setCame] = useState<{
+    answer: Extract<UseFineTuneAnswer, { ok: true }>
+    from: string
+  } | null>(null)
   const [pendingFocus, setPendingFocus] = useState<number | 'words' | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
@@ -140,6 +145,19 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     setPendingFocus(null)
   }, [pendingFocus])
 
+  // Another take chosen in Takes ends the line about the last use (not the new take it made).
+  const shownKey = !view
+    ? null
+    : view.picture.kind === 'take'
+      ? `take-${view.picture.n}`
+      : view.picture.kind === 'game'
+        ? 'game'
+        : 'none'
+  const cameHere =
+    came && (shownKey === null || shownKey === came.from || shownKey === `take-${came.answer.take}`)
+      ? came.answer
+      : null
+  if (came && !cameHere) setCame(null)
   const heading = (
     <div className="brief-panel-head">
       <h2>Fine-tune the picture</h2>
@@ -222,7 +240,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     use.mutate(n, {
       onSuccess: (answer) => {
         if (!answer.ok) return
-        setCame(answer)
+        setCame({ answer, from: pictureKey })
         setWords('')
         setLooking(null)
         setMarked(null)
@@ -280,10 +298,10 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
         Change one thing in the picture in the game from words: add, remove or change something. The
         rest stays as it is. Use one and it replaces the picture; the old one stays among the takes.
       </p>
-      {came && (
+      {cameHere && (
         <section className="notice notice-ok" aria-label="Fine-tune used" role="status">
           <div className="notice-text">
-            <strong>{cameAlongLine(came.take, came.carried, came.from)}</strong>
+            <strong>{cameAlongLine(cameHere.take, cameHere.carried, cameHere.from)}</strong>
           </div>
           <button type="button" className="btn btn-ghost" onClick={() => setCame(null)}>
             Close
