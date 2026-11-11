@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Option A — Use this waits a moment before it can be pressed</title><style>body{background:#16141a;color:#eee;font:14px system-ui;padding:24px;max-width:960px}
+h1{font-size:18px}h2{font-size:14px;color:#aaa;margin:26px 0 10px;font-weight:600}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
+.tk{width:180px;display:flex;flex-direction:column;gap:6px;border:1px solid #333;border-radius:10px;padding:8px;background:#1d1b22}
+.pic{height:110px;border:1px solid #444;border-radius:8px;background:#222;display:flex;align-items:center;justify-content:center;color:#999;text-align:center;font-size:12px}
+.pic.img{background:linear-gradient(135deg,#3b2f4a,#7a5a3a)}
+.cap{font-size:12px;color:#aaa}.cap b{color:#eee}
+.bar{height:4px;background:#333;border-radius:3px}.bar i{display:block;height:4px;background:#ff8a3d;border-radius:3px}
+.acts{display:flex;gap:8px;margin-top:auto;flex-wrap:wrap}
+.btn{border:1px solid #555;border-radius:7px;padding:4px 10px;font-size:12px;background:#2a2730;color:#eee}
+.btn.pri{background:#ff8a3d;color:#1a1a1a;border-color:#ff8a3d}
+.btn.off{opacity:.35}
+.chip{font-size:11px;border-radius:9px;padding:0 6px;background:#3d6b45;color:#dfe}
+.ptr{color:#ffcf9a;font-size:12px}
+.note{color:#ffcf9a;margin-top:12px;max-width:760px}
+.rec{color:#9fd49f;font-size:13px}
+.ask{font-size:12px;color:#eee}
+.fill{display:block;height:4px;background:#ff8a3d;border-radius:3px;margin-top:2px}
+</style></head><body>
+<h1>Option A — Use this waits a moment before it can be pressed</h1><p class="rec">Recommended: the same guard browsers put on download and permission buttons; nothing moves, nothing extra to press.</p>
+<h2>1 · Fine-tune 1 is being made. The pointer is on its Stop.</h2>
+<div class="row"><div class="tk"><div class="pic">Being made…</div><div class="cap"><b>Fine-tune 1</b> · making, about 1 s left</div><div class="bar"><i style="width:96%"></i></div><div class="acts"><span class="btn">Stop</span></div><div class="ptr">▲ pointer here</div></div>
+<div class="tk"><div class="pic">Waiting</div><div class="cap"><b>Fine-tune 2</b> · waiting</div></div></div>
+
+<h2>2 · It finishes. For one second, Use this and Drop are shown but dim; a click, Enter or the D key does nothing. Resting the pointer on either shows “Just finished — a moment…”.</h2>
+<div class="row"><div class="tk"><div class="pic img">(the fine-tune)</div><div class="cap"><b>Fine-tune 1</b> <span class="chip">new</span></div><div class="acts"><span class="btn pri off" title="Just finished — a moment…">Use this</span><span class="btn off" title="Just finished — a moment…">Drop</span></div><div class="ptr">▲ late click lands here: nothing happens<br>tip: Just finished — a moment…</div></div>
+<div class="tk"><div class="pic">Being made…</div><div class="cap"><b>Fine-tune 2</b> · making, about 20 s left</div><div class="bar"><i style="width:3%"></i></div><div class="acts"><span class="btn">Stop</span></div></div></div>
+<h2>3 · After the moment, both turn on as usual.</h2>
+<div class="row"><div class="tk"><div class="pic img">(the fine-tune)</div><div class="cap"><b>Fine-tune 1</b> <span class="chip">new</span></div><div class="acts"><span class="btn pri">Use this</span><span class="btn">Drop</span></div></div>
+<div class="tk"><div class="pic">Being made…</div><div class="cap"><b>Fine-tune 2</b> · making, about 19 s left</div><div class="bar"><i style="width:8%"></i></div><div class="acts"><span class="btn">Stop</span></div></div></div>
+<p class="note">Cost: a person who really wants it waits about a second. Fine-tune 2 is untouched by the late click.</p>
+</body></html>
