@@ -33,6 +33,17 @@ describe('locateProject', () => {
     expect(locateProject(root)).toEqual({ ok: false, message: noProjectMessage(root) })
   })
 
+  it('passes over a folder named like the project file, to the project file above it', () => {
+    const root = tempRepo({
+      'content-studio.json': projectJson(),
+      'game/content-studio.json/x': 'x',
+    })
+    expect(locateProject(join(root, 'game'))).toEqual({
+      ok: true,
+      file: join(root, 'content-studio.json'),
+    })
+  })
+
   it('uses the named file as it is', () => {
     const root = tempRepo({ 'game/other.json': projectJson() })
     const file = join(root, 'game', 'other.json')
