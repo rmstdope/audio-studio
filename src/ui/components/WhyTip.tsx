@@ -42,7 +42,8 @@ function greyedIn(target: EventTarget | null): HTMLElement | null {
 
 /**
  * The one tip for every greyed control, mounted once in the app. It listens to the whole document,
- * so a control needs only `off(...)` spread on it: the tip shows the control's reason at once on
+ * so a control needs only `off(...)` spread on it (or `tipOnly(...)` for one that stays pressable,
+ * which gets the same tip without being made inert): the tip shows the control's reason at once on
  * hover, focus or a tap, above it (below when there is no room, inward near an edge), follows the
  * reason as it changes and goes when the control turns on. It also makes a greyed control inert:
  * pressing, typing in or changing it does nothing, while Tab still reaches it.

@@ -54,8 +54,7 @@ export function LanguageSwitch({
           tabIndex={active === tab.id ? 0 : -1}
           className={tab.dimmed ? 'tab tab-dim' : tab.warn ? 'tab tab-warn' : 'tab'}
           aria-selected={active === tab.id}
-          title={tab.dimmed ? undefined : tab.title}
-          {...(tab.dimmed ? tipOnly(tab.title) : {})}
+          {...(tab.dimmed ? tipOnly(tab.title) : { title: tab.title })}
           onClick={() => onChoose(tab.id)}
         >
           {tab.name}
