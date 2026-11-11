@@ -60,7 +60,9 @@ describe('content-studio on a game', () => {
   it('prints help that names the new command and file', async () => {
     const { stdout, code } = await run(tempRepo({}), '--help')
     expect(code).toBe(0)
-    expect(stdout.split('\n')[0]).toBe("content-studio: make a game's narration, music and images.")
+    expect(stdout.split('\n')[0]).toBe(
+      "content-studio: make a game's narration, music, images, sound effects and scenes.",
+    )
     expect(stdout).toContain('content-studio.json')
   })
 })

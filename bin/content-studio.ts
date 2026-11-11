@@ -7,7 +7,7 @@ import { forgetLoadedKeys } from '../src/services/env'
 import { ensureStudioFolder } from '../src/services/studioFolder'
 import { locateProject, openProject, projectFileProblem } from '../src/services/workspace'
 
-const HELP = `content-studio: make a game's narration, music and images.
+const HELP = `content-studio: make a game's narration, music, images, sound effects and scenes.
 
 Run it from inside a game repository that has an ${PROJECT_FILE}.
 

@@ -191,12 +191,12 @@ effects and scenes are the same in every language, so their paths never do.
 
 ### `music`
 
-| Field               | What it is                                                                                                            | Default    |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `from.part`         | Each part's loops.                                                                                                    | none       |
-| `from.shared`       | The stingers: short pieces for the whole game, at most 10 seconds each.                                               | none       |
-| `model`             | The music model takes are made with (`balanced`, `quick`, `quickest`, `careful`, …); a take can be made with another. | `balanced` |
-| `clips`, `manifest` | Where the chosen takes go.                                                                                            | required   |
+| Field               | What it is                                                                                                                                        | Default    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `from.part`         | Each part's loops.                                                                                                                                | none       |
+| `from.shared`       | The stingers: short pieces for the whole game, at most 10 seconds each.                                                                           | none       |
+| `model`             | The music model takes are made with (`balanced`, `quick`, `quickest`, `careful`, `short`, `shortest`, `eleven`); a take can be made with another. | `balanced` |
+| `clips`, `manifest` | Where the chosen takes go.                                                                                                                        | required   |
 
 ### `images`
 
@@ -307,8 +307,9 @@ Between languages, lines are matched by `id`.
 
 `patches` is optional (absent or `[]` means the image needs none): the small changes the game lays
 over the image when it needs them, in the game's order. Each has an `id` (a slug, used once in the
-image), a `title` and `text`, the words for the edit. The studio shows them on the image's page and
-lets the user reword them; making them is a later step. An image several parts list must list the
+image), a `title` and `text`, the words for the edit, and optionally `area`, the id of one of the
+image's named areas, whose place the patch starts from. The studio shows them on the image's page,
+lets the user reword them, makes takes of them and puts the chosen one in the game. An image several parts list must list the
 same patches (id, title and words; the order may differ), or the lists disagree.
 
 `areas` is optional (absent or `[]` means none): the named areas the game wants placed on the image,
@@ -428,16 +429,16 @@ words are said.
 }
 ```
 
-| Field               | What it is                                                                             |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `voice`             | The voice's id at its provider; absent while uncast.                                   |
-| `voiceName`         | The voice's name, shown in the studio.                                                 |
-| `style`             | How the character speaks, as a cue: what each line gets unless it has its own.         |
-| `speed`             | The character's own speaking speed (0.5 to 2), in place of the project's.              |
-| `audition.keywords` | What a voice search for the character looks for.                                       |
-| `audition.phrase`   | The character's own audition phrase, in place of the project's.                        |
-| `languages`         | The casting in a language besides the source: `voice`, `voiceName`, `speed`, `phrase`. |
-| `pronounce`         | By language: written words → how they are spoken, applied in the order listed.         |
+| Field               | What it is                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `voice`             | The voice's id at its provider (`eleven:` before an ElevenLabs id); absent while uncast. |
+| `voiceName`         | The voice's name, shown in the studio.                                                   |
+| `style`             | How the character speaks, as a cue: what each line gets unless it has its own.           |
+| `speed`             | The character's own speaking speed (0.5 to 2), in place of the project's.                |
+| `audition.keywords` | What a voice search for the character looks for.                                         |
+| `audition.phrase`   | The character's own audition phrase, in place of the project's.                          |
+| `languages`         | The casting in a language besides the source: `voice`, `voiceName`, `speed`, `phrase`.   |
+| `pronounce`         | By language: written words → how they are spoken, applied in the order listed.           |
 
 A speaker's casting in the source language is its own fields, and its casting in another language
 is under `languages`, so a game with one language never sees language codes there. The tables
@@ -511,18 +512,19 @@ and `key` (`null` for none).
 }
 ```
 
-| Field                         | What it is                                                                                                                                                                   | Default                      |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `style.look`                  | What every image looks like.                                                                                                                                                 | required                     |
-| `style.keepOut`               | What no image may hold.                                                                                                                                                      | `""`                         |
-| `style.palette`               | The only colours a picture may use, as `#rrggbb`.                                                                                                                            | `[]`: any                    |
-| `style.colourDepth`           | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                                                                                      | `full`                       |
-| `style.dithering`             | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.                                                                                 | `patterned`                  |
-| `style.parts`                 | A part's addition to the look, by part id.                                                                                                                                   | `{}`                         |
-| `images.<id>.text`, `gameWas` | A rewording.                                                                                                                                                                 | none                         |
-| `images.<id>.patches.<patch>` | A rewording of a patch the game asks for: `text` and `gameWas`, as for an image. Kept when the game stops asking.                                                            | none                         |
-| `images.<id>.areas.<area>`    | The box marked for a named area: `{ x, y, width, height }`, whole pixels of the image's own size (at least 4 each way, inside the picture). Kept when the game stops asking. | none                         |
-| `images.<id>.partStyle`       | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`).                                                              | the first part that lists it |
+| Field                                 | What it is                                                                                                                                                                                                                                                                                                                              | Default                      |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `style.look`                          | What every image looks like.                                                                                                                                                                                                                                                                                                            | required                     |
+| `style.keepOut`                       | What no image may hold.                                                                                                                                                                                                                                                                                                                 | `""`                         |
+| `style.palette`                       | The only colours a picture may use, as `#rrggbb`.                                                                                                                                                                                                                                                                                       | `[]`: any                    |
+| `style.colourDepth`                   | `full`, `16-bit` or `8-bit`, when no palette is listed.                                                                                                                                                                                                                                                                                 | `full`                       |
+| `style.dithering`                     | `flat`, `patterned` or `scattered`: how in-between shades are made when colours are reduced.                                                                                                                                                                                                                                            | `patterned`                  |
+| `style.parts`                         | A part's addition to the look, by part id.                                                                                                                                                                                                                                                                                              | `{}`                         |
+| `images.<id>.text`, `gameWas`         | A rewording.                                                                                                                                                                                                                                                                                                                            | none                         |
+| `images.<id>.patches.<patch>`         | A rewording of a patch the game asks for: `text` and `gameWas`, as for an image. Kept when the game stops asking.                                                                                                                                                                                                                       | none                         |
+| `images.<id>.areas.<area>`            | The box marked for a named area: `{ x, y, width, height }`, whole pixels of the image's own size (at least 4 each way, inside the picture), and optionally `point: { x, y }`, where the game marks the thing, inside the box (absent: the centre). Boxes of no take yet; they go with the take chosen. Kept when the game stops asking. | none                         |
+| `images.<id>.takeAreas.<take>.<area>` | The same boxes, kept per take (by take number), so each take has its own.                                                                                                                                                                                                                                                               | none                         |
+| `images.<id>.partStyle`               | Which part's addition the image uses: a part id, or `null` for none (today's `actStyleFrom` and `actStyleOff`).                                                                                                                                                                                                                         | the first part that lists it |
 
 The studio reads the style and each image's edit apart. A bad `images.<id>` (say, `text` without
 `gameWas`, a patch's edit without its `gameWas`, or a box that is not four whole numbers) drops only that image's edit (all of it), and the image shows the game's words; a bad `style` is
@@ -597,7 +599,9 @@ Two locks record something else, in the same layout:
 `cache/` holds the studio's working state on this machine: audition takes and sessions in progress,
 the voices ruled out, every take not chosen, notes on lines, what Whisper heard, and your own
 settings (`cache/settings.json`: how much you have paid Fish, which sets how many requests it takes
-at once, and how long takes fade when played in the studio). None of it is the game's. The cache
+at once, and how long takes fade when played in the studio), what paid recordings cost
+(`cache/spending.json`) and how long image takes took on this computer (`cache/take-times.json`).
+None of it is the game's. The cache
 keeps no copy of the image style: the style is the studio's own, so there is no game style to
 compare it with. Deleting the
 cache loses unfinished work and these settings, never what the game plays. Its layout is the
@@ -618,7 +622,7 @@ them, and writes nothing else there. The game reads the manifests, keyed by item
 **An image's named areas.** When the game's list asks for named areas on an image (`areas`) and some
 are placed in the studio, the image's manifest entry gains `areas`, keyed by the area's id, each the box's
 `x`, `y`, `width` and `height` as fractions of the picture (0 to 1, six decimals), so they survive a change of
-size. Only position is passed, no title, and only for areas the list currently asks for; an image with
+size, and `mark`, `{ x, y }` as fractions too, when the area has a point placed (absent: the centre). Only position is passed, no title, and only for areas the list currently asks for; an image with
 none placed has no `areas` key. The studio writes it when a box is placed, moved, resized or cleared, and on
 Refresh from the game for the act. A game that does not read `areas` is unaffected.
 
@@ -661,6 +665,7 @@ to one of the scene's states.
   of one.
 - Keys are written in a stable order and the layout a file already has is kept, so a change is a
   small diff. Locks are one entry per line.
-- The studio writes only the files above, inside the project root. It never runs git, and it runs
-  the game's commands only from a **Refresh** you press.
+- The studio writes only the files above, inside the project root. It never changes git (it only
+  reads `git status`, for the Changes page), and it runs the game's commands only from a
+  **Refresh** you press.
 - It never deletes a clip without asking you first.
