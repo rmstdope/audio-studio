@@ -63,7 +63,8 @@ export function useSidebarFolded(): [boolean, () => void] {
     })
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== '[' || e.ctrlKey || e.metaKey || e.altKey) return
+      // [ needs Option (Mac) or AltGr (Ctrl+Alt) on many layouts, so only Ctrl or Cmd alone is a shortcut.
+      if (e.key !== '[' || e.repeat || e.metaKey || (e.ctrlKey && !e.altKey)) return
       if (isTypingTarget(e.target as Element | null)) return
       e.preventDefault()
       toggle()

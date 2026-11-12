@@ -425,6 +425,13 @@ describe('folding the sidebar', () => {
     ])
   })
 
+  it('tips a narration act whose lines are not yet counted with its line count', () => {
+    localStorage.clear()
+    const { container } = render({ view: 'part', part: 'act1' })
+    fold(container)
+    expect(pills(container)[0]!.title).toBe('Act I: The Lantern · 12 lines')
+  })
+
   it('shows no pills for a workspace without acts, nor on Setup', () => {
     localStorage.clear()
     const effects = render({ view: 'effects', page: null })
@@ -456,6 +463,13 @@ describe('folding the sidebar', () => {
     press('[', input)
     expect(first.container.querySelector('.rail-item')).not.toBeNull()
     press('[', document, { ctrlKey: true })
+    expect(first.container.querySelector('.rail-item')).not.toBeNull()
+    press('[', document, { repeat: true })
+    expect(first.container.querySelector('.rail-item')).not.toBeNull()
+    // Where [ needs Option or AltGr to type, it still folds.
+    press('[', document, { altKey: true })
+    expect(first.container.querySelector('.rail-item')).toBeNull()
+    press('[', document, { altKey: true, ctrlKey: true })
     expect(first.container.querySelector('.rail-item')).not.toBeNull()
     const second = render({ view: 'changes' })
     expect(second.container.querySelector('.rail-item')).not.toBeNull()

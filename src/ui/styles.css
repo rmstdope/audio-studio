@@ -170,10 +170,8 @@ a {
   }
 }
 
-@media (min-width: 900px) {
-  .sidebar.sidebar-rail {
-    flex: 0 0 72px;
-  }
+.sidebar.sidebar-rail {
+  flex: 0 0 72px;
 }
 
 @media (max-width: 600px) {

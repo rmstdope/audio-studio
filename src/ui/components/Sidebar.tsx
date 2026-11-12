@@ -324,7 +324,11 @@ function railActs(
         label: actPillLabel(i),
         tip: pillTip(
           part.title,
-          p ? `${count.text} done` : count.tone === null ? count.text : undefined,
+          p
+            ? `${count.text} done`
+            : part.dialog === 'ok'
+              ? plural(part.lineCount, 'line')
+              : count.text,
         ),
         href: routeHref({
           view: 'part',
