@@ -67,6 +67,8 @@ describe('the room the shell leaves the pages', () => {
       72 -
       lengths(top('.sidebar'), 'border-right')[0]! -
       sidePadding(top('.sidebar-rail')) -
+      sidePadding(top('.rail-nav')) -
+      sidePadding(top('.rail-group')) -
       sidePadding(top('.rail-pills')) -
       2 * lengths(pill, 'border')[0]! -
       sidePadding(pill)
