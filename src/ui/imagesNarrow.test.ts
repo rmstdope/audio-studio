@@ -44,13 +44,32 @@ describe('an image’s workbench', () => {
   })
 })
 
-describe('a patch row the game asks for (as-9b8)', () => {
-  it('holds the chevron on the first line, and wraps only the words beside it', () => {
-    expect(rule('.game-patch-row')).not.toMatch(/flex-wrap/)
-    expect(rule('.game-patch-chev')).toMatch(/flex:\s*none/)
-    expect(rule('.game-patch-words')).toMatch(/flex-wrap:\s*wrap/)
-    expect(rule('.game-patch-words')).toMatch(/flex:\s*1/)
-    expect(rule('.game-patch-words')).toMatch(/min-width:\s*0/)
+describe('the Patches workbench frame', () => {
+  it('puts the stage beside a 300 px tools column, the takes below both', () => {
+    expect(rule('.game-patches .patch-bench')).toMatch(
+      /grid-template-columns:\s*minmax\(0, 1fr\) 300px/,
+    )
+    expect(rule('.game-patches .patch-bench > .patch-takes')).toMatch(/grid-column:\s*1 \/ -1/)
+  })
+
+  it('leaves the Fine-tune workbench its own two columns', () => {
+    expect(rule('.patch-bench')).toMatch(
+      /grid-template-columns:\s*minmax\(0, 3fr\) minmax\(0, 2fr\)/,
+    )
+  })
+})
+
+describe('the Patches tab in a narrow window', () => {
+  it('puts the list, the stage and the tools one above the other', () => {
+    const narrow = css.slice(css.indexOf('@media (max-width: 700px) {\n  .patch-bench,'))
+    const block = narrow.slice(0, narrow.indexOf('\n}\n'))
+    expect(block).toMatch(/\.patches-lefty/)
+    expect(block).toMatch(/grid-template-columns:\s*1fr/)
+  })
+
+  it('wraps the chips, and lets the list scroll inside itself', () => {
+    expect(rule('.patches-chips')).toMatch(/flex-wrap:\s*wrap/)
+    expect(rule('.patches-list')).toMatch(/overflow-y:\s*auto/)
   })
 })
 

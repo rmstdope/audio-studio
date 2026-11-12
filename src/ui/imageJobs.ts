@@ -1,4 +1,4 @@
-import type { ImageRow } from '../core/images'
+import type { ImageRow, PatchRow } from '../core/images'
 
 /** The jobs of an image's page, one tab each. */
 export type ImageJob = 'make' | 'fine-tune' | 'patches' | 'areas'
@@ -41,9 +41,7 @@ export function imageJobTabs(input: JobTabsInput): JobTab[] {
     },
   ]
   if (row.patches.length > 0) {
-    const chosen = row.patches.filter(
-      (p) => row.chosenTake !== null && p.chosenOn.includes(row.chosenTake),
-    ).length
+    const chosen = row.patches.filter((p) => patchChosen(row, p)).length
     tabs.push({
       job: 'patches',
       title: 'Patches',
@@ -72,4 +70,28 @@ export function imageJobTabs(input: JobTabsInput): JobTab[] {
 /** The job a number key opens among the tabs shown (1 is the first tab); null for any other key. */
 export function jobAtKey(tabs: JobTab[], key: string): ImageJob | null {
   return /^[1-9]$/.test(key) ? (tabs[Number(key) - 1]?.job ?? null) : null
+}
+
+/** Whether the patch is chosen on the image's chosen take, the take the game shows. */
+export function patchChosen(row: ImageRow, patch: PatchRow): boolean {
+  return row.chosenTake !== null && patch.chosenOn.includes(row.chosenTake)
+}
+
+/** The heading over the patches: how many are chosen of those the game asks for. */
+export function patchesHeading(row: ImageRow): string {
+  const chosen = row.patches.filter((p) => patchChosen(row, p)).length
+  return `Patches · ${chosen} of ${row.patches.length} chosen`
+}
+
+/** How the Patches tab lays out: a list beside a portrait image, chips above any other. */
+export function patchLayoutOf(size: { width: number; height: number }): 'list' | 'chips' {
+  return size.height > size.width ? 'list' : 'chips'
+}
+
+/** What a patch says of how far it has come: its chosen take, or how many takes there are. */
+export function patchStateText(takes: readonly { n: number; chosen: boolean }[]): string {
+  const chosen = takes.find((t) => t.chosen)
+  if (chosen) return `Take ${chosen.n} chosen`
+  if (takes.length === 0) return 'no takes yet'
+  return `${takes.length} ${takes.length === 1 ? 'take' : 'takes'}`
 }

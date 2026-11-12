@@ -154,11 +154,12 @@ function words(node: Node): string {
     : [...node.childNodes].map((child) => words(child)).join(' ')
 }
 const text = (el: Element | null | undefined) => (el ? words(el).replace(/\s+/g, ' ').trim() : '')
-const rows = (host: Element) => [
-  ...host.querySelectorAll<HTMLButtonElement>('button.game-patch-row'),
-]
+const rows = (host: Element) => [...host.querySelectorAll<HTMLButtonElement>('button.patch-pick')]
 const button = (host: Element, name: string) =>
-  [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === name)
+  [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    // The keys a button shows are not part of its name.
+    (b) => text(b).replace(/ [CDS]$/, '') === name,
+  )
 const stageOf = (host: Element): HTMLElement => {
   const stage = host.querySelector<HTMLElement>('.patch-stage')!
   stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1024, height: 576 }) as DOMRect
@@ -184,8 +185,8 @@ const thumbs = (host: Element) => [
 const open = async (host: Element, at = 0) => act(async () => rows(host)[at]!.click())
 const heading = (host: Element) => text(host.querySelector('.patch-looking'))
 
-describe('the closed rows of the patches', () => {
-  it('say how far each patch has come, after any “changed here” mark', async () => {
+describe('the list of the patches', () => {
+  it('says how far each patch has come, after any “changed here” mark', async () => {
     const { host } = await render(
       [
         patchRow('a'),
@@ -200,14 +201,15 @@ describe('the closed rows of the patches', () => {
           work('c', { takes: [takeOf(1, { chosen: true }), takeOf(2), takeOf(3)] }),
           work('d', { takes: [takeOf(4)] }),
         ]),
+      { body: { ok: true }, status: 200 },
+      { width: 576, height: 1024 },
     )
     expect(rows(host).map((r) => text(r))).toEqual([
-      '▸ Title of a a no takes yet',
-      '▸ Title of b b changed here 2 takes, none chosen',
-      '▸ Title of c c 3 takes Take 1 chosen',
-      '▸ Title of d d 1 take, none chosen',
+      'Title of a a no takes yet',
+      'Title of b changed here b 2 takes',
+      'Title of c c Take 1 chosen',
+      'Title of d d 1 take',
     ])
-    expect(host.querySelector('.game-patch-end .chip')?.textContent).toBe('Take 1 chosen')
   })
 })
 
@@ -323,17 +325,15 @@ describe('an open patch with no takes', () => {
     ])
   })
 
-  it('keeps the mark through closing and opening the row, per patch', async () => {
+  it('keeps the mark through switching to another patch and back, per patch', async () => {
     const { host } = await render([patchRow('a'), patchRow('b')], () =>
       view([work('a'), work('b')]),
     )
     await open(host, 0)
     await drag(stageOf(host), [100, 50], [300, 250])
-    await open(host, 0)
-    expect(host.querySelector('.patch-stage')).toBeNull()
-    await open(host, 0)
-    expect(host.querySelector('.patch-mark')).not.toBeNull()
     await open(host, 1)
+    expect(host.querySelector('.patch-mark')).toBeNull()
+    await open(host, 0)
     expect(host.querySelectorAll('.patch-mark').length).toBe(1)
   })
 
@@ -453,14 +453,13 @@ describe('an open patch with takes', () => {
     const { host } = await render([patchRow('a')], made())
     await open(host)
     await act(async () => thumbs(host)[0]!.click())
-    const switchBox = host.querySelector<HTMLInputElement>('input.patch-switch')!
-    expect(switchBox.checked).toBe(true)
-    expect(text(switchBox.closest('label'))).toBe('Show the patch')
-    await act(async () => switchBox.click())
+    expect(text(button(host, 'Patch off'))).toBe('Patch off S')
+    await act(async () => button(host, 'Patch off')!.click())
     expect(host.querySelector('img.patch-over')).toBeNull()
     expect(host.querySelector('.patch-mark')).not.toBeNull()
     expect(heading(host)).toBe('Looking at Take 1 FLUX.2 klein')
-    await act(async () => switchBox.click())
+    expect(button(host, 'Patch off')).toBeUndefined()
+    await act(async () => button(host, 'Patch on')!.click())
     expect(host.querySelector('img.patch-over')).not.toBeNull()
     expect(host.querySelector('.patch-mark')).toBeNull()
   })
@@ -475,7 +474,9 @@ describe('an open patch with takes', () => {
     expect(button(host, 'Choose')).not.toBeUndefined()
     expect(button(host, 'Drop')).not.toBeUndefined()
     expect(button(host, 'Un-choose')).toBeUndefined()
-    expect(text(host)).toContain('or press D to drop, C to choose, S to turn the patch off and on')
+    expect(text(host.querySelector('.patch-keys'))).toBe(
+      '← → take · C choose · D drop · S patch off/on',
+    )
   })
 
   it('chooses and drops at once, with no question', async () => {
@@ -1059,16 +1060,15 @@ describe('what the game gets', () => {
     expect(caption(host)).toBe('1024 × 640 · cropped to fit')
   })
 
-  it('changes only the patch it sits in, and keeps its state when the row is closed and opened', async () => {
+  it('changes only the patch it sits in, and keeps its state when another patch is opened and this one again', async () => {
     const { host } = await render([patchRow('a'), patchRow('b')], one())
     await open(host, 0)
+    await act(async () => box(host).click())
+    expect(box(host).checked).toBe(false)
     await open(host, 1)
-    await act(async () => box(host, 0).click())
-    expect(box(host, 0).checked).toBe(false)
-    expect(box(host, 1).checked).toBe(true)
+    expect(box(host).checked).toBe(true)
     await open(host, 0)
-    await open(host, 0)
-    expect(box(host, 0).checked).toBe(false)
+    expect(box(host).checked).toBe(false)
   })
 
   it('puts the mark on the same place of either version', async () => {
@@ -1145,13 +1145,14 @@ describe('what the game gets', () => {
     expect(isOff(button(host, 'Drop')!)).toBe(true)
   })
 
-  it('wears “Old look” on the closed row and above the picture of a chosen patch in an old look', async () => {
+  it('wears “Old look” in the list and above the picture of a chosen patch in an old look', async () => {
     const { host } = await render(
       [patchRow('a')],
       one({ takes: [takeOf(1, { chosen: true, look: 'old' })], oldLook: true }),
+      { body: { ok: true }, status: 200 },
+      { width: 576, height: 1024 },
     )
     expect(text(rows(host)[0])).toContain('Take 1 chosen Old look')
-    await open(host)
     expect(heading(host)).toBe('Looking at Take 1 FLUX.2 klein Chosen Old look')
   })
 })
@@ -1308,19 +1309,17 @@ describe('the model of new takes', () => {
     expect(sent.map((s) => (s.body as { model: string }).model)).toEqual(['klein', 'qwen-edit'])
   })
 
-  it('keeps one pick per patch, across closing and opening its row', async () => {
+  it('keeps one pick per patch, across switching to another patch and back', async () => {
     const { host } = await render([patchRow('a'), patchRow('b')], () =>
       withModels([work('a'), work('b')]),
     )
     await open(host, 0)
     await pick(menuOf(host), 'qwen-edit')
     await open(host, 1)
-    expect(menuOf(host, 0).value).toBe('qwen-edit')
-    expect(menuOf(host, 1).value).toBe('klein')
-    await open(host, 0)
     expect(host.querySelectorAll(MODEL)).toHaveLength(1)
+    expect(menuOf(host).value).toBe('klein')
     await open(host, 0)
-    expect(menuOf(host, 0).value).toBe('qwen-edit')
+    expect(menuOf(host).value).toBe('qwen-edit')
   })
 
   it('starts on Qwen when klein is not here and Qwen is', async () => {
@@ -1398,17 +1397,17 @@ describe('the model of new takes', () => {
       ]),
     )
     await open(host, 0)
-    await open(host, 1)
-    expect(isOff(menuOf(host, 0))).toBe(true)
-    expect(menuOf(host, 0).dataset.why).toBe(
+    expect(isOff(menuOf(host))).toBe(true)
+    expect(menuOf(host).dataset.why).toBe(
       'Takes are being made for this patch. Change this when they are done, or Stop.',
     )
-    expect(isOff(menuOf(host, 1))).toBe(false)
-    expect(menuOf(host, 1).dataset.why).toBeUndefined()
     const making = host.querySelectorAll('.patch-thumb-making')
     expect(text(making[0])).toContain('Take 2 Qwen Image Edit making · about 5 min left')
     expect(text(making[1])).toContain('Take 3 Qwen Image Edit waiting')
     expect(button(host, 'Stop')).not.toBeUndefined()
+    await open(host, 1)
+    expect(isOff(menuOf(host))).toBe(false)
+    expect(menuOf(host).dataset.why).toBeUndefined()
   })
 
   it('names the model under each take and beside Looking at; an old take reads FLUX.2 klein', async () => {
@@ -1482,5 +1481,47 @@ describe('the model of new takes', () => {
     )
     await open(host)
     expect(host.querySelector(MODEL)).toBeNull()
+  })
+})
+
+describe('the three parts of an open patch', () => {
+  const made = () => view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })])
+
+  it('puts the stage on the left, the tools on the right headed by the patch’s title, and the takes below both', async () => {
+    const { host } = await render([patchRow('a')], made)
+    const bench = host.querySelector('.patch-bench')!
+    expect([...bench.children].map((c) => c.className)).toEqual([
+      'patch-bench-left',
+      'patch-bench-right',
+      'patch-takes',
+    ])
+    const [stage, tools, strip] = [...bench.children]
+    expect(stage!.querySelector('.patch-stage')).not.toBeNull()
+    expect(text(tools!.querySelector('.patch-title'))).toBe('Title of a')
+    expect(tools!.querySelector('textarea')).not.toBeNull()
+    expect(tools!.querySelector('select[aria-label="Number of new takes"]')).not.toBeNull()
+    expect(text(strip!.querySelector('h3'))).toBe('Takes · 2')
+    expect(strip!.querySelectorAll('button.patch-thumb').length).toBe(2)
+  })
+
+  it('puts Patch off, Drop and Choose with their keys under the picture, and the keys line in the tools', async () => {
+    const { host } = await render([patchRow('a')], made)
+    await act(async () => thumbs(host)[0]!.click())
+    const under = host.querySelector('.patch-controls')!
+    expect([...under.querySelectorAll('button')].map((b) => text(b))).toEqual([
+      'Patch off S',
+      'Drop D',
+      'Choose C',
+    ])
+    expect(under.closest('.patch-bench-left')).not.toBeNull()
+    expect(host.querySelector('.patch-bench-right .patch-keys')).not.toBeNull()
+  })
+
+  it('turns the patch off and on with S as well as with its button', async () => {
+    const { host } = await render([patchRow('a')], made)
+    await key(host.querySelector('.patch-bench')!, 's')
+    expect(button(host, 'Patch on')).not.toBeUndefined()
+    await key(host.querySelector('.patch-bench')!, 's')
+    expect(button(host, 'Patch off')).not.toBeUndefined()
   })
 })

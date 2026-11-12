@@ -3314,7 +3314,6 @@ button.cue-chip[aria-expanded='true'] {
   border: 2px dashed var(--accent);
   pointer-events: none;
 }
-.patch-toggle,
 .patch-actions {
   display: flex;
   align-items: center;
@@ -5200,45 +5199,6 @@ textarea[aria-disabled='true'][data-why] {
 .game-patches p {
   margin: 0;
 }
-.game-patch-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--line);
-}
-.game-patch-list > li {
-  border-bottom: 1px solid var(--line);
-}
-.game-patch-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 2px;
-  background: none;
-  border: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.game-patch-row b,
-.game-patch-row .mono {
-  overflow-wrap: anywhere;
-}
-.game-patch-chev {
-  flex: none;
-  width: 14px;
-  color: var(--faint);
-}
-.game-patch-words {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  min-width: 0;
-}
 .game-patch-mark {
   margin-left: auto;
   font-size: 12px;
@@ -5550,16 +5510,6 @@ textarea[aria-disabled='true'][data-why] {
 }
 
 /* The takes of a patch the game asks for (as-bo8.2) */
-.game-patch-end {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  margin-left: auto;
-}
-.game-patch-end .game-patch-mark {
-  margin-left: 0;
-}
 .make-again-line {
   background: var(--raised);
   border-radius: 9px;
@@ -5567,15 +5517,108 @@ textarea[aria-disabled='true'][data-why] {
   color: var(--text-soft);
   font-size: 12px;
 }
-.game-patch-summary {
-  font-size: 12px;
-  color: var(--muted);
-}
+
 .patch-bench {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 16px;
   align-items: start;
+}
+.game-patches .patch-bench {
+  grid-template-columns: minmax(0, 1fr) 300px;
+}
+.game-patches .patch-bench > .patch-takes {
+  grid-column: 1 / -1;
+}
+.patch-title {
+  margin: 0;
+  font-size: 15px;
+}
+.patch-keys kbd {
+  font-size: 11px;
+}
+
+/* The Patches tab: a list beside a portrait image, a row of chips above any other. */
+.patches-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.patches-lefty {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.patches-side h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.patches-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.patch-pick {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.patch-pick[aria-current='true'] {
+  border-color: var(--accent);
+}
+.patch-pick-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+}
+.patch-pick-row b,
+.patch-pick-row .mono {
+  overflow-wrap: anywhere;
+}
+.patch-pick-top,
+.patch-pick-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.patches-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.patches-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.patch-pick .dot {
+  background: var(--faint);
+}
+.patch-pick .dot.ok {
+  background: var(--ok);
+}
+.patch-pick.pchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
 }
 .patch-bench-left,
 .patch-bench-right {
@@ -5659,7 +5702,9 @@ textarea[aria-disabled='true'][data-why] {
   min-height: 44px;
 }
 @media (max-width: 700px) {
-  .patch-bench {
+  .patch-bench,
+  .game-patches .patch-bench,
+  .patches-lefty {
     grid-template-columns: 1fr;
   }
 }
@@ -5716,13 +5761,6 @@ textarea[aria-disabled='true'][data-why] {
   margin: 0 0 12px;
   overflow-wrap: anywhere;
 }
-.game-patch-bar {
-  display: inline-block;
-  width: 90px;
-  height: 4px;
-  vertical-align: middle;
-}
-
 .confirm-heading {
   margin: 0;
   color: var(--text-soft);
@@ -6023,4 +6061,14 @@ textarea[aria-disabled='true'][data-why] {
 .chip-accent {
   background: var(--accent-soft-bg);
   color: var(--accent-soft-ink);
+}
+.game-patch-summary {
+  font-size: 12px;
+  color: var(--muted);
+}
+.game-patch-bar {
+  display: inline-block;
+  width: 90px;
+  height: 4px;
+  vertical-align: middle;
 }

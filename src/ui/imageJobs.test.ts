@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import type { ImageRow } from '../core/images'
-import { imageJobTabs, jobAtKey } from './imageJobs'
+import type { PatchRow } from '../core/images'
+import {
+  imageJobTabs,
+  jobAtKey,
+  patchChosen,
+  patchesHeading,
+  patchLayoutOf,
+  patchStateText,
+} from './imageJobs'
 
 /** An image row with only what the tabs read. */
 function row(over: {
@@ -94,5 +102,47 @@ describe('jobAtKey', () => {
     expect(jobAtKey(tabs, '3')).toBe('areas')
     expect(jobAtKey(tabs, '4')).toBeNull()
     expect(jobAtKey(tabs, 'a')).toBeNull()
+  })
+})
+
+describe('the Patches tab', () => {
+  it('lays out a list beside a portrait image, chips above a landscape or square one', () => {
+    expect(patchLayoutOf({ width: 600, height: 800 })).toBe('list')
+    expect(patchLayoutOf({ width: 800, height: 600 })).toBe('chips')
+    expect(patchLayoutOf({ width: 600, height: 600 })).toBe('chips')
+  })
+
+  it('counts a patch chosen when it is chosen on the image’s chosen take', () => {
+    const patch = { id: 'a', chosenOn: [3] } as unknown as PatchRow
+    expect(patchChosen(row({ chosenTake: 3 }), patch)).toBe(true)
+    expect(patchChosen(row({ chosenTake: 2 }), patch)).toBe(false)
+    expect(patchChosen(row({}), patch)).toBe(false)
+  })
+
+  it('heads the patches with how many are chosen', () => {
+    const patches = [
+      { id: 'a', chosenOn: [1] },
+      { id: 'b', chosenOn: [] },
+      { id: 'c', chosenOn: [1] },
+    ]
+    expect(patchesHeading(row({ chosenTake: 1, patches }))).toBe('Patches · 2 of 3 chosen')
+  })
+
+  it('says how far a patch has come', () => {
+    expect(patchStateText([])).toBe('no takes yet')
+    expect(patchStateText([{ n: 1, chosen: false }])).toBe('1 take')
+    expect(
+      patchStateText([
+        { n: 1, chosen: false },
+        { n: 2, chosen: false },
+        { n: 3, chosen: false },
+      ]),
+    ).toBe('3 takes')
+    expect(
+      patchStateText([
+        { n: 1, chosen: false },
+        { n: 2, chosen: true },
+      ]),
+    ).toBe('Take 2 chosen')
   })
 })

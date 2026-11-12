@@ -177,6 +177,7 @@ function MakingThumb({
 export function PatchWorkbench({
   imageId,
   patchId,
+  title,
   view,
   work,
   words,
@@ -193,6 +194,8 @@ export function PatchWorkbench({
 }: {
   imageId: string
   patchId: string
+  /** The patch's title, as the game names it. */
+  title: string
   view: ImagePatchesView
   work: PatchWorkView
   /** The patch's field of words. */
@@ -282,6 +285,7 @@ export function PatchWorkbench({
   if (!take) {
     return (
       <>
+        <h3 className="patch-title">{title}</h3>
         {words}
         <span className="muted small">
           {view.pictureGone
@@ -528,15 +532,9 @@ export function PatchWorkbench({
         </span>
         {shown && (
           <div className="patch-controls">
-            <label className="patch-toggle">
-              <input
-                className="patch-switch"
-                type="checkbox"
-                checked={showing}
-                onChange={(event) => setShowing(event.target.checked)}
-              />
-              Show the patch
-            </label>
+            <button type="button" className="btn" onClick={() => setShowing((on) => !on)}>
+              {showing ? 'Patch off' : 'Patch on'} <kbd>S</kbd>
+            </button>
             {shown.chosen ? (
               <button
                 type="button"
@@ -558,7 +556,7 @@ export function PatchWorkbench({
                   {...off(!canChange && changeWhy)}
                   onClick={() => onDrop(shown.n)}
                 >
-                  Drop
+                  Drop <kbd>D</kbd>
                 </button>
                 <button
                   type="button"
@@ -566,14 +564,10 @@ export function PatchWorkbench({
                   {...off(!canChoose && chooseWhy)}
                   onClick={() => onChoose(shown.n)}
                 >
-                  Choose
+                  Choose <kbd>C</kbd>
                 </button>
               </>
             )}
-            <span className="faint small">
-              or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose, <kbd>S</kbd> to turn the patch
-              off and on
-            </span>
           </div>
         )}
         {shown && lookError !== null && (
@@ -591,6 +585,7 @@ export function PatchWorkbench({
     <div className="patch-bench" onKeyDown={onKeyDown}>
       <div className="patch-bench-left">{left}</div>
       <div className="patch-bench-right">
+        <h3 className="patch-title">{title}</h3>
         {words}
         {tie &&
           (atArea ? (
@@ -672,6 +667,10 @@ export function PatchWorkbench({
           )}
         </div>
         {absentLine && <span className="faint small">{absentLine}</span>}
+        <span className="faint small patch-keys">
+          <kbd>←</kbd> <kbd>→</kbd> take · <kbd>C</kbd> choose · <kbd>D</kbd> drop · <kbd>S</kbd>{' '}
+          patch off/on
+        </span>
         {!view.maker.ok ? (
           <span className="takes-missing small" role="status">
             {view.maker.message}
@@ -702,82 +701,82 @@ export function PatchWorkbench({
             </button>
           </div>
         ))}
-        <div className="patch-takes">
-          <div className="patch-takes-head">
-            <h3>{takes.length === 0 ? 'Takes' : `Takes · ${takes.length}`}</h3>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={game}
-                onChange={(event) => onGame(event.target.checked)}
-              />
-              What the game gets
-            </label>
-          </div>
-          {lockUnread && takes.length > 0 && (
-            <span className="takes-missing small">
-              Choosing, dropping and un-choosing wait until the images lock can be read. You can
-              still look and make more takes.
-            </span>
-          )}
-          {items.length === 0 ? (
-            <div className="takes-empty">
-              No takes yet. Each take is a new try at this change, painted with the part of the
-              picture around the mark in view.
-            </div>
-          ) : (
-            <>
-              <div className="patch-thumbs">
-                {items.map(({ n, take: t, making: m }) =>
-                  t ? (
-                    <button
-                      key={n}
-                      type="button"
-                      className="patch-thumb"
-                      aria-pressed={n === lookingAt}
-                      ref={(el) => {
-                        if (el) thumbs.current.set(n, el)
-                        else thumbs.current.delete(n)
-                      }}
-                      onClick={() => pick(t)}
-                    >
-                      <CloseUp
-                        sources={sources}
-                        space={space}
-                        look={t.look}
-                        n={n}
-                        area={t.area}
-                        kept={t.kept}
-                      />
-                      <span className="patch-thumb-label">
-                        <span className="grow">Take {n}</span>
-                        {t.chosen && <span className="chip chip-ok">Chosen</span>}
-                        {t.isNew && <span className="chip chip-new">new</span>}
-                        {t.earlier && <span className="faint small">earlier words</span>}
-                      </span>
-                      <span className="faint small patch-thumb-model">
-                        {editModel(t.model).short}
-                      </span>
-                    </button>
-                  ) : (
-                    <MakingThumb
-                      key={n}
-                      making={m!}
-                      space={space}
-                      imageId={imageId}
-                      patchId={patchId}
-                    />
-                  ),
-                )}
-              </div>
-              <span className="faint small">
-                Press a take, or use ← →, to lay it over the picture.
-              </span>
-            </>
-          )}
-        </div>
         {problem && <span className="adopt-error">{problem}</span>}
         {error && <span className="adopt-error">{error.message}</span>}
+      </div>
+      <div className="patch-takes">
+        <div className="patch-takes-head">
+          <h3>{takes.length === 0 ? 'Takes' : `Takes · ${takes.length}`}</h3>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={game}
+              onChange={(event) => onGame(event.target.checked)}
+            />
+            What the game gets
+          </label>
+        </div>
+        {lockUnread && takes.length > 0 && (
+          <span className="takes-missing small">
+            Choosing, dropping and un-choosing wait until the images lock can be read. You can still
+            look and make more takes.
+          </span>
+        )}
+        {items.length === 0 ? (
+          <div className="takes-empty">
+            No takes yet. Each take is a new try at this change, painted with the part of the
+            picture around the mark in view.
+          </div>
+        ) : (
+          <>
+            <div className="patch-thumbs">
+              {items.map(({ n, take: t, making: m }) =>
+                t ? (
+                  <button
+                    key={n}
+                    type="button"
+                    className="patch-thumb"
+                    aria-pressed={n === lookingAt}
+                    ref={(el) => {
+                      if (el) thumbs.current.set(n, el)
+                      else thumbs.current.delete(n)
+                    }}
+                    onClick={() => pick(t)}
+                  >
+                    <CloseUp
+                      sources={sources}
+                      space={space}
+                      look={t.look}
+                      n={n}
+                      area={t.area}
+                      kept={t.kept}
+                    />
+                    <span className="patch-thumb-label">
+                      <span className="grow">Take {n}</span>
+                      {t.chosen && <span className="chip chip-ok">Chosen</span>}
+                      {t.isNew && <span className="chip chip-new">new</span>}
+                      {t.earlier && <span className="faint small">earlier words</span>}
+                    </span>
+                    <span className="faint small patch-thumb-model">
+                      {editModel(t.model).short}
+                    </span>
+                  </button>
+                ) : (
+                  <MakingThumb
+                    key={n}
+                    making={m!}
+                    space={space}
+                    imageId={imageId}
+                    patchId={patchId}
+                  />
+                ),
+              )}
+            </div>
+            <span className="faint small">
+              Press a take, or use ← →, to lay it over the picture.
+            </span>
+          </>
+        )}
       </div>
     </div>
   )
