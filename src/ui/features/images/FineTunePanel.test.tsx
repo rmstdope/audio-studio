@@ -400,7 +400,7 @@ describe('looking at, dropping and using fine-tunes', () => {
       'Take 4 is in the game now. Its 3 named areas and 1 chosen patch came along from Take 3. Close',
     )
     expect(wordsBox(host).value).toBe('')
-    expect(document.activeElement).toBe(wordsBox(host))
+    expect(document.activeElement).not.toBe(wordsBox(host))
     await act(async () => button(host, 'Close')!.click())
     expect(host.querySelector('[role=status]')).toBeNull()
   })
@@ -610,6 +610,24 @@ describe('the screen: Choose, the count and the keys', () => {
     ])
     await key(document.body, 'd')
     expect(sent.at(-1)).toMatchObject({ method: 'DELETE', path: '/api/images/inn/fine-tunes/2' })
+  })
+
+  it('undoes with Z right after a choose, without clicking out of the words box', async () => {
+    const { host, sent } = await render(
+      ready,
+      { status: 200, body: { ok: true, take: 9, from: 8, carried: { areas: 0, patches: 0 } } },
+      () => takesView(8, CHAIN),
+    )
+    await settle()
+    await act(async () => await new Promise((r) => setTimeout(r, 1050)))
+    await key(document.body, 'c')
+    await settle()
+    expect(document.activeElement).not.toBe(wordsBox(host))
+    await key(document.activeElement ?? document.body, 'z')
+    await settle()
+    expect(sent.filter((s) => s.path === '/api/images/inn/choose')).toEqual([
+      { method: 'POST', path: '/api/images/inn/choose', body: { n: 7 } },
+    ])
   })
 
   it('hears no key while its tab is not the open one', async () => {

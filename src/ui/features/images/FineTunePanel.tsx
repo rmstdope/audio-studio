@@ -354,7 +354,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
         setWords('')
         setLooking(null)
         setMarked(null)
-        setPendingFocus('words')
+        // Focus is not sent to the words box: Z right after a choose is Undo, not a letter.
       },
       onSettled: () => {
         changing.current = false
