@@ -457,7 +457,12 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
         <div className="fine-stage">
           <div
             className="patch-stage"
-            style={{ aspectRatio: `${picture.width} / ${picture.height}` }}
+            style={
+              {
+                aspectRatio: `${picture.width} / ${picture.height}`,
+                '--picture-ratio': picture.width / picture.height,
+              } as CSSProperties
+            }
             onPointerDown={(event) => {
               if (event.button !== 0 || event.ctrlKey) return
               event.preventDefault()

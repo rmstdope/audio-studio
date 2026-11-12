@@ -489,10 +489,13 @@ export function PatchWorkbench({
         ) : (
           <div
             className="patch-stage"
-            style={{
-              aspectRatio: `${space.width} / ${space.height}`,
-              ...(game ? { imageRendering: 'pixelated' } : {}),
-            }}
+            style={
+              {
+                aspectRatio: `${space.width} / ${space.height}`,
+                '--picture-ratio': space.width / space.height,
+                ...(game ? { imageRendering: 'pixelated' } : {}),
+              } as CSSProperties
+            }
             onPointerDown={(event) => {
               if (event.button !== 0 || event.ctrlKey) return
               event.preventDefault()

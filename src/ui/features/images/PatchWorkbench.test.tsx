@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagePatchesView, PatchWorkView } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
+import { valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -1486,6 +1487,19 @@ describe('the model of new takes', () => {
 
 describe('the three parts of an open patch', () => {
   const made = () => view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })])
+
+  it('fits a portrait picture to the window’s height, so Choose and the takes stay in view', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
+        take: { n: 3, width: 160, height: 200, cropped: false },
+        game: { width: 160, height: 200 },
+      }),
+    )
+    const stage = host.querySelector<HTMLElement>('.patch-stage')!
+    expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(160 / 200))
+    const widths = valuesInEveryWindow(stage, 'width')
+    expect(widths.at(-1)).toMatch(/^\.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
+  })
 
   it('puts the stage on the left, the tools on the right headed by the patch’s title, and the takes below both', async () => {
     const { host } = await render([patchRow('a')], made)
