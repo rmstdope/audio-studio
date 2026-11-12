@@ -21,6 +21,9 @@ describe('the room the shell leaves the pages', () => {
   it('keeps the sidebar slim beside the page', () => {
     expect(rule(media('(min-width: 900px)'), '.sidebar')).toContain('flex: 0 0 212px')
     expect(rule(css, '.sidebar')).toContain('padding: 16px 10px')
+    // The unfolded sidebar keeps its own sticky full-height rules (the folded rail repeats them)
+    expect(rule(media('(min-width: 900px)'), '.sidebar')).toContain('position: sticky')
+    expect(rule(media('(min-width: 900px)'), '.sidebar')).toContain('height: 100vh')
   })
 
   it('folds the sidebar to a 72px rail with its dots coloured by how far each act is', () => {
