@@ -5603,6 +5603,8 @@ textarea[aria-disabled='true'][data-why] {
   border-color: var(--accent);
 }
 .patch-pick-row {
+  box-sizing: border-box;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 3px;

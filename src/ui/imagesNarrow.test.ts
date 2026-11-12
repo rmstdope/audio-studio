@@ -121,3 +121,10 @@ describe('the list beside the named areas picture (as-kw3x.6)', () => {
     expect(rule('.named-area-list', block)).toMatch(/max-height:\s*50vh/)
   })
 })
+
+describe('the patch list beside a portrait image', () => {
+  it('makes each patch a box as wide as the list, whatever its name', () => {
+    expect(rule('.patch-pick-row')).toMatch(/width:\s*100%/)
+    expect(rule('.patch-pick-row')).toMatch(/box-sizing:\s*border-box/)
+  })
+})
