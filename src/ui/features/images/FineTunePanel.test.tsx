@@ -612,16 +612,22 @@ describe('the screen: Choose, the count and the keys', () => {
     expect(sent.at(-1)).toMatchObject({ method: 'DELETE', path: '/api/images/inn/fine-tunes/2' })
   })
 
-  it('leaves focus out of the words box after a choose, so Z is not typed into it', async () => {
-    const { host } = await render(ready, {
-      status: 200,
-      body: { ok: true, take: 9, from: 8, carried: { areas: 0, patches: 0 } },
-    })
+  it('undoes with Z right after a choose, without clicking out of the words box', async () => {
+    const { host, sent } = await render(
+      ready,
+      { status: 200, body: { ok: true, take: 9, from: 8, carried: { areas: 0, patches: 0 } } },
+      () => takesView(8, CHAIN),
+    )
     await settle()
     await act(async () => await new Promise((r) => setTimeout(r, 1050)))
     await key(document.body, 'c')
     await settle()
     expect(document.activeElement).not.toBe(wordsBox(host))
+    await key(document.activeElement ?? document.body, 'z')
+    await settle()
+    expect(sent.filter((s) => s.path === '/api/images/inn/choose')).toEqual([
+      { method: 'POST', path: '/api/images/inn/choose', body: { n: 7 } },
+    ])
   })
 
   it('hears no key while its tab is not the open one', async () => {
