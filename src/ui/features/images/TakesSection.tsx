@@ -158,11 +158,14 @@ export function TakesSection({
   row,
   prompt,
   saveWords,
+  active = true,
 }: {
   row: ImageRow
   prompt?: ReactNode
   /** Sees the prompt's words saved: whether they were, or null with nothing to save. */
   saveWords?: () => Promise<boolean> | null
+  /** Whether the section is on the page: its keys (← → C D) act only then. */
+  active?: boolean
 }) {
   const id = row.id
   const query = useImageTakes(id)
@@ -204,12 +207,16 @@ export function TakesSection({
   const thumbs = useRef(new Map<number, HTMLButtonElement>())
   // The page's keys (← → C D) are heard anywhere on the page, by the handler of the last render.
   const keys = useRef<(event: KeyboardEvent) => void>(() => {})
+  const activeNow = useRef(active)
   let onKey: (event: KeyboardEvent) => void = () => {}
   useEffect(() => {
     keys.current = onKey
+    activeNow.current = active
   })
   useEffect(() => {
-    const listen = (event: KeyboardEvent) => keys.current(event)
+    const listen = (event: KeyboardEvent) => {
+      if (activeNow.current) keys.current(event)
+    }
     document.addEventListener('keydown', listen)
     return () => document.removeEventListener('keydown', listen)
   }, [])
