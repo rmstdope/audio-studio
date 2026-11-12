@@ -14,7 +14,10 @@ import {
   ChangesIcon,
   SpendingIcon,
   CheckIcon,
+  ChevronsLeftIcon,
 } from './icons'
+import { SidebarRail, type RailAct } from './SidebarRail'
+import { actPillLabel, railDot, useSidebarFolded } from '../sidebarFold'
 import { dollars, plural, shortTitle } from '../format'
 import { amountText } from '../spending'
 import { actCount, doneCount, openWorkspace, type DoneTone } from '../sidebarActs'
@@ -48,6 +51,28 @@ export function Sidebar({
   const language = route.view === 'part' || route.view === 'lines' ? route.language : undefined
   const progress = useNarrationProgress(language, open === 'narration')
   const done = progress.data?.ok ? progress.data.parts : {}
+  const [folded, toggleFolded] = useSidebarFolded()
+  if (folded) {
+    const folder = summary.root.split(/[\\/]/).filter(Boolean).pop()
+    const markTip = [
+      summary.name,
+      folder,
+      credit.data?.ok ? `${dollars(credit.data.credit)} credit for paid models` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    return (
+      <SidebarRail
+        summary={summary}
+        route={route}
+        activePart={activePart}
+        acts={railActs(summary, route, activePart, done)}
+        markTip={markTip}
+        problems={{ count: problems, tip: plural(problems, 'thing') + ' to fix' }}
+        onUnfold={toggleFolded}
+      />
+    )
+  }
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -55,6 +80,10 @@ export function Sidebar({
           <LayersIcon size={18} />
         </div>
         <span className="brand-name">Content Studio</span>
+        <button className="brand-fold" title="Fold the sidebar" onClick={toggleFolded}>
+          <ChevronsLeftIcon />
+          <span className="sr-only">Fold the sidebar</span>
+        </button>
       </div>
 
       <div className="project-box">
@@ -271,6 +300,99 @@ export function Sidebar({
       </nav>
     </aside>
   )
+}
+
+/** A pill's tip: the act's whole title, and how far it is when that is counted. */
+function pillTip(title: string, count?: string): string {
+  return count ? `${title} · ${count}` : title
+}
+
+/** The open workspace's acts as the rail's pills; none for a workspace without acts. */
+function railActs(
+  summary: ProjectSummary,
+  route: Route,
+  activePart: string | null,
+  progress: Record<string, { ok: number; lines: number }>,
+): RailAct[] {
+  const open = openWorkspace(route)
+  if (open === 'narration') {
+    return summary.parts.map((part, i) => {
+      const p = progress[part.id]
+      const count = actCount(part, p)
+      return {
+        key: part.id,
+        label: actPillLabel(i),
+        tip: pillTip(
+          part.title,
+          p
+            ? `${count.text} done`
+            : part.dialog === 'ok'
+              ? plural(part.lineCount, 'line')
+              : count.text,
+        ),
+        href: routeHref({
+          view: 'part',
+          part: part.id,
+          language: route.view === 'part' || route.view === 'lines' ? route.language : undefined,
+        }),
+        current: activePart === part.id,
+        dot: p ? railDot(p.ok, p.lines) : undefined,
+      }
+    })
+  }
+  if (open === 'music' && summary.music) {
+    const lists = summary.music.lists
+    return lists.map((list) => {
+      const done = list.state === 'ok' ? tracksDone(list.tracks) : null
+      const index = lists.filter((l) => l.kind === 'act').indexOf(list)
+      return {
+        key: `${list.kind}:${list.id}`,
+        label: list.kind === 'stingers' ? 'Stingers' : actPillLabel(index),
+        tip: pillTip(list.title, done ? `${done.done}/${done.total} done` : undefined),
+        href: routeHref(
+          list.kind === 'stingers'
+            ? { view: 'music', page: 'stingers' }
+            : { view: 'music', page: 'act', part: list.id },
+        ),
+        current: route.view === 'music' && listFor(lists, route) === list,
+        dot: done ? railDot(done.done, done.total) : undefined,
+      }
+    })
+  }
+  if (open === 'images' && summary.images) {
+    const images = summary.images
+    return [
+      ...images.acts.map((act, i): RailAct => {
+        const done = act.state === 'ok' ? imagesDone(act) : null
+        return {
+          key: act.id,
+          label: actPillLabel(i),
+          tip: pillTip(act.title, done ? `${done.done}/${done.total} done` : undefined),
+          href: routeHref({ view: 'images', page: 'act', part: act.id }),
+          current: route.view === 'images' && currentAct(images, route) === act.id,
+          dot: done ? railDot(done.done, done.total) : undefined,
+        }
+      }),
+      {
+        key: 'style',
+        label: 'Style',
+        tip: 'Style',
+        href: routeHref({ view: 'images', page: 'style' }),
+        current: route.view === 'images' && route.page === 'style',
+      },
+    ]
+  }
+  if (open === 'scenes' && route.view === 'scenes' && summary.scenes) {
+    const scenes = summary.scenes
+    return scenes.acts.map((act, i) => ({
+      key: act.id,
+      label: actPillLabel(i),
+      tip: pillTip(act.title, act.state === 'ok' ? plural(act.scenes.length, 'scene') : undefined),
+      href: routeHref({ view: 'scenes', page: 'act', part: act.id }),
+      current: currentSceneAct(scenes, route)?.id === act.id,
+    }))
+  }
+  return []
 }
 
 /** A done count at the right of a sidebar entry, in its colour. */

@@ -282,3 +282,199 @@ describe('the sidebar’s Scenes', () => {
     expect(links.filter((l) => l.current).map((l) => l.text)).toEqual(['Act I 16'])
   })
 })
+
+/** Presses a key at `target` (the page when left out). */
+function press(key: string, target: EventTarget = document, init: KeyboardEventInit = {}) {
+  act(() => {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }))
+  })
+}
+
+/** The folded rail's entries as `[name, href, current]`. */
+function railItems(container: HTMLElement) {
+  return [...container.querySelectorAll('a.rail-item')].map((a) => [
+    a.textContent!.trim(),
+    a.getAttribute('href'),
+    a.getAttribute('aria-current') === 'page',
+  ])
+}
+
+/** The folded rail's act pills. */
+function pills(container: HTMLElement) {
+  return [...container.querySelectorAll('a.rail-pill')].map((a) => ({
+    text: a.textContent!.trim(),
+    href: a.getAttribute('href'),
+    current: a.getAttribute('aria-current') === 'page',
+    title: a.getAttribute('title'),
+    dot: a.querySelector('.rail-dot')?.getAttribute('data-dot') ?? null,
+  }))
+}
+
+describe('folding the sidebar', () => {
+  const fold = (container: HTMLElement) =>
+    act(() => (container.querySelector('.brand-fold') as HTMLElement).click())
+
+  it('has a fold button on the brand row, and the unfolded sidebar is otherwise as before', () => {
+    localStorage.clear()
+    const { container } = render({ view: 'setup' })
+    const button = container.querySelector('.brand .brand-fold')!
+    expect(button.getAttribute('title')).toBe('Fold the sidebar')
+    expect(container.querySelector('.rail-item')).toBeNull()
+    expect(container.querySelector('.project-box')).not.toBeNull()
+  })
+
+  it('becomes the rail: mark, unfold button, workspaces, then the project pages', () => {
+    localStorage.clear()
+    const { container } = render({ view: 'setup' })
+    fold(container)
+    expect(container.querySelector('.project-box')).toBeNull()
+    expect(container.querySelector('.rail-fold')!.getAttribute('title')).toBe('Unfold the sidebar')
+    expect(railItems(container).map((i) => i[0])).toEqual([
+      'Narration',
+      'Music',
+      'Images',
+      'Effects',
+      'Scenes',
+      'Cast',
+      'Changes',
+      'Spending',
+      'Setup',
+    ])
+    expect(container.querySelector('.rail-sep')).not.toBeNull()
+    act(() => (container.querySelector('.rail-fold') as HTMLElement).click())
+    expect(container.querySelector('.rail-item')).toBeNull()
+  })
+
+  it('gives each entry its whole name as its tip, and the mark the project, folder and credit', () => {
+    localStorage.clear()
+    const { container } = render({ view: 'setup' }, [[['credit'], { ok: true, credit: 41.8 }]])
+    fold(container)
+    const tips = [...container.querySelectorAll('a.rail-item')].map((a) => a.getAttribute('title'))
+    expect(tips).toEqual([
+      'Narration',
+      'Music',
+      'Images',
+      'Sound effects',
+      'Scenes',
+      'All characters',
+      'Changes',
+      'Spending',
+      'Setup',
+    ])
+    expect(container.querySelector('.rail-mark')!.getAttribute('title')).toBe(
+      'Sample · sample · $41.80 credit for paid models',
+    )
+  })
+
+  it('leaves the credit out of the mark’s tip when it is unknown', () => {
+    localStorage.clear()
+    const { container } = render({ view: 'setup' })
+    fold(container)
+    expect(container.querySelector('.rail-mark')!.getAttribute('title')).toBe('Sample · sample')
+  })
+
+  it('marks the open workspace and lists its acts as pills with dots and tips', () => {
+    localStorage.clear()
+    const { container } = render({ view: 'images', page: 'act', part: 'act1' })
+    fold(container)
+    expect(
+      railItems(container)
+        .filter((i) => i[2])
+        .map((i) => i[0]),
+    ).toEqual(['Images'])
+    expect(pills(container)).toEqual([
+      {
+        text: 'Act 1',
+        href: '#/images/parts/act1',
+        current: true,
+        title: 'Act I: The Lantern · 2/5 done',
+        dot: 'some',
+      },
+      {
+        text: 'Act 2',
+        href: '#/images/parts/act2',
+        current: false,
+        title: 'Act II: The Road',
+        dot: null,
+      },
+      { text: 'Style', href: '#/images/style', current: false, title: 'Style', dot: null },
+    ])
+  })
+
+  it('lists Music’s acts and Stingers, Narration’s acts and Scenes’ acts', () => {
+    localStorage.clear()
+    const music = render({ view: 'music', page: 'stingers' })
+    fold(music.container)
+    expect(pills(music.container).map((p) => [p.text, p.current, p.dot])).toEqual([
+      ['Act 1', false, 'some'],
+      ['Stingers', true, 'all'],
+    ])
+    const narration = render({ view: 'part', part: 'act1' }, [
+      [['narration-progress', undefined], { ok: true, parts: { act1: { ok: 12, lines: 12 } } }],
+    ])
+    expect(pills(narration.container).map((p) => [p.text, p.dot, p.title])).toEqual([
+      ['Act 1', 'all', 'Act I: The Lantern · 12/12 done'],
+      ['Act 2', null, 'Act II: The Long Name That Goes On · no script'],
+      ['Act 3', null, 'Prologue · dialog gone'],
+      ['Act 4', null, 'Act IV: Broken · invalid'],
+    ])
+    const scenes = render({ view: 'scenes', page: 'act', part: 'act2' })
+    expect(pills(scenes.container).map((p) => [p.text, p.current])).toEqual([
+      ['Act 1', false],
+      ['Act 2', true],
+    ])
+  })
+
+  it('tips a narration act whose lines are not yet counted with its line count', () => {
+    localStorage.clear()
+    const { container } = render({ view: 'part', part: 'act1' })
+    fold(container)
+    expect(pills(container)[0]!.title).toBe('Act I: The Lantern · 12 lines')
+  })
+
+  it('shows no pills for a workspace without acts, nor on Setup', () => {
+    localStorage.clear()
+    const effects = render({ view: 'effects', page: null })
+    expect(pills(effects.container)).toEqual([])
+    const setup = render({ view: 'setup' })
+    expect(pills(setup.container)).toEqual([])
+  })
+
+  it('shows Setup’s problem count as a badge on its icon', () => {
+    localStorage.clear()
+    const checks = {
+      ok: true,
+      checks: [{ state: 'problem' }, { state: 'ok' }, { state: 'problem' }],
+    }
+    const { container } = render({ view: 'setup' }, [[['setup'], checks]])
+    fold(container)
+    expect(container.querySelector('.rail-badge')!.textContent).toBe('2')
+  })
+
+  it('folds and unfolds with [, except while typing, and keeps the choice across a remount', () => {
+    localStorage.clear()
+    // Earlier sidebars would answer the key too, and race to write the choice.
+    cleanups.splice(0).forEach((c) => c())
+    const first = render({ view: 'setup' })
+    press('[')
+    expect(first.container.querySelector('.rail-item')).not.toBeNull()
+    const input = document.createElement('input')
+    document.body.append(input)
+    press('[', input)
+    expect(first.container.querySelector('.rail-item')).not.toBeNull()
+    press('[', document, { ctrlKey: true })
+    expect(first.container.querySelector('.rail-item')).not.toBeNull()
+    press('[', document, { repeat: true })
+    expect(first.container.querySelector('.rail-item')).not.toBeNull()
+    // Where [ needs Option or AltGr to type, it still folds.
+    press('[', document, { altKey: true })
+    expect(first.container.querySelector('.rail-item')).toBeNull()
+    press('[', document, { altKey: true, ctrlKey: true })
+    expect(first.container.querySelector('.rail-item')).not.toBeNull()
+    const second = render({ view: 'changes' })
+    expect(second.container.querySelector('.rail-item')).not.toBeNull()
+    press('[')
+    expect(second.container.querySelector('.rail-item')).toBeNull()
+    expect(render({ view: 'setup' }).container.querySelector('.rail-item')).toBeNull()
+  })
+})

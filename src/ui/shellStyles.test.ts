@@ -23,6 +23,13 @@ describe('the room the shell leaves the pages', () => {
     expect(rule(css, '.sidebar')).toContain('padding: 16px 10px')
   })
 
+  it('folds the sidebar to a 72px rail with its dots coloured by how far each act is', () => {
+    expect(rule(css, '.sidebar.sidebar-rail')).toContain('flex: 0 0 72px')
+    expect(rule(css, ".rail-dot[data-dot='all']")).toContain('var(--ok)')
+    expect(rule(css, ".rail-dot[data-dot='some']")).toContain('var(--warn)')
+    expect(rule(css, ".rail-pill[aria-current='page']")).toContain('var(--accent)')
+  })
+
   it('gives the page small margins at its sides', () => {
     expect(rule(css, '.content')).toContain('padding: 20px 24px 32px')
   })
