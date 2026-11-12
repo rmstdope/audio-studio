@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Collapsible sidebar</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root {
+        --bg: #06070c;
+        --sidebar: rgb(10 11 18 / 55%);
+        --glass: rgb(255 255 255 / 3.5%);
+        --glass-strong: rgb(255 255 255 / 6%);
+        --edge: rgb(255 255 255 / 8%);
+        --accent-grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+        --logo-glow: 0 6px 20px rgb(255 90 100 / 35%);
+        --line: rgb(255 255 255 / 7%);
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --warn: #ffc24b;
+        --panel: #10121a;
+        --shadow: 0 12px 32px rgb(0 0 0 / 45%);
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(900px 500px at 85% -10%, rgb(255 90 120 / 14%), transparent 60%),
+          radial-gradient(700px 500px at 10% 110%, rgb(90 120 255 / 12%), transparent 60%),
+          var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 20px 16px 40px;
+      }
+      .intro {
+        max-width: 1200px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .tabs {
+        max-width: 1200px;
+        margin: 0 auto 10px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        background: var(--glass-strong);
+        border: 1px solid var(--edge);
+        color: var(--text-soft);
+        border-radius: 999px;
+        padding: 6px 14px;
+        cursor: pointer;
+        font: inherit;
+      }
+      .tab[aria-pressed='true'] {
+        background: var(--accent-soft-bg);
+        border-color: var(--accent);
+        color: var(--accent-soft-ink);
+      }
+      .variant-note {
+        max-width: 1200px;
+        margin: 0 auto 12px;
+        color: var(--text-soft);
+      }
+      .variant-note b {
+        color: var(--accent-soft-ink);
+      }
+      .variant-note ul {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      /* The window */
+      .window {
+        max-width: 1200px;
+        margin: 0 auto;
+        height: 640px;
+        border: 1px solid var(--edge);
+        border-radius: 14px;
+        overflow: hidden;
+        display: flex;
+        background: rgb(6 7 12 / 70%);
+        position: relative;
+      }
+      .side {
+        flex: 0 0 212px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--edge);
+        padding: 14px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        transition: flex-basis 0.18s ease;
+        overflow: hidden;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 4px;
+      }
+      .mark {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+        border-radius: 9px;
+        background: var(--accent-grad);
+        box-shadow: var(--logo-glow);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+      }
+      .brand-name {
+        font-weight: 600;
+        font-size: 15px;
+        white-space: nowrap;
+      }
+      .collapse {
+        margin-left: auto;
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        border: 1px solid transparent;
+        background: none;
+        color: var(--faint);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+      }
+      .collapse:hover {
+        background: var(--glass-strong);
+        color: var(--text);
+        border-color: var(--edge);
+      }
+      .project {
+        padding: 10px;
+        border-radius: 12px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .project strong {
+        color: var(--text);
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nav .label {
+        padding: 0 8px 6px;
+      }
+      .item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 32px;
+        padding: 0 8px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 13.5px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .item:hover {
+        background: var(--glass);
+        color: var(--text);
+      }
+      .item.on {
+        background: var(--glass-strong);
+        box-shadow: inset 0 0 0 1px var(--edge);
+        color: var(--text);
+      }
+      .item.sub {
+        padding-left: 32px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .meta {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .meta.ok {
+        color: var(--ok);
+      }
+      .meta.part {
+        color: var(--warn);
+      }
+      .foot {
+        margin-top: auto;
+      }
+
+      /* The rail: icon over a small word */
+      .rail {
+        flex: 0 0 72px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--edge);
+        padding: 14px 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      .rail .mark {
+        margin: 0 auto 6px;
+        cursor: pointer;
+      }
+      .rail .collapse {
+        margin: 0 auto 8px;
+      }
+      .r-item {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 7px 2px 6px;
+        border-radius: 10px;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 10.5px;
+        line-height: 1.15;
+        text-align: center;
+      }
+      .r-item:hover {
+        background: var(--glass);
+        color: var(--text);
+      }
+      .r-item.on {
+        background: var(--glass-strong);
+        box-shadow: inset 0 0 0 1px var(--edge);
+        color: var(--text);
+      }
+      .r-item.on::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 10px;
+        bottom: 10px;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--accent-grad);
+      }
+      .badge {
+        position: absolute;
+        top: 3px;
+        right: 9px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+        font-size: 10px;
+        line-height: 16px;
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .rail-sep {
+        height: 1px;
+        background: var(--line);
+        margin: 6px 8px;
+      }
+      .rail-foot {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      /* Variant C: acts as small pills under the open workspace */
+      .acts-pills {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 2px 6px 6px;
+      }
+      .pill {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        height: 22px;
+        border-radius: 6px;
+        font-size: 10.5px;
+        color: var(--muted);
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .pill:hover {
+        background: var(--glass);
+        color: var(--text);
+      }
+      .pill.on {
+        border-color: var(--accent);
+        color: var(--accent-soft-ink);
+        background: var(--accent-soft-bg);
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--faint);
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .dot.part {
+        background: var(--warn);
+      }
+
+      /* Variant A: flyout beside the rail */
+      .flyout {
+        position: absolute;
+        left: 72px;
+        top: 0;
+        bottom: 0;
+        width: 220px;
+        background: var(--panel);
+        border-right: 1px solid var(--edge);
+        box-shadow: var(--shadow);
+        padding: 16px 10px;
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        z-index: 5;
+      }
+      .flyout.open {
+        display: flex;
+      }
+      .flyout h3 {
+        margin: 0 8px 8px;
+        font-size: 14px;
+      }
+
+      /* Variant B: a second column with the open workspace's lists */
+      .lists {
+        flex: 0 0 188px;
+        background: rgb(10 11 18 / 35%);
+        border-right: 1px solid var(--edge);
+        padding: 14px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .lists-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 4px 0 8px;
+        margin-bottom: 8px;
+      }
+      .lists-head h3 {
+        margin: 0;
+        font-size: 14px;
+      }
+      .lists .project {
+        margin-top: auto;
+      }
+
+      /* The page beside it, a stand-in for the image page */
+      .content {
+        flex: 1;
+        min-width: 0;
+        padding: 18px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow: hidden;
+      }
+      .crumbs {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      .crumbs .switch {
+        color: var(--text-soft);
+        border-bottom: 1px dashed var(--faint);
+        cursor: pointer;
+      }
+      .content h2 {
+        margin: 4px 0 0;
+        font-size: 26px;
+        letter-spacing: -0.02em;
+      }
+      .stage {
+        flex: 1;
+        display: flex;
+        gap: 14px;
+        min-height: 0;
+      }
+      .picture {
+        flex: 1;
+        border-radius: 16px;
+        border: 1px solid var(--edge);
+        background:
+          linear-gradient(160deg, rgb(255 122 61 / 18%), transparent 50%),
+          linear-gradient(20deg, rgb(90 120 255 / 18%), transparent 60%), #0d0f14;
+        display: grid;
+        place-items: center;
+        color: var(--faint);
+        position: relative;
+      }
+      .width-tag {
+        position: absolute;
+        bottom: 10px;
+        right: 12px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 11px;
+        color: var(--muted);
+        background: rgb(0 0 0 / 40%);
+        padding: 2px 8px;
+        border-radius: 6px;
+      }
+      .tools {
+        flex: 0 0 240px;
+        border-radius: 16px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        padding: 14px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .tip {
+        position: absolute;
+        left: 76px;
+        background: var(--panel);
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        color: var(--text-soft);
+        box-shadow: var(--shadow);
+        white-space: nowrap;
+        z-index: 6;
+        display: none;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Collapsing the sidebar into an icon rail</h1>
+      <b>Agreed: variant C</b> (as-kw3x.1). A and B are kept for the record. Three ways to fold the
+      left pane to a 72 px rail, icon over a small word. Each window is live: press the <b>«</b> /
+      <b>»</b> button to fold and unfold, and click the rail. The page on the right is only a
+      stand-in for the image page; its width tag shows what is won.
+    </div>
+    <div class="tabs" role="group" aria-label="Variant">
+      <button class="tab" data-v="a" aria-pressed="false">A · Rail with a flyout</button>
+      <button class="tab" data-v="b" aria-pressed="false">B · Rail plus a lists column</button>
+      <button class="tab" data-v="c" aria-pressed="true">C · Rail with acts in it</button>
+    </div>
+
+    <div class="variant-note" data-note="a" hidden>
+      <b>A · Rail with a flyout.</b> Folded, the rail holds only the workspaces and the project
+      pages. The acts of a workspace open in a panel that floats over the page when its icon is
+      clicked, and close again when an act is picked or the pointer leaves.
+      <ul>
+        <li>Most room: the page keeps the full width all the time.</li>
+        <li>Changing act costs two clicks; the crumbs above the title also switch act.</li>
+        <li>Project name and credit move to a tip on the studio's mark.</li>
+      </ul>
+    </div>
+    <div class="variant-note" data-note="b" hidden>
+      <b>B · Rail plus a lists column.</b> The rail is always there. Beside it, a second column
+      lists the open workspace's acts (and Style), with the project box at its foot. That column is
+      what folds away; the rail never does.
+      <ul>
+        <li>Unfolded it is about as wide as today; folded it is just the rail.</li>
+        <li>Clicking the open workspace's icon again folds or unfolds its list.</li>
+        <li>Familiar from code editors; two columns to read when unfolded.</li>
+      </ul>
+    </div>
+    <div class="variant-note" data-note="c">
+      <b>C · Rail with acts in it.</b> Folded, the open workspace keeps its acts in the rail as
+      short pills ("Act 1", "Act 2", "Style"), with a dot coloured by how much is done. Every page
+      stays one click away.
+      <ul>
+        <li>No floating panels, nothing hidden.</li>
+        <li>Act names are shortened to fit; the full title is in the tip and the page title.</li>
+        <li>Counts become a coloured dot (green all done, amber some, grey none).</li>
+      </ul>
+    </div>
+
+    <div class="window" id="win"></div>
+
+    <script>
+      const ICON = {
+        layers: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+        mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+        music:
+          '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+        image:
+          '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 9"/>',
+        speaker: '<path d="M11 5 6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',
+        people:
+          '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>',
+        changes:
+          '<circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M6 7.5v9M8.3 6.2c4.4 1 7.1 2.9 7.6 3.9"/>',
+        spending:
+          '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.4-.9-1.4-1.4-2.8-1.4-1.6 0-2.7.8-2.7 2 0 3 5.6 1.5 5.6 4.3 0 1.2-1.1 2-2.9 2-1.5 0-2.6-.6-3-1.6M12 6.3v1.5M12 16.2v1.5"/>',
+        check: '<path d="m5 12 5 5L20 7"/>',
+        left: '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
+        right: '<path d="m13 17 5-5-5-5M6 17l5-5-5-5"/>',
+        panel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+      }
+      const svg = (n, s = 16) =>
+        `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`
+
+      const WORKSPACES = [
+        { id: 'narration', icon: 'mic', full: 'Narration', short: 'Narration' },
+        { id: 'music', icon: 'music', full: 'Music', short: 'Music' },
+        { id: 'images', icon: 'image', full: 'Images', short: 'Images' },
+        { id: 'effects', icon: 'speaker', full: 'Sound effects', short: 'Effects', meta: '12/30' },
+        { id: 'scenes', icon: 'layers', full: 'Scenes', short: 'Scenes' },
+      ]
+      const PROJECT = [
+        { id: 'chars', icon: 'people', full: 'All characters', short: 'Cast', meta: '24' },
+        { id: 'changes', icon: 'changes', full: 'Changes', short: 'Changes', meta: '7' },
+        { id: 'spend', icon: 'spending', full: 'Spending', short: 'Spending', meta: '$3.20' },
+        { id: 'setup', icon: 'check', full: 'Setup', short: 'Setup', meta: '1' },
+      ]
+      const ACTS = [
+        { id: 'a1', full: 'Act 1: The Lighthouse', short: 'Act 1', meta: '9/9', tone: 'ok' },
+        { id: 'a2', full: 'Act 2: Under the Pier', short: 'Act 2', meta: '4/11', tone: 'part' },
+        { id: 'a3', full: 'Act 3: Storm Night', short: 'Act 3', meta: '0/8', tone: '' },
+        { id: 'style', full: 'Style', short: 'Style' },
+      ]
+
+      const state = { v: 'c', folded: true, open: 'images', act: 'a2', flyout: false, lists: true }
+
+      function fullSidebar() {
+        return `<aside class="side">
+          <div class="brand"><div class="mark">${svg('layers', 18)}</div><span class="brand-name">Content Studio</span>
+            <button class="collapse" data-act="fold" title="Fold the sidebar  ( [ )">${svg('left', 14)}</button></div>
+          <div class="project"><span class="label">Project</span><strong>RetroQuest</strong><span>retroquest</span><span>$41.80 credit for paid models</span></div>
+          <nav class="nav"><span class="label">Workspace</span>
+            ${WORKSPACES.map(
+              (w) =>
+                `<div class="item" data-ws="${w.id}">${svg(w.icon)}<span class="grow">${w.full}</span>${w.meta ? `<span class="meta">${w.meta}</span>` : ''}</div>` +
+                (w.id === state.open
+                  ? ACTS.map(
+                      (a) =>
+                        `<div class="item sub ${a.id === state.act ? 'on' : ''}" data-actid="${a.id}"><span class="grow">${a.full.replace(/^Act \d: /, '')}</span>${a.meta ? `<span class="meta ${a.tone}">${a.meta}</span>` : ''}</div>`,
+                    ).join('')
+                  : ''),
+            ).join('')}
+          </nav>
+          <nav class="nav foot">${PROJECT.map((p) => `<div class="item">${svg(p.icon)}<span class="grow">${p.full}</span><span class="meta">${p.meta}</span></div>`).join('')}</nav>
+        </aside>`
+      }
+
+      function railItem(w, extra = '') {
+        const on = w.id === state.open ? 'on' : ''
+        const badge = w.id === 'setup' ? '<span class="badge">1</span>' : ''
+        return `<div class="r-item ${on}" data-ws="${w.id}" title="${w.full}">${svg(w.icon, 20)}<span>${w.short}</span>${badge}</div>${extra}`
+      }
+
+      function rail() {
+        const fold =
+          state.v === 'b'
+            ? ''
+            : `<button class="collapse" data-act="fold" title="Unfold the sidebar  ( [ )">${svg('right', 14)}</button>`
+        const pills = (w) =>
+          state.v === 'c' && w.id === state.open
+            ? `<div class="acts-pills">${ACTS.map((a) => `<div class="pill ${a.id === state.act ? 'on' : ''}" data-actid="${a.id}" title="${a.full}${a.meta ? ' · ' + a.meta + ' done' : ''}">${a.tone !== undefined ? `<span class="dot ${a.tone}"></span>` : ''}${a.short}</div>`).join('')}</div>`
+            : ''
+        return `<aside class="rail">
+          <div class="mark" title="RetroQuest · retroquest · $41.80 credit for paid models">${svg('layers', 18)}</div>
+          ${fold}
+          ${WORKSPACES.map((w) => railItem(w, pills(w))).join('')}
+          <div class="rail-foot"><div class="rail-sep"></div>${PROJECT.map((p) => railItem(p)).join('')}</div>
+        </aside>`
+      }
+
+      function flyout() {
+        return `<div class="flyout ${state.flyout ? 'open' : ''}"><h3>Images</h3>
+          ${ACTS.map((a) => `<div class="item ${a.id === state.act ? 'on' : ''}" data-actid="${a.id}"><span class="grow">${a.full}</span>${a.meta ? `<span class="meta ${a.tone}">${a.meta}</span>` : ''}</div>`).join('')}
+        </div>`
+      }
+
+      function lists() {
+        if (!state.lists) return ''
+        return `<aside class="lists"><div class="lists-head"><h3>Images</h3><span class="grow"></span>
+            <button class="collapse" data-act="lists" title="Fold this list  ( [ )">${svg('left', 14)}</button></div>
+          ${ACTS.map((a) => `<div class="item ${a.id === state.act ? 'on' : ''}" data-actid="${a.id}"><span class="grow">${a.full.replace(/^Act \d: /, '')}</span>${a.meta ? `<span class="meta ${a.tone}">${a.meta}</span>` : ''}</div>`).join('')}
+          <div class="project"><span class="label">Project</span><strong>RetroQuest</strong><span>$41.80 credit</span></div>
+        </aside>`
+      }
+
+      function content() {
+        const act = ACTS.find((a) => a.id === state.act)
+        return `<main class="content">
+          <div class="crumbs">Images › <span class="switch" title="Switch act">${act.full} ▾</span> › harbour-at-dusk</div>
+          <h2>Harbour at dusk</h2>
+          <div class="stage">
+            <div class="picture">(the picture: room to work on it)<span class="width-tag" id="wtag"></span></div>
+            <div class="tools">Tools for the one job at hand go here; the job split comes next.</div>
+          </div>
+        </main>`
+      }
+
+      function render() {
+        const win = document.getElementById('win')
+        let html = ''
+        if (state.v === 'a') html = state.folded ? rail() + flyout() : fullSidebar()
+        if (state.v === 'b') html = rail() + lists()
+        if (state.v === 'c') html = state.folded ? rail() : fullSidebar()
+        win.innerHTML = html + content()
+        const pic = win.querySelector('.picture')
+        document.getElementById('wtag').textContent =
+          `picture ${Math.round(pic.getBoundingClientRect().width)} px wide`
+      }
+
+      document.getElementById('win').addEventListener('click', (e) => {
+        const t = e.target.closest('[data-act],[data-ws],[data-actid]')
+        if (!t) {
+          if (state.flyout) ((state.flyout = false), render())
+          return
+        }
+        if (t.dataset.act === 'fold') ((state.folded = !state.folded), (state.flyout = false))
+        else if (t.dataset.act === 'lists') state.lists = false
+        else if (t.dataset.actid) ((state.act = t.dataset.actid), (state.flyout = false))
+        else if (t.dataset.ws) {
+          const ws = t.dataset.ws
+          if (!WORKSPACES.some((w) => w.id === ws)) return
+          if (state.v === 'a' && state.folded && ws === 'images') state.flyout = !state.flyout
+          else if (state.v === 'b' && ws === state.open) state.lists = !state.lists
+          else if (ws === 'images') state.open = 'images'
+        }
+        render()
+      })
+      document.querySelectorAll('.tab').forEach((b) =>
+        b.addEventListener('click', () => {
+          state.v = b.dataset.v
+          state.flyout = false
+          document
+            .querySelectorAll('.tab')
+            .forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+          document
+            .querySelectorAll('[data-note]')
+            .forEach((n) => (n.hidden = n.dataset.note !== state.v))
+          render()
+        }),
+      )
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== '[') return
+        if (state.v === 'b') state.lists = !state.lists
+        else state.folded = !state.folded
+        state.flyout = false
+        render()
+      })
+      window.addEventListener('resize', render)
+      render()
+    </script>
+  </body>
+</html>
