@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { EDIT_MODEL_IDS, type EditModelId, type ImageDownload } from './imageModels'
 import { PatchAreaSchema, type PatchArea } from './imagePatches'
+import type { ImageTakeView } from './imageTakes'
 
 /** How many characters of the words the take's caption keeps. */
 const CAPTION_WORDS = 60
@@ -35,10 +36,10 @@ export const FineTuneBoardSchema = z.strictObject({
 /** An image's board of fine-tunes. */
 export type FineTuneBoard = z.infer<typeof FineTuneBoardSchema>
 
-/** The body of making fine-tunes: 1 to 6 of the words and mark, or the failed one again. */
+/** The body of making fine-tunes: 1 to 10 of the words and mark, or the failed one again. */
 export const MakeFineTunesBody = z.union([
   z.strictObject({
-    count: z.number().int().min(1).max(6),
+    count: z.number().int().min(1).max(10),
     words: z.string().refine((w) => w.trim() !== '', 'Say what to change.'),
     area: PatchAreaSchema.nullable(),
     /** The edit model for the new fine-tunes; the default one when left out. */
@@ -51,7 +52,7 @@ export const MakeFineTunesBody = z.union([
 export const UseFineTuneBody = z.strictObject({ n: z.number().int().positive() })
 
 /** The words as a caption shows them: on one line, shortened with an ellipsis. */
-function shortened(words: string): string {
+export function shortened(words: string): string {
   const one = words.replace(/\s+/g, ' ').trim()
   return one.length > CAPTION_WORDS ? `${one.slice(0, CAPTION_WORDS).trimEnd()}…` : one
 }
@@ -63,7 +64,7 @@ export function fineTuneCaption(from: number | null, words: string): string {
 }
 
 /**
- * What the green line says after "Use this": the new take is in the game, and the named areas and
+ * What the green line says after Choose: the new take is in the game, and the named areas and
  * chosen patches that came along, naming only what exists. `from` is the take it was made from,
  * null for the game's own image.
  */
@@ -140,3 +141,68 @@ export interface FineTunesView {
 export type UseFineTuneAnswer =
   | { ok: true; take: number; from: number | null; carried: { areas: number; patches: number } }
   | { ok: false; message: string }
+
+/** One step of a picture's history: the game's own image, or a take. */
+export type HistoryStep =
+  | { kind: 'game' }
+  | {
+      kind: 'take'
+      n: number
+      /** The words it was fine-tuned with; null for a take made from the prompt. */
+      words: string | null
+      /** Made from the prompt, fine-tuned from the game's own image, or fine-tuned from a take. */
+      from: 'prompt' | 'game' | 'take'
+      /** The picture in the game. */
+      inGame: boolean
+      /** Comes after the one in the game: choosing it again redoes. */
+      after: boolean
+    }
+
+/** The chain of the picture in the game, oldest first. */
+export interface FineTuneHistory {
+  steps: HistoryStep[]
+  /** The index of the step in the game. */
+  at: number
+  /** The take Undo chooses; null when there is no step before. */
+  undoTo: number | null
+}
+
+/**
+ * The history of the picture in the game, read from the takes' "fine-tuned from": the chain from
+ * the take made from the prompt (or from the game's own image) to the newest take that descends
+ * from the chosen one. The steps after the chosen one are kept so they can be redone; a fine-tune
+ * from an earlier step is the newest take, so the history follows its branch. A dropped take ends
+ * the chain there. Nothing is stored.
+ */
+export function fineTuneHistory(
+  takes: Pick<ImageTakeView, 'n' | 'fineTunedFrom'>[],
+  chosen: number | null,
+): FineTuneHistory {
+  const byN = new Map(takes.map((t) => [t.n, t]))
+  if (chosen === null || !byN.has(chosen)) return { steps: [{ kind: 'game' }], at: 0, undoTo: null }
+  /** The takes from `n` back to the oldest still on the board, newest first. */
+  const chainOf = (n: number): number[] => {
+    const chain = [n]
+    for (let t = byN.get(n); t?.fineTunedFrom?.take != null;) {
+      t = byN.get(t.fineTunedFrom.take)
+      if (!t || chain.includes(t.n)) break
+      chain.push(t.n)
+    }
+    return chain
+  }
+  const tip = Math.max(...takes.map((t) => t.n).filter((n) => chainOf(n).includes(chosen)))
+  const ns = chainOf(tip).reverse()
+  const steps = ns.map((n): HistoryStep => {
+    const from = byN.get(n)?.fineTunedFrom
+    return {
+      kind: 'take',
+      n,
+      words: from?.words ?? null,
+      from: !from ? 'prompt' : from.take === null ? 'game' : 'take',
+      inGame: n === chosen,
+      after: ns.indexOf(n) > ns.indexOf(chosen),
+    }
+  })
+  const at = ns.indexOf(chosen)
+  return { steps, at, undoTo: at > 0 ? ns[at - 1]! : null }
+}

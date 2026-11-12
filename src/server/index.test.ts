@@ -5634,7 +5634,7 @@ describe('the image fine-tune routes', () => {
   })
 
   it('refuses a bad body, and answers 404 for an image the game does not list', async () => {
-    expect((await send('POST', '', { count: 7, words: 'x', area: null })).status).toBe(400)
+    expect((await send('POST', '', { count: 11, words: 'x', area: null })).status).toBe(400)
     expect((await send('POST', '', { count: 1, words: ' ', area: null })).status).toBe(400)
     expect((await send('POST', '/use', { n: 'x' })).status).toBe(400)
     expect((await fetch(new URL('/api/images/ghost/fine-tunes', studio.url))).status).toBe(404)

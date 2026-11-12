@@ -4,6 +4,7 @@ import {
   FineTuneBoardSchema,
   fineTuneCaption,
   MakeFineTunesBody,
+  fineTuneHistory,
 } from './imageFineTunes'
 
 describe('fineTuneCaption', () => {
@@ -51,13 +52,13 @@ describe('cameAlongLine', () => {
 
 describe('MakeFineTunesBody', () => {
   const area = { x: 1, y: 2, width: 30, height: 40 }
-  test('takes 1 to 6 with words, a mark or none', () => {
-    expect(MakeFineTunesBody.safeParse({ count: 6, words: 'Add a cat', area }).success).toBe(true)
+  test('takes 1 to 10 with words, a mark or none', () => {
+    expect(MakeFineTunesBody.safeParse({ count: 10, words: 'Add a cat', area }).success).toBe(true)
     expect(MakeFineTunesBody.safeParse({ count: 1, words: 'Add a cat', area: null }).success).toBe(
       true,
     )
     expect(MakeFineTunesBody.safeParse({ count: 0, words: 'x', area: null }).success).toBe(false)
-    expect(MakeFineTunesBody.safeParse({ count: 7, words: 'x', area: null }).success).toBe(false)
+    expect(MakeFineTunesBody.safeParse({ count: 11, words: 'x', area: null }).success).toBe(false)
   })
   test('refuses empty words', () => {
     expect(MakeFineTunesBody.safeParse({ count: 2, words: '  ', area: null }).success).toBe(false)
@@ -77,5 +78,78 @@ describe('FineTuneBoardSchema', () => {
       tunes: [{ n: 1, base: 0, seed: 5, words: 'x', area: null, model: 'klein' }],
     })
     expect(board.tunes[0]?.seen).toBe(false)
+  })
+})
+
+describe('fineTuneHistory', () => {
+  const take = (n: number, from?: { take: number | null; words: string }) => ({
+    n,
+    fineTunedFrom: from,
+  })
+
+  test('is the game’s own image alone when no take is chosen', () => {
+    expect(fineTuneHistory([take(1)], null)).toEqual({
+      steps: [{ kind: 'game' }],
+      at: 0,
+      undoTo: null,
+    })
+  })
+
+  test('is one step for a take made from the prompt, with no undo', () => {
+    const h = fineTuneHistory([take(3), take(4)], 3)
+    expect(h.steps).toEqual([
+      { kind: 'take', n: 3, words: null, from: 'prompt', inGame: true, after: false },
+    ])
+    expect(h.undoTo).toBeNull()
+  })
+
+  test('lists the chain oldest first and undoes to the step before', () => {
+    const takes = [
+      take(3),
+      take(7, { take: 3, words: 'Add a rowing boat' }),
+      take(8, { take: 7, words: 'Light the lamp' }),
+    ]
+    const h = fineTuneHistory(takes, 8)
+    expect(h.steps.map((s) => (s.kind === 'take' ? s.n : 0))).toEqual([3, 7, 8])
+    expect(h.steps[2]).toMatchObject({ inGame: true, words: 'Light the lamp', from: 'take' })
+    expect(h.at).toBe(2)
+    expect(h.undoTo).toBe(7)
+  })
+
+  test('keeps the steps after the one in the game, dimmed, so they can be redone', () => {
+    const takes = [take(3), take(7, { take: 3, words: 'a' }), take(8, { take: 7, words: 'b' })]
+    const h = fineTuneHistory(takes, 7)
+    expect(h.steps.map((s) => s.kind === 'take' && [s.n, s.inGame, s.after])).toEqual([
+      [3, false, false],
+      [7, true, false],
+      [8, false, true],
+    ])
+    expect(h.undoTo).toBe(3)
+  })
+
+  test('follows the newest branch from an earlier step', () => {
+    const takes = [
+      take(3),
+      take(7, { take: 3, words: 'a' }),
+      take(8, { take: 7, words: 'b' }),
+      take(9, { take: 3, words: 'c' }),
+    ]
+    expect(fineTuneHistory(takes, 9).steps.map((s) => s.kind === 'take' && s.n)).toEqual([3, 9])
+    expect(fineTuneHistory(takes, 3).steps.map((s) => s.kind === 'take' && s.n)).toEqual([3, 9])
+    expect(fineTuneHistory(takes, 7).steps.map((s) => s.kind === 'take' && s.n)).toEqual([3, 7, 8])
+  })
+
+  test('ends the chain at a take that was dropped', () => {
+    const takes = [take(7, { take: 3, words: 'a' }), take(8, { take: 7, words: 'b' })]
+    const h = fineTuneHistory(takes, 8)
+    expect(h.steps.map((s) => s.kind === 'take' && s.n)).toEqual([7, 8])
+    expect(h.steps[0]).toMatchObject({ from: 'take' })
+  })
+
+  test('starts at a fine-tune of the game’s own image', () => {
+    const takes = [take(5, { take: null, words: 'Add a lamp' })]
+    expect(fineTuneHistory(takes, 5).steps).toEqual([
+      { kind: 'take', n: 5, words: 'Add a lamp', from: 'game', inGame: true, after: false },
+    ])
   })
 })

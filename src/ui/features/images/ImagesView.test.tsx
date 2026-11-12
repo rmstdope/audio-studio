@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagesRoute } from '../../route'
 import type { GameArea, GamePatch, ImageEdits, ImageStyle, MadeFrom } from '../../../core/images'
@@ -23,6 +23,8 @@ const { ImagesView } = await import('./ImagesView')
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const cleanups: (() => void)[] = []
+// A page left mounted would keep hearing the document's keys in the next test.
+afterEach(() => cleanups.splice(0).forEach((c) => c()))
 afterAll(() => {
   cleanups.forEach((c) => c())
   GlobalRegistrator.unregister()
