@@ -1102,13 +1102,13 @@ describe('the patches the game asks for', () => {
   const door = { id: 'door-ajar', title: 'Door ajar', description: 'Open the door' }
   const heading = (page: HTMLElement) => [...page.querySelectorAll('h2')].map((h) => text(h))
 
-  it('puts a panel under the workbench and above the trial, whose heading is renamed', () => {
+  it('puts a panel under the workbench, one pick for each patch', () => {
     const page = render(
       { view: 'images', page: 'image', image: 'inn', from: 'act1' },
       summary({ patches: [lamp, door] }),
     )
     expect(heading(page)).toEqual(['Prompt', 'Fine-tune the picture', 'Patches the game asks for'])
-    expect(page.querySelectorAll('.game-patch-row').length).toBe(2)
+    expect(page.querySelectorAll('.patch-pick').length).toBe(2)
   })
 
   it('leaves the page as it is when the game asks for none', () => {
@@ -1169,20 +1169,19 @@ describe('the patches the game asks for', () => {
       ).toEqual(["the game changed a patch's words", 'make again: Door ajar'])
     })
 
-    it('marks the row of the patch on the image’s page with a chip, after the changed-here mark', () => {
+    it('marks the patch on the image’s page with a chip', () => {
       const edits = {
         inn: { patches: { 'lamp-lit': { text: 'Dim it', gameWas: 'Light the lamp' } } },
       }
       const page = render(image, settled({ edits, choices: { 'lamp-lit': [2] } }))
-      const [first, second] = [...page.querySelectorAll('.game-patch-row')]
-      expect(text(first!.querySelector('.game-patch-end'))).toBe('changed hereMake again')
+      const [first, second] = [...page.querySelectorAll('.patch-pick')]
       expect(first!.querySelector('.chip-warn')?.textContent).toBe('Make again')
       expect(second!.querySelector('.chip-warn')).toBeNull()
     })
 
     it('says, in a line above the words when opened, where it was chosen and how to get it back', () => {
       const page = render(image, settled({ choices: { 'lamp-lit': [1, 2] } }))
-      act(() => page.querySelector<HTMLButtonElement>('.game-patch-row')!.click())
+      act(() => page.querySelector<HTMLButtonElement>('.patch-pick')!.click())
       const line = page.querySelector('.game-patch-body .make-again-line')
       expect(text(line)).toBe(
         'Chosen on takes 1 and 2 of the image, so the game does not show it now. Make a new one here, or choose one of those takes again to bring it back.',
@@ -1191,7 +1190,7 @@ describe('the patches the game asks for', () => {
 
     it('has no chip or line once the patch has a chosen take on the take in the game', () => {
       const page = render(image, settled({ choices: { 'lamp-lit': [2, 4] } }))
-      expect(page.querySelector('.game-patch-row .chip-warn')).toBeNull()
+      expect(page.querySelector('.patch-pick .chip-warn')).toBeNull()
     })
   })
 

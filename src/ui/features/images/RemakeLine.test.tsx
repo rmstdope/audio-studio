@@ -35,6 +35,16 @@ const patch = (id: string, over: Partial<PatchRow> = {}): PatchRow => ({
   chosenArea: null,
   ...over,
 })
+const takeOf = (n: number, isNew = false) => ({
+  n,
+  area,
+  earlier: false,
+  chosen: false,
+  isNew,
+  look: 'ready' as const,
+  model: 'klein' as const,
+  kept: null,
+})
 const idle = (id: string, over: Partial<PatchWorkView> = {}): PatchWorkView => ({
   id,
   takes: [],
@@ -89,7 +99,7 @@ async function render({
         ok: true,
         take:
           chosenTake === null ? null : { n: chosenTake, width: 1024, height: 640, cropped: false },
-        game: { width: 640, height: 400 },
+        game: { width: 400, height: 400 },
         lookError: null,
         lookKey: 'k',
         lockUnread: false,
@@ -118,8 +128,8 @@ async function render({
         createElement(GamePatchesPanel, {
           row: {
             id: 'inn',
-            width: 640,
-            height: 400,
+            width: 400,
+            height: 640,
             chosenTake,
             areas: [],
             patches,
@@ -167,7 +177,7 @@ describe('the Remake patches line', () => {
     expect(lines((await render({ patches: [patch('door', { chosenOn: [] })] })).host)).toBe('')
     const has = await render({
       patches: [patch('door')],
-      work: [idle('door', { takes: [{ n: 1 } as never] })],
+      work: [idle('door', { takes: [takeOf(1)] })],
     })
     expect(lines(has.host)).toBe('')
     expect(lines((await render({ chosenTake: null })).host)).toBe('')
@@ -210,7 +220,7 @@ describe('the Remake patches line', () => {
     expect(text(one.host.querySelector('.remake-leftout'))).toBe(
       'Bread taken has no area to make it from: open it and mark one.',
     )
-    expect(one.host.querySelector('select')).toBeNull()
+    expect(one.host.querySelector('select[aria-label="Takes of each patch"]')).toBeNull()
     const two = await render({ earlier: {} })
     expect(text(two.host.querySelector('.remake-leftout'))).toBe(
       'Bread taken, Door open and Lamp lit have no area to make them from: open them and mark one each.',
@@ -278,20 +288,16 @@ describe('the press while it runs and after', () => {
     expect(lines(host)).toBe(
       'Making 6 takes for 3 patches with FLUX.2 klein · about 2 min leftStop',
     )
-    expect(host.querySelector('select')).toBeNull()
-    const rows = [...host.querySelectorAll('button.game-patch-row')].map((r) => text(r))
+    expect(host.querySelector('select[aria-label="Takes of each patch"]')).toBeNull()
+    const rows = [...host.querySelectorAll('button.patch-pick')].map((r) => text(r))
     expect(rows[0]).toContain('Making 2 takes')
     expect(rows[1]).toContain('Waiting')
-    expect(host.querySelectorAll('button[aria-expanded="true"]').length).toBe(0)
     await act(async () => button(host, 'Stop').click())
     expect(sent[0]!.path).toBe('/api/images/inn/patches/remake/stop')
   })
 
   it('becomes a summary with Close, and the rows read as agreed with "new"', async () => {
-    const takes = [
-      { n: 1, isNew: true },
-      { n: 2, isNew: true },
-    ] as never
+    const takes = [takeOf(1, true), takeOf(2, true)]
     const { host, sent } = await render({
       pressed: press({ made: 6 }),
       work: [idle('bread', { takes }), idle('door', { takes }), idle('lamp', { takes })],
@@ -299,13 +305,13 @@ describe('the press while it runs and after', () => {
     expect(lines(host)).toBe(
       'Made 6 of 6 takes. Choose one for each patch to put it back in the game.Close',
     )
-    const first = host.querySelector('button.game-patch-row')!
-    expect(text(first)).toContain('2 takes, none chosen')
+    const first = host.querySelector('button.patch-pick')!
+    expect(text(first)).toContain('2 takes')
     expect(text(first)).toContain('new')
     expect(text(first)).toContain('Make again')
     await act(async () => button(host, 'Close').click())
     await act(async () => await new Promise((r) => setTimeout(r, 10)))
-    expect(sent[0]!.path).toBe('/api/images/inn/patches/remake/close')
+    expect(sent.map((x) => x.path)).toContain('/api/images/inn/patches/remake/close')
     expect(document.activeElement).toBe(first)
   })
 
@@ -330,7 +336,7 @@ describe('the press while it runs and after', () => {
     expect(lines(failed.host)).toContain(
       'Made 5 of 6 takes. 1 could not be made — Door open says why.',
     )
-    const rows = [...failed.host.querySelectorAll('button.game-patch-row')].map((r) => text(r))
+    const rows = [...failed.host.querySelectorAll('button.patch-pick')].map((r) => text(r))
     expect(rows[1]).toContain('no takes yet · 1 could not be made')
   })
 
@@ -346,9 +352,7 @@ describe('the press while it runs and after', () => {
     const link = [...host.querySelectorAll('.remake-line button.link-button')][0]!
     expect(text(link)).toBe('Door open')
     await act(async () => (link as HTMLButtonElement).click())
-    expect(host.querySelectorAll('button.game-patch-row')[1]!.getAttribute('aria-expanded')).toBe(
-      'true',
-    )
+    expect(host.querySelectorAll('button.patch-pick')[1]!.getAttribute('aria-current')).toBe('true')
   })
 
   it('says "Made 0 of 6 takes." when nothing could be made', async () => {

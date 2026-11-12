@@ -38,6 +38,7 @@ async function render(
   patches: PatchRow[],
   answer: { status: number; body: unknown } = { status: 200, body: { ok: true } },
   view: Record<string, unknown> | null = {},
+  shape: { width?: number; height?: number; chosenTake?: number | null } = {},
 ) {
   const sent: { method: string; path: string; body: unknown }[] = []
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
@@ -72,7 +73,9 @@ async function render(
       createElement(
         QueryClientProvider,
         { client },
-        createElement(GamePatchesPanel, { row: { id: 'inn', patches } as ImageRow }),
+        createElement(GamePatchesPanel, {
+          row: { id: 'inn', patches, chosenTake: null, ...shape } as ImageRow,
+        }),
       ),
     )
   })
@@ -85,8 +88,8 @@ async function render(
   return { host, sent }
 }
 
-const rowButtons = (host: Element) => [
-  ...host.querySelectorAll<HTMLButtonElement>('button.game-patch-row'),
+const pickButtons = (host: Element) => [
+  ...host.querySelectorAll<HTMLButtonElement>('button.patch-pick'),
 ]
 const text = (el: Element | null) => el?.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 
@@ -110,55 +113,100 @@ describe('GamePatchesPanel', () => {
     expect(host.innerHTML).toBe('')
   })
 
-  it('lists the patches by title with their id, all closed, each row a button that says so', async () => {
+  it('opens the first patch on arrival, and lists every patch as a button that says which is open', async () => {
     const { host } = await render([patch('bread-taken'), patch('door-ajar')])
-    expect(text(host.querySelector('h2'))).toBe('Patches the game asks for')
-    expect(text(host.querySelector('.game-patches-intro'))).toBe(
-      'Small changes the game lays over this image when it needs them.',
+    expect(host.querySelector('section')!.getAttribute('aria-label')).toBe(
+      'Patches the game asks for',
     )
-    const rows = rowButtons(host)
-    expect(rows.map((r) => text(r))).toEqual([
-      '▸Title of bread-takenbread-taken',
-      '▸Title of door-ajardoor-ajar',
-    ])
-    expect(rows.map((r) => r.getAttribute('aria-expanded'))).toEqual(['false', 'false'])
-    expect(host.querySelector('textarea')).toBeNull()
+    const picks = pickButtons(host)
+    expect(picks.map((r) => r.getAttribute('aria-current'))).toEqual(['true', null])
+    expect(host.querySelectorAll('textarea').length).toBe(1)
+    expect(host.querySelector('textarea')!.value).toBe('Game words of bread-taken')
   })
 
-  it('opens a patch in place with one field of words and closes it again; several can be open', async () => {
+  it('opens one patch at a time: another press swaps the open patch', async () => {
     const { host } = await render([patch('bread-taken'), patch('door-ajar')])
-    const [first, second] = rowButtons(host)
-    await act(async () => first!.click())
-    await act(async () => second!.click())
-    expect(rowButtons(host).map((r) => r.getAttribute('aria-expanded'))).toEqual(['true', 'true'])
-    const fields = [...host.querySelectorAll('textarea')]
-    expect(fields.map((f) => f.value)).toEqual([
-      'Game words of bread-taken',
-      'Game words of door-ajar',
-    ])
+    await act(async () => pickButtons(host)[1]!.click())
+    expect(pickButtons(host).map((r) => r.getAttribute('aria-current'))).toEqual([null, 'true'])
+    expect(host.querySelectorAll('textarea').length).toBe(1)
+    expect(host.querySelector('textarea')!.value).toBe('Game words of door-ajar')
     expect(text(host.querySelector('label'))).toBe('What should change')
     expect(text(host.querySelector('.field-tag'))).toBe('from the game')
-    await act(async () => first!.click())
-    expect(host.querySelectorAll('textarea').length).toBe(1)
-    expect(rowButtons(host)[0]!.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('keeps the chevron apart from the words, so a long title wraps beside it (as-9b8)', async () => {
-    const { host } = await render([patch('bread-taken', { changed: true })])
-    const [chevron, words, ...others] = [...rowButtons(host)[0]!.children]
-    expect(chevron!.className).toBe('game-patch-chev')
-    expect(others.length).toBe(0)
-    expect(words!.className).toBe('game-patch-words')
-    expect([...words!.children].map((c) => text(c))).toEqual([
-      'Title of bread-taken',
-      'bread-taken',
-      'changed here',
+  it('lists the patches beside a portrait image: title, id and state, headed with how many are chosen', async () => {
+    const { host } = await render(
+      [patch('bread-taken', { chosenOn: [2] }), patch('door-ajar')],
+      undefined,
+      {
+        patches: [
+          { id: 'bread-taken', takes: [{ n: 1, chosen: true }], making: [], failed: [] },
+          { id: 'door-ajar', takes: [], making: [], failed: [] },
+        ],
+      },
+      { width: 600, height: 800, chosenTake: 2 },
+    )
+    expect(host.querySelector('.patches-chips')).toBeNull()
+    const side = host.querySelector('.patches-side')!
+    expect(text(side.querySelector('h3'))).toBe('Patches · 1 of 2 chosen')
+    expect(pickButtons(host).map((r) => text(r))).toEqual([
+      'Title of bread-takenbread-takenTake 1 chosen',
+      'Title of door-ajardoor-ajarno takes yet',
     ])
+  })
+
+  it('puts the patches as a row of chips above a landscape or square image, the id as the tip', async () => {
+    for (const size of [
+      { width: 800, height: 600 },
+      { width: 600, height: 600 },
+    ]) {
+      const { host } = await render(
+        [patch('bread-taken', { chosenOn: [2] }), patch('door-ajar')],
+        undefined,
+        {},
+        { ...size, chosenTake: 2 },
+      )
+      expect(host.querySelector('.patches-side')).toBeNull()
+      const bar = host.querySelector('.patches-chips')!
+      expect(text(bar.querySelector('.label'))).toBe('Patches · 1 of 2 chosen')
+      expect(pickButtons(host).map((r) => text(r))).toEqual([
+        'Title of bread-taken',
+        'Title of door-ajar',
+      ])
+      expect(pickButtons(host).map((r) => r.title)).toEqual(['bread-taken', 'door-ajar'])
+      expect(pickButtons(host).map((r) => r.querySelector('.dot')?.className)).toEqual([
+        'dot ok',
+        'dot',
+      ])
+    }
+  })
+
+  it('opens by itself, instead of the first, the patch whose game words changed', async () => {
+    const { host } = await render([
+      patch('bread-taken'),
+      patch('door-ajar', { changed: true, gameChanged: true, gameWas: 'Old' }),
+    ])
+    expect(pickButtons(host).map((r) => r.getAttribute('aria-current'))).toEqual([null, 'true'])
+  })
+
+  it('marks a patch reworded here on its row in the list', async () => {
+    const { host } = await render(
+      [
+        patch('bread-taken', {
+          changed: true,
+          words: 'Mine',
+          gameWas: 'Game words of bread-taken',
+        }),
+      ],
+      undefined,
+      {},
+      { width: 600, height: 800 },
+    )
+    expect(text(pickButtons(host)[0]!.querySelector('.game-patch-mark'))).toBe('changed here')
   })
 
   it('saves rewording when the field is left, shows Saved, and the game’s words', async () => {
     const { host, sent } = await render([patch('bread-taken')])
-    await act(async () => rowButtons(host)[0]!.click())
     await reword(host.querySelector('textarea')!, 'No bread at all')
     expect(sent).toEqual([
       {
@@ -174,8 +222,6 @@ describe('GamePatchesPanel', () => {
     const { host, sent } = await render([
       patch('bread-taken', { changed: true, words: 'Mine', gameWas: 'Game words of bread-taken' }),
     ])
-    expect(text(rowButtons(host)[0]!.querySelector('.game-patch-mark'))).toBe('changed here')
-    await act(async () => rowButtons(host)[0]!.click())
     expect(text(host.querySelector('.field-tag'))).toBe("changed here · use the game's")
     expect(text(host.querySelector('.game-patch-body .muted'))).toBe(
       "The game's words: Game words of bread-taken",
@@ -195,10 +241,7 @@ describe('GamePatchesPanel', () => {
         gameWas: 'Old door words',
       }),
     ])
-    expect(rowButtons(host).map((r) => r.getAttribute('aria-expanded'))).toEqual(['false', 'true'])
-    expect(text(rowButtons(host)[1]!.querySelector('.game-patch-mark'))).toBe(
-      'the game changed its words',
-    )
+    expect(pickButtons(host).map((r) => r.getAttribute('aria-current'))).toEqual([null, 'true'])
     const notice = host.querySelector('.notice')!
     expect(text(notice.querySelector('strong'))).toBe(
       "The game changed this patch's words since you wrote your own.",
@@ -233,7 +276,7 @@ describe('GamePatchesPanel', () => {
       path: '/api/images/inn/game-patches/door-ajar/compare',
       body: { choice: 'game' },
     })
-    expect(rowButtons(host)[0]!.getAttribute('aria-expanded')).toBe('true')
+    expect(pickButtons(host)[0]!.getAttribute('aria-current')).toBe('true')
     expect(document.activeElement).toBe(host.querySelector('textarea'))
   })
 
@@ -260,7 +303,6 @@ describe('GamePatchesPanel', () => {
         ],
       },
     })
-    await act(async () => rowButtons(host)[0]!.click())
     await reword(host.querySelector('textarea')!, 'x')
     expect(text(host.querySelector('.game-patch-body'))).toContain('cannot be written')
     expect(host.querySelector('.saved')).toBeNull()
@@ -286,8 +328,7 @@ describe('GamePatchesPanel', () => {
       expect(text(notice.querySelector('.muted'))).toBe(
         'If the game shows both at once, one is drawn over the other where they meet.',
       )
-      expect(notice.previousElementSibling?.className).toContain('game-patches-intro')
-      expect(notice.nextElementSibling?.className).toContain('game-patch-list')
+      expect(notice.nextElementSibling?.className).toContain('patches-layout')
       expect(notice.querySelectorAll('button, a, [tabindex]').length).toBe(0)
     })
     it('lists every pair under a shorter heading, in the game’s order', async () => {
@@ -309,13 +350,11 @@ describe('GamePatchesPanel', () => {
     })
     it('puts one amber line at the top of an open patch, naming each patch it overlaps', async () => {
       const { host } = await render(three())
-      await act(async () => rowButtons(host)[0]!.click())
-      await act(async () => rowButtons(host)[1]!.click())
-      const lines = [...host.querySelectorAll('.game-patch-body .line-warn')]
-      expect(lines.map((l) => text(l))).toEqual([
-        'The chosen take overlaps Door ajar and Fire out.',
-        'The chosen take overlaps Bread taken and Fire out.',
-      ])
+      const first = () => text(host.querySelector('.game-patch-body .line-warn'))
+      expect(first()).toBe('The chosen take overlaps Door ajar and Fire out.')
+      await act(async () => pickButtons(host)[1]!.click())
+      expect(first()).toBe('The chosen take overlaps Bread taken and Fire out.')
+      expect(host.querySelectorAll('.game-patch-body .line-warn').length).toBe(1)
       const body = host.querySelector('.game-patch-body')!
       expect(
         body.querySelector('.line-warn')!.nextElementSibling?.querySelector('textarea'),
@@ -323,7 +362,7 @@ describe('GamePatchesPanel', () => {
     })
     it('puts no line in an open patch that overlaps nothing', async () => {
       const { host } = await render([...three().slice(0, 2), patch('far', { chosenArea: at(500) })])
-      await act(async () => rowButtons(host)[2]!.click())
+      await act(async () => pickButtons(host)[2]!.click())
       expect(host.querySelector('.line-warn')).toBeNull()
     })
   })

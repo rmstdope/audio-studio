@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { makeAgainOf, overlappingPatches, tieOf } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
 import { off } from '../../off'
@@ -12,17 +12,17 @@ import {
   overlapPairLine,
 } from '../../imagesText'
 import {
-  patchSummary,
   type ImagePatchesView,
   type PatchTie,
   type PatchArea,
   type PatchWorkView,
 } from '../../../core/imagePatches'
-import { progressOf } from '../../musicTakesText'
 import { useImagePatchCompare, useImagePatches, useSetImagePatchWords } from '../../api'
 import { startEditModel, type EditModelId } from '../../../core/imageModels'
-import { patchRowId, RemakeLine } from './RemakeLine'
+import { progressOf } from '../../musicTakesText'
 import { rowFailed, rowMaking } from '../../remakeText'
+import { patchChosen, patchesHeading, patchLayoutOf, patchStateText } from '../../imageJobs'
+import { patchRowId, RemakeLine } from './RemakeLine'
 import { PatchWorkbench } from './PatchWorkbench'
 import { WordsField, type SaveWordsNow } from './WordsField'
 
@@ -154,6 +154,7 @@ function PatchBody({
         <PatchWorkbench
           imageId={imageId}
           patchId={patch.id}
+          title={patch.title}
           view={view}
           work={work}
           words={words}
@@ -176,14 +177,15 @@ function PatchBody({
 }
 
 /**
- * The patches the game asks for on an image, a list of titles that open in place to the words of
- * the edit, which can be reworded. Any number are open at once; a patch whose game words changed
- * under the user's opens by itself. Nothing on the page when the game asks for none.
+ * The patches the game asks for on an image, laid out by the image's shape: a list beside a
+ * portrait image, a row of chips above any other. One patch is open at a time, the first whose
+ * game words changed under the user's, else the first. Nothing on the page when the game asks for
+ * none.
  */
 export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [saved, setSaved] = useState(false)
   const query = useImagePatches(row.id)
-  // The marks the person made their own live here, not in the open patch, so closing and opening a row keeps them.
+  // The marks the person made their own live here, not in the open patch, so switching patches keeps them.
   const [marks, setMarks] = useState<Record<string, PatchArea>>({})
   // The box "What the game gets" of each patch lives here too; every box is ticked when the page opens.
   const [games, setGames] = useState<Record<string, boolean>>({})
@@ -192,17 +194,12 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [remakePick, setRemakePick] = useState<EditModelId | null>(null)
   const view = query.data && 'patches' in query.data ? query.data : null
   const again = new Set(makeAgainOf(row).map((patch) => patch.id))
-  const [open, setOpen] = useState(
-    () => new Set(row.patches.filter((patch) => patch.gameChanged).map((patch) => patch.id)),
+  const [chosenId, setOpenId] = useState<string | null>(
+    () => row.patches.find((patch) => patch.gameChanged)?.id ?? null,
   )
-  // A patch named in the press's summary opens and scrolls into view once its row is there.
-  const [reveal, setReveal] = useState<string | null>(null)
-  useEffect(() => {
-    if (reveal === null) return
-    document.getElementById(patchRowId(reveal))?.scrollIntoView?.({ block: 'nearest' })
-    setReveal(null)
-  }, [reveal, open])
   if (row.patches.length === 0) return null
+  const openId = row.patches.some((p) => p.id === chosenId) ? chosenId! : row.patches[0]!.id
+  const patch = row.patches.find((p) => p.id === openId)!
   // Nothing is said until the patches are loaded, nor when the chosen picture or the lock cannot be read.
   const pairs = view && !view.pictureGone && !view.lockUnread ? overlappingPatches(row.patches) : []
   const overlapsOf = (id: string) =>
@@ -211,25 +208,73 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
     const titles = overlapsOf(id)
     return titles.length > 0 ? overlapOpenLine(titles) : null
   }
-  const toggle = (id: string) =>
-    setOpen((now) => {
-      const next = new Set(now)
-      if (!next.delete(id)) next.add(id)
-      return next
-    })
+  const heading = patchesHeading(row)
+  const list = patchLayoutOf(row) === 'list'
+  const workOf = (id: string) => view?.patches.find((p) => p.id === id) ?? null
+  const pick = (p: PatchRow) => {
+    const work = workOf(p.id)
+    return (
+      <button
+        key={p.id}
+        id={patchRowId(p.id)}
+        className={list ? 'patch-pick patch-pick-row' : 'patch-pick pchip'}
+        type="button"
+        title={list ? undefined : p.id}
+        aria-current={p.id === openId ? 'true' : undefined}
+        onClick={() => setOpenId(p.id)}
+      >
+        {list ? (
+          <>
+            <span className="patch-pick-top">
+              <b>{p.title}</b>
+              {p.changed && (
+                <span className="game-patch-mark">
+                  {p.gameChanged ? 'the game changed its words' : 'changed here'}
+                </span>
+              )}
+              {work?.takes.some((t) => t.isNew) && <span className="chip chip-new">new</span>}
+            </span>
+            <span className="mono muted">{p.id}</span>
+            {again.has(p.id) && <span className="chip chip-warn">Make again</span>}
+            {work && (
+              <span className="patch-pick-state">
+                {work.making.length > 0 ? (
+                  <span className="game-patch-summary">
+                    <span className="bar game-patch-bar" aria-hidden="true">
+                      <i style={{ width: `${Math.round(progressOf(work.making[0]!) * 100)}%` }} />
+                    </span>{' '}
+                    {rowMaking(work.making)}
+                  </span>
+                ) : (
+                  <span className={`chip ${work.takes.some((t) => t.chosen) ? 'chip-ok' : ''}`}>
+                    {patchStateText(work.takes)}
+                  </span>
+                )}
+                {rowFailed(work.failed.length) && (
+                  <span className="game-patch-summary">{rowFailed(work.failed.length)}</span>
+                )}
+                {work.oldLook && <span className="chip chip-warn">Old look</span>}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <span className={`dot${patchChosen(row, p) ? ' ok' : ''}`} aria-hidden="true" />
+            {p.title}
+            {again.has(p.id) && <span className="chip chip-warn">Make again</span>}
+          </>
+        )}
+      </button>
+    )
+  }
   return (
     <section className="panel game-patches" aria-label="Patches the game asks for">
-      <div className="brief-panel-head">
-        <h2>Patches the game asks for</h2>
-        {saved && (
-          <span className="saved" role="status">
-            Saved
-          </span>
-        )}
-      </div>
-      <p className="muted game-patches-intro">
-        Small changes the game lays over this image when it needs them.
-      </p>
+      <h2 className="sr-only">Patches the game asks for</h2>
+      {saved && (
+        <span className="saved" role="status">
+          Saved
+        </span>
+      )}
       {pairs.length > 0 && (
         <section className="notice notice-warn" aria-label="Overlapping patches">
           <div className="notice-text">
@@ -252,91 +297,44 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
           marks={marks}
           model={remakePick ?? startEditModel(view.models)}
           onModel={setRemakePick}
-          onOpen={(id) => {
-            setOpen((now) => new Set(now).add(id))
-            setReveal(id)
-          }}
+          onOpen={(id) => setOpenId(id)}
         />
       )}
-      <ul className="game-patch-list">
-        {row.patches.map((patch) => {
-          const isOpen = open.has(patch.id)
-          const work = view?.patches.find((p) => p.id === patch.id) ?? null
-          const summary = work ? patchSummary(work.takes) : null
-          return (
-            <li key={patch.id}>
-              <button
-                id={patchRowId(patch.id)}
-                className="game-patch-row"
-                type="button"
-                aria-expanded={isOpen}
-                onClick={() => toggle(patch.id)}
-              >
-                <span className="game-patch-chev" aria-hidden="true">
-                  {isOpen ? '▾' : '▸'}
-                </span>
-                <span className="game-patch-words">
-                  <b>{patch.title}</b>
-                  <span className="mono muted">{patch.id}</span>
-                  <span className="game-patch-end">
-                    {patch.changed && (
-                      <span className="game-patch-mark">
-                        {patch.gameChanged ? 'the game changed its words' : 'changed here'}
-                      </span>
-                    )}
-                    {summary && (
-                      <span className="game-patch-summary">
-                        {work && work.making.length > 0 ? (
-                          <>
-                            <span className="bar game-patch-bar" aria-hidden="true">
-                              <i
-                                style={{
-                                  width: `${Math.round(progressOf(work.making[0]!) * 100)}%`,
-                                }}
-                              />
-                            </span>{' '}
-                            {rowMaking(work.making)}
-                          </>
-                        ) : (
-                          summary.text
-                        )}
-                        {work && rowFailed(work.failed.length)}
-                      </span>
-                    )}
-                    {work?.takes.some((t) => t.isNew) && <span className="chip chip-new">new</span>}
-                    {summary?.chip && <span className="chip chip-ok">{summary.chip}</span>}
-                    {again.has(patch.id) && <span className="chip chip-warn">Make again</span>}
-                    {work?.oldLook && <span className="chip chip-warn">Old look</span>}
-                  </span>
-                </span>
-              </button>
-              {isOpen && (
-                <PatchBody
-                  imageId={row.id}
-                  patch={patch}
-                  view={view}
-                  work={work}
-                  mark={marks[patch.id] ?? null}
-                  onMark={(area) => setMarks((now) => ({ ...now, [patch.id]: area }))}
-                  onBackToArea={() => setMarks(({ [patch.id]: _own, ...others }) => others)}
-                  tie={tieOf(row, patch)}
-                  imageSize={row}
-                  game={games[patch.id] ?? true}
-                  onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
-                  model={picks[patch.id] ?? startEditModel(view?.models ?? {})}
-                  onModel={(model) => setPicks((now) => ({ ...now, [patch.id]: model }))}
-                  onSaved={() => setSaved(true)}
-                  onEdit={() => setSaved(false)}
-                  overlapLine={overlapLineOf(patch.id)}
-                  makeAgainLine={
-                    again.has(patch.id) ? makeAgainOpenLine(patch.chosenOn, row.chosenTake) : null
-                  }
-                />
-              )}
-            </li>
-          )
-        })}
-      </ul>
+      <div className={list ? 'patches-layout patches-lefty' : 'patches-layout'}>
+        {list ? (
+          <div className="patches-side">
+            <h3>{heading}</h3>
+            <div className="patches-list">{row.patches.map(pick)}</div>
+          </div>
+        ) : (
+          <div className="patches-chips">
+            <span className="label">{heading}</span>
+            {row.patches.map(pick)}
+          </div>
+        )}
+        <PatchBody
+          key={patch.id}
+          imageId={row.id}
+          patch={patch}
+          view={view}
+          work={workOf(patch.id)}
+          mark={marks[patch.id] ?? null}
+          onMark={(area) => setMarks((now) => ({ ...now, [patch.id]: area }))}
+          onBackToArea={() => setMarks(({ [patch.id]: _own, ...others }) => others)}
+          tie={tieOf(row, patch)}
+          imageSize={row}
+          game={games[patch.id] ?? true}
+          onGame={(on) => setGames((now) => ({ ...now, [patch.id]: on }))}
+          model={picks[patch.id] ?? startEditModel(view?.models ?? {})}
+          onModel={(model) => setPicks((now) => ({ ...now, [patch.id]: model }))}
+          onSaved={() => setSaved(true)}
+          onEdit={() => setSaved(false)}
+          overlapLine={overlapLineOf(patch.id)}
+          makeAgainLine={
+            again.has(patch.id) ? makeAgainOpenLine(patch.chosenOn, row.chosenTake) : null
+          }
+        />
+      </div>
     </section>
   )
 }

@@ -1429,10 +1429,14 @@ style and None. `partStyle: null` in the image's edit means None; `partStyle: <a
 act, and a missing, unlisted or style-less pick is the first listing act (None when it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`.
 
 **The patches the game asks for** (as-bo8.1; `ImageRow.patches`, `ui/features/images/GamePatchesPanel.tsx`).
-An image whose list carries patches gets a full-width panel, "Patches the game asks for", directly
-below the workbench: a
-list of titles, each with its id, that open in place (any number at once; all closed on load except a
-patch whose game words changed under the user's) to the patch's workbench (as-bo8.2, below): one field of words, reworded as the image's own
+An image whose list carries patches gets a panel, the Patches tab of the image's page
+(as-kw3x.5; `GamePatchesPanel.tsx`), laid out by the image's declared shape (`patchLayoutOf` in
+`ui/imageJobs.ts`): beside a portrait image (taller than wide) the patches are a list on the left
+(about 220 px; title, id and a state chip: "Take 2 chosen", "3 takes", "no takes yet"), above a
+landscape or square image they are a row of chips (a dot green when chosen), both headed "Patches · 2 of 5
+chosen". One patch is open at a time (on arrival the first whose game words changed under the
+user's, else the first), shown as the patch's workbench (as-bo8.2, below): the stage, the tools and
+the takes strip below both. The patch's workbench has one field of words, reworded as the image's own
 words are. The rewording is `images.<id>.patches.<patchId>: { text, gameWas }` in the edits
 (`applyPatchWordsChange`, `resolvePatchCompare`; `PATCH /api/images/:id/game-patches/:patch`,
 `{ words }`, and `POST …/compare`, `{ choice }`), with the same notice, "Use the game's" and "Keep
