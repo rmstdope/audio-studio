@@ -196,6 +196,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
       if (event.key.toLowerCase() !== 's') return
       if (event.metaKey || event.ctrlKey || event.altKey || typingIn(event.target)) return
       setClean(true)
+      setGesture(null)
     }
     const release = (event: globalThis.KeyboardEvent) => {
       if (event.key.toLowerCase() === 's') setClean(false)
@@ -283,7 +284,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     )
 
   const down = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || event.ctrlKey || !ready) return
+    if (event.button !== 0 || event.ctrlKey || !ready || clean) return
     event.preventDefault()
     const at = pointAt(event)
     const handle = (event.target as HTMLElement).dataset?.handle as Handle | undefined
@@ -383,7 +384,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
   }
 
   const keys = (event: KeyboardEvent<HTMLElement>, area: AreaRow) => {
-    if (area.id !== selected || !area.box) return
+    if (clean || area.id !== selected || !area.box) return
     if (event.target !== rowButtons.current[area.id]) return
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
@@ -530,12 +531,15 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                   onError={() => setUnreadable(view.take?.n ?? null)}
                 />
                 {patches
-                  .filter((patch) => patch.src && shown.has(patch.id))
+                  .filter(
+                    (patch): patch is ListedPatch & { src: string } =>
+                      !!patch.src && shown.has(patch.id),
+                  )
                   .map((patch) => (
                     <img
                       key={patch.id}
                       className="named-area-take named-area-patch"
-                      src={patch.src!}
+                      src={patch.src}
                       alt={patch.title}
                       draggable={false}
                     />

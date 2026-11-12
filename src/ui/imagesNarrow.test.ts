@@ -112,6 +112,8 @@ describe('the list beside the named areas picture (as-kw3x.6)', () => {
     expect(rule('.named-areas-side')).toMatch(/align-self:\s*stretch/)
     expect(rule('.named-area-list')).toMatch(/overflow-y:\s*auto/)
     expect(rule('.named-area-list')).toMatch(/flex:\s*1 1 0/)
+    // Never squeezed away by a wide, short picture: a few rows stay in reach.
+    expect(rule('.named-area-list')).toMatch(/min-height:\s*7rem/)
   })
 
   it('takes the height of its rows once stacked under the picture, capped by the window', () => {

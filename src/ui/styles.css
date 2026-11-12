@@ -5424,7 +5424,6 @@ textarea[aria-disabled='true'][data-why] {
 .named-area-switch-off {
   font-size: 13px;
   color: var(--faint);
-  opacity: 0.6;
   cursor: default;
 }
 .named-area-switch {
@@ -5441,7 +5440,7 @@ textarea[aria-disabled='true'][data-why] {
   padding: 0;
   min-width: 0;
   flex: 1 1 0;
-  min-height: 0;
+  min-height: 7rem;
   overflow-y: auto;
 }
 .named-area {
