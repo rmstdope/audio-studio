@@ -721,6 +721,29 @@ describe('History and Undo', () => {
     expect(host.querySelector('[role=status]')).toBeNull()
   })
 
+  it('names no stale take after C chooses and Z undoes, the views following the server', async () => {
+    let chosen = 1
+    const { host } = await render(
+      () => view({ picture: picture(chosen), tunes: [tune(1)] }),
+      { status: 200, body: { ok: true, take: 6, from: 1, carried: { areas: 0, patches: 0 } } },
+      () =>
+        takesView(chosen, [
+          [1, undefined],
+          [6, 1, 'Add a cat'],
+        ]),
+    )
+    await act(async () => cards(host)[0]!.querySelector('button')!.click())
+    chosen = 6
+    await key(document.body, 'c')
+    await settle()
+    expect(text(host.querySelector('[role=status]'))).toContain('Take 6 is in the game now.')
+    chosen = 1
+    await key(document.body, 'z')
+    await settle()
+    expect(steps(host)[0]).toContain('Take 1 · in the game')
+    expect(text(host.querySelector('[role=status]'))).not.toContain('Take 6 is in the game now.')
+  })
+
   it('puts the came-along line away when the source take is chosen elsewhere, after the new take was shown', async () => {
     let served = view({ picture: picture(3), tunes: [tune(1)] })
     const { host, client } = await render(() => served, {
