@@ -7,13 +7,13 @@ import { createElevenMusic } from './elevenMusic'
 
 // Live: makes one 10-second stinger with the real ACE-Step (XL turbo, 4B language model), and one
 // with each Stable Audio model that is downloaded, which takes minutes the first time. Opt in with
-// AUDIO_STUDIO_LIVE_MUSIC=1, on a Mac with uv and the models (see Setup's Music generator row).
+// CONTENT_STUDIO_LIVE_MUSIC=1, on a Mac with uv and the models (see Setup's Music generator row).
 const machine = {
   which: (c: string) => Bun.which(c) !== null,
   platform: process.platform,
   arch: process.arch,
 }
-const optedIn = process.env.AUDIO_STUDIO_LIVE_MUSIC === '1'
+const optedIn = process.env.CONTENT_STUDIO_LIVE_MUSIC === '1'
 const live = optedIn && aceStepReady(machine, aceStepCheckpoints()).ok
 
 describe.skipIf(!live)('createAceStepWorker, with real ACE-Step (macOS)', () => {
@@ -75,9 +75,9 @@ for (const model of ['short', 'shortest'] as const) {
 }
 
 // Live, and paid: makes one 10-second stinger with Eleven Music. Opt in with
-// AUDIO_STUDIO_LIVE_ELEVENLABS=1 and ELEVENLABS_API_KEY in the environment, on a paid plan.
+// CONTENT_STUDIO_LIVE_ELEVENLABS=1 and ELEVENLABS_API_KEY in the environment, on a paid plan.
 const elevenKey = process.env.ELEVENLABS_API_KEY ?? null
-const liveEleven = process.env.AUDIO_STUDIO_LIVE_ELEVENLABS === '1' && elevenKey !== null
+const liveEleven = process.env.CONTENT_STUDIO_LIVE_ELEVENLABS === '1' && elevenKey !== null
 describe.skipIf(!liveEleven)('createElevenMusic, with real ElevenLabs', () => {
   it(
     'makes a short take, as long as asked, with no seed',

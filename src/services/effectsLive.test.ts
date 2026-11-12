@@ -3,11 +3,11 @@ import { readWav } from '../core/wav'
 import { createEffectsWorker } from './effects'
 
 // Live: makes one effect with the real Stable Audio 3 Small SFX on the CPU (about 25 s the first
-// time). Opt in with AUDIO_STUDIO_LIVE_EFFECTS=1, with uv and the model downloaded (see Setup's
+// time). Opt in with CONTENT_STUDIO_LIVE_EFFECTS=1, with uv and the model downloaded (see Setup's
 // Sound-effect models row).
 const probe = createEffectsWorker()
 const live =
-  process.env.AUDIO_STUDIO_LIVE_EFFECTS === '1' &&
+  process.env.CONTENT_STUDIO_LIVE_EFFECTS === '1' &&
   Bun.which('uv') !== null &&
   probe.download() === 'whole'
 

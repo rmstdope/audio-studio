@@ -18,7 +18,7 @@ describe('the project file’s JSON Schema', () => {
       properties: Record<string, { const?: unknown }>
     }
     expect(schema.$id).toBe(
-      'https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json',
+      'https://raw.githubusercontent.com/rmstdope/content-studio/main/schema/content-studio.schema.json',
     )
     expect(schema.title).toBe('content-studio.json')
     expect(schema.properties.version!.const).toBe(2)

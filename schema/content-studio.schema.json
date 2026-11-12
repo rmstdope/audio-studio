@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json",
+  "$id": "https://raw.githubusercontent.com/rmstdope/content-studio/main/schema/content-studio.schema.json",
   "title": "content-studio.json",
   "type": "object",
   "properties": {

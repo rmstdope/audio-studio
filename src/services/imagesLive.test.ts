@@ -3,13 +3,13 @@ import { IMAGE_MODEL_IDS } from '../core/imageModels'
 import { createMfluxGenerator, mfluxReady } from './images'
 
 // Live: makes one 512×288 take with each model through the real mflux, which downloads the weights
-// the first time (15 GB and 31 GB). Opt in with AUDIO_STUDIO_LIVE_IMAGES=1, on a Mac with mflux.
+// the first time (15 GB and 31 GB). Opt in with CONTENT_STUDIO_LIVE_IMAGES=1, on a Mac with mflux.
 const machine = {
   which: (c: string) => Bun.which(c) !== null,
   platform: process.platform,
   arch: process.arch,
 }
-const live = process.env.AUDIO_STUDIO_LIVE_IMAGES === '1' && mfluxReady(machine).ok
+const live = process.env.CONTENT_STUDIO_LIVE_IMAGES === '1' && mfluxReady(machine).ok
 
 describe.skipIf(!live)('createMfluxGenerator, with real mflux (macOS)', () => {
   for (const model of IMAGE_MODEL_IDS) {

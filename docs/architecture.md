@@ -120,7 +120,7 @@ A native window (Electrobun) can wrap the same web UI later; nothing in the desi
 ## 4. Module layout
 
 ```
-audio-studio/
+content-studio/
 ├── bin/content-studio.ts     CLI entry: find project, start server, open browser
 ├── src/
 │   ├── core/                    pure logic, no I/O; most of the tests
@@ -227,7 +227,7 @@ section (as-6u9.3), the `music` section (as-6u9.4), the `images` section (as-6u9
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rmstdope/content-studio/main/schema/content-studio.schema.json",
   "version": 2,
   "name": "RetroQuest",
   "description": "A retro-style text adventure played in the browser. Narrated by a warm storyteller; characters are villagers of Willowbrook.",
@@ -1387,7 +1387,7 @@ read by an older studio.
   bill a take stopped while being made, which Stop's title says while a paid take is being made.
 
 **Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
-(`AUDIO_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,
+(`CONTENT_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,
 search the library once and make one 10-second stinger, and spend money doing it. Nobody but the
 user can run them, so each pull request of step 14 says how to verify it by hand. Each pull request
 adds its new modules to the layout in §4.
@@ -2374,8 +2374,8 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   spoken-text building, chunking, alignment (ported from `test_narrate.py`), audition state
   transitions.
 - `services/` are tested against fakes (a fake `FishClient` and `Transcriber`), plus a few opt-in
-  live tests behind an env flag: `AUDIO_STUDIO_LIVE_MUSIC=1` for the local music models, and
-  `AUDIO_STUDIO_LIVE_ELEVENLABS=1` with `ELEVENLABS_API_KEY` for a paid Eleven Music take.
+  live tests behind an env flag: `CONTENT_STUDIO_LIVE_MUSIC=1` for the local music models, and
+  `CONTENT_STUDIO_LIVE_ELEVENLABS=1` with `ELEVENLABS_API_KEY` for a paid Eleven Music take.
 - The server API is tested with an in-memory project fixture (a small consumer repo in
   `test/fixtures/`).
 - UI: component tests for the audition and line table; one Playwright smoke test over the fixture.
