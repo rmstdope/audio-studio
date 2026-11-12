@@ -6,7 +6,7 @@
 
 ## Why
 
-Not established. It only appeared with the whole suite running (about 100 s, machine busy), so a timing race in the test or in the board write is likely.
+Not established. After the rebase onto main a second image services test (patch take timing) failed the same way, and also passed alone. It only appeared with the whole suite running (about 100 s, machine busy), so a timing race in the test or in the board write is likely.
 
 ## Cost
 
