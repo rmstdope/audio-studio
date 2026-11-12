@@ -122,7 +122,7 @@ describe('the list beside the named areas picture (as-kw3x.6)', () => {
   })
 })
 
-describe('the patch list beside a portrait image', () => {
+describe('the patch list beside a portrait image (as-sgou)', () => {
   it('makes each patch a box as wide as the list, whatever its name', () => {
     expect(rule('.patch-pick-row')).toMatch(/width:\s*100%/)
     expect(rule('.patch-pick-row')).toMatch(/box-sizing:\s*border-box/)
