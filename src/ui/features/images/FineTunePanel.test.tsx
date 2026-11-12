@@ -723,7 +723,7 @@ describe('History and Undo', () => {
 
   it('names no stale take after C chooses and Z undoes, the views following the server', async () => {
     let chosen = 1
-    const { host } = await render(
+    const { host, sent } = await render(
       () => view({ picture: picture(chosen), tunes: [tune(1)] }),
       { status: 200, body: { ok: true, take: 6, from: 1, carried: { areas: 0, patches: 0 } } },
       () =>
@@ -732,6 +732,7 @@ describe('History and Undo', () => {
           [6, 1, 'Add a cat'],
         ]),
     )
+    // Look at fine-tune 1, then choose it with C rather than the Choose button.
     await act(async () => cards(host)[0]!.querySelector('button')!.click())
     chosen = 6
     await key(document.body, 'c')
@@ -740,6 +741,7 @@ describe('History and Undo', () => {
     chosen = 1
     await key(document.body, 'z')
     await settle()
+    expect(sent[1]).toEqual({ method: 'POST', path: '/api/images/inn/choose', body: { n: 1 } })
     expect(steps(host)[0]).toContain('Take 1 · in the game')
     expect(text(host.querySelector('[role=status]'))).not.toContain('Take 6 is in the game now.')
   })
