@@ -5628,18 +5628,126 @@ textarea[aria-disabled='true'][data-why] {
   outline-offset: 2px;
 }
 
+/* The Fine-tune job: the picture as large as fits on the left, the tools on the right, the strip below. */
+.fine-job {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 16px;
+  align-items: start;
+}
+.fine-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.fine-stage .patch-stage {
+  max-width: none;
+}
+.fine-under {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fine-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.fine-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fine-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.fine-tools h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.fine-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fine-strip-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+/* The history: a line of dots, oldest at the top, the picture in the game filled green, later steps dimmed. */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 1px solid var(--line-strong);
+  margin-left: 5px;
+}
+.history-step {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding-left: 14px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.history-step[data-after='true'] {
+  opacity: 0.55;
+}
+.history-step[data-now='true'] {
+  color: var(--text);
+}
+.history-dot {
+  position: absolute;
+  left: -5px;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+  background: var(--panel);
+}
+.history-step[data-now='true'] .history-dot {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.history-pick {
+  all: unset;
+  cursor: pointer;
+  text-align: left;
+}
+.history-pick:hover,
+.history-pick:focus-visible {
+  color: var(--accent-soft-ink);
+  text-decoration: underline;
+}
+@media (max-width: 820px) {
+  .fine-job {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* The fine-tune form is one column: each label above its field, the words box as wide as the column and as tall as its words. */
-.fine-tune .patch-bench-right .field {
+.fine-tune .fine-tools .field {
   flex-direction: column;
   align-items: stretch;
   gap: 4px;
 }
-.fine-tune .patch-bench-right .lbl,
+.fine-tune .fine-tools .lbl,
 .fine-tune .edit-model .lbl {
   font-size: 13px;
   color: var(--muted);
 }
-.fine-tune .patch-bench-right textarea {
+.fine-tune .fine-tools textarea {
   box-sizing: border-box;
   width: 100%;
   resize: vertical;

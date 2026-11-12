@@ -52,7 +52,7 @@ export const MakeFineTunesBody = z.union([
 export const UseFineTuneBody = z.strictObject({ n: z.number().int().positive() })
 
 /** The words as a caption shows them: on one line, shortened with an ellipsis. */
-function shortened(words: string): string {
+export function shortened(words: string): string {
   const one = words.replace(/\s+/g, ' ').trim()
   return one.length > CAPTION_WORDS ? `${one.slice(0, CAPTION_WORDS).trimEnd()}…` : one
 }

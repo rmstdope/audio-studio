@@ -9,6 +9,8 @@ import {
 } from 'react'
 import {
   cameAlongLine,
+  fineTuneHistory,
+  shortened,
   type FineTuneFailedView,
   type FineTuneMakingView,
   type FineTuneView,
@@ -26,7 +28,9 @@ import type { ImageRow } from '../../../core/images'
 import { rightAfterDrop, stepRight } from '../../../core/imageTakes'
 import { timeText } from '../../../core/takeTimes'
 import {
+  useChooseImageTake,
   useDropFineTune,
+  useImageTakes,
   useFineTunes,
   useMakeFineTunes,
   useMarkFineTuneSeen,
@@ -34,19 +38,26 @@ import {
   useUseFineTune,
 } from '../../api'
 import { areaFromDrag } from '../../imagePatchArea'
-import { JUST_FINISHED, modelMissingWhy, refusal, WAIT_FOR_CHANGE } from '../../imagesText'
+import {
+  IMAGES_LOCK_WHY,
+  JUST_FINISHED,
+  modelMissingWhy,
+  refusal,
+  STYLE_BROKEN_WHY,
+  WAIT_FOR_CHANGE,
+} from '../../imagesText'
 import { progressOf } from '../../musicTakesText'
 import { off } from '../../off'
 import { EditModelMenu } from './EditModelMenu'
 
 /** How many fine-tunes one press can make. */
-const MAX_AT_ONCE = 6
+const MAX_AT_ONCE = 10
 
-/** How long a card that has just turned ready keeps Use this and Drop off, in milliseconds. */
+/** How long a card that has just turned ready keeps Choose and Drop off, in milliseconds. */
 const SETTLE_MS = 1000
 
-/** The keys a fine-tune panel hears when focus is inside it. */
-const KEYS = new Set(['ArrowLeft', 'ArrowRight', 'd', 's'])
+/** The keys the open Fine-tune tab hears anywhere on the page. */
+const KEYS = new Set(['ArrowLeft', 'ArrowRight', 'c', 'd', 's', 'z'])
 
 /** Where an area lies on a picture of this size, in the percentages the page draws with. */
 function placed(area: PatchArea, size: { width: number; height: number }): CSSProperties {
@@ -72,8 +83,16 @@ function leftText(making: FineTuneMakingView): string {
   return left <= 0 ? 'taking longer than expected' : `about ${timeText(left, 'up')} left`
 }
 
-/** The text of the box "Make fine-tunes" button: the count is in the menu beside it. */
-const MAKE_LABEL = 'Make fine-tunes'
+/** The text of the Make button: the count is the one in the menu beside it. */
+function makeLabel(count: number): string {
+  return `Make ${count} fine-tune${count === 1 ? '' : 's'}`
+}
+
+/** The caption under the big picture: which picture is in the game, and which fine-tune is over it. */
+function stageCaption(picture: FineTunesView['picture'], over: number | null): string {
+  const base = picture.kind === 'take' ? `Take ${picture.n}` : "the game's own image"
+  return `In the game · ${base}${over === null ? '' : `, with Fine-tune ${over} over it`}`
+}
 
 /** A fine-tune laid over the picture it was made from, as a card's picture. */
 function Thumb({ base, over, size }: { base: string; over: string | null; size: PatchArea }) {
@@ -96,10 +115,11 @@ function Thumb({ base, over, size }: { base: string; over: string | null; size: 
 }
 
 /**
- * The panel "Fine-tune the picture" of an image: the picture in the game (the chosen take, or the
- * game's own image) as one large picture to mark and to lay fine-tunes over, the words and Make
- * controls, and the fine-tunes as cards that are used or dropped. Using one makes it the image's
- * next take, chosen.
+ * The Fine-tune tab of an image: the picture in the game (the chosen take, or the game's own
+ * image) as one large picture to mark and to lay fine-tunes over, with Before / after, Drop and
+ * Choose under it; the History of the picture with its Undo, the words and the Make controls on
+ * the right; and the fine-tunes as thumbs in a strip. Choosing one makes it the image's next
+ * take, chosen. C, D, S, Z and the arrows act anywhere on the page while the tab is open.
  */
 export function FineTunePanel({ row }: { row: ImageRow }) {
   const query = useFineTunes(row.id)
@@ -107,6 +127,8 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const stop = useStopFineTunes(row.id)
   const drop = useDropFineTune(row.id)
   const use = useUseFineTune(row.id)
+  const choose = useChooseImageTake(row.id)
+  const takesQuery = useImageTakes(row.id)
   const seen = useMarkFineTuneSeen(row.id)
   const jobOpen = useJobOpen()
   const [words, setWords] = useState('')
@@ -114,7 +136,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const [marked, setMarked] = useState<{ picture: string; area: PatchArea } | null>(null)
   // The model picked in the menu: not remembered past the page, so it starts on `startEditModel`.
   const [pick, setPick] = useState<EditModelId | null>(null)
-  const [count, setCount] = useState(2)
+  const [count, setCount] = useState(4)
   const [looking, setLooking] = useState<number | null>(null)
   const [showing, setShowing] = useState(true)
   // What a use brought along, with the picture it was made from: the line is about the picture in
@@ -130,6 +152,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const wordsBox = useRef<HTMLTextAreaElement>(null)
   const cards = useRef(new Map<number, HTMLButtonElement>())
   const stops = useRef(new Map<number, HTMLButtonElement>())
+  const keyHandler = useRef<((event: KeyboardEvent) => void) | null>(null)
 
   const view = query.data && 'picture' in query.data ? query.data : null
   const tunes = view?.tunes ?? []
@@ -176,6 +199,13 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       seen.mutate(shown.n)
     }
   })
+  // The keys are heard anywhere on the page, but only while this tab is the open one.
+  useEffect(() => {
+    if (!jobOpen) return
+    const listen = (event: KeyboardEvent) => keyHandler.current?.(event)
+    document.addEventListener('keydown', listen)
+    return () => document.removeEventListener('keydown', listen)
+  }, [jobOpen])
   useEffect(() => {
     if (lookingAt !== null) cards.current.get(lookingAt)?.scrollIntoView?.({ block: 'nearest' })
   }, [lookingAt])
@@ -217,21 +247,17 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       ? came.answer
       : null
   if (came && !cameHere) setCame(null)
-  const heading = (
-    <div className="brief-panel-head">
-      <h2>Fine-tune the picture</h2>
-    </div>
-  )
+  keyHandler.current = null
   if (!view)
     return (
       <section className="panel fine-tune" aria-label="Fine-tune the picture">
-        {heading}
+        <h2 className="sr-only">Fine-tune the picture</h2>
       </section>
     )
   if (view.picture.kind === 'none') {
     return (
       <section className="panel fine-tune" aria-label="Fine-tune the picture">
-        {heading}
+        <h2 className="sr-only">Fine-tune the picture</h2>
         <p className="muted">
           There&apos;s no picture to fine-tune yet. Make takes and choose one, then change it here.
         </p>
@@ -266,8 +292,22 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     : busy || make.isPending
       ? 'Fine-tunes are being made for this picture. Change this when they are done, or Stop.'
       : null
-  const problem = refusal(make.data) ?? refusal(drop.data) ?? refusal(use.data)
-  const error = make.error ?? drop.error ?? use.error ?? stop.error
+  const takes = takesQuery.data && 'takes' in takesQuery.data ? takesQuery.data : null
+  const history = takes
+    ? fineTuneHistory(takes.takes, picture.kind === 'take' ? picture.n : null)
+    : null
+  const changingPicture = use.isPending || drop.isPending || choose.isPending
+  // Choosing (a fine-tune, or an earlier or later step) is refused while the lock cannot be read or the style is broken.
+  const chooseWhy = takes?.lockUnread
+    ? IMAGES_LOCK_WHY
+    : takes?.lookError
+      ? STYLE_BROKEN_WHY
+      : changingPicture
+        ? WAIT_FOR_CHANGE
+        : null
+  const problem =
+    refusal(make.data) ?? refusal(drop.data) ?? refusal(use.data) ?? refusal(choose.data)
+  const error = make.error ?? drop.error ?? use.error ?? stop.error ?? choose.error
   const items = [
     ...tunes.map((t) => ({
       n: t.n,
@@ -327,10 +367,28 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     // A click, or a drag too small to change, changes nothing.
     if (dragged) setMarked({ picture: pictureKey, area: dragged })
   }
-  const onKeyDown = (event: React.KeyboardEvent) => {
+  /** Chooses an earlier or later step of the history again: an ordinary choose of that take. */
+  const onStep = (n: number) => {
+    if (changing.current || chooseWhy !== null) return
+    choose.reset()
+    use.reset()
+    changing.current = true
+    choose.mutate(n, {
+      onSuccess: (answer) => {
+        if (!answer.ok) return
+        setLooking(null)
+        setMarked(null)
+      },
+      onSettled: () => {
+        changing.current = false
+      },
+    })
+  }
+  keyHandler.current = (event) => {
     const target = event.target
     if (event.metaKey || event.ctrlKey || event.altKey) return
-    if (!KEYS.has(event.key) && !KEYS.has(event.key.toLowerCase())) return
+    const key = event.key.toLowerCase()
+    if (!KEYS.has(event.key) && !KEYS.has(key)) return
     // Keys typed into a field or menu are its own.
     if (
       target instanceof HTMLTextAreaElement ||
@@ -338,31 +396,48 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       (target instanceof HTMLInputElement && target.type !== 'checkbox')
     )
       return
-    // The image's own keys rest while focus is inside the panel.
-    event.stopPropagation()
-    event.preventDefault()
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault()
       const next = stepRight(strip, lookingAt, event.key === 'ArrowLeft' ? -1 : 1)
       if (next !== null) setLooking(next)
       return
     }
-    const key = event.key.toLowerCase()
     if (key === 's') {
+      event.preventDefault()
       if (shown) setShowing((on) => !on)
       return
     }
-    if (key === 'd' && shown && !event.repeat) onDrop(shown.n)
+    // Held down, C, D and Z would choose and drop back and forth.
+    if (event.repeat) return
+    if (key === 'c' && shown && chooseWhy === null) {
+      event.preventDefault()
+      onUse(shown.n)
+    }
+    if (key === 'd' && shown) {
+      event.preventDefault()
+      onDrop(shown.n)
+    }
+    if (key === 'z' && history?.undoTo != null) {
+      event.preventDefault()
+      onStep(history.undoTo)
+    }
   }
 
   const overlaid = showing ? shown : null
   const showMark = mark !== null
+  const stepLabel = (step: Extract<(typeof steps)[number], { kind: 'take' }>) =>
+    [
+      `Take ${step.n}`,
+      step.inGame && 'in the game',
+      step.from === 'game' && "from the game's own image",
+      step.words === null ? 'made from the prompt' : `“${shortened(step.words)}”`,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  const steps = history?.steps ?? []
   return (
-    <section className="panel fine-tune" aria-label="Fine-tune the picture" onKeyDown={onKeyDown}>
-      {heading}
-      <p className="muted">
-        Change one thing in the picture in the game from words: add, remove or change something. The
-        rest stays as it is. Use one and it replaces the picture; the old one stays among the takes.
-      </p>
+    <section className="panel fine-tune" aria-label="Fine-tune the picture">
+      <h2 className="sr-only">Fine-tune the picture</h2>
       {cameHere && (
         <section className="notice notice-ok" aria-label="Fine-tune used" role="status">
           <div className="notice-text">
@@ -373,8 +448,8 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
           </button>
         </section>
       )}
-      <div className="patch-bench">
-        <div className="patch-bench-left">
+      <div className="fine-job">
+        <div className="fine-stage">
           <div
             className="patch-stage"
             style={{ aspectRatio: `${picture.width} / ${picture.height}` }}
@@ -409,39 +484,96 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
             )}
             {showMark && mark && <div className="patch-mark" style={placed(mark, picture)} />}
           </div>
-          <div className="patch-looking">
-            {shown ? (
-              <>
-                <b>Looking at Fine-tune {shown.n}</b>
-                <label className="patch-toggle">
-                  <input
-                    className="patch-switch"
-                    type="checkbox"
-                    checked={showing}
-                    onChange={(event) => setShowing(event.target.checked)}
-                  />
-                  Show the fine-tune <span className="faint small">(S)</span>
-                </label>
-              </>
-            ) : (
-              <span className="faint small">{pictureCaption(picture)}</span>
-            )}
-          </div>
-          {mark ? (
-            <span className="muted small">
-              Marked area: the change is kept to this place.{' '}
-              <button type="button" className="patch-back" onClick={() => setMarked(null)}>
-                Clear the mark
+          <div className="fine-under">
+            <span className="fine-caption">
+              {stageCaption(picture, overlaid?.n ?? null)}
+              {overlaid?.isNew && <span className="chip chip-new">new</span>}
+            </span>
+            <span className="fine-buttons">
+              <button
+                type="button"
+                className="btn"
+                aria-pressed={showing}
+                {...off(!shown && 'Make a fine-tune first.')}
+                onClick={() => setShowing((on) => !on)}
+              >
+                Before / after <span className="faint small">S</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                {...off(
+                  !shown && 'Make a fine-tune first.',
+                  shown && changingPicture && WAIT_FOR_CHANGE,
+                  shown && justFinished(shown.n) && JUST_FINISHED,
+                )}
+                onClick={() => shown && onDrop(shown.n)}
+              >
+                Drop <span className="faint small">D</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                {...off(
+                  !shown && 'Make a fine-tune first.',
+                  chooseWhy,
+                  shown && justFinished(shown.n) && JUST_FINISHED,
+                )}
+                onClick={() => shown && onUse(shown.n)}
+              >
+                Choose <span className="faint small">C</span>
               </button>
             </span>
-          ) : (
-            <span className="muted small">
-              No area marked: the whole picture may change. Drag on the picture to keep the change
-              to one place.
-            </span>
-          )}
+          </div>
         </div>
-        <div className="patch-bench-right">
+        <div className="fine-tools">
+          {history && (
+            <>
+              <h3>History</h3>
+              <div className="history">
+                {steps.map((step) =>
+                  step.kind === 'game' ? (
+                    <div key="game" className="history-step" data-now="true">
+                      <span className="history-dot" />
+                      <span>The game&apos;s own image</span>
+                    </div>
+                  ) : (
+                    <div
+                      key={step.n}
+                      className="history-step"
+                      data-now={step.inGame ? 'true' : undefined}
+                      data-after={step.after ? 'true' : undefined}
+                    >
+                      <span className="history-dot" />
+                      {step.inGame ? (
+                        <span>{stepLabel(step)}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="history-pick"
+                          title={`Choose Take ${step.n} again`}
+                          {...off(chooseWhy)}
+                          onClick={() => onStep(step.n)}
+                        >
+                          {stepLabel(step)}
+                        </button>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+              {history.undoTo !== null && (
+                <button
+                  type="button"
+                  className="btn"
+                  {...off(chooseWhy)}
+                  onClick={() => history.undoTo !== null && onStep(history.undoTo)}
+                >
+                  Undo: back to Take {history.undoTo} <span className="faint small">Z</span>
+                </button>
+              )}
+            </>
+          )}
           <label className="field">
             <span className="lbl">What to change</span>
             <textarea
@@ -453,6 +585,15 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
               onChange={(event) => setWords(event.target.value)}
             />
           </label>
+          <span className="muted small">
+            Drag on the picture to change only part of it; with no mark the whole picture is
+            changed.{' '}
+            {mark && (
+              <button type="button" className="patch-back" onClick={() => setMarked(null)}>
+                Clear the mark
+              </button>
+            )}
+          </span>
           <EditModelMenu
             value={model}
             onChange={setPick}
@@ -487,7 +628,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
                 make.mutate({ count, words: words1, area: mark, model })
               }}
             >
-              {MAKE_LABEL}
+              {makeLabel(count)}
             </button>
             {busy && (
               <button
@@ -509,135 +650,114 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
           {problem && <span className="adopt-error">{problem}</span>}
           {error && <span className="adopt-error">{error.message}</span>}
         </div>
-      </div>
-      {items.length === 0 ? (
-        <div className="takes-empty">No fine-tunes yet. Describe a change and make a few.</div>
-      ) : (
-        <div className="patch-thumbs">
-          {items.map(({ n, tune, making, failed }) =>
-            tune ? (
-              <div
-                key={n}
-                className="patch-thumb fine-card"
-                data-looking={n === lookingAt ? 'true' : undefined}
-              >
-                <button
-                  type="button"
-                  className="fine-card-pick"
-                  aria-pressed={n === lookingAt}
-                  ref={(el) => {
-                    if (el) cards.current.set(n, el)
-                    else cards.current.delete(n)
-                  }}
-                  onClick={() => setLooking(n)}
-                >
-                  <Thumb
-                    base={baseSrc}
-                    over={tuneSrc(n)}
-                    size={{ x: 0, y: 0, width: picture.width, height: picture.height }}
-                  />
-                  <span className="patch-thumb-label">
-                    <span className="grow">Fine-tune {n}</span>
-                    {tune.isNew && <span className="chip chip-new">new</span>}
-                  </span>
-                </button>
-                <div className="patch-controls">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    {...off(
-                      (use.isPending || drop.isPending) && WAIT_FOR_CHANGE,
-                      justFinished(n) && JUST_FINISHED,
-                    )}
-                    onClick={() => onUse(n)}
+        <div className="fine-strip">
+          <span className="fine-strip-label">Fine-tunes</span>
+          {items.length === 0 ? (
+            <div className="takes-empty">No fine-tunes yet. Describe a change and make a few.</div>
+          ) : (
+            <div className="patch-thumbs fine-thumbs">
+              {items.map(({ n, tune, making, failed }) =>
+                tune ? (
+                  <div
+                    key={n}
+                    className="patch-thumb fine-card"
+                    data-looking={n === lookingAt ? 'true' : undefined}
                   >
-                    Use this
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    {...off(
-                      (use.isPending || drop.isPending) && WAIT_FOR_CHANGE,
-                      justFinished(n) && JUST_FINISHED,
-                    )}
-                    onClick={() => onDrop(n)}
-                  >
-                    Drop
-                  </button>
-                </div>
-              </div>
-            ) : making ? (
-              <div key={n} className="patch-thumb patch-thumb-making">
-                <div
-                  className="patch-making-pic"
-                  style={{ aspectRatio: `${picture.width} / ${picture.height}` }}
-                >
-                  {making.state === 'making' ? 'Being made…' : 'Waiting'}
-                </div>
-                <span className="patch-thumb-label">
-                  <span>
-                    <b>Fine-tune {n}</b> · {making.state === 'making' ? 'making, ' : ''}
-                    {leftText(making)}
-                  </span>
-                </span>
-                {making.state === 'making' && (
-                  <>
-                    <div className="bar" role="progressbar" aria-label={`Fine-tune ${n}`}>
-                      <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
-                    </div>
-                    <div className="patch-controls">
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        ref={(el) => {
-                          if (el) stops.current.set(n, el)
-                          else stops.current.delete(n)
-                        }}
-                        {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
-                        onClick={() => onDrop(n)}
-                      >
-                        Stop
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              failed && (
-                <div key={n} className="patch-thumb errbox" role="alert">
-                  <span className="patch-thumb-label">
-                    <strong>Fine-tune {n}</strong>
-                  </span>
-                  <span className="muted small">{failed.message}</span>
-                  <div className="patch-controls">
                     <button
                       type="button"
-                      className="btn"
-                      {...off(
-                        !view.maker.ok && view.maker.message,
-                        view.models[failed.model] !== 'whole' &&
-                          modelMissingWhy(editModel(failed.model).name),
-                        make.isPending && WAIT_FOR_CHANGE,
-                      )}
-                      onClick={() => make.mutate({ retry: n })}
+                      className="fine-card-pick"
+                      aria-pressed={n === lookingAt}
+                      ref={(el) => {
+                        if (el) cards.current.set(n, el)
+                        else cards.current.delete(n)
+                      }}
+                      onClick={() => setLooking(n)}
                     >
-                      Try again
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
-                      onClick={() => onDrop(n)}
-                    >
-                      Drop
+                      <Thumb
+                        base={baseSrc}
+                        over={tuneSrc(n)}
+                        size={{ x: 0, y: 0, width: picture.width, height: picture.height }}
+                      />
+                      <span className="patch-thumb-label">
+                        <span className="grow">Fine-tune {n}</span>
+                        {tune.isNew && <span className="chip chip-new">new</span>}
+                      </span>
                     </button>
                   </div>
-                </div>
-              )
-            ),
+                ) : making ? (
+                  <div key={n} className="patch-thumb patch-thumb-making">
+                    <div
+                      className="patch-making-pic"
+                      style={{ aspectRatio: `${picture.width} / ${picture.height}` }}
+                    >
+                      {making.state === 'making' ? 'Being made…' : 'Waiting'}
+                    </div>
+                    <span className="patch-thumb-label">
+                      <span>
+                        <b>Fine-tune {n}</b> · {making.state === 'making' ? 'making, ' : ''}
+                        {leftText(making)}
+                      </span>
+                    </span>
+                    {making.state === 'making' && (
+                      <>
+                        <div className="bar" role="progressbar" aria-label={`Fine-tune ${n}`}>
+                          <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
+                        </div>
+                        <div className="patch-controls">
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            ref={(el) => {
+                              if (el) stops.current.set(n, el)
+                              else stops.current.delete(n)
+                            }}
+                            {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
+                            onClick={() => onDrop(n)}
+                          >
+                            Stop
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  failed && (
+                    <div key={n} className="patch-thumb errbox" role="alert">
+                      <span className="patch-thumb-label">
+                        <strong>Fine-tune {n}</strong>
+                      </span>
+                      <span className="muted small">{failed.message}</span>
+                      <div className="patch-controls">
+                        <button
+                          type="button"
+                          className="btn"
+                          {...off(
+                            !view.maker.ok && view.maker.message,
+                            view.models[failed.model] !== 'whole' &&
+                              modelMissingWhy(editModel(failed.model).name),
+                            make.isPending && WAIT_FOR_CHANGE,
+                          )}
+                          onClick={() => make.mutate({ retry: n })}
+                        >
+                          Try again
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          {...off((use.isPending || drop.isPending) && WAIT_FOR_CHANGE)}
+                          onClick={() => onDrop(n)}
+                        >
+                          Drop
+                        </button>
+                      </div>
+                    </div>
+                  )
+                ),
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
     </section>
   )
 }
