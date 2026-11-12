@@ -68,7 +68,7 @@ const PRESSED_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset'
 /** How many takes the count menu starts on. */
 const STARTING_COUNT = 4
 
-/** Below this window width the frame stacks and the stage has no fixed height to fit. */
+/** Below this window width the frame stacks (the stylesheet's `@media (max-width: 1000px)`) and the stage has no fixed height to fit. */
 const NARROW = 1000
 
 /** What a side takes besides its picture: caption, size line, buttons and the gaps between them. */
@@ -242,7 +242,7 @@ export function TakesSection({
   const onRight = right !== null && strip.includes(right) ? right : (strip.at(-1) ?? null)
 
   // The right side starts on the newest take and stays where it is put; it moves only when its
-  // take leaves the grid.
+  // take leaves the strip.
   useEffect(() => {
     if (strip.length && (right === null || !strip.includes(right))) setRight(strip.at(-1)!)
   })
@@ -254,7 +254,7 @@ export function TakesSection({
       seen.mutate(shown.n)
     }
   })
-  // The grid scrolls on its own: the take on the right is kept in view as ← and → step.
+  // The strip scrolls on its own: the take on the right is kept in view as ← and → step.
   useEffect(() => {
     if (onRight !== null) thumbs.current.get(onRight)?.scrollIntoView?.({ block: 'nearest' })
   }, [onRight])
@@ -526,7 +526,7 @@ export function TakesSection({
         {...off(makeWhy)}
         onClick={() => {
           // The button is off while takes are made, and the browser drops focus from it; focus
-          // goes to the take on the right in the grid, so ← and → keep stepping it.
+          // goes to the take on the right in the strip, so ← and → keep stepping it.
           focusQuietly.current = true
           setPendingFocus(onRight ?? 'right')
           afterWordsSaved(() => make.mutate({ count, model }))
@@ -837,7 +837,14 @@ export function TakesSection({
                   <span className="grow">Take {t.n}</span>
                   {t.earlier && <span className="faint">earlier words</span>}
                   {t.n === wasChosen && <span className="faint">was chosen</span>}
-                  {t.fineTunedFrom && <span className="faint">fine-tuned</span>}
+                  {t.fineTunedFrom && (
+                    <span className="faint">
+                      fine-tuned from{' '}
+                      {t.fineTunedFrom.take === null
+                        ? "the game's own image"
+                        : `Take ${t.fineTunedFrom.take}`}
+                    </span>
+                  )}
                   {t.isNew && <span className="chip chip-new">new</span>}
                 </span>
               )
@@ -995,7 +1002,7 @@ function LeftSide({
   )
 }
 
-/** A take waiting or being made, in the grid: its place, its time and a progress bar. */
+/** A take waiting or being made, in the strip: its place, its time and a progress bar. */
 function MakingThumb({
   making,
   width,

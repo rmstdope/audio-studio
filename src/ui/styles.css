@@ -4091,7 +4091,7 @@ textarea[aria-disabled='true'][data-why] {
   padding: 14px;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 @media (max-width: 1000px) {
   .image-workbench {
@@ -4217,6 +4217,8 @@ textarea[aria-disabled='true'][data-why] {
 }
 .image-thumb .image-take-picture {
   border-radius: 4px;
+  max-height: 110px;
+  object-fit: contain;
 }
 .image-thumb-label {
   display: flex;

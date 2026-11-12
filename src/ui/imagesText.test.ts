@@ -129,6 +129,9 @@ describe('the game’s look words', () => {
     expect(pictureRendering(1)).toBe('pixelated')
     expect(pictureRendering(2)).toBe('pixelated')
   })
+  it('draws an enlargement that is not a whole number smooth, as hard pixels would be uneven', () => {
+    expect(pictureRendering(1.37)).toBe('auto')
+  })
   it('captions the model’s picture, adding that it is cropped', () => {
     expect(modelCaption(1280, 720, false)).toBe('1280 × 720')
     expect(modelCaption(1024, 1024, true)).toBe('1024 × 1024 · cropped to fit')

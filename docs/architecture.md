@@ -1605,11 +1605,11 @@ sides, a game picture brought to the look before the image's size changed (480 �
 now 1920 × 1080) is captioned with its own size, read from the picture once it loads, and keeps its
 own shape, drawn as wide as the image would be (with hard pixels when that enlarges it) until it is
 brought to the look again; the strip's thumbs keep the image's shape. The image
-the game uses (its game picture is the one the game has now) and the compared take are enlarged by
-the largest whole number of the game's size at which the two fit side by side in their column,
-drawn with hard pixels; when not even ×1 fits (RetroQuest's 640- and 480-wide images on a laptop)
-they are shrunk side by side to fit, down to half the game's size, and drawn smooth; narrower still
-they stand one above the other, each fitted to the width. Each has its buttons under its picture
+the game uses (its game picture is the one the game has now) and the compared take are shown as
+large as the two fit side by side in the stage's width and height (`fitZoom`, in hundredths of the game's size), drawn with hard
+pixels at a whole multiple and smooth otherwise (as the pixel art would be uneven); in a window under 1000 px, where
+the stage has no fixed height, the largest whole number that fits the width, else shrunk side by side down to half
+the game's size, and narrower still one above the other, each fitted to the width. Each has its buttons under its picture
 (Un-choose; Drop and Choose). Choose moves the compared take to the left and the take chosen before
 comes to be compared, marked "was chosen" for that visit. The compared take is the page's own
 state (after a reload the newest) and does not move when a take finishes. Keys work anywhere on

@@ -1,4 +1,5 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
+import { readFileSync } from 'node:fs'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImageRow } from '../../../core/images'
 import type { ImageTakeView, ImageTakesView } from '../../../core/imageTakes'
@@ -1577,6 +1578,7 @@ describe('saving an image’s words', () => {
 })
 
 describe('the Make frame', () => {
+  const chosenRow3 = { chosenTake: 3, status: 'chosen' as const }
   const chosenAndTwo = [take(1), take(2, { chosen: true }), take(3, { isNew: true })]
   const chosenRow = { chosenTake: 2, status: 'chosen' as const }
   const frame = (s: { container: HTMLElement }) => s.container.querySelector('.image-workbench')!
@@ -1665,5 +1667,39 @@ describe('the Make frame', () => {
     )
     expect(s.container.querySelector('[data-side="left"]')?.textContent).toContain('No picture yet')
     expect(s.container.querySelectorAll('[data-strip] button')).toHaveLength(0)
+  })
+
+  it('names the take a fine-tuned take came from in its thumb', async () => {
+    const s = await show(
+      view({
+        takes: [
+          take(1, { fineTunedFrom: { take: 3, words: 'Add a cat' } }),
+          take(2, { fineTunedFrom: { take: null, words: 'Add a lamp' } }),
+          take(3, { chosen: true }),
+        ],
+      }),
+      chosenRow3,
+    )
+    const labels = [...s.container.querySelectorAll('[data-strip] .image-thumb-label')].map(
+      (l) => l.textContent,
+    )
+    expect(labels[0]).toContain('fine-tuned from Take 3')
+    expect(labels[1]).toContain("fine-tuned from the game's own image")
+  })
+
+  it('shows the game’s own image on the left and the empty text on the right', async () => {
+    const s = await show(view(), { gameFile: { file: 'web/inn.png', exists: true } })
+    expect(s.container.querySelector('[data-side="left"]')?.textContent).toContain(
+      'The game’s own image'.replace('’', "'"),
+    )
+    expect(s.container.querySelector('[data-side="right"]')?.textContent).toContain(
+      'Make takes to compare them here.',
+    )
+  })
+
+  it('keeps the stage from clipping a tall side or question: it scrolls', () => {
+    const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
+    const at = css.indexOf('.image-stage-panel {')
+    expect(css.slice(at, css.indexOf('}', at))).toMatch(/overflow(-y)?:\s*auto/)
   })
 })

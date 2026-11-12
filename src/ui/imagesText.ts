@@ -274,10 +274,10 @@ export function fitZoom(
 
 /**
  * How a picture at `zoom` is drawn: with hard pixels at a whole size, as the game's pixel art is;
- * smooth when shrunk, where hard pixels would drop some of them unevenly.
+ * smooth when shrunk or enlarged by a part, where hard pixels would be uneven.
  */
 export function pictureRendering(zoom: number): 'pixelated' | 'auto' {
-  return zoom < 1 ? 'auto' : 'pixelated'
+  return zoom >= 1 && Math.abs(zoom - Math.round(zoom)) < 1e-6 ? 'pixelated' : 'auto'
 }
 
 /** The caption under the model's picture: its size, and that its edges are cut when it is another shape. */
