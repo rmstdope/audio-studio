@@ -1,5 +1,4 @@
 import type { ImageRow, PatchRow } from '../core/images'
-import { patchSummary } from '../core/imagePatches'
 
 /** The jobs of an image's page, one tab each. */
 export type ImageJob = 'make' | 'fine-tune' | 'patches' | 'areas'
@@ -91,7 +90,8 @@ export function patchLayoutOf(size: { width: number; height: number }): 'list' |
 
 /** What a patch says of how far it has come: its chosen take, or how many takes there are. */
 export function patchStateText(takes: readonly { n: number; chosen: boolean }[]): string {
-  const { text, chip } = patchSummary(takes)
-  if (chip) return chip
-  return text.replace(', none chosen', '')
+  const chosen = takes.find((t) => t.chosen)
+  if (chosen) return `Take ${chosen.n} chosen`
+  if (takes.length === 0) return 'no takes yet'
+  return `${takes.length} ${takes.length === 1 ? 'take' : 'takes'}`
 }

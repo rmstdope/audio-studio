@@ -5314,9 +5314,6 @@ textarea[aria-disabled='true'][data-why] {
 }
 
 /* The takes of a patch the game asks for (as-bo8.2) */
-game-patch-end .game-patch-mark {
-  margin-left: 0;
-}
 .make-again-line {
   background: var(--raised);
   border-radius: 9px;
@@ -5324,13 +5321,17 @@ game-patch-end .game-patch-mark {
   color: var(--text-soft);
   font-size: 12px;
 }
-patch-bench {
+
+.patch-bench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 16px;
   align-items: start;
 }
-.patch-bench > .patch-takes {
+.game-patches .patch-bench {
+  grid-template-columns: minmax(0, 1fr) 300px;
+}
+.game-patches .patch-bench > .patch-takes {
   grid-column: 1 / -1;
 }
 .patch-title {
@@ -5358,6 +5359,9 @@ patch-bench {
   font-size: 13px;
 }
 .patches-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -5392,6 +5396,14 @@ patch-bench {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 8px;
+}
+.patches-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .patches-chips {
   display: flex;
@@ -5495,6 +5507,7 @@ patch-bench {
 }
 @media (max-width: 700px) {
   .patch-bench,
+  .game-patches .patch-bench,
   .patches-lefty {
     grid-template-columns: 1fr;
   }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { makeAgainOf, overlappingPatches, tieOf } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
 import { off } from '../../off'
@@ -170,7 +170,10 @@ function PatchBody({
           onModel={onModel}
         />
       ) : (
-        words
+        <>
+          <h3 className="patch-title">{patch.title}</h3>
+          {words}
+        </>
       )}
     </div>
   )
@@ -194,12 +197,19 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [remakePick, setRemakePick] = useState<EditModelId | null>(null)
   const view = query.data && 'patches' in query.data ? query.data : null
   const again = new Set(makeAgainOf(row).map((patch) => patch.id))
-  const [chosenId, setOpenId] = useState<string | null>(
+  const [openPick, setOpenId] = useState<string | null>(
     () => row.patches.find((patch) => patch.gameChanged)?.id ?? null,
   )
+  // A patch named in the press's summary opens and its pick scrolls into view once it is there.
+  const [reveal, setReveal] = useState<string | null>(null)
+  useEffect(() => {
+    if (reveal === null) return
+    document.getElementById(patchRowId(reveal))?.scrollIntoView?.({ block: 'nearest' })
+    setReveal(null)
+  }, [reveal])
   if (row.patches.length === 0) return null
-  const openId = row.patches.some((p) => p.id === chosenId) ? chosenId! : row.patches[0]!.id
-  const patch = row.patches.find((p) => p.id === openId)!
+  const patch = row.patches.find((p) => p.id === openPick) ?? row.patches[0]!
+  const openId = patch.id
   // Nothing is said until the patches are loaded, nor when the chosen picture or the lock cannot be read.
   const pairs = view && !view.pictureGone && !view.lockUnread ? overlappingPatches(row.patches) : []
   const overlapsOf = (id: string) =>
@@ -214,57 +224,58 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const pick = (p: PatchRow) => {
     const work = workOf(p.id)
     return (
-      <button
-        key={p.id}
-        id={patchRowId(p.id)}
-        className={list ? 'patch-pick patch-pick-row' : 'patch-pick pchip'}
-        type="button"
-        title={list ? undefined : p.id}
-        aria-current={p.id === openId ? 'true' : undefined}
-        onClick={() => setOpenId(p.id)}
-      >
-        {list ? (
-          <>
-            <span className="patch-pick-top">
-              <b>{p.title}</b>
-              {p.changed && (
-                <span className="game-patch-mark">
-                  {p.gameChanged ? 'the game changed its words' : 'changed here'}
+      <li key={p.id}>
+        <button
+          id={patchRowId(p.id)}
+          className={list ? 'patch-pick patch-pick-row' : 'patch-pick pchip'}
+          type="button"
+          title={list ? undefined : p.id}
+          aria-current={p.id === openId ? 'true' : undefined}
+          onClick={() => setOpenId(p.id)}
+        >
+          {list ? (
+            <>
+              <span className="patch-pick-top">
+                <b>{p.title}</b>
+                {p.changed && (
+                  <span className="game-patch-mark">
+                    {p.gameChanged ? 'the game changed its words' : 'changed here'}
+                  </span>
+                )}
+                {work?.takes.some((t) => t.isNew) && <span className="chip chip-new">new</span>}
+              </span>
+              <span className="mono muted">{p.id}</span>
+              {again.has(p.id) && <span className="chip chip-warn">Make again</span>}
+              {work && (
+                <span className="patch-pick-state">
+                  {work.making.length > 0 ? (
+                    <span className="game-patch-summary">
+                      <span className="bar game-patch-bar" aria-hidden="true">
+                        <i style={{ width: `${Math.round(progressOf(work.making[0]!) * 100)}%` }} />
+                      </span>{' '}
+                      {rowMaking(work.making)}
+                    </span>
+                  ) : (
+                    <span className={`chip ${work.takes.some((t) => t.chosen) ? 'chip-ok' : ''}`}>
+                      {patchStateText(work.takes)}
+                    </span>
+                  )}
+                  {rowFailed(work.failed.length) && (
+                    <span className="game-patch-summary">{rowFailed(work.failed.length)}</span>
+                  )}
+                  {work.oldLook && <span className="chip chip-warn">Old look</span>}
                 </span>
               )}
-              {work?.takes.some((t) => t.isNew) && <span className="chip chip-new">new</span>}
-            </span>
-            <span className="mono muted">{p.id}</span>
-            {again.has(p.id) && <span className="chip chip-warn">Make again</span>}
-            {work && (
-              <span className="patch-pick-state">
-                {work.making.length > 0 ? (
-                  <span className="game-patch-summary">
-                    <span className="bar game-patch-bar" aria-hidden="true">
-                      <i style={{ width: `${Math.round(progressOf(work.making[0]!) * 100)}%` }} />
-                    </span>{' '}
-                    {rowMaking(work.making)}
-                  </span>
-                ) : (
-                  <span className={`chip ${work.takes.some((t) => t.chosen) ? 'chip-ok' : ''}`}>
-                    {patchStateText(work.takes)}
-                  </span>
-                )}
-                {rowFailed(work.failed.length) && (
-                  <span className="game-patch-summary">{rowFailed(work.failed.length)}</span>
-                )}
-                {work.oldLook && <span className="chip chip-warn">Old look</span>}
-              </span>
-            )}
-          </>
-        ) : (
-          <>
-            <span className={`dot${patchChosen(row, p) ? ' ok' : ''}`} aria-hidden="true" />
-            {p.title}
-            {again.has(p.id) && <span className="chip chip-warn">Make again</span>}
-          </>
-        )}
-      </button>
+            </>
+          ) : (
+            <>
+              <span className={`dot${patchChosen(row, p) ? ' ok' : ''}`} aria-hidden="true" />
+              {p.title}
+              {again.has(p.id) && <span className="chip chip-warn">Make again</span>}
+            </>
+          )}
+        </button>
+      </li>
     )
   }
   return (
@@ -297,19 +308,22 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
           marks={marks}
           model={remakePick ?? startEditModel(view.models)}
           onModel={setRemakePick}
-          onOpen={(id) => setOpenId(id)}
+          onOpen={(id) => {
+            setOpenId(id)
+            setReveal(id)
+          }}
         />
       )}
       <div className={list ? 'patches-layout patches-lefty' : 'patches-layout'}>
         {list ? (
           <div className="patches-side">
             <h3>{heading}</h3>
-            <div className="patches-list">{row.patches.map(pick)}</div>
+            <ul className="patches-list">{row.patches.map(pick)}</ul>
           </div>
         ) : (
           <div className="patches-chips">
             <span className="label">{heading}</span>
-            {row.patches.map(pick)}
+            <ul className="patches-chips-list">{row.patches.map(pick)}</ul>
           </div>
         )}
         <PatchBody

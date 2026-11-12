@@ -351,7 +351,12 @@ describe('the press while it runs and after', () => {
     })
     const link = [...host.querySelectorAll('.remake-line button.link-button')][0]!
     expect(text(link)).toBe('Door open')
+    const scrolled: string[] = []
+    // On the element itself: another file may have put a stub on the prototype.
+    const pickOf = document.getElementById('game-patch-row-door')!
+    pickOf.scrollIntoView = () => scrolled.push(pickOf.id)
     await act(async () => (link as HTMLButtonElement).click())
+    expect(scrolled).toEqual(['game-patch-row-door'])
     expect(host.querySelectorAll('button.patch-pick')[1]!.getAttribute('aria-current')).toBe('true')
   })
 
