@@ -8,6 +8,7 @@ import {
   applyActStyleChange,
   applyActStylePick,
   adoptAreas,
+  carryAreas,
   applyAreaBox,
   areaFractions,
   areaFractionsOn,
@@ -1432,6 +1433,17 @@ describe('the boxes of each take', () => {
       '4': { fountain: box, 'old-notice': other },
     })
     expect(adoptAreas(none, inn.id, 4)).toEqual(none)
+  })
+  it('carries the boxes of a take onto a new one, the legacy boxes with them, and no more', () => {
+    const legacy = applyAreaBox(none, inn.id, 'fountain', box)
+    const carried = carryAreas(on(legacy, 'old-notice', 2, other), inn.id, 2, 5)
+    expect(carried.images[inn.id]?.areas).toBeUndefined()
+    expect(carried.images[inn.id]?.takeAreas).toEqual({
+      '2': { fountain: box, 'old-notice': other },
+      '5': { fountain: box, 'old-notice': other },
+    })
+    // A take with no boxes has none to carry.
+    expect(carryAreas(none, inn.id, 2, 5)).toEqual(none)
   })
   it('places a box on the take in the game and takes the legacy boxes along', () => {
     const legacy = applyAreaBox(none, inn.id, 'fountain', box)
