@@ -1105,7 +1105,7 @@ describe('the patches the game asks for', () => {
       { view: 'images', page: 'image', image: 'inn', from: 'act1' },
       summary({ patches: [lamp, door] }),
     )
-    expect(heading(page)).toEqual(['Prompt', 'Patches the game asks for'])
+    expect(heading(page)).toEqual(['Prompt', 'Fine-tune the picture', 'Patches the game asks for'])
     expect(page.querySelectorAll('.game-patch-row').length).toBe(2)
   })
 
@@ -1251,9 +1251,14 @@ describe('the named areas the game declares', () => {
   const lineOf = (page: HTMLElement, at = 0) =>
     text([...page.querySelectorAll('tbody tr')][at]!.querySelector('.images-areas'))
 
-  it('lists them on the image’s page below the workbench and above the patches', () => {
+  it('lists them on the image’s page below the workbench and the fine-tune panel, above the patches', () => {
     const page = render(image, summary({ areas: [fountain, notice], patches: [lamp] }))
-    expect(heading(page)).toEqual(['Prompt', 'Named areas', 'Patches the game asks for'])
+    expect(heading(page)).toEqual([
+      'Prompt',
+      'Fine-tune the picture',
+      'Named areas',
+      'Patches the game asks for',
+    ])
     expect(text(page.querySelector('.named-areas-head'))).toBe('Named areas0 of 2 placed')
     expect([...page.querySelectorAll('.named-area')].map((r) => text(r))).toEqual([
       'FountainfountainTo place',

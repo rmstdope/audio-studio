@@ -9,16 +9,12 @@ import {
   type EditModelId,
   type ImageDownload,
 } from '../core/imageModels'
-import { cropPixels, editWindow, isCropped, pastePixels } from '../core/imagePixels'
+import { isCropped, type Pixels } from '../core/imagePixels'
 import { ImageLockSchema } from '../core/images'
 import { ImageManifestSchema, type ImageManifest } from '../core/imageTakes'
 import {
   checkPatchArea,
-  keepChanged,
   keptBox,
-  matchOutside,
-  matchToTake,
-  openSides,
   planRemake,
   remakeCovered,
   tieOf,
@@ -44,11 +40,12 @@ import {
   readPatchBoard,
   renderPatchGame,
 } from './imagePatchGame'
-import { downloadOf, makeImageTake, type ImageGenerator } from './images'
+import { downloadOf, type ImageGenerator } from './images'
 import { describeFailure } from './imageTakes'
+import { editStep } from './imageEditStep'
 import { choices, sorted } from './musicClips'
 import { isSafeId } from './musicTakes'
-import { decodePng, encodePng, encodeTransparentPng, pngSize } from './png'
+import { decodePng, pngSize } from './png'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
@@ -301,30 +298,25 @@ export function createImagePatches({
   async function run(
     found: Found,
     entry: Entry,
-    take: { path: string; width: number; height: number },
+    around: Pixels,
     entries: Map<number, Entry>,
   ): Promise<void> {
     if (entries.get(entry.n) !== entry || entry.state !== 'waiting') return
     const stop = new AbortController()
     entry.stop = stop
     const seed = newSeed() // before any await, so the takes of one press take their seeds in order
-    const window = editWindow(entry.area, take)
-    const cropFile = `${found.folder}/editing-${entry.n}.png`
     try {
-      const around = decodePng(new Uint8Array(await Bun.file(take.path).arrayBuffer()))
-      // The model gets the marked area with some context, not the whole picture: faster, and the
-      // thing to change is larger in its view.
-      await writeAtomic(found.root, cropFile, encodePng(cropPixels(around, window)))
       let began: number | null = null
-      const made = await makeImageTake(
+      const made = await editStep(
         { generator, queue, free },
         {
-          prompt: entry.words,
-          width: window.width,
-          height: window.height,
-          seed,
+          root: found.root,
+          cropFile: `${found.folder}/editing-${entry.n}.png`,
+          source: around,
+          area: entry.area,
+          words: entry.words,
           model: entry.model,
-          editing: resolveInRoot(found.root, cropFile),
+          seed,
         },
         stop.signal,
         () => {
@@ -333,33 +325,10 @@ export function createImagePatches({
           began = entry.startedAt
         },
       )
-      if (stop.signal.aborted) return
+      if (!made) return
       // Timed from when the take started making, so its wait for the GPU is not counted.
       const took = began === null ? null : (now() - began) / 1000
-      const part = decodePng(made.png)
-      if (part.width !== window.width || part.height !== window.height) {
-        throw new Error(
-          `The edited picture came back at ${part.width} × ${part.height} instead of ${window.width} × ${window.height}.`,
-        )
-      }
-      // The colours are matched in the window, where the model's drift is all there is to see:
-      // laid into the whole take, everything outside the window would read as no drift at all.
-      // Then the drift round the mark is taken away too, and what the edit changed is kept, an
-      // object it grew past the mark whole.
-      const inside = { ...entry.area, x: entry.area.x - window.x, y: entry.area.y - window.y }
-      const original = cropPixels(around, window)
-      const kept = keepChanged(
-        matchOutside(matchToTake(part, original, inside), original, inside),
-        original,
-        inside,
-        openSides(window, take),
-      )
-      const blank = {
-        width: take.width,
-        height: take.height,
-        data: new Uint8Array(take.width * take.height * 4),
-      }
-      const png = encodeTransparentPng(pastePixels(blank, kept, window))
+      const png = made.png
       const saved: PatchTake = {
         n: entry.n,
         base: entry.base,
@@ -397,8 +366,6 @@ export function createImagePatches({
       failedModels.set(found.key, failed)
       entry.message = describeFailure(error)
       entry.state = 'failed'
-    } finally {
-      await rm(resolveInRoot(found.root, cropFile), { force: true })
     }
   }
 
@@ -446,6 +413,16 @@ export function createImagePatches({
         : DEFAULT_EDIT_MODEL
     const problem = await makerProblem(model)
     if (problem) return { ok: false, message: problem }
+    // Read once for all the takes, before any is queued.
+    let around: Pixels
+    try {
+      around = decodePng(new Uint8Array(await Bun.file(picture.path).arrayBuffer()))
+    } catch {
+      return {
+        ok: false,
+        message: "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
+      }
+    }
     const queued: Entry[] = []
     if (failed) {
       failed.state = 'waiting'
@@ -474,7 +451,8 @@ export function createImagePatches({
         queued.push(entry)
       }
     }
-    for (const entry of queued) void run(found, entry, picture, entries)
+    // No await from here until every take is in line, so the takes of one press are made in number order.
+    for (const entry of queued) void run(found, entry, around, entries)
     return { ok: true }
   }
 

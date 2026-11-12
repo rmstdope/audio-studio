@@ -19,9 +19,11 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
+import type { FineTunesView, UseFineTuneAnswer } from '../core/imageFineTunes'
 import type { ImagePatchesView, PatchArea } from '../core/imagePatches'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
 import type { EditModelId } from '../core/imageModels'
+import type { FineTuneAnswer, FineTuneRequest } from '../services/imageFineTunes'
 import type { ImagePatchAnswer, PatchMakeRequest } from '../services/imagePatches'
 import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
@@ -1676,6 +1678,8 @@ function useImageTakesChange<Input>(
         client.invalidateQueries({ queryKey: ['image-takes', imageId] }),
         // The patches lie on the image's chosen take, which a choice, un-choice or drop may change.
         client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+        // So do the fine-tunes: they belong to the picture in the game.
+        client.invalidateQueries({ queryKey: ['image-fine-tunes', imageId] }),
         client.invalidateQueries({ queryKey: ['image-making'] }),
         ...(project ? [client.invalidateQueries({ queryKey: ['project'] })] : []),
       ]),
@@ -1860,6 +1864,100 @@ export function useMarkPatchTakeSeen(imageId: string, patchId: string) {
     path: `/takes/${n}/seen`,
     method: 'POST',
   }))
+}
+
+/** The fine-tunes of an image's picture in the game; polled while any is being made. */
+export function useFineTunes(imageId: string) {
+  return useQuery({
+    queryKey: ['image-fine-tunes', imageId],
+    queryFn: () =>
+      getJson<FineTunesView | ProjectFailure>(
+        `/api/images/${encodeURIComponent(imageId)}/fine-tunes`,
+      ),
+    refetchInterval: (query) => {
+      const view = query.state.data
+      return view && 'making' in view && view.making.length > 0 ? 1000 : false
+    },
+  })
+}
+
+/**
+ * A change to an image's fine-tunes: sends `request` to the fine-tune route, answers what the
+ * server said (a refusal is an answer, not an error), then reloads the fine-tunes. `used` also
+ * reloads what a used fine-tune changes: the takes, the patches and the project.
+ */
+function useFineTuneChange<Input, Answer>(
+  imageId: string,
+  request: (input: Input) => { path: string; method: string; body?: unknown },
+  used = false,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: Input) => {
+      const { path, method, body } = request(input)
+      const response = await fetch(`/api/images/${encodeURIComponent(imageId)}/fine-tunes${path}`, {
+        method,
+        ...(body === undefined
+          ? {}
+          : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`changing the fine-tunes answered ${response.status}`)
+      }
+      return (await response.json()) as Answer
+    },
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['image-fine-tunes', imageId] }),
+        ...(used
+          ? [
+              client.invalidateQueries({ queryKey: ['image-takes', imageId] }),
+              client.invalidateQueries({ queryKey: ['image-patches', imageId] }),
+              client.invalidateQueries({ queryKey: ['image-making'] }),
+              client.invalidateQueries({ queryKey: ['project'] }),
+            ]
+          : []),
+      ]),
+  })
+}
+
+/** Asks for fine-tunes of the picture in the game: new ones, or a failed one again. */
+export function useMakeFineTunes(imageId: string) {
+  return useFineTuneChange<FineTuneRequest, NonNullable<FineTuneAnswer>>(imageId, (body) => ({
+    path: '',
+    method: 'POST',
+    body,
+  }))
+}
+
+/** Stops the fine-tunes that are waiting or being made. */
+export function useStopFineTunes(imageId: string) {
+  return useFineTuneChange<void, unknown>(imageId, () => ({ path: '/stop', method: 'POST' }))
+}
+
+/** Takes a fine-tune off the board. */
+export function useDropFineTune(imageId: string) {
+  return useFineTuneChange<number, NonNullable<FineTuneAnswer>>(imageId, (n) => ({
+    path: `/${n}`,
+    method: 'DELETE',
+  }))
+}
+
+/** Records that a fine-tune has been laid over the picture once. */
+export function useMarkFineTuneSeen(imageId: string) {
+  return useFineTuneChange<number, NonNullable<FineTuneAnswer>>(imageId, (n) => ({
+    path: `/${n}/seen`,
+    method: 'POST',
+  }))
+}
+
+/** Uses a fine-tune: it becomes the image's next take, chosen. */
+export function useUseFineTune(imageId: string) {
+  return useFineTuneChange<number, UseFineTuneAnswer>(
+    imageId,
+    (n) => ({ path: '/use', method: 'POST', body: { n } }),
+    true,
+  )
 }
 
 /** Asks for takes of an image (new ones, or a failed one again). */

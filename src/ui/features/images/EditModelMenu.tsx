@@ -22,6 +22,7 @@ export function EditModelMenu({
   downloads,
   failed,
   label,
+  visible = false,
   why,
 }: {
   value: EditModelId
@@ -31,6 +32,8 @@ export function EditModelMenu({
   failed: EditModelId[]
   /** The menu's name for screen readers. */
   label: string
+  /** Shows the label above the menu; otherwise the menu is named for screen readers only. */
+  visible?: boolean
   /** Why the menu is off; null or false when it is on. */
   why?: string | false | null
 }) {
@@ -39,6 +42,11 @@ export function EditModelMenu({
   const warning = imageWarning(stateOf(value))
   return (
     <div className="edit-model">
+      {visible && (
+        <span className="lbl" aria-hidden="true">
+          {label}
+        </span>
+      )}
       <MenuFace text={editShortEntry(value, figures)}>
         <select
           className="takes-model"

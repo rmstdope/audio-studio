@@ -2900,7 +2900,6 @@ button.cue-chip[aria-expanded='true'] {
 
 .design-text {
   width: 100%;
-  min-height: 96px;
   resize: vertical;
   font: inherit;
   line-height: 1.5;
@@ -5610,4 +5609,72 @@ textarea[aria-disabled='true'][data-why] {
 .image-make .menu-face {
   flex-basis: 100%;
   max-width: none;
+}
+
+/* A fine-tune's card: the picture is a button that lays it over the big picture, Use this and Drop beside it. */
+.fine-card-pick {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+.fine-card[data-looking='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.fine-card-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The fine-tune form is one column: each label above its field, the words box as wide as the column and as tall as its words. */
+.fine-tune .patch-bench-right .field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.fine-tune .patch-bench-right .lbl,
+.fine-tune .edit-model .lbl {
+  font-size: 13px;
+  color: var(--muted);
+}
+.fine-tune .patch-bench-right textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+/* Wide enough for "Fine-tune 5" and its chip on one line; a card being made has a picture box that says so. */
+.fine-tune .patch-thumbs {
+  grid-template-columns: repeat(auto-fill, minmax(min(176px, 100%), 1fr));
+}
+.patch-making-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--inset);
+  color: var(--muted);
+  font-size: 12px;
+}
+/* Fine-tune cards in one row line up: the name and its chip on one line, level pictures, buttons at the foot. */
+.fine-tune .fine-card-pick {
+  flex: 1 1 auto;
+}
+.fine-tune .patch-thumb-label {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.fine-tune .patch-thumb-label .grow {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fine-tune .patch-thumb .patch-controls {
+  margin-top: auto;
+}
+.fine-tune .patch-thumb-making .patch-thumb-label {
+  flex-wrap: wrap;
+  white-space: normal;
 }
