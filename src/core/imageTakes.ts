@@ -63,14 +63,20 @@ export function takeIsEarlier(made: MadeFrom, wordsNow: string): boolean {
   return made.words !== wordsNow
 }
 
+/** How many takes one press of Make can ask for. */
+export const MAX_IMAGE_TAKES_AT_ONCE = 10
+
 /**
- * The body of asking for takes: this many new ones (1 to 4), with the model to make them with
+ * The body of asking for takes: this many new ones (1 to 10), with the model to make them with
  * (the project's, else the one that is here, when it is left out), or the failed take with this
  * number again.
  */
 export const MakeImageTakesBody = z.union([
   z
-    .object({ count: z.number().int().min(1).max(4), model: z.enum(IMAGE_MODEL_IDS).optional() })
+    .object({
+      count: z.number().int().min(1).max(MAX_IMAGE_TAKES_AT_ONCE),
+      model: z.enum(IMAGE_MODEL_IDS).optional(),
+    })
     .strict(),
   z.object({ retry: z.number().int().positive() }).strict(),
 ])

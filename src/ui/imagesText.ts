@@ -254,6 +254,25 @@ export function lookZoom(
 }
 
 /**
+ * How big the two pictures are shown when the stage has a known height as well: as large as both
+ * fit side by side in `availableWidth` x `availableHeight` (a hundredth of the game's size at a
+ * time, at least a tenth), keeping their shape. With no known height (0) it is `lookZoom`.
+ */
+export function fitZoom(
+  availableWidth: number,
+  availableHeight: number,
+  gap: number,
+  width: number,
+  height: number,
+): { zoom: number; stacked: boolean } {
+  if (availableHeight <= 0 || availableWidth <= 0 || width <= 0 || height <= 0) {
+    return lookZoom(availableWidth, gap, width)
+  }
+  const fit = Math.min((availableWidth - gap) / (2 * width), availableHeight / height)
+  return { zoom: Math.max(SMALLEST_STACKED, shrunk(fit)), stacked: false }
+}
+
+/**
  * How a picture at `zoom` is drawn: with hard pixels at a whole size, as the game's pixel art is;
  * smooth when shrunk, where hard pixels would drop some of them unevenly.
  */

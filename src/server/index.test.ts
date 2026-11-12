@@ -5556,7 +5556,8 @@ describe('the image takes routes', () => {
   })
 
   it('refuses a bad body and answers 404 for an image the game does not list', async () => {
-    expect((await send('POST', '/api/images/inn/takes', { count: 9 })).status).toBe(400)
+    expect((await send('POST', '/api/images/inn/takes', { count: 11 })).status).toBe(400)
+    expect((await send('POST', '/api/images/inn/takes', { count: 0 })).status).toBe(400)
     expect((await send('POST', '/api/images/inn/choose', { n: 'x' })).status).toBe(400)
     expect((await send('POST', '/api/images/ghost/takes', { count: 1 })).status).toBe(404)
     expect((await fetch(new URL('/api/images/ghost/takes', studio.url))).status).toBe(404)

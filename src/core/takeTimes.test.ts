@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   figureOf,
+  forTakesText,
   perTakeText,
   recordTime,
   roundedSeconds,
@@ -81,5 +82,13 @@ describe('words', () => {
     expect(perTakeText({ seconds: 20, guess: true })).toBe('a guess: about 20 s a take')
     expect(perTakeText({ seconds: 23, guess: false })).toBe('about 25 s a take')
     expect(perTakeText({ seconds: 460, guess: false })).toBe('about 8 min a take')
+  })
+})
+
+describe('forTakesText', () => {
+  it('gives the time for the number asked, a guess marked as one', () => {
+    expect(forTakesText({ seconds: 20, guess: true }, 4)).toBe('a guess: about 1 min for 4 takes')
+    expect(forTakesText({ seconds: 23, guess: false }, 1)).toBe('about 25 s for 1 take')
+    expect(forTakesText({ seconds: 20, guess: false }, 10)).toBe('about 3 min for 10 takes')
   })
 })

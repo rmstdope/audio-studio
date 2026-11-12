@@ -15,6 +15,7 @@ import {
   listSeparator,
   joined,
   lookNoticeText,
+  fitZoom,
   lookZoom,
   makeTakesText,
   pictureRendering,
@@ -529,5 +530,23 @@ describe('areaRowWhy', () => {
     expect(areaRowWhy('none')).toBe(
       'Choose a take of the image first. Areas are placed on the take the game shows.',
     )
+  })
+})
+
+describe('fitZoom', () => {
+  it('fits two pictures side by side to the width when the height allows', () => {
+    // (1014 - 14) / 2 = 500 wide each; 500 / 640 of the game's width.
+    expect(fitZoom(1014, 900, 14, 640, 360)).toEqual({ zoom: 0.78, stacked: false })
+  })
+  it('fits them to the height when that is the tighter limit, keeping the shape', () => {
+    expect(fitZoom(2000, 360, 14, 640, 360)).toEqual({ zoom: 1, stacked: false })
+    expect(fitZoom(2000, 540, 14, 640, 360)).toEqual({ zoom: 1.5, stacked: false })
+    expect(fitZoom(2000, 600, 14, 360, 640)).toEqual({ zoom: 0.93, stacked: false })
+  })
+  it('never goes below a tenth while the stage is laid out', () => {
+    expect(fitZoom(20, 5, 14, 640, 360)).toEqual({ zoom: 0.1, stacked: false })
+  })
+  it('falls back to the width alone when the height is not known', () => {
+    expect(fitZoom(1380, 0, 10, 320, 200)).toEqual(lookZoom(1380, 10, 320))
   })
 })

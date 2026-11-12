@@ -1578,27 +1578,33 @@ then the picture, then the lock entry, so a failure can be pressed again; the ta
 read. The game's own `file` is never written or deleted. Where the pictures of the chosen image and of
 the game's own are served from: `GET /api/images/:id/current` (the chosen clip, else the game's file).
 
-**The workbench** (an image's page, under its notices) keeps the whole round, words, make, look,
-choose or drop, in view at once. Its first column holds
+**The workbench** (the Make tab of an image's page, as-kw3x.3; `docs/ui/as-kw3x-image-jobs.html`, job Make)
+keeps the whole round, words, make, look, choose or drop, in one frame filling the window's height
+below the tabs (`max(520px, 100vh - 230px)`): the **stage** in the middle, the **tools** column of
+300 px on the right and the **strip** along the bottom. The tools column holds
 the Prompt panel, then **Make takes** (the menu "Model for new takes" on a line of its own, which
 starts on the project's model, or on the model that is here when that one is missing, with a faint
 line saying so, a pick holding only while the page is open; closed it reads "FLUX.2 klein — a guess: about 20 s
-a take" (or "about 25 s a take" once timed); then the count menu, which keeps its pick after a press while the page is open, and Make N takes, and Stop while takes are made), then **Takes · N**:
-the other takes as a grid of thumbs that scrolls on its own, takes being made among them with their
-progress. Takes are made from the words on disk, so a press of Make or of a failed take's Try again first sees the prompt saved, as
+a take" (or "about 25 s a take" once timed); then the count menu, 1 to 10 (`MAX_IMAGE_TAKES_AT_ONCE`, which is also the
+server's limit) starting at 4 and keeping its pick while the page is open, Make N takes, Stop while takes are made, and a line
+"1 to 10 at a time · about 1 min for 4 takes" (`forTakesText`)), and at its foot "What the game gets" and a line of the keys.
+The strip, **Takes · N** (every take, the chosen one included): a thumb for each, the chosen one outlined in
+green and not pressable, the compared one in the accent, takes being made among them with their
+progress; it scrolls sideways and keeps the compared take in view. Takes are made from the words on disk, so a press of Make or of a failed take's Try again first sees the prompt saved, as
 a patch's Make does: it waits for a save under way, or saves words a failed save left in the field, with
 both buttons and Make's menus off meanwhile, and asks for no takes if the words could not be saved (as-95q).
-The second column holds the image the game uses beside one other take. Both columns stay
-in view while the page scrolls (sticky, the first at most the window's height); below 1000 px they
-stand one above the other. A box in the Takes heading, "What the game gets" (ticked when the page
-opens; the page's own, never saved), switches every take shown, on both sides and in the grid,
+The stage holds the image the game uses ("In the game · Take 8", with Un-choose) beside one other take
+("Comparing · Take 5", with the chip "new", Drop and Choose, each showing its key), always side by side and as large as both fit
+the stage's width and height (`fitZoom`, in hundredths of the game's size; the stage's height is ignored below 1000 px, where
+`lookZoom` applies); below 1000 px the stage, tools and strip stand one above the other. The box "What the game gets" (ticked when the page
+opens; the page's own, never saved), switches every take shown, on both sides and in the strip,
 between what the model made (with its size, and "cropped to fit" when it had another shape) and
 what the game gets (with the game's size; in its place, while a take has none, "Bringing to the
 game's look…", "Not brought to the game's look yet." or what to fix in the style). On the two
 sides, a game picture brought to the look before the image's size changed (480 × 360 for an image
 now 1920 × 1080) is captioned with its own size, read from the picture once it loads, and keeps its
 own shape, drawn as wide as the image would be (with hard pixels when that enlarges it) until it is
-brought to the look again; the grid's thumbs keep the image's shape. The image
+brought to the look again; the strip's thumbs keep the image's shape. The image
 the game uses (its game picture is the one the game has now) and the compared take are enlarged by
 the largest whole number of the game's size at which the two fit side by side in their column,
 drawn with hard pixels; when not even ×1 fits (RetroQuest's 640- and 480-wide images on a laptop)
@@ -1637,7 +1643,7 @@ new press or a hand start on an image of the act, and a quit forgets it.
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
 `PATCH /api/image-style` (`{ look }` or `{ keepOut }`); for takes
-`GET` and `POST /api/images/:id/takes` (`{ count, model? }` 1 to 4, or `{ retry }`), `PUT /api/image-model`, `GET /api/images/:id/takes/:n`
+`GET` and `POST /api/images/:id/takes` (`{ count, model? }` 1 to 10, or `{ retry }`), `PUT /api/image-model`, `GET /api/images/:id/takes/:n`
 (the model's picture), `…/:n/game` (the game's version), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
 `/unchoose`, `/accept`, `/stop`, `GET /api/images/:id/current`, `GET /api/images/making` and
 `GET`/`POST /api/images/bring-all`, `GET /api/images/take-times`, `GET /api/images/model-state` and `POST /api/image-acts/:id/make-all` and
