@@ -150,6 +150,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
   const changing = useRef(false)
+  const cameShown = useRef(false)
   const wordsBox = useRef<HTMLTextAreaElement>(null)
   const cards = useRef(new Map<number, HTMLButtonElement>())
   const stops = useRef(new Map<number, HTMLButtonElement>())
@@ -244,8 +245,14 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       : view.picture.kind === 'game'
         ? 'game'
         : 'none'
+  // The source take may keep the line only until the new take has been shown: after that, only the
+  // new take does, so Undo, a History step or a choose in Make ends it.
+  if (!came) cameShown.current = false
+  else if (shownKey === `take-${came.answer.take}`) cameShown.current = true
   const cameHere =
-    came && (shownKey === null || shownKey === came.from || shownKey === `take-${came.answer.take}`)
+    came &&
+    (shownKey === `take-${came.answer.take}` ||
+      (!cameShown.current && (shownKey === null || shownKey === came.from)))
       ? came.answer
       : null
   if (came && !cameHere) setCame(null)
@@ -381,8 +388,6 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     choose.mutate(n, {
       onSuccess: (answer) => {
         if (!answer.ok) return
-        // The line named the take a use put in the game; the person has now chosen another.
-        setCame(null)
         setLooking(null)
         setMarked(null)
       },

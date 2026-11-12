@@ -692,6 +692,27 @@ describe('History and Undo', () => {
     expect(host.querySelector('[role=status]')).toBeNull()
   })
 
+  it('puts the came-along line away when the source take is chosen elsewhere, after the new take was shown', async () => {
+    let served = view({ picture: picture(3), tunes: [tune(1)] })
+    const { host, client } = await render(() => served, {
+      status: 200,
+      body: { ok: true, take: 4, from: 3, carried: { areas: 0, patches: 0 } },
+    })
+    await choose(host, 0)
+    await settle()
+    const follow = async (n: number) => {
+      served = view({ picture: picture(n), tunes: [tune(1)] })
+      await act(async () => {
+        await client.invalidateQueries({ queryKey: ['image-fine-tunes', 'inn'] })
+      })
+      await settle()
+    }
+    await follow(4)
+    expect(host.querySelector('[role=status]')).not.toBeNull()
+    await follow(3)
+    expect(host.querySelector('[role=status]')).toBeNull()
+  })
+
   it('keeps the steps after the one in the game, dimmed, and clicking one chooses it', async () => {
     const { host, sent } = await render(
       () => view({ picture: picture(7) }),
