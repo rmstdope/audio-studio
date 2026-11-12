@@ -74,11 +74,22 @@ describe('the take on the right', () => {
 })
 
 describe('the request to make takes', () => {
-  it('asks for 1 to 4 takes, or the retry of one', () => {
+  it('asks for 1 to 10 takes, or the retry of one', () => {
     expect(MakeImageTakesBody.safeParse({ count: 2 }).success).toBe(true)
-    expect(MakeImageTakesBody.safeParse({ count: 5 }).success).toBe(false)
+    expect(MakeImageTakesBody.safeParse({ count: 11 }).success).toBe(false)
     expect(MakeImageTakesBody.safeParse({ count: 0 }).success).toBe(false)
     expect(MakeImageTakesBody.safeParse({ retry: 7 }).success).toBe(true)
     expect(MakeImageTakesBody.safeParse({ count: 2, retry: 7 }).success).toBe(false)
+  })
+})
+
+describe('asking for takes', () => {
+  it('takes 1 to 10 at once', () => {
+    for (const count of [1, 4, 10]) {
+      expect(MakeImageTakesBody.safeParse({ count }).success).toBe(true)
+    }
+    for (const count of [0, 11, 2.5]) {
+      expect(MakeImageTakesBody.safeParse({ count }).success).toBe(false)
+    }
   })
 })

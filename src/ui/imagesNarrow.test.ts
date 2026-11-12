@@ -28,21 +28,19 @@ describe('the two sides of an image’s takes', () => {
 })
 
 describe('an image’s workbench', () => {
-  it('puts the tools beside the pictures, both held in view, the takes scrolling on their own', () => {
-    expect(rule('.image-workbench')).toMatch(
-      /grid-template-columns:\s*minmax\(260px, 300px\) minmax\(0, 1fr\)/,
-    )
-    expect(rule('.image-workbench-tools')).toMatch(/position:\s*sticky/)
-    expect(rule('.image-workbench-tools')).toMatch(/max-height:\s*calc\(100vh - 32px\)/)
-    expect(rule('.image-stage-panel')).toMatch(/position:\s*sticky/)
-    expect(rule('.image-thumbs')).toMatch(/overflow-y:\s*auto/)
+  it('is a frame: the stage, the tools column of about 300 px, and the strip along the bottom', () => {
+    expect(rule('.image-workbench')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) 300px/)
+    expect(rule('.image-workbench')).toMatch(/grid-template-rows:\s*minmax\(0, 1fr\) auto/)
+    expect(rule('.image-workbench')).toMatch(/height:\s*max\(520px, calc\(100vh - 230px\)\)/)
+    expect(rule(".image-workbench > [data-area='strip']")).toMatch(/grid-column:\s*1 \/ -1/)
+    expect(rule('.image-thumbs')).toMatch(/overflow-x:\s*auto/)
   })
 
   it('puts the columns one above the other in a narrow window', () => {
     const narrow = css.slice(css.indexOf('@media (max-width: 1000px) {\n  .image-workbench'))
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
     expect(rule('.image-workbench', block)).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
-    expect(block).toMatch(/position:\s*static/)
+    expect(rule('.image-workbench', block)).toMatch(/height:\s*auto/)
   })
 })
 

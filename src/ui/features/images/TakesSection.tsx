@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
+  MAX_IMAGE_TAKES_AT_ONCE,
   rightAfterDrop,
   stepRight,
   type ImageMakingView,
@@ -13,6 +14,7 @@ import {
   type SetAsideQuestion,
 } from '../../../core/imagePatches'
 import { fineTuneCaption } from '../../../core/imageFineTunes'
+import { forTakesText } from '../../../core/takeTimes'
 import type { ImageRow } from '../../../core/images'
 import {
   IMAGE_MODEL_IDS,
@@ -39,10 +41,10 @@ import { MenuFace } from '../../components/MenuFace'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import {
   BRINGING_WHY,
+  fitZoom,
   IMAGES_LOCK_WHY,
   imageMakeWhy,
   imageMenuWhy,
-  lookZoom,
   makeTakesText,
   QUESTION_OPEN_WHY,
   refusal,
@@ -63,8 +65,14 @@ import { TakePicture, gameSource, modelSource, type Showing } from './TakePictur
 /** The inputs that are pressed rather than typed into, which leave the page's keys to it. */
 const PRESSED_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset'])
 
-/** How many takes one press can make. */
-const MAX_AT_ONCE = 4
+/** How many takes the count menu starts on. */
+const STARTING_COUNT = 4
+
+/** Below this window width the frame stacks (the stylesheet's `@media (max-width: 1000px)`) and the stage has no fixed height to fit. */
+const NARROW = 1000
+
+/** What a side takes besides its picture: caption, size line, buttons and the gaps between them. */
+const SIDE_CHROME = 100
 
 /** The space between the two sides, in pixels (the stylesheet's `.image-stage` gap). */
 const STAGE_GAP = 14
@@ -180,7 +188,7 @@ export function TakesSection({
   const view = query.data
   const [right, setRight] = useState<number | null>(null)
   const [wasChosen, setWasChosen] = useState<number | null>(null)
-  const [count, setCount] = useState(2)
+  const [count, setCount] = useState(STARTING_COUNT)
   const [picked, setPicked] = useState<ImageModelId | null>(null)
   // The question open: choosing, un-choosing or dropping a take with chosen patches asks first.
   const [asking, setAsking] = useState<SetAsideAsk | null>(null)
@@ -195,7 +203,7 @@ export function TakesSection({
   const [waitingForWords, setWaitingForWords] = useState(false)
   const [showing, setShowing] = useState<Showing>('game')
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
-  const [available, setAvailable] = useState(0)
+  const [available, setAvailable] = useState({ width: 0, height: 0 })
   const asked = useRef(new Set<number>())
   // Focus asked for by a press of Make does not scroll: a mouse press stays where it was.
   const focusQuietly = useRef(false)
@@ -234,7 +242,7 @@ export function TakesSection({
   const onRight = right !== null && strip.includes(right) ? right : (strip.at(-1) ?? null)
 
   // The right side starts on the newest take and stays where it is put; it moves only when its
-  // take leaves the grid.
+  // take leaves the strip.
   useEffect(() => {
     if (strip.length && (right === null || !strip.includes(right))) setRight(strip.at(-1)!)
   })
@@ -246,13 +254,18 @@ export function TakesSection({
       seen.mutate(shown.n)
     }
   })
-  // The grid scrolls on its own: the take on the right is kept in view as ← and → step.
+  // The strip scrolls on its own: the take on the right is kept in view as ← and → step.
   useEffect(() => {
     if (onRight !== null) thumbs.current.get(onRight)?.scrollIntoView?.({ block: 'nearest' })
   }, [onRight])
   useEffect(() => {
     if (!stage || typeof ResizeObserver === 'undefined') return
-    const measure = () => setAvailable(stage.clientWidth)
+    // A narrow window stacks the frame and the stage grows with its pictures: only the width counts.
+    const measure = () =>
+      setAvailable({
+        width: stage.clientWidth,
+        height: window.innerWidth <= NARROW ? 0 : Math.max(0, stage.clientHeight - SIDE_CHROME),
+      })
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(stage)
@@ -280,14 +293,16 @@ export function TakesSection({
         {null}
         {[]}
         <div className="image-workbench">
-          <div className="image-workbench-tools">{prompt}</div>
-          <section className="panel">
+          <section className="panel image-stage-panel" data-area="stage">
             {!view
               ? query.isError
                 ? 'The takes could not be loaded.'
                 : 'Loading takes…'
               : 'The takes could not be listed.'}
           </section>
+          <div className="image-workbench-tools" data-area="tools">
+            {prompt}
+          </div>
         </div>
       </>
     )
@@ -318,9 +333,15 @@ export function TakesSection({
   const menuWhy = imageMenuWhy(why)
   const makeWhy = imageMakeWhy(why)
   const size = { width: row.width, height: row.height }
-  // The two sides sit side by side at the largest whole size at which both fit, else shrunk side by
-  // side down to half the game's size, else one above the other (lookZoom).
-  const { zoom, stacked } = lookZoom(available, STAGE_GAP, row.width)
+  // The two sides sit side by side as large as both fit the stage; in a narrow window, whole sizes
+  // else shrunk down to half the game's size, else one above the other (fitZoom).
+  const { zoom, stacked } = fitZoom(
+    available.width,
+    available.height,
+    STAGE_GAP,
+    row.width,
+    row.height,
+  )
   const set = (update: (v: ImageTakesView) => ImageTakesView) =>
     client.setQueryData<ImageTakesView>(['image-takes', id], (v) =>
       v && 'takes' in v ? update(v) : v,
@@ -493,7 +514,7 @@ export function TakesSection({
         {...off(menuWhy)}
         onChange={(event) => setCount(Number(event.target.value))}
       >
-        {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
+        {Array.from({ length: MAX_IMAGE_TAKES_AT_ONCE }, (_, i) => i + 1).map((n) => (
           <option key={n} value={n}>
             {takeCountText(n)}
           </option>
@@ -505,13 +526,13 @@ export function TakesSection({
         {...off(makeWhy)}
         onClick={() => {
           // The button is off while takes are made, and the browser drops focus from it; focus
-          // goes to the take on the right in the grid, so ← and → keep stepping it.
+          // goes to the take on the right in the strip, so ← and → keep stepping it.
           focusQuietly.current = true
           setPendingFocus(onRight ?? 'right')
           afterWordsSaved(() => make.mutate({ count, model }))
         }}
       >
-        {makeTakesText(count, !none)}
+        {makeTakesText(count, false)}
       </button>
     </>
   )
@@ -559,114 +580,9 @@ export function TakesSection({
         </div>
       ))}
       <div className="image-workbench">
-        <div className="image-workbench-tools">
-          {prompt}
-          <section className="panel takes-panel image-make" aria-label="Make takes">
-            <div className="takes-head">
-              <h2>Make takes</h2>
-              {busy && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  {...off(stop.isPending && WAIT_FOR_CHANGE)}
-                  onClick={() => stop.mutate()}
-                >
-                  Stop
-                </button>
-              )}
-            </div>
-            {otherInUse && generator.ok && (
-              <span className="takes-missing small" role="status">
-                {states[ready.projectModel].installed
-                  ? imageSwitchedLine(ready.projectModel, fallback)
-                  : states[ready.projectModel].download === 'partial'
-                    ? `${imageModel(ready.projectModel).short}, the project's image model, is only partly downloaded, so these takes use ${imageModel(fallback).short}. Setup says how to finish it.`
-                    : `${imageModel(ready.projectModel).short}, the project's image model, isn't on this computer, so these takes use ${imageModel(fallback).short}. Setup says how to download it.`}
-              </span>
-            )}
-            <div className="takes-make">{controls}</div>
-          </section>
-          <section className="panel takes-panel image-takes" aria-label="Takes">
-            <div className="takes-head">
-              <h2>{none ? 'Takes' : `Takes · ${strip.length}`}</h2>
-              {!none && (
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={showing === 'game'}
-                    onChange={(event) => setShowing(event.target.checked ? 'game' : 'model')}
-                  />
-                  What the game gets
-                </label>
-              )}
-            </div>
-            {lockUnread && !none && (
-              <span className="takes-missing small">
-                Choosing, dropping and un-choosing wait until the images lock can be read. You can
-                still look and make more takes.
-              </span>
-            )}
-            {strip.length > 0 || making.length > 0 ? (
-              <div className="image-thumbs" data-strip>
-                {others.map((t) => {
-                  const src =
-                    showing === 'game' ? gameSource(id, t, row, lookError) : modelSource(id, t)
-                  return (
-                    <button
-                      type="button"
-                      key={t.n}
-                      className="image-thumb"
-                      aria-pressed={t.n === onRight}
-                      ref={(el) => {
-                        if (el) thumbs.current.set(t.n, el)
-                        else thumbs.current.delete(t.n)
-                      }}
-                      onClick={() => setRight(t.n)}
-                    >
-                      {src ? (
-                        <Picture
-                          src={src}
-                          alt=""
-                          {...(showing === 'game' ? size : { width: t.width, height: t.height })}
-                        />
-                      ) : (
-                        <div
-                          className="image-take-empty"
-                          style={{ aspectRatio: `${row.width} / ${row.height}` }}
-                        />
-                      )}
-                      <span className="image-thumb-label">
-                        <span className="grow">Take {t.n}</span>
-                        {t.earlier && <span className="faint">earlier words</span>}
-                        {t.n === wasChosen && <span className="faint">was chosen</span>}
-                        {t.isNew && <span className="chip chip-new">new</span>}
-                      </span>
-                    </button>
-                  )
-                })}
-                {making.map((m) => (
-                  <MakingThumb key={m.n} making={m} {...size} />
-                ))}
-              </div>
-            ) : null}
-            {strip.length > 0 && (
-              <span className="faint small">
-                Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the image the game
-                uses.
-              </span>
-            )}
-            {none && (
-              <div className="takes-empty">
-                <strong>Each take is a new image made from the prompt.</strong>
-                <span className="muted">
-                  Make a few, compare them, and choose the one the game shows.
-                </span>
-              </div>
-            )}
-          </section>
-        </div>
         <section
           className="panel image-stage-panel"
+          data-area="stage"
           aria-label="The chosen take and one to compare"
         >
           <div className="image-stage" data-stacked={stacked} ref={setStage}>
@@ -759,13 +675,15 @@ export function TakesSection({
                 </span>
                 {rightTake ? (
                   <>
+                    <span aria-hidden="true">{' · '}</span>
                     <b>Take {rightTake.n}</b>
+                    {rightTake.isNew && <span className="chip chip-new">new</span>}
                     <ModelName id={rightTake.model} />
                     {rightTake.earlier && <span className="faint small">earlier words</span>}
                     <FineTunedFrom take={rightTake} />
                   </>
                 ) : (
-                  <b>{chosen ? 'No other takes yet' : 'No takes yet'}</b>
+                  chosen && <b>No other takes yet</b>
                 )}
               </div>
               {rightTake ? (
@@ -808,7 +726,7 @@ export function TakesSection({
                       {...off(!canDrop && dropWhy, open && QUESTION_OPEN_WHY)}
                       onClick={() => request({ kind: 'drop', n: rightTake.n })}
                     >
-                      Drop
+                      Drop <kbd>D</kbd>
                     </button>
                     <button
                       type="button"
@@ -820,11 +738,8 @@ export function TakesSection({
                       )}
                       onClick={() => request({ kind: 'choose', n: rightTake.n })}
                     >
-                      Choose
+                      Choose <kbd>C</kbd>
                     </button>
-                    <span className="faint small">
-                      or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose
-                    </span>
                   </div>
                   {lookError !== null && (
                     <span className="faint small">Fix the style to choose this take.</span>
@@ -835,7 +750,7 @@ export function TakesSection({
                   title={
                     chosen
                       ? 'No other takes yet — make a few more to compare with the chosen one.'
-                      : 'No takes yet'
+                      : 'Make takes to compare them here.'
                   }
                   {...size}
                 />
@@ -844,6 +759,125 @@ export function TakesSection({
           </div>
           {!open && problem && <span className="adopt-error">{problem}</span>}
           {!open && error && <span className="adopt-error">{error.message}</span>}
+        </section>
+        <div className="image-workbench-tools" data-area="tools">
+          {prompt}
+          <section className="panel takes-panel image-make" aria-label="Make takes">
+            <div className="takes-head">
+              <h2>Make takes</h2>
+              {busy && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  {...off(stop.isPending && WAIT_FOR_CHANGE)}
+                  onClick={() => stop.mutate()}
+                >
+                  Stop
+                </button>
+              )}
+            </div>
+            {otherInUse && generator.ok && (
+              <span className="takes-missing small" role="status">
+                {states[ready.projectModel].installed
+                  ? imageSwitchedLine(ready.projectModel, fallback)
+                  : states[ready.projectModel].download === 'partial'
+                    ? `${imageModel(ready.projectModel).short}, the project's image model, is only partly downloaded, so these takes use ${imageModel(fallback).short}. Setup says how to finish it.`
+                    : `${imageModel(ready.projectModel).short}, the project's image model, isn't on this computer, so these takes use ${imageModel(fallback).short}. Setup says how to download it.`}
+              </span>
+            )}
+            <div className="takes-make">{controls}</div>
+            <span className="faint small">
+              1 to {MAX_IMAGE_TAKES_AT_ONCE} at a time · {forTakesText(figures[model], count)}
+            </span>
+          </section>
+          {!none && (
+            <div className="image-tools-foot">
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={showing === 'game'}
+                  onChange={(event) => setShowing(event.target.checked ? 'game' : 'model')}
+                />
+                What the game gets
+              </label>
+              <span className="faint small">
+                <kbd>←</kbd> <kbd>→</kbd> takes · <kbd>C</kbd> choose · <kbd>D</kbd> drop
+              </span>
+            </div>
+          )}
+        </div>
+        <section className="panel takes-panel image-takes" data-area="strip" aria-label="Takes">
+          <div className="takes-head">
+            <h2>{none ? 'Takes' : `Takes · ${takes.length}`}</h2>
+          </div>
+          {lockUnread && !none && (
+            <span className="takes-missing small">
+              Choosing, dropping and un-choosing wait until the images lock can be read. You can
+              still look and make more takes.
+            </span>
+          )}
+          <div className="image-thumbs" data-strip>
+            {takes.map((t) => {
+              const src =
+                showing === 'game' ? gameSource(id, t, row, lookError) : modelSource(id, t)
+              const picture = src ? (
+                <Picture
+                  src={src}
+                  alt=""
+                  {...(showing === 'game' ? size : { width: t.width, height: t.height })}
+                />
+              ) : (
+                <div
+                  className="image-take-empty"
+                  style={{ aspectRatio: `${row.width} / ${row.height}` }}
+                />
+              )
+              const label = (
+                <span className="image-thumb-label">
+                  <span className="grow">Take {t.n}</span>
+                  {t.earlier && <span className="faint">earlier words</span>}
+                  {t.n === wasChosen && <span className="faint">was chosen</span>}
+                  {t.fineTunedFrom && (
+                    <span className="faint">
+                      fine-tuned from{' '}
+                      {t.fineTunedFrom.take === null
+                        ? "the game's own image"
+                        : `Take ${t.fineTunedFrom.take}`}
+                    </span>
+                  )}
+                  {t.isNew && <span className="chip chip-new">new</span>}
+                </span>
+              )
+              // The chosen take already stands on the left: it is marked here, not pressed.
+              if (t.chosen) {
+                return (
+                  <div key={t.n} className="image-thumb image-thumb-chosen" data-chosen="true">
+                    {picture}
+                    {label}
+                  </div>
+                )
+              }
+              return (
+                <button
+                  type="button"
+                  key={t.n}
+                  className="image-thumb"
+                  aria-pressed={t.n === onRight}
+                  ref={(el) => {
+                    if (el) thumbs.current.set(t.n, el)
+                    else thumbs.current.delete(t.n)
+                  }}
+                  onClick={() => setRight(t.n)}
+                >
+                  {picture}
+                  {label}
+                </button>
+              )
+            })}
+            {making.map((m) => (
+              <MakingThumb key={m.n} making={m} {...size} />
+            ))}
+          </div>
         </section>
       </div>
     </>
@@ -907,8 +941,8 @@ function LeftSide({
       <>
         <div className="take-row">
           {label}
+          <span aria-hidden="true">{' · '}</span>
           <b>Take {chosen.n}</b>
-          <span className="chip chip-ok">Chosen</span>
           {row.looksOld && <span className="chip chip-warn">Old look</span>}
           <ModelName id={chosen.model} />
           <FineTunedFrom take={chosen} />
@@ -963,16 +997,12 @@ function LeftSide({
   return (
     <>
       <div className="take-row">{label}</div>
-      <EmptyFrame
-        title="Nothing shows here yet"
-        hint="Choose a take and the game shows it."
-        {...size}
-      />
+      <EmptyFrame title="No picture yet" hint="Choose a take and the game shows it." {...size} />
     </>
   )
 }
 
-/** A take waiting or being made, in the grid: its place, its time and a progress bar. */
+/** A take waiting or being made, in the strip: its place, its time and a progress bar. */
 function MakingThumb({
   making,
   width,

@@ -404,7 +404,7 @@ describe('an image’s page', () => {
     /** The page with a new prompt typed and `press` pressed at once, whose save waits for `release`. */
     async function typedAndPressed(
       answer: () => Response,
-      press = 'Make 2 takes',
+      press = 'Make 4 takes',
       takes: Partial<ImageTakesView> = {},
     ) {
       const page = render(route, summary(), {}, null, false, takes)
@@ -450,8 +450,8 @@ describe('an image’s page', () => {
 
     it('keeps Make off while it waits, so a second press asks for nothing more', async () => {
       const { page, release } = await typedAndPressed(() => Response.json({ ok: true }))
-      expect(isOff(button(page, 'Make 2 takes'))).toBe(true)
-      await act(async () => button(page, 'Make 2 takes').click())
+      expect(isOff(button(page, 'Make 4 takes'))).toBe(true)
+      await act(async () => button(page, 'Make 4 takes').click())
       await act(async () => release())
       await settle()
       expect(takesAsked()).toHaveLength(1)
@@ -468,7 +468,7 @@ describe('an image’s page', () => {
       await settle()
       expect(takesAsked()).toEqual([])
       expect(text(page)).toContain('Too long')
-      expect(isOff(button(page, 'Make 2 takes'))).toBe(false)
+      expect(isOff(button(page, 'Make 4 takes'))).toBe(false)
     })
 
     it('makes nothing when the save itself failed', async () => {
@@ -476,7 +476,7 @@ describe('an image’s page', () => {
       await act(async () => release())
       await settle()
       expect(takesAsked()).toEqual([])
-      expect(isOff(button(page, 'Make 2 takes'))).toBe(false)
+      expect(isOff(button(page, 'Make 4 takes'))).toBe(false)
     })
 
     describe('Try again on a failed take, which is made from the prompt as it stands', () => {
@@ -509,7 +509,7 @@ describe('an image’s page', () => {
       it('is off while a press of Make waits for the prompt', async () => {
         const { page, release } = await typedAndPressed(
           () => Response.json({ ok: true }),
-          'Make 2 takes',
+          'Make 4 takes',
           oneFailed,
         )
         expect(isOff(button(page, 'Try again'))).toBe(true)
@@ -520,7 +520,7 @@ describe('an image’s page', () => {
 
     it('asks for the takes at once when nothing was typed', async () => {
       const page = render(route, summary(), {}, null, false, {})
-      await act(async () => button(page, 'Make 2 takes').click())
+      await act(async () => button(page, 'Make 4 takes').click())
       await settle()
       expect(asked()).toEqual(['POST'])
     })

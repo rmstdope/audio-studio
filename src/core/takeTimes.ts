@@ -89,6 +89,12 @@ export function perTakeText(figure: Figure): string {
   return `${figure.guess ? 'a guess: ' : ''}about ${timeText(figure.seconds, 'nearest')} a take`
 }
 
+/** What the line under a Make button says `n` takes take: "about 1 min for 4 takes". */
+export function forTakesText(figure: Figure, n: number): string {
+  const takes = n === 1 ? 'take' : 'takes'
+  return `${figure.guess ? 'a guess: ' : ''}about ${timeText(figure.seconds * n, 'nearest')} for ${n} ${takes}`
+}
+
 /**
  * The saved timings as read: only positive numbers, only the last five of each, the keys in a
  * fixed order.
