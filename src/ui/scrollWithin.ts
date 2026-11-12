@@ -20,7 +20,10 @@ export function scrollWithin(
   box.scrollTop += nearest(inner.top, inner.bottom, outer.top, outer.bottom)
 }
 
-/** How far to scroll along one axis to bring [start, end] inside [from, to]: the start wins when it cannot all fit. */
+/**
+ * How far to scroll along one axis to bring [start, end] inside [from, to]: the start wins when
+ * it cannot all fit.
+ */
 function nearest(start: number, end: number, from: number, to: number): number {
   if (start < from) return start - from
   if (end > to) return Math.min(end - to, start - from)

@@ -1469,13 +1469,15 @@ describe('the workbench', () => {
   })
 
   it('brings the thumb of the take stepped to into view in the strip, never moving the page', async () => {
-    const s = await show(view({ takes: three }))
     const pageMoves: string[] = []
     const real = HTMLElement.prototype.scrollIntoView
     HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
       pageMoves.push(this.textContent ?? '')
     }
     cleanups.push(() => (HTMLElement.prototype.scrollIntoView = real))
+    // Opening the page keeps the newest take in view without moving the page.
+    const s = await show(view({ takes: three }))
+    expect(pageMoves).toEqual([])
     // The strip shows 300px and is scrolled to its end; the thumbs stand 150px apart, so Take 3
     // (on the right) is in view and Takes 1 and 2 are out of view to the left.
     const strip = s.container.querySelector<HTMLElement>('[data-strip]')!

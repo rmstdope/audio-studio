@@ -24,7 +24,7 @@ export interface PagerProps {
 let pending: { side: 'previous' | 'next'; href: string; at: number; byButton: boolean } | null =
   null
 
-/** How long a press may wait for its page to open before it is forgotten. */
+/** How long a press may wait for its page to open and still keep focus on its button. */
 const PENDING_MS = 3000
 
 /**
@@ -47,11 +47,11 @@ export function Pager({ place, previous, next, keys = true }: PagerProps) {
   // button, greyed out or not.
   useEffect(() => {
     const kept = pending
-    if (!kept || kept.href !== window.location.hash) return
     pending = null
-    if (Date.now() - kept.at >= PENDING_MS) return
+    if (!kept || kept.href !== window.location.hash) return
+    // However long a leave question held the step, the page it opens starts at the top.
     window.scrollTo(0, 0)
-    if (kept.byButton) buttons.current[kept.side]?.focus()
+    if (kept.byButton && Date.now() - kept.at < PENDING_MS) buttons.current[kept.side]?.focus()
   }, [place.position])
   const latest = useRef({ previous, next })
   latest.current = { previous, next }
