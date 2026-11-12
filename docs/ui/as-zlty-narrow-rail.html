@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Option A — the rail stays beside the page</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --sidebar: rgb(10 11 18/55%);
+        --glass: rgb(255 255 255/3.5%);
+        --glass-strong: rgb(255 255 255/6%);
+        --edge: rgb(255 255 255/8%);
+        --accent-grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --warn: #ffc24b;
+        --panel: #10121a;
+        --raised: #191c24;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(900px 500px at 85% -10%, rgb(255 90 120/14%), transparent 60%), var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 20px 16px 40px;
+      }
+      .intro {
+        max-width: 1200px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro b {
+        color: var(--text-soft);
+      }
+      .frames {
+        display: flex;
+        gap: 28px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .frame {
+        border: 1px solid var(--edge);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--bg);
+        position: relative;
+      }
+      .cap {
+        font-size: 12px;
+        color: var(--faint);
+        margin: 0 0 6px;
+      }
+      .win {
+        display: flex;
+        height: 560px;
+        overflow: hidden;
+        position: relative;
+      }
+      .win.col {
+        flex-direction: column;
+      }
+      .rail {
+        flex: 0 0 72px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--edge);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 12px 6px;
+        overflow: hidden;
+      }
+      .mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--accent-grad);
+        margin-bottom: 4px;
+        flex: none;
+      }
+      .fold {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        color: var(--faint);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        flex: none;
+      }
+      .item {
+        width: 60px;
+        border-radius: 9px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 6px 0 5px;
+        font-size: 10px;
+        color: var(--muted);
+        gap: 2px;
+        position: relative;
+        flex: none;
+      }
+      .item i {
+        font-style: normal;
+        font-size: 15px;
+        line-height: 1;
+      }
+      .item.cur {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .pills {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        width: 60px;
+      }
+      .pill {
+        font-size: 10px;
+        border-radius: 999px;
+        padding: 3px 6px;
+        background: var(--glass-strong);
+        color: var(--text-soft);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+      .pill.cur {
+        background: var(--accent);
+        color: #1a0a02;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--warn);
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .sep {
+        width: 36px;
+        height: 1px;
+        background: var(--edge);
+        margin: 6px 0;
+      }
+      .grow {
+        flex: 1;
+      }
+      .badge {
+        position: absolute;
+        top: 2px;
+        right: 8px;
+        background: var(--warn);
+        color: #1a1200;
+        border-radius: 999px;
+        font-size: 9px;
+        padding: 0 4px;
+      }
+      .page {
+        flex: 1;
+        min-width: 0;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow: hidden;
+      }
+      .page h2 {
+        margin: 0;
+        font-size: 17px;
+      }
+      .crumb {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .card {
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .thumb {
+        width: 64px;
+        height: 44px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #2a3350, #4a2a3a);
+        flex: none;
+      }
+      .lines {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .ln {
+        height: 7px;
+        border-radius: 4px;
+        background: var(--glass-strong);
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 10px;
+        background: var(--sidebar);
+        border-bottom: 1px solid var(--edge);
+        flex: none;
+      }
+      .bar .mark {
+        margin: 0;
+        width: 26px;
+        height: 26px;
+      }
+      .hitem {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 7px;
+        border-radius: 8px;
+        font-size: 11px;
+        color: var(--muted);
+        white-space: nowrap;
+        flex: none;
+        position: relative;
+      }
+      .hitem.cur {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .hitem i {
+        font-style: normal;
+        font-size: 14px;
+      }
+      .hpills {
+        display: flex;
+        gap: 4px;
+        flex: none;
+      }
+      .vsep {
+        width: 1px;
+        height: 22px;
+        background: var(--edge);
+        flex: none;
+        margin: 0 2px;
+      }
+      .scroll {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        overflow: hidden;
+        flex: 1;
+        min-width: 0;
+        mask-image: linear-gradient(90deg, #000 88%, transparent);
+      }
+      .where {
+        font-size: 13px;
+        color: var(--text-soft);
+        flex: 1;
+      }
+      .where b {
+        color: var(--text);
+      }
+      .note {
+        max-width: 1200px;
+        margin: 18px auto 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .drawer {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 240px;
+        background: #0c0d14;
+        border-right: 1px solid var(--edge);
+        box-shadow: 0 12px 40px rgb(0 0 0/60%);
+        padding: 14px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        z-index: 2;
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgb(0 0 0/45%);
+        z-index: 1;
+      }
+      .drow {
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+      .drow.cur {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .drow.sub {
+        padding-left: 26px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Option A — the rail stays beside the page</h1>
+      <p>
+        Folded in a narrow window, the rail stays a <b>full-height column on the left</b>, exactly
+        as on a desktop. The page takes everything to its right. The rail stays put while the page
+        scrolls; if the window is too short for every entry, the rail scrolls on its own.
+      </p>
+    </div>
+    <div class="frames">
+      <div>
+        <p class="cap">A tablet-width window (760 px), folded</p>
+        <div class="frame" style="width: 760px">
+          <div class="win">
+            <div class="rail">
+              <div class="mark"></div>
+              <div class="fold">»</div>
+              <div class="item"><i>🎙</i>Narration</div>
+              <div class="item"><i>♪</i>Music</div>
+              <div class="item cur"><i>▣</i>Images</div>
+              <div class="pills">
+                <div class="pill"><span class="dot ok"></span>Act 1</div>
+                <div class="pill cur"><span class="dot"></span>Act 2</div>
+                <div class="pill"><span class="dot"></span>Act 3</div>
+              </div>
+              <div class="item"><i>🔊</i>Effects</div>
+              <div class="item"><i>◫</i>Scenes</div>
+              <div class="grow"></div>
+              <div class="sep"></div>
+              <div class="item"><i>👥</i>Cast</div>
+              <div class="item"><i>⇄</i>Changes</div>
+              <div class="item"><i>$</i>Spending</div>
+              <div class="item"><i>✓</i>Setup<span class="badge">2</span></div>
+            </div>
+            <div class="page">
+              <div class="crumb">Images › Act 2</div>
+              <h2>Act 2 — The harbour</h2>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap">A phone-width window (390 px), folded</p>
+        <div class="frame" style="width: 390px">
+          <div class="win">
+            <div class="rail">
+              <div class="mark"></div>
+              <div class="fold">»</div>
+              <div class="item"><i>🎙</i>Narration</div>
+              <div class="item"><i>♪</i>Music</div>
+              <div class="item cur"><i>▣</i>Images</div>
+              <div class="pills">
+                <div class="pill"><span class="dot ok"></span>Act 1</div>
+                <div class="pill cur"><span class="dot"></span>Act 2</div>
+                <div class="pill"><span class="dot"></span>Act 3</div>
+              </div>
+              <div class="item"><i>🔊</i>Effects</div>
+              <div class="item"><i>◫</i>Scenes</div>
+              <div class="grow"></div>
+              <div class="sep"></div>
+              <div class="item"><i>👥</i>Cast</div>
+              <div class="item"><i>⇄</i>Changes</div>
+              <div class="item"><i>$</i>Spending</div>
+              <div class="item"><i>✓</i>Setup<span class="badge">2</span></div>
+            </div>
+            <div class="page">
+              <div class="crumb">Images › Act 2</div>
+              <h2>Act 2 — The harbour</h2>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="thumb"></div>
+                <div class="lines">
+                  <div class="ln" style="width: 70%"></div>
+                  <div class="ln" style="width: 45%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">
+      Cost: at phone width the rail keeps 72 px of a 390 px window. Unfolded in a narrow window is
+      unchanged: the full sidebar still sits above the page.
+    </p>
+  </body>
+</html>
