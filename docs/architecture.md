@@ -167,7 +167,10 @@ wrapping and never crossing acts. A step sets `window.location.hash` as the brea
 route hold that asks before leaving a scene's unsaved changes applies unchanged. ← and → step too,
 unless the press is in a field or inside a control that uses the arrows (`ARROW_USERS` in
 `ui/pager.ts`); the image page passes `keys={false}` because its take strip keeps the arrows
-page-wide. The language chosen stays in the address of the neighbour. On a character's page, a
+page-wide. The language chosen stays in the address of the neighbour. Every step lands at the top
+of the page, so the same arrow stays under the pointer (as-pbby): the control scrolls the window to
+the top once the stepped-to item shows, and a strip or grid that keeps its take in view
+(`ui/scrollWithin.ts`) scrolls only itself, never the page. On a character's page, a
 part's overview and Lines page and an act's Scenes page, the pages whose header has buttons or a
 language switch, the control sits inside the header's action group (`.header-end`), held to the
 right end, so a narrower window wraps it with the buttons and never alone at the left (as-ped,

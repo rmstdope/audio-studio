@@ -145,6 +145,44 @@ describe('the previous/next control', () => {
     lastPage.unmount()
   })
 
+  it('lands every move at the top of the page, from a button or an arrow key', () => {
+    const tops: unknown[][] = []
+    const real = window.scrollTo
+    window.scrollTo = ((...args: unknown[]) => void tops.push(args)) as typeof window.scrollTo
+    try {
+      window.location.hash = '#/music/tracks/b'
+      const p = show(middle)
+      act(() => p.next.click())
+      // The same control on the next item, as a page that is not opened afresh shows it.
+      p.rerender({ ...middle, place: { position: 4, count: 12 } })
+      expect(tops).toEqual([[0, 0]])
+      press('ArrowLeft')
+      p.rerender(middle)
+      expect(tops).toEqual([
+        [0, 0],
+        [0, 0],
+      ])
+      p.unmount()
+    } finally {
+      window.scrollTo = real
+    }
+  })
+
+  it('leaves the page where it is on a page opened another way', () => {
+    const tops: unknown[][] = []
+    const real = window.scrollTo
+    window.scrollTo = ((...args: unknown[]) => void tops.push(args)) as typeof window.scrollTo
+    try {
+      window.location.hash = '#/elsewhere'
+      const p = show(middle)
+      p.rerender({ ...middle, place: { position: 4, count: 12 } })
+      expect(tops).toEqual([])
+      p.unmount()
+    } finally {
+      window.scrollTo = real
+    }
+  })
+
   it('does not move focus on a page opened another way', () => {
     window.location.hash = '#/elsewhere'
     const p = show(middle)

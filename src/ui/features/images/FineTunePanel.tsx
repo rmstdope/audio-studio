@@ -38,6 +38,7 @@ import { JUST_FINISHED, modelMissingWhy, refusal, WAIT_FOR_CHANGE } from '../../
 import { progressOf } from '../../musicTakesText'
 import { off } from '../../off'
 import { EditModelMenu } from './EditModelMenu'
+import { scrollWithin } from '../../scrollWithin'
 
 /** How many fine-tunes one press can make. */
 const MAX_AT_ONCE = 6
@@ -177,7 +178,8 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     }
   })
   useEffect(() => {
-    if (lookingAt !== null) cards.current.get(lookingAt)?.scrollIntoView?.({ block: 'nearest' })
+    const card = lookingAt === null ? undefined : cards.current.get(lookingAt)
+    scrollWithin(card, card?.closest<HTMLElement>('.patch-thumbs'))
   }, [lookingAt])
   // The words box grows with its words, so none are out of view; a height dragged taller stays.
   useLayoutEffect(() => {
