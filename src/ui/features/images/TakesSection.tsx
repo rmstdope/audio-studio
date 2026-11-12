@@ -241,7 +241,7 @@ export function TakesSection({
   // A take shown on the right once is no longer "new".
   const shown = ready?.takes.find((t) => t.n === onRight)
   useEffect(() => {
-    if (shown?.isNew && !asked.current.has(shown.n)) {
+    if (active && shown?.isNew && !asked.current.has(shown.n)) {
       asked.current.add(shown.n)
       seen.mutate(shown.n)
     }

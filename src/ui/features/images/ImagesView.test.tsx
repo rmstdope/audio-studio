@@ -167,11 +167,13 @@ function render(
   run: unknown = null,
   modelState = false,
   takes?: Partial<ImageTakesView>,
+  seed?: (client: InstanceType<typeof QueryClient>) => void,
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(['image-making'], making)
   if (takes) client.setQueryData(['image-takes', 'inn'], { ...noTakes, ...takes })
   client.setQueryData(['look-run'], run)
+  seed?.(client)
   if (modelState) {
     const whole = { download: 'whole', failed: false }
     client.setQueryData(['image-model-state'], {
@@ -1256,8 +1258,8 @@ describe('the named areas the game declares', () => {
     expect(heading(page)).toEqual([
       'Prompt',
       'Fine-tune the picture',
-      'Named areas',
       'Patches the game asks for',
+      'Named areas',
     ])
     expect(text(page.querySelector('.named-areas-head'))).toBe('Named areas0 of 2 placed')
     expect([...page.querySelectorAll('.named-area')].map((r) => text(r))).toEqual([
@@ -1383,14 +1385,28 @@ describe('the jobs of an image’s page', () => {
     const page = render(image, summary({ areas: [fountain], patches: [lamp] }))
     press('2')
     expect(shown(page)).toEqual(['Fine-tune the picture'])
-    press('1', {}, page.querySelector('textarea') ?? document.body)
-    expect(shown(page)).toEqual(['Fine-tune the picture'])
     press('1', { metaKey: true })
     press('1', { ctrlKey: true })
     press('1', { altKey: true })
     expect(shown(page)).toEqual(['Fine-tune the picture'])
     press('3')
     expect(shown(page)).toEqual(['Patches the game asks for'])
+  })
+
+  it('does not switch while a menu is focused, but does while a box is', () => {
+    const page = render(image, summary({ areas: [fountain] }))
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'listbox')
+    const option = document.createElement('button')
+    menu.append(option)
+    page.append(menu)
+    press('3', {}, option)
+    expect(shown(page)).toEqual(['Prompt'])
+    const box = document.createElement('input')
+    box.type = 'checkbox'
+    page.append(box)
+    press('3', {}, box)
+    expect(shown(page)).toEqual(['Named areas'])
   })
 
   it('does not switch when the key is pressed in a field', () => {
@@ -1415,5 +1431,59 @@ describe('the jobs of an image’s page', () => {
     expect(text(tabsOf(page)[0]!.querySelector('.chip'))).toBe('making…')
     act(() => tabsOf(page)[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     expect(text(tabsOf(page)[0]!.querySelector('.chip'))).toBe('No take chosen')
+  })
+
+  it('keeps the unseen fine-tunes unseen while Make is open, and shows how many in the chip', async () => {
+    const asked: string[] = []
+    const real = globalThis.fetch
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      asked.push(`${init?.method ?? 'GET'} ${url}`)
+      return Response.json({ ok: true })
+    }) as typeof fetch
+    cleanups.push(() => (globalThis.fetch = real))
+    const tune = (n: number) => ({ n, words: 'w', area: null, model: 'klein', isNew: true })
+    const page = render(image, summary(), {}, null, false, undefined, (client) =>
+      client.setQueryData(['image-fine-tunes', 'inn'], {
+        ok: true,
+        picture: { kind: 'take', n: 1, width: 320, height: 200 },
+        maker: { ok: true },
+        models: {},
+        tunes: [tune(1), tune(2)],
+        making: [],
+        failed: [],
+        failedModels: [],
+      }),
+    )
+    await flush()
+    expect(asked.filter((a) => a.includes('/seen'))).toEqual([])
+    expect(text(tabsOf(page)[1]!.querySelector('.chip'))).toBe('2 new')
+  })
+
+  it('opens Make to focus the words after settling the game’s words from another tab', async () => {
+    const changed = summary({ edits: { inn: { text: 'mine', gameWas: 'old' } } })
+    const page = render(image, changed)
+    press('2')
+    expect(shown(page)).toEqual(['Fine-tune the picture'])
+    await act(async () => button(page, 'Keep mine').click())
+    await flush()
+    expect(shown(page)).toEqual(['Prompt'])
+    expect(document.activeElement?.tagName).toBe('TEXTAREA')
+  })
+
+  it('does not take the Take keys in another tab', async () => {
+    const asked: string[] = []
+    const real = globalThis.fetch
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      asked.push(`${init?.method ?? 'GET'} ${url}`)
+      return Response.json({ ok: true })
+    }) as typeof fetch
+    cleanups.push(() => (globalThis.fetch = real))
+    const page = render(image, summary({ areas: [fountain] }))
+    press('3')
+    expect(shown(page)).toEqual(['Named areas'])
+    press('c')
+    press('d')
+    await flush()
+    expect(asked.filter((a) => a.startsWith('POST') || a.startsWith('DELETE'))).toEqual([])
   })
 })

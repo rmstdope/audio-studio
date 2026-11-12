@@ -1,3 +1,4 @@
+import { useJobOpen } from './ImageJobTabs'
 import {
   useEffect,
   useRef,
@@ -219,6 +220,7 @@ export function PatchWorkbench({
   const drop = useDropPatchTake(imageId, patchId)
   const unchoose = useUnchoosePatchTake(imageId, patchId)
   const seen = useMarkPatchTakeSeen(imageId, patchId)
+  const jobOpen = useJobOpen()
   const [looking, setLooking] = useState<number | null>(null)
   const [showing, setShowing] = useState(true)
   const [count, setCount] = useState(2)
@@ -253,7 +255,7 @@ export function PatchWorkbench({
   })
   // A take laid over the picture once is no longer "new".
   useEffect(() => {
-    if (shown?.isNew && !asked.current.has(shown.n)) {
+    if (jobOpen && shown?.isNew && !asked.current.has(shown.n)) {
       asked.current.add(shown.n)
       seen.mutate(shown.n)
     }

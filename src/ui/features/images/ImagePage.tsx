@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   acceptableReasons,
   type ImageRow,
@@ -24,7 +24,7 @@ import { routeHref } from '../../route'
 import { ActStyleBox } from './ActStyleBox'
 import { ActStyleMenu } from './ActStyleMenu'
 import { ActLinks } from './ActLinks'
-import { ImageJobTabs } from './ImageJobTabs'
+import { ImageJobTabs, JobOpenProvider } from './ImageJobTabs'
 import { NamedAreasPanel } from './NamedAreasPanel'
 import { FineTunePanel } from './FineTunePanel'
 import { GamePatchesPanel } from './GamePatchesPanel'
@@ -35,7 +35,7 @@ import { WordsField, type SaveWordsNow } from './WordsField'
 function Job({ job, open, children }: { job: ImageJob; open: ImageJob; children: ReactNode }) {
   return (
     <div id={`job-${job}`} role="tabpanel" aria-labelledby={`job-tab-${job}`} hidden={job !== open}>
-      {children}
+      <JobOpenProvider value={job === open}>{children}</JobOpenProvider>
     </div>
   )
 }
@@ -71,7 +71,7 @@ export function ImagePage({
     makingPatches:
       !!patchesView &&
       'patches' in patchesView &&
-      patchesView.patches.some((p) => p.making.length > 0),
+      (patchesView.patches.some((p) => p.making.length > 0) || !!patchesView.remake.press?.running),
   })
   const save = useSetImageWords(row.id)
   const compare = useImageCompare(row.id)
@@ -79,10 +79,19 @@ export function ImagePage({
   const canAccept = acceptableReasons(row.reasons)
   const field = useRef<HTMLTextAreaElement>(null)
   const saveNow = useRef<SaveWordsNow>(null)
+  // Asked for after settling the game's words: the field is focused once Make is showing.
+  const [focusAsk, setFocusAsk] = useState(0)
+  useEffect(() => {
+    if (focusAsk > 0) field.current?.focus()
+  }, [focusAsk])
   const settle = (choice: 'keep' | 'game') =>
     compare.mutate(choice, {
       onSuccess: (result) => {
-        if (result.ok) field.current?.focus()
+        if (result.ok) {
+          // The words are on Make: focus them once that tab is showing.
+          setJob('make')
+          setFocusAsk((n) => n + 1)
+        }
       },
     })
   // The act's images in the list's order; one with no row (the lists disagree) is not stepped to.
@@ -256,11 +265,11 @@ export function ImagePage({
       <Job job="fine-tune" open={job}>
         <FineTunePanel key={`fine-tune-${row.id}`} row={row} />
       </Job>
-      <Job job="areas" open={job}>
-        <NamedAreasPanel key={`areas-${row.id}`} row={row} />
-      </Job>
       <Job job="patches" open={job}>
         <GamePatchesPanel key={`patches-${row.id}`} row={row} />
+      </Job>
+      <Job job="areas" open={job}>
+        <NamedAreasPanel key={`areas-${row.id}`} row={row} />
       </Job>
     </>
   )

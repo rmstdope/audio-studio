@@ -1,5 +1,16 @@
-import { useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, type ReactNode } from 'react'
 import { jobAtKey, type ImageJob, type JobTab } from '../../imageJobs'
+
+/** Whether the job around a panel is the open tab; a panel in a closed tab marks nothing seen and measures nothing. */
+const JobOpen = createContext(true)
+
+/** Says whether the job its children are in is the open tab. */
+export const JobOpenProvider = JobOpen.Provider
+
+/** Whether the panel's job is the open tab (true outside the image page's tabs). */
+export function useJobOpen(): boolean {
+  return useContext(JobOpen)
+}
 
 /** A small drawing for each job, in the studio's stroke style. */
 const ICONS: Record<ImageJob, ReactNode> = {
@@ -32,13 +43,17 @@ const ICONS: Record<ImageJob, ReactNode> = {
 
 /** Whether a key pressed on `target` is typing in a field or choosing in a menu. */
 function typingIn(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  if (target instanceof HTMLInputElement && PRESSED_INPUTS.has(target.type)) return false
   return (
-    target instanceof Element &&
     target.closest(
-      'input, textarea, select, [contenteditable], [role="menu"], [role="listbox"]',
+      'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="listbox"]',
     ) !== null
   )
 }
+
+/** The inputs that are pressed rather than typed into (a take's box): the tab keys still work there. */
+const PRESSED_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset'])
 
 /**
  * The row of an image page's job tabs: each with its icon, name, state chip and key. The open tab
