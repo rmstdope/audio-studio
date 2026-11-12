@@ -1,40 +1,46 @@
 # Content Studio
 
-Narration, music and images for games. Run it from inside a game repository: it reads
-the repository's `content-studio.json`, and writes voice files and their metadata in place. Committing
-them is up to you.
+Narration, music, images, sound effects and scenes for games. Run it from inside a game
+repository: it reads the repository's `content-studio.json` and writes the game's files in place.
+Committing them is up to you; the studio never commits.
 
-See [docs/architecture.md](docs/architecture.md) for the design. The files the studio reads and writes in a
-game are described in [docs/project-files.md](docs/project-files.md).
+- [docs/architecture.md](docs/architecture.md) is the design.
+- [docs/project-files.md](docs/project-files.md) describes the files the studio reads and writes in
+  a game.
 
-## Status
+## What it does
 
-The studio validates the project, shows each part's characters and the state of every line's clip, adopts clips recorded before it,
-and casts voices by audition: it searches Fish Audio's library by keywords, records each candidate
-saying the audition phrase in the character's style, and runs keep/drop rounds until one voice is
-left, which it writes to the cast. It records narration: line by line, or a whole part (or one
-character) as a job with a plan, progress and Cancel, removing orphaned clips when asked.
-Each take is checked with Whisper, and recorded again (up to three times) until enough of its
-words are heard; the manifest gets real word timings. A line never heard well enough shows as
-weak: retake it from its row, or from Generate when asked. Clips recorded before the studio (or
-unchecked) can be measured with Whisper without new audio. A character's style is edited on its
-audition page, a line's own cue by clicking it in the lines table, and the pronunciation table on
-All characters. **Changes** lists what git sees of the studio's files, so
-you know what to commit; the studio itself never commits. **Refresh dialog** runs the
-project's `refresh.part` command for a part and shows what changed; cues left without a line are
-listed on the part's overview, to give to the reworded line or remove.
+- **Narration.** Casts a voice for each character by audition: from Fish Audio's or ElevenLabs'
+  library, your own voices, a cloned voice or a designed one. Then it records every line of dialog
+  with the cast voice, in each language the game declares. Each take is checked with Whisper and
+  made again until enough of its words are heard, and the manifest gets real word timings. Only
+  what is missing or out of date is recorded again. Paid recordings ask first what they can cost and
+  are held to it, and what they cost is logged.
+- **Music.** Loops and stingers made locally with ACE-Step or Stable Audio Open, or with Eleven
+  Music. You choose between takes; stingers can be trimmed
+  and faded.
+- **Images.** Each image the game lists is made locally with FLUX.2 klein, Z-Image-Turbo or
+  Qwen-Image through mflux, in the act's style. Patches paint a change into a chosen picture, and
+  named areas are marked for the game.
+- **Sound effects.** One-shots and loops made locally with Stable Audio, chosen from takes.
+- **Scenes.** How each scene's music, effects and narration sound together, with loudness
+  measured against the project's target.
+- **Changes** lists what git sees of the studio's files, so you know what to commit. **Refresh**
+  runs the game's own command to rewrite its lists from the game's code.
 
-Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`; with
-`"output": { "lufs": -16 }` each clip is also levelled to that loudness, as RetroQuest's `level.py`
-does), and checking
-takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads
-the model). Without them, set `"generate": { "transcriber": "none" }` in the project file's `narration` section.
+**Setup**, in the studio, checks every tool and key a model needs and says how to install what is
+missing. In short:
+
+- [ffmpeg](https://ffmpeg.org) (`brew install ffmpeg`)
+- [uv](https://docs.astral.sh/uv/) for the local models, and an Apple silicon Mac for Whisper,
+  music and images (sound effects' default model runs on any CPU)
+- `FISH_AUDIO_API_KEY` and, to use ElevenLabs, `ELEVENLABS_API_KEY`, in the environment or in the
+  project's env file (`.env` unless the project file names another)
 
 The studio keeps its own files in `content-studio/` beside the project file. Its working state on
-your machine (audition takes and sessions, your Fish tier and take fade) is in
-`content-studio/cache/`, which the studio keeps out of git with `content-studio/.gitignore`, written
-when it starts. The project file's format, version 2, is described in
-[docs/project-files.md](docs/project-files.md).
+your machine (takes, your Fish tier and take fade, the spend log) is in `content-studio/cache/`,
+which `content-studio/.gitignore` keeps out of git. The studio writes that `.gitignore` when it
+starts.
 
 ## Install
 
@@ -62,12 +68,13 @@ cd ~/repos/retroquest   # any repository with a content-studio.json
 content-studio          # opens the studio in your browser
 ```
 
-Options: `--project <file>` to use a specific project file, `--port <n>`, `--no-open`, `--help`.
+Options: `--project <file>` to use a specific project file, `--port <n>`, `--no-open`, `--dev`,
+`-h`/`--help`.
 
 ## Develop
 
-`content-studio --dev` reloads on every change to the studio's own code: server changes are picked
-up in place (same port, no restart) and UI changes are pushed to the open page. Use it in a game
+`content-studio --dev` reloads on every change to the studio's own code. Server changes are picked
+up in place (same port, no restart), and UI changes are pushed to the open page. Use it in a game
 repository while working on the studio.
 
 ```sh
@@ -76,4 +83,7 @@ bun test
 bun run typecheck
 bun run format       # prettier
 bun run check        # format:check, typecheck and tests, as CI runs them
+bun run schema       # writes schema/content-studio.schema.json from the project file's schema
 ```
+
+Live tests that call real models or services are opt-in: see §11 of the architecture.

@@ -1,7 +1,7 @@
 {
   "name": "content-studio",
   "version": "0.1.0",
-  "description": "Narration, music and images for games",
+  "description": "Narration, music, images, sound effects and scenes for games",
   "type": "module",
   "private": true,
   "bin": {

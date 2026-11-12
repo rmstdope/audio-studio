@@ -2,17 +2,18 @@
 
 ## The project
 
-A local, graphical tool for producing a game's audio, starting with narration: casting a voice per
-character by audition on Fish Audio, and recording every line of dialog with it. It runs from
-inside a checked-out game repository (the _consumer_, first of all RetroQuest), reads that
-repository's `content-studio.json`, and writes voice files and their metadata in place.
+A local, graphical tool for producing a game's content: narration (casting a voice per character
+by audition on Fish Audio or ElevenLabs, and recording every line of dialog with it), music,
+images, sound effects and scenes. It runs from inside a checked-out game repository (the
+_consumer_, first of all RetroQuest), reads that repository's `content-studio.json`, and writes the
+game's files and their metadata in place.
 
 `docs/architecture.md` is the design: read it before changing how the tool works, and keep it up to
 date in the same change when the design moves. What comes next is on the bead board.
 
 ## Work tracking
 
-Planned work is tracked in beads (`bd`), prefix `as`; `skills/beads-workflow` carries the commands.
+Planned work is tracked in beads (`bd`), prefix `as`; `.claude/skills/beads-workflow` carries the commands.
 GitHub issues are the inbox for outside requests and bug reports only. Every bead is created
 unranked and ranked later with the navigator; a bead is planned in one session and implemented in
 another. Beads are the work queue; a bead that changes the design updates `docs/architecture.md`
@@ -40,7 +41,8 @@ freely; once it is pinned down, capture it in a test before fixing it.
 - `src/core/` is pure, so most rules are tested there without disk, network or audio.
 - `src/services/` and `src/server/` are tested against temporary repositories made with
   `test/helpers.ts` (`tempRepo`, `projectJson`), never against a real consumer.
-- Calls to Fish Audio and Whisper go behind interfaces with fakes in tests; live tests are opt-in.
+- Calls to Fish Audio, ElevenLabs, Whisper and the local models go behind interfaces with fakes in
+  tests; live tests are opt-in.
 
 ### Simple design
 
@@ -53,9 +55,11 @@ text when needed) instead of guessing.
 ```
 bin/content-studio.ts CLI: find the project file, start the server, open the browser
 src/core/             pure logic: schemas, fingerprint, planner, text rules (no I/O)
-src/services/         I/O: reading and writing the consumer's files, later Fish, Whisper, ffmpeg
+src/services/         I/O: the consumer's files, Fish Audio, ElevenLabs, ffmpeg, the workers
 src/server/           Bun.serve: JSON API and the UI
 src/ui/               React app (TanStack Query), one stylesheet with design tokens
+worker/               Python workers run with uv: Whisper, music, sound effects
+scripts/schema.ts     writes schema/content-studio.schema.json, the project file's JSON Schema
 test/                 helpers and the sample project used by `bun run dev`
 ```
 
@@ -118,7 +122,7 @@ bundle breaks.
   scenes' locks, `formatMusicLock` and `formatBriefs` for music's, `formatImageLock` and
   `formatImageEdits` for images', `formatEffectLock` for effects').
 - Never delete clips without the user confirming it in the UI.
-- Only changes from the studio's own page are accepted (the Origin check on POST routes).
+- Only changes from the studio's own page are accepted (the Origin check on every POST, PUT, PATCH and DELETE route).
 
 ## Commands
 
@@ -130,6 +134,7 @@ bun run format         # prettier --write; format:check is what CI runs
 bun run check          # format:check, typecheck and tests: run before every commit
 bun run dev            # the studio on test/fixtures/sample, reloading on changes
 content-studio --dev   # in a consumer repository, reloading on changes (after `bun link`)
+bun run schema         # write schema/content-studio.schema.json again after changing the schema
 ```
 
 ## Code conventions

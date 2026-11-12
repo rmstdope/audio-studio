@@ -31,13 +31,14 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
   inputs changed are re-recorded, clips whose line left the script are removed.
 - Output stays compatible with what the game already reads (`manifest.json` with word timings).
 - Never touch git beyond reading `git status` to show what changed.
+- Make the game's sound effects: the list and the studio's own descriptions (§8.9), the models
+  (§8.8) and the takes, made, compared and chosen, looping ones seamless (§8.10; §12 decision 9).
 
 **Non-goals (for now)**
 
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects: the list and the studio's own descriptions (§8.9), the model (§8.8) and the takes — made, compared, chosen, looping ones seamless — (§8.10) are built (§12 decision 9).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
@@ -76,7 +77,8 @@ retroquest/                      ← user runs `content-studio` here
    to, writes the studio folder's `.gitignore` (`cache/`) when it is missing
    (`services/studioFolder.ts`), then starts a Bun HTTP server on
    `127.0.0.1` (random free port, or `--port`) and opens the browser on it.
-3. The UI talks to the server over a small JSON API, and gets live job progress over a WebSocket.
+3. The UI talks to the server over a small JSON API, and follows a running job's progress by
+   polling it (`GET /api/parts/:part/jobs/latest`, `GET /api/jobs/:id`).
 4. The studio writes only to paths the project file names, and every path goes through
    `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
    they are plain files in the part's clips folder (no folders, no symbolic links). The one
@@ -95,23 +97,25 @@ retroquest/                      ← user runs `content-studio` here
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 
-Installed once from this repo with `bun link` (later `bun add -g`), then run in any consumer.
+Installed once from this repo with `bun link`, then run in any consumer.
 
 ---
 
 ## 3. Technology
 
-| Concern                                     | Choice                                                           | Why                                                                                                                                                                                 |
-| ------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime, server, bundler, tests             | **Bun** (`Bun.serve` with HTML imports, `bun test`)              | One tool for everything; serves the React app with no separate build step.                                                                                                          |
-| UI                                          | **React 19 + TypeScript**, TanStack Query for server state       | Bun bundles JSX with no extra setup; Query handles caching and refetching.                                                                                                          |
-| Styling                                     | Plain CSS with design tokens (custom properties), one stylesheet | Small, no framework lock-in; dark-first theme, the Aurora look: glass panels on a deep background with two faint glows, the accent a gradient on the main action and the logo only. |
-| Waveforms and playback                      | **wavesurfer.js**                                                | Waveform, seek, and region playback for the audition and line inspector.                                                                                                            |
-| Validation                                  | **zod**                                                          | One schema per file type gives validation, types and readable errors.                                                                                                               |
-| TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                                              |
-| Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines.                             |
-| Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                                                    |
-| Music generation (§8.5)                     | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free and local; why, in §12 decision 4.                                                                                                                                             |
+| Concern                                     | Choice                                                           | Why                                                                                                                                                                                              |
+| ------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Runtime, server, bundler, tests             | **Bun** (`Bun.serve` with HTML imports, `bun test`)              | One tool for everything; serves the React app with no separate build step.                                                                                                                       |
+| UI                                          | **React 19 + TypeScript**, TanStack Query for server state       | Bun bundles JSX with no extra setup; Query handles caching and refetching.                                                                                                                       |
+| Styling                                     | Plain CSS with design tokens (custom properties), one stylesheet | Small, no framework lock-in; dark-first theme, the Aurora look: glass panels on a deep background with two faint glows, the accent a gradient on the main action and the logo only.              |
+| Validation                                  | **zod**                                                          | One schema per file type gives validation, types and readable errors.                                                                                                                            |
+| TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                                                           |
+| Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines.                                          |
+| Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                                                                 |
+| Music generation (§8.5)                     | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free and local; why, in §12 decision 4.                                                                                                                                                          |
+| Short music and sound effects (§8.5, §8.8)  | **Stable Audio** in long-lived Python workers (`uv run`)         | Free and local: Stable Audio Open as a music model and a second effects model (`worker/stable_audio.py`), Stable Audio 3 Small SFX for effects on the CPU (`worker/effects.py`); §12 decision 9. |
+| Images (§8.7)                               | **mflux** (subprocess, one per take)                             | Free and local on Apple silicon: FLUX.2 klein 4B, Z-Image-Turbo, Qwen-Image; §12 decision 8.                                                                                                     |
+| Hosted voices and music (§8.6)              | **ElevenLabs REST API** via a thin `fetch` client                | Optional and paid, per voice and per model beside Fish and the local models; §12 decision 7.                                                                                                     |
 
 A native window (Electrobun) can wrap the same web UI later; nothing in the design depends on it.
 
@@ -121,77 +125,37 @@ A native window (Electrobun) can wrap the same web UI later; nothing in the desi
 
 ```
 content-studio/
-├── bin/content-studio.ts     CLI entry: find project, start server, open browser
+├── bin/content-studio.ts   CLI entry: find the project file, start the server, open the browser
 ├── src/
-│   ├── core/                    pure logic, no I/O; most of the tests
-│   │   ├── project.ts           project file schema, path templates ({part})
-│   │   ├── resources.ts         schemas for script, cast, cues, manifest, lock
-│   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
-│   │   ├── pronounce.ts         the pronunciation table's rules (cleaning, problems)
-│   │   ├── soundAlikeEdit.ts    the project's sound-alike groups as edited (rows, problems)
-│   │   ├── prices.ts            Fish's prices per model, promotions with their end
-│   │   ├── spend.ts             whether a paid recording may start (confirmed, covered)
-│   │   ├── spending.ts          paid recordings as saved, and the page's totals and rows
-│   │   ├── changes.ts           git status output parsed and grouped by part
-│   │   ├── dialogDiff.ts        what a refreshed dialog added, removed and changed
-│   │   ├── elevenSpeech.ts      ElevenLabs' speech models, their credits, a voice's stage model, the speed
-│   │   ├── fingerprint.ts       hash of everything that affects a clip
-│   │   ├── planner.ts           script × lock × disk → status per line, generation plan
-│   │   ├── summary.ts           parts and characters as the UI shows them
-│   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
-│   │   ├── voices.ts            whose a voice is: `eleven:` ids for ElevenLabs, bare ones Fish's
-│   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
-│   │   ├── align.ts             Whisper words → word timings, heard ratio (narrate.py's, + names)
-│   │   ├── numbers.ts           the numbers 0–99 in words, per language, matched to digits
-│   │   ├── audition.ts          the audition board: to hear, shortlist, drop and undo
-│   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
-│   │   ├── heard.ts             what Whisper heard of a part's lines below full, as saved
-│   │   ├── soundAlike.ts        English words that sound the same, matched as one
-│   │   ├── setup.ts             what the machine and project lack, from facts, with a fix each
-│   │   ├── notes.ts             the user's notes on a part's lines, as saved
-│   │   ├── lineTakes.ts         a line's extra takes, as saved, and as listed
-│   │   └── wav.ts               read and join WAVs
-│   ├── services/                I/O behind interfaces (fakes in tests)
-│   │   ├── env.ts               the Fish and ElevenLabs API keys, from the environment or the env file
-│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription, music, tts, voice, shared voices, design)
-│   │   ├── elevenMusic.ts       Eleven Music as a MusicGenerator: the brief, the key, the MP3 decoded
-│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice, designVoice)
-│   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
-│   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
-│   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
-│   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
-│   │   ├── spending.ts          the record of paid recordings (content-studio/cache/spending.json) and the running ones
-│   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
-│   │   ├── models.ts            s1 → s2.1-pro, and a stage's model, in the project file's `narration.models.fish`
-│   │   ├── modelsView.ts        the whole dialog's size and what recorded clips were made with, for the Models panel
-│   │   ├── projectFile.ts       reading the project file for a change, and writing it back as it was laid out
-│   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
-│   │   ├── takes.ts             audition takes and tries: recorded once, cached by what they are made of
-│   │   ├── setup.ts             the facts for the setup checks: tools on the PATH, the key, Fish
-│   │   ├── notes.ts             the user's notes on lines, saved in the cache
-│   │   ├── lineTakes.ts         a line's extra takes: taken, listed, used as the clip, dropped
-│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
-│   │   ├── audio.ts             encode MP3 with ffmpeg, level its loudness (as level.py)
-│   │   ├── files.ts             read resources, write atomically, lock formatting
-│   │   ├── workspace.ts         find the project, load it and its parts, adopt clips
-│   │   ├── git.ts               `git status --porcelain` for the project's paths
-│   │   └── jobs.ts              job queue, concurrency, cancel, progress events
-│   ├── server/
-│   │   ├── index.ts             Bun.serve: routes, WebSocket, static UI
-│   │   └── api/*.ts             one file per resource (parts, characters, auditions, jobs)
-│   └── ui/                      React app
-│       ├── index.html
-│       ├── app/                 shell, routing, theme
-│       ├── features/
-│       │   ├── overview/        part dashboard, cast grid
-│       │   ├── audition/        the audition board, ruled-out voices
-│       │   ├── characters/      all characters, a character's page, the casting brief
-│       │   └── narration/       line table, plan, job progress, inspector
-│       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in (from the element's playing event) and out for the person's `takeFade` setting, the game's file does not
-│       ├── loopAudio.ts         the player's audio: a loop decoded once and played round on Web Audio with no gap (an audio element's loop clicks where it comes round), every other clip on the element
-│       ├── pager.ts             the previous/next control's rules: which key press steps (not in a field or in a control that uses ←/→), and the control's props for an item of a list
-│       └── components/          buttons, chips, waveform, player, status pills
-├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
+│   ├── core/               pure logic, no I/O; most of the tests. Per workspace, its schemas and rules:
+│   │                       project.ts, projectSchema.ts (the project file), resources.ts (script, cast,
+│   │                       cues, manifest, lock), fingerprint.ts, planner.ts and generation.ts (status
+│   │                       per line, the plan), spoken.ts, align.ts, audition.ts, models.ts, prices.ts,
+│   │                       spend.ts, elevenSpeech.ts; music*.ts, image*.ts, effect*.ts and scene*.ts
+│   │                       for the other workspaces; setup.ts (what the machine and project lack)
+│   ├── services/           I/O behind interfaces (fakes in tests): workspace.ts (find and load the
+│   │                       project), files.ts (resolveInRoot, writeAtomic, lock formatting),
+│   │                       projectFile.ts, narration.ts and jobs.ts (recording lines, the job queue),
+│   │                       fish.ts, elevenlabs.ts, transcriber.ts, audio.ts (ffmpeg); music.ts,
+│   │                       stableAudio.ts, elevenMusic.ts and musicTakes.ts; images.ts (mflux) and
+│   │                       imageTakes.ts; effects.ts and effectTakes.ts; scenes.ts and
+│   │                       sceneLoudness.ts; refresh.ts (the game's commands), git.ts, setup.ts
+│   ├── server/index.ts     Bun.serve: every route of the JSON API (§9), the guards, the static UI
+│   └── ui/                 React app: index.html, main.tsx, App.tsx (routes by the address's hash,
+│       │                   route.ts), api.ts (every query and change), styles.css (the tokens), and
+│       │                   the pure helpers each page uses (player.ts, loopAudio.ts, pager.ts, off.ts,
+│       │                   *Text.ts for the pages' wording)
+│       ├── components/     shared pieces: Sidebar, Pager, WhyTip, Menu, Confirm, SpendConfirm, Problems
+│       └── features/       one folder per page: overview/ (a part), lines/ (the line table, Generate),
+│                           characters/, audition/ (the board), music/, images/, effects/, scenes/,
+│                           setup/ (Setup, the Models panel), spending/, changes/ (git status)
+├── worker/                 long-lived Python workers run with uv, JSON lines on stdin/stdout:
+│                           transcribe.py (mlx-whisper), music.py (ACE-Step), stable_audio.py
+│                           (Stable Audio Open), effects.py (Stable Audio 3 Small SFX)
+├── scripts/schema.ts       writes schema/content-studio.schema.json (`bun run schema`)
+├── schema/                 the project file's JSON Schema, from core/projectSchema.ts
+├── test/                   helpers.ts (tempRepo, projectJson, fakes), fixtures/ (the sample project
+│                           `bun run dev` opens, fake workers)
 └── docs/
 ```
 
@@ -826,8 +790,8 @@ generation while the script and cast still change) and `final` (the recording th
   edited afterwards becomes a draft one until the next final recording). A weak final clip is
   retaken only with the final model: from its row, or by the final plan when asked. With one
   model for both, on each of a part's voices' own providers, the part has no final step: a final
-  plan or recording is a draft one (§8.6). A paid
-  `audition` model is still to come, with its cost per take.
+  plan or recording is a draft one (§8.6). A paid `audition` model is built too: its takes are paid
+  from the sitting's budget (§8.1).
 
 ### 8.5 Music
 
@@ -1380,10 +1344,10 @@ read by an older studio.
   each is logged in the spending record. Stop aborts the request; ElevenLabs may still
   bill a take stopped while being made, which Stop's title says while a paid take is being made.
 
-**Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
-(`CONTENT_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,
-search the library once and make one 10-second stinger, and spend money doing it. Nobody but the
-user can run them.
+**Testing.** Every test uses a fake `ElevenLabsClient`. The one live test
+(`src/services/musicLive.test.ts`, `CONTENT_STUDIO_LIVE_ELEVENLABS=1` with `ELEVENLABS_API_KEY`, on
+a paid plan) makes one 10-second stinger with Eleven Music, and spends money doing it. No live test
+speaks a line or searches the library. Nobody but the user can run it.
 
 ---
 
@@ -2174,37 +2138,95 @@ as "the music"), or saying the sounds themselves are too quiet when every playin
 
 ## 9. Server API
 
-Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
-`POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
-`GET /api/characters/:id/voice` (its cast voice as Fish knows it, its take and the audition
-phrase; one lookup, no search), `PATCH /api/characters/:id`
-(keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`,
-`POST /api/parts/:part/lines/:key/try` (`{ cue }`: a take of the line said with that cue, nothing saved; with `at`, the cue is added at that gap inside the line)
-and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
-`{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
-`GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
-asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
-retakeWeak }`: start a generation, a measuring or a checking again, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
-`GET`/`DELETE /api/jobs/:id` (progress, cancel).
+Every route is in `src/server/index.ts`. Changes (POST, PUT, PATCH, DELETE) are taken only from
+the studio's own page (§2). A running job's progress is polled (`GET /api/parts/:part/jobs/latest`,
+`GET /api/jobs/:id`); nothing is pushed to the page, and the UI reads the project again when its
+window regains focus.
+
 Takes are cached in `content-studio/cache/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
-spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
-/api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
-`undo` (the last drop), `more` (`{ provider }`, `fish` unless `elevenlabs`; no body is Fish's), `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money, and `GET /api/elevenlabs/account` the plan's account and what is held of it, `GET /api/elevenlabs/voices/freeable` the voices the studio added that nothing uses and `POST /api/elevenlabs/voices/free` (`{ voices }`) removes them; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `content-studio/cache/auditions/`. Ruled-out voices:
-`GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
-`DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
+spoken phrase and settings, so a take is recorded once. Auditions: `POST /api/auditions/:id/start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `content-studio/cache/auditions/`.
+Every route of a character, its
 voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
 not declared), and casting changes that language only. So does every route under
 `/api/parts/:part` that reads or writes a language's files (its lines' heard, note, check, accept,
 record, try, takes and take files, cues and their moves, the plan, adopt, jobs and `jobs/latest`),
 and `PATCH /api/pronounce` and `PATCH /api/sound-alike`, which save that language's own table or
-groups. The rest is the plan:
+groups.
 
 ```
-GET    /api/project                              project, parts
-POST   /api/scene-loudness/:part                 measure every scene of an act in the background ({ open?: { scene, entry } }; 409 if it is being measured)
-GET    /api/scene-loudness                       the acts being measured, scenes done out of all
+GET    /api/project                              the project summary, or the project file's problems
+GET    /api/narration/progress?language=         each act's ok lines out of all, in a language
+GET    /api/parts/:part?language=                the part in a language (default: the first), every line
+                                                 with its status and reason, and each language's progress
+POST   /api/parts/:part/adopt                    write lock from existing clips
+GET    /api/parts/:part/clips/:file?language=    a clip from the part's clips folder (that language's)
+POST   /api/parts/:part/refresh                  run refresh.part (its result names the act's loops added and removed)
+GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
+PATCH  /api/parts/:part/lines/:key/note          the user's note on the line ({ note }; empty removes)
+POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }; with `at`, at that gap inside the line): a take, nothing saved
+POST   /api/parts/:part/lines/:key/record        record one line into the clips, manifest and lock ({ confirmedCost } on a paid model, else 409 with the ceiling)
+POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
+POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
+GET    /api/parts/:part/lines/:key/takes         the line's extra takes, newest first, current or stale
+POST   /api/parts/:part/lines/:key/takes         one more take into the cache; a paid draft model asks for `{ confirmedCost }`
+GET    /api/parts/:part/lines/:key/takes/:file   a take's audio (`<id>.wav`)
+DELETE /api/parts/:part/lines/:key/takes/:file   drop the take (`:file` is the take's id)
+POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (as a recording)
+PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
+PATCH  /api/parts/:part/cues/:key/inside         a cue at a gap inside the line ({ at, cue, text }; empty cue: remove;
+                                                 refused when `text` is no longer the line's words)
+POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
+PATCH  /api/parts/:part/scene-cues               a scene's cue ({ scene, cue }; empty: remove)
+POST   /api/parts/:part/scene-cues/move          an orphaned scene cue to a scene ({ from, to }; null: remove)
+GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no side effects)
+POST   /api/parts/:part/jobs                     run a plan ({ kind: record | measure | check, stage: draft | final,
+                                                 speaker, keys, orphans, retakeWeak }; one job per part and
+                                                 language at a time; the server plans it afresh); a paid
+                                                 one with { confirmedCost }, else 409 with
+                                                 { reason: confirm | credit | price, ceiling }
+GET    /api/parts/:part/jobs/latest              the part's latest job in the language asked for
+GET    /api/jobs/:id                             a job's progress (polled while it runs)
+DELETE /api/jobs/:id                             cancel
+PATCH  /api/characters/:id                       style, speed, keywords or phrase (one per request)
+GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase (one lookup, no search)
+POST   /api/characters/:id/takes                 record a take ({ voice, board? })
+GET    /api/takes/:file                          a recorded take (`<key>.mp3`; an ElevenLabs take is served as WAV)
+GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
+DELETE /api/characters/:id/ruled-out             forget them all
+DELETE /api/characters/:id/ruled-out/:voice      allow one again
+GET    /api/auditions/:id                        the audition in progress, with phrase and takes
+DELETE /api/auditions/:id                        stop it without casting
+POST   /api/auditions/:id/start                  an audition: cast voice on the shortlist, nothing to hear
+POST   /api/auditions/:id/own                    the voices on the user's own Fish account (§8.1)
+POST   /api/auditions/:id/move                   shortlist, unlist or drop a voice ({ voice, move })
+POST   /api/auditions/:id/undo                   undo the last drop
+POST   /api/auditions/:id/more                   more candidates to hear ({ provider? }: Fish's library by default, or ElevenLabs')
+POST   /api/auditions/:id/add                    a voice by its id ({ voice })
+POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json ({ voice })
+GET|POST|DELETE /api/auditions/:id/sitting       the audition's money (above); POST …/sitting/add adds to it
+POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
+POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
+GET    /api/characters/:id/designs               the description the design box starts with, and what an ElevenLabs design would say and cost (eleven: { text, credits }, null without an audition phrase)
+POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }), or ElevenLabs ({ description, provider: 'elevenlabs', creditsUpTo }); 409 until the cost is confirmed and covered
+GET    /api/elevenlabs/account                   the plan's account and what running recordings and auditions hold of it
+GET    /api/elevenlabs/voices/freeable           the voices the studio added that nothing uses
+POST   /api/elevenlabs/voices/free               remove them ({ voices })
+PUT    /api/elevenlabs/tts                       ElevenLabs' voice settings ({ tts, was }; refused while something records)
+PATCH  /api/pronounce?language=                  a language's pronunciation table ({ table, was }: whole)
+PATCH  /api/sound-alike?language=                a language's sound-alike groups ({ groups, was })
+GET    /api/models                               the stage models, the dialog's size, clips by model, and what is busy
+PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
+PUT    /api/models/:stage                        one Fish stage's model ({ model, was }; refused if the file differs, the model is unpriced or s1, or something is recording)
+PUT    /api/models/elevenlabs/:stage             one ElevenLabs stage's model ({ model, was }; refused as above)
+PUT    /api/music/model                          the project's music model ({ model, was })
+PUT    /api/image-model                          the project's image model ({ model, was })
+PUT    /api/effect-model                         the project's sound-effects model ({ model, was }; stale `was` 409)
+PATCH  /api/fish-tier                            { tier } the Fish tier (or null) in content-studio/cache/settings.json
+PATCH  /api/take-fade                            { seconds } the take fade in content-studio/cache/settings.json
 GET    /api/credit                               the Fish account's API credit (dollars)
-GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish, ACE-Step)
+GET    /api/setup                                what the machine and project lack (§10)
+GET    /api/spending                             paid recordings: totals per part, running ones live, or the record's problems
+GET    /api/changes                              git status of project paths
 POST   /api/music/tracks/:id/keep-mine           keep the studio's brief over the game's changed one (404 for a track nobody lists)
 GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
 POST   /api/music/tracks/:id/takes               { count } or { retry } queue takes (409 and why if the generator is not ready)
@@ -2217,21 +2239,6 @@ POST   /api/music/tracks/:id/move                { file, to } move a take to the
 DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
 GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
 GET    /api/music/tracks/:id/takes/:file         a take's WAV (?seam=1: its seam)
-PATCH  /api/fish-tier                            { tier } the Fish tier (or null) in content-studio/cache/settings.json
-GET    /api/parts/:part?language=                the part in a language (default: the first), every line
-                                                 with its status and reason, and each language's progress
-GET    /api/parts/:part/clips/:file?language=    a clip from the part's clips folder (that language's)
-GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
-POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }): a take, nothing saved
-PATCH  /api/parts/:part/lines/:key/note          the user's note on the line ({ note }; empty removes)
-GET    /api/parts/:part/lines/:key/takes         the line's extra takes, newest first, current or stale
-POST   /api/parts/:part/lines/:key/takes         one more take into the cache; a paid draft model asks for `{ confirmedCost }`
-GET    /api/parts/:part/lines/:key/takes/:id.wav a take's audio
-POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (as a recording)
-DELETE /api/parts/:part/lines/:key/takes/:id     drop the take
-POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
-POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
-POST   /api/parts/:part/refresh                  run refresh.part (its result names the act's loops added and removed)
 PUT    /api/music/tracks/:id/takes/:file/fades  save a stinger take's fades (DELETE removes them); GET …/takes/:file?fadeIn&fadeOut&shape hears them
 POST   /api/music/stingers/refresh               run refresh.shared; the stingers added and removed
 POST   /api/effects/refresh                      run refresh.shared; the effect ids added and removed
@@ -2254,55 +2261,20 @@ POST   /api/effects/stop-all                     stop every take waiting or bein
 GET    /api/effects/batch                        what the latest make-all made, stopped and failed (null: none)
 POST   /api/effects/batch/close                  forgets that summary (Close)
 GET    /api/music/lists/:id/batch                the latest make-all of a list; POST …/batch/close forgets it
-GET    /api/image-acts/:id/batch                 the latest make-all of an act; POST …/batch/close forgets it
 PUT    /api/effect-model                         the project's sound-effects model ({ model, was }; stale `was` 409)
-POST   /api/parts/:part/adopt                    write lock from existing clips
-PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
-PATCH  /api/parts/:part/cues/:key/inside         a cue at a gap inside the line ({ at, cue, text }; empty cue: remove;
-                                                 refused when `text` is no longer the line's words)
-POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
-PATCH  /api/parts/:part/scene-cues               a scene's cue ({ scene, cue }; empty: remove)
-POST   /api/parts/:part/scene-cues/move          an orphaned scene cue to a scene ({ from, to }; null: remove)
-GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no side effects)
-GET    /api/characters                           all characters, with the parts and line counts of each
-PATCH  /api/characters/:id                       style, speed, keywords, phrase
-PATCH  /api/pronounce?language=                   a language's pronunciation table ({ table, was }: whole)
-PATCH  /api/sound-alike?language=                 a language's sound-alike groups ({ groups, was })
-PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
-GET    /api/models                               the stage models, the dialog's size, clips by model, and what is busy
-PUT    /api/models/:stage                        one stage's model ({ model, was }; refused if the file differs, the model is unpriced or s1, or something is recording)
-GET    /api/spending                             paid recordings: totals per part, running ones live, or the record's problems
-GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
-GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
-DELETE /api/characters/:id/ruled-out             forget them all
-DELETE /api/characters/:id/ruled-out/:voice      allow one again
-GET    /api/auditions/:id                        the audition in progress, with phrase and takes
-DELETE /api/auditions/:id                        stop it without casting
-POST   /api/auditions/:id/start                  an audition: cast voice on the shortlist, nothing to hear
-POST   /api/auditions/:id/move                   shortlist, unlist or drop a voice
-POST   /api/auditions/:id/undo                   undo the last drop
-POST   /api/auditions/:id/more                   more candidates to hear ({ provider? }: Fish's library or ElevenLabs')
-POST   /api/auditions/:id/add                    a voice by its Fish id
-POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
-POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
-POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
-GET    /api/characters/:id/designs               the description the design box starts with, and what an ElevenLabs design would say and cost (eleven: { text, credits }, null without an audition phrase)
-POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }), or ElevenLabs ({ description, provider: 'elevenlabs', creditsUpTo }); 409 until the cost is confirmed and covered
-POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
-                                                 part and language at a time); a paid
-                                                 one with { confirmedCost }, else 409 with
-                                                 { reason: confirm | credit | price, ceiling }
-GET    /api/parts/:part/jobs/latest              the part's latest job in the language asked for
-GET    /api/jobs/:id                             a job's progress (polled while it runs)
-DELETE /api/jobs/:id                             cancel
-POST   /api/characters/:id/takes             record a take (own page only)
-GET    /api/takes/:key.mp3                   a recorded take
-GET    /api/changes                              git status of project paths
-WS     /api/events                               file changes (later; job progress is polled)
+PATCH  /api/music/tracks/:id                     change one of a track's brief, seconds, bpm or key ({ brief } and the like)
+POST   /api/music/tracks/:id/accept|unchoose     accept a changed brief; take the chosen take back
+GET    /api/music/tracks/:id/current             the clip the game plays for the track
+GET    /api/music/model-state                    whether the music model can make takes, and why not
+POST   /api/music/lists/:id/make-all|stop        make takes for every track of a list with none chosen; stop them
 ```
 
-Planned: the server watches the resource files, so an edit made in the editor (or a
-`git checkout`) shows up in the UI at once. Until then the UI reloads when its window regains focus.
+Images' and scenes' routes are described with them:
+
+- **Images** (§8.7, its **API** paragraph): `/api/images/…`, `/api/image-acts/:id/…` and
+  `PATCH /api/image-style`.
+- **Scenes** (§8.11): `PUT /api/scenes/:part/:id`, `POST /api/scene-loudness/:part` and
+  `GET /api/scene-loudness`.
 
 ---
 
@@ -2359,15 +2331,25 @@ Planned: the server watches the resource files, so an edit made in the editor (o
 - `core/` is covered by `bun test` unit tests: fingerprint stability, planner statuses and reasons,
   spoken-text building, chunking, alignment (ported from `test_narrate.py`), audition state
   transitions.
-- `services/` are tested against fakes (a fake `FishClient` and `Transcriber`), plus a few opt-in
-  live tests behind an env flag: `CONTENT_STUDIO_LIVE_MUSIC=1` for the local music models, and
-  `CONTENT_STUDIO_LIVE_ELEVENLABS=1` with `ELEVENLABS_API_KEY` for a paid Eleven Music take.
-- The server API is tested with an in-memory project fixture (a small consumer repo in
-  `test/fixtures/`).
-- UI: component tests for the audition and line table; one Playwright smoke test over the fixture.
+- `services/` are tested against fakes (`FishClient`, `ElevenLabsClient`, `Transcriber`, and the
+  music, image and effect generators; fake workers in `test/fixtures/`), plus opt-in live tests,
+  each behind its own env flag and skipped without it:
+  - `CONTENT_STUDIO_LIVE=1`: real Whisper (`transcriber.test.ts`; macOS with uv, `say` and ffmpeg);
+  - `CONTENT_STUDIO_LIVE_MUSIC=1`: the local music models (`musicLive.test.ts`; uv and the models);
+  - `CONTENT_STUDIO_LIVE_ELEVENLABS=1` with `ELEVENLABS_API_KEY`: one paid Eleven Music take
+    (`musicLive.test.ts`);
+  - `CONTENT_STUDIO_LIVE_IMAGES=1`: one take with each image model through mflux
+    (`imagesLive.test.ts`);
+  - `CONTENT_STUDIO_LIVE_EFFECTS=1`: real Small SFX (`effectsLive.test.ts`; uv and the model
+    downloaded).
+- Services and the server API are tested against temporary repositories on disk, made with
+  `tempRepo` and `projectJson` in `test/helpers.ts`, never against a real consumer.
+  `test/fixtures/sample` is the sample project `bun run dev` opens.
+- UI: pure helpers (`src/ui/*.ts`) have unit tests, and component tests (`*.test.tsx`) cover every
+  workspace's pages and panels (lines, characters, audition, music, images, effects, scenes, setup)
+  and shared components (sidebar, pager, tips). There is no browser test.
 - A component test renders into a DOM from `@happy-dom/global-registrator`, registered by the test
-  file itself before it imports React, so the other suites run without one (first:
-  `SpeedEditor.test.tsx`).
+  file itself before it imports React, so the other suites run without one.
 
 - **Greyed controls explain themselves** (as-6v7r). No control uses the native `disabled` attribute
   (an `<option>` may): it is spread `off(reason, …)` from `src/ui/off.ts`, which writes `aria-disabled`,
@@ -2391,7 +2373,7 @@ Planned: the server watches the resource files, so an edit made in the editor (o
    with one voice. Different voices need different names (`narrator-act1`, `narrator-act2`).
    Hence one project-wide `cast.json`.
 2. **UI framework: React.**
-3. **Models: free only, for now.** The project file already has `audition`, `draft` and `final`
+3. **Models: any priced model, at every stage.** The project file already has `audition`, `draft` and `final`
    model stages; paid models are allowed for every stage (§8.4).
 4. **Music is generated locally with ACE-Step 1.5.** No hosted music API has a lasting free tier
    with rights to use the result (ElevenLabs Music's free plan is non-commercial; others give
