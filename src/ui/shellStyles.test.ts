@@ -30,6 +30,15 @@ describe('the room the shell leaves the pages', () => {
     expect(rule(css, ".rail-pill[aria-current='page']")).toContain('var(--accent)')
   })
 
+  // The Stingers pill is narrow enough to squeeze a shrinkable dot to a sliver (as-4zpu).
+  it("keeps every rail pill's dot a 6px circle, however narrow the pill", () => {
+    const dot = rule(css, '.rail-dot')
+    expect(dot).toContain('width: 6px')
+    expect(dot).toContain('height: 6px')
+    expect(dot).toContain('border-radius: 50%')
+    expect(dot).toContain('flex-shrink: 0')
+  })
+
   it('gives the page small margins at its sides', () => {
     expect(rule(css, '.content')).toContain('padding: 20px 24px 32px')
   })
