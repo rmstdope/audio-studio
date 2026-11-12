@@ -52,7 +52,7 @@ describe('cameAlongLine', () => {
 
 describe('MakeFineTunesBody', () => {
   const area = { x: 1, y: 2, width: 30, height: 40 }
-  test('takes 1 to 6 with words, a mark or none', () => {
+  test('takes 1 to 10 with words, a mark or none', () => {
     expect(MakeFineTunesBody.safeParse({ count: 10, words: 'Add a cat', area }).success).toBe(true)
     expect(MakeFineTunesBody.safeParse({ count: 1, words: 'Add a cat', area: null }).success).toBe(
       true,

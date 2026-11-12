@@ -12,6 +12,7 @@ const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { FineTunePanel } = await import('./FineTunePanel')
 const { JobOpenProvider } = await import('./ImageJobTabs')
+const { IMAGES_LOCK_WHY } = await import('../../imagesText')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -496,10 +497,17 @@ describe('a late click meant for Stop', () => {
     await act(async () => await new Promise((r) => setTimeout(r, 400)))
     served = view({ tunes: [tune(1), tune(2)], making: [] })
     await finish(client)
-    const choose2 = () => isOff(button(host, 'Choose C')!)
-    expect(choose2()).toBe(true)
+    const chooseOff = () => isOff(button(host, 'Choose C')!)
+    await act(async () => cards(host)[1]!.querySelector('button')!.click())
+    expect(chooseOff()).toBe(true)
     await act(async () => await new Promise((r) => setTimeout(r, 750)))
-    expect(choose2()).toBe(false)
+    // Card 1's second is over, card 2 finished 400 ms later and is still settling.
+    expect(chooseOff()).toBe(true)
+    await act(async () => cards(host)[0]!.querySelector('button')!.click())
+    expect(chooseOff()).toBe(false)
+    await act(async () => cards(host)[1]!.querySelector('button')!.click())
+    await act(async () => await new Promise((r) => setTimeout(r, 400)))
+    expect(chooseOff()).toBe(false)
   })
 
   it('does nothing on Enter in the dimmed second', async () => {
@@ -642,69 +650,114 @@ describe('History and Undo', () => {
     expect(button(host, 'Undo: back to Take 7 Z')).toBeDefined()
   })
 
-  test_undo()
-  function test_undo() {
-    it('chooses the earlier take with Undo and with Z, as an ordinary choose', async () => {
-      const { host, sent } = await render(
-        () => view({ picture: picture(8) }),
-        undefined,
-        () => takesView(8, CHAIN),
-      )
-      await act(async () => button(host, 'Undo: back to Take 7 Z')!.click())
-      await settle()
-      expect(sent).toEqual([{ method: 'POST', path: '/api/images/inn/choose', body: { n: 7 } }])
-      await key(document.body, 'z')
-      await settle()
-      expect(sent).toHaveLength(2)
-    })
+  it('chooses the earlier take with Undo and with Z, as an ordinary choose', async () => {
+    const { host, sent } = await render(
+      () => view({ picture: picture(8) }),
+      undefined,
+      () => takesView(8, CHAIN),
+    )
+    await act(async () => button(host, 'Undo: back to Take 7 Z')!.click())
+    await settle()
+    expect(sent).toEqual([{ method: 'POST', path: '/api/images/inn/choose', body: { n: 7 } }])
+    await key(document.body, 'z')
+    await settle()
+    expect(sent[1]).toEqual({ method: 'POST', path: '/api/images/inn/choose', body: { n: 7 } })
+  })
 
-    it('keeps the steps after the one in the game, dimmed, and clicking one chooses it', async () => {
-      const { host, sent } = await render(
-        () => view({ picture: picture(7) }),
-        undefined,
-        () => takesView(7, CHAIN),
-      )
-      const later = host.querySelectorAll<HTMLElement>('.history-step')[2]!
-      expect(later.dataset.after).toBe('true')
-      await act(async () => later.querySelector('button')!.click())
-      await settle()
-      expect(sent[0]).toMatchObject({ path: '/api/images/inn/choose', body: { n: 8 } })
-    })
+  it('keeps the steps after the one in the game, dimmed, and clicking one chooses it', async () => {
+    const { host, sent } = await render(
+      () => view({ picture: picture(7) }),
+      undefined,
+      () => takesView(7, CHAIN),
+    )
+    const later = host.querySelectorAll<HTMLElement>('.history-step')[2]!
+    expect(later.dataset.after).toBe('true')
+    await act(async () => later.querySelector('button')!.click())
+    await settle()
+    expect(sent[0]).toMatchObject({ path: '/api/images/inn/choose', body: { n: 8 } })
+  })
 
-    it('has one step and no Undo for a take made from the prompt', async () => {
-      const { host } = await render(
-        () => view({ picture: picture(3) }),
-        undefined,
-        () => takesView(3, [[3, undefined]]),
-      )
-      expect(steps(host)).toEqual(['Take 3 · in the game · made from the prompt'])
-      expect(button(host, 'Undo: back to Take 3 Z')).toBeUndefined()
-      expect(text(host)).not.toContain('Undo')
-    })
+  it('has one step and no Undo for a take made from the prompt', async () => {
+    const { host } = await render(
+      () => view({ picture: picture(3) }),
+      undefined,
+      () => takesView(3, [[3, undefined]]),
+    )
+    expect(steps(host)).toEqual(['Take 3 · in the game · made from the prompt'])
+    expect(button(host, 'Undo: back to Take 3 Z')).toBeUndefined()
+    expect(text(host)).not.toContain('Undo')
+  })
 
-    it('shows the game’s own image as its one step when no take is chosen', async () => {
-      const { host } = await render(
-        () => view({ picture: { kind: 'game', width: 1024, height: 576 } }),
-        undefined,
-        () => takesView(null, [[1, undefined]]),
-      )
-      expect(steps(host)).toEqual(["The game's own image"])
-    })
+  it('shows the game’s own image as its one step when no take is chosen', async () => {
+    const { host } = await render(
+      () => view({ picture: { kind: 'game', width: 1024, height: 576 } }),
+      undefined,
+      () => takesView(null, [[1, undefined]]),
+    )
+    expect(steps(host)).toEqual(["The game's own image"])
+  })
 
-    it('turns the steps and Undo off while the style needs fixing, with the reason', async () => {
-      const { host, sent } = await render(
-        () => view({ picture: picture(8) }),
-        undefined,
-        () => takesView(8, CHAIN, { lookError: 'The style is broken.' }),
-      )
-      const undo = button(host, 'Undo: back to Take 7 Z')!
-      expect(isOff(undo)).toBe(true)
-      expect(undo.getAttribute('data-why')).toBe(
-        'The style needs fixing first. Fix it to choose this take.',
-      )
-      await act(async () => undo.click())
-      await key(document.body, 'z')
-      expect(sent).toEqual([])
-    })
-  }
+  it('turns the steps and Undo off while the style needs fixing, with the reason', async () => {
+    const { host, sent } = await render(
+      () => view({ picture: picture(8) }),
+      undefined,
+      () => takesView(8, CHAIN, { lookError: 'The style is broken.' }),
+    )
+    const undo = button(host, 'Undo: back to Take 7 Z')!
+    expect(isOff(undo)).toBe(true)
+    expect(undo.getAttribute('data-why')).toBe(
+      'The style needs fixing first. Fix it to choose this take.',
+    )
+    await act(async () => undo.click())
+    await key(document.body, 'z')
+    expect(sent).toEqual([])
+  })
+
+  it('says nothing yet while the takes do not have the chosen take', async () => {
+    const { host } = await render(
+      () => view({ picture: picture(9) }),
+      undefined,
+      () => takesView(8, CHAIN),
+    )
+    expect(host.querySelector('.history')).toBeNull()
+    expect(text(host)).not.toContain("The game's own image")
+  })
+
+  it('turns Choose, the steps and Undo off with the lock unreadable, with its reason', async () => {
+    const { host, sent } = await render(
+      () => view({ picture: picture(8), tunes: [tune(1)] }),
+      undefined,
+      () => takesView(8, CHAIN, { lockUnread: true }),
+    )
+    await act(async () => await new Promise((r) => setTimeout(r, 50)))
+    const off = [button(host, 'Choose C')!, button(host, 'Undo: back to Take 7 Z')!]
+    expect(off.map(isOff)).toEqual([true, true])
+    expect(off[1]!.getAttribute('data-why')).toBe(IMAGES_LOCK_WHY)
+    await act(async () => off[1]!.click())
+    await key(document.body, 'z')
+    await key(document.body, 'c')
+    expect(sent).toEqual([])
+  })
+
+  it('turns the steps off while a choose is being saved', async () => {
+    const { host, sent } = await render(
+      () => view({ picture: picture(8) }),
+      undefined,
+      () => takesView(8, CHAIN),
+    )
+    // The save of the first choose does not answer until it is let go.
+    const fast = globalThis.fetch
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    globalThis.fetch = (async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') await held
+      return fast(path, init)
+    }) as typeof fetch
+    await act(async () => button(host, 'Undo: back to Take 7 Z')!.click())
+    await key(document.body, 'z')
+    await act(async () => button(host, 'Undo: back to Take 7 Z')!.click())
+    release()
+    await settle()
+    expect(sent.filter((s) => s.path.endsWith('/choose'))).toHaveLength(1)
+  })
 })

@@ -5611,7 +5611,7 @@ textarea[aria-disabled='true'][data-why] {
   max-width: none;
 }
 
-/* A fine-tune's card: the picture is a button that lays it over the big picture, Use this and Drop beside it. */
+/* A fine-tune's card: the picture is a button that lays it over the big picture, Choose and Drop are under the big picture. */
 .fine-card-pick {
   all: unset;
   display: flex;

@@ -64,7 +64,7 @@ export function fineTuneCaption(from: number | null, words: string): string {
 }
 
 /**
- * What the green line says after "Use this": the new take is in the game, and the named areas and
+ * What the green line says after Choose: the new take is in the game, and the named areas and
  * chosen patches that came along, naming only what exists. `from` is the take it was made from,
  * null for the game's own image.
  */

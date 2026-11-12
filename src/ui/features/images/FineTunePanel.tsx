@@ -157,7 +157,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const view = query.data && 'picture' in query.data ? query.data : null
   const tunes = view?.tunes ?? []
   // A card that turns ready while the page is open keeps its buttons off for a second, so a click
-  // meant for its Stop does not land on Use this. Cards there when the picture is first seen do not.
+  // meant for its Stop does not land on Choose. Cards there when the picture is first seen do not.
   const seenReady = useRef<{ picture: string; ns: Set<number> } | null>(null)
   const readyAt = useRef(new Map<number, number>())
   const [, tick] = useState(0)
@@ -293,9 +293,12 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       ? 'Fine-tunes are being made for this picture. Change this when they are done, or Stop.'
       : null
   const takes = takesQuery.data && 'takes' in takesQuery.data ? takesQuery.data : null
-  const history = takes
-    ? fineTuneHistory(takes.takes, picture.kind === 'take' ? picture.n : null)
-    : null
+  // The two queries refresh separately: until the takes know the chosen take, History says nothing.
+  const chosenN = picture.kind === 'take' ? picture.n : null
+  const history =
+    takes && (chosenN === null || takes.takes.some((t) => t.n === chosenN))
+      ? fineTuneHistory(takes.takes, chosenN)
+      : null
   const changingPicture = use.isPending || drop.isPending || choose.isPending
   // Choosing (a fine-tune, or an earlier or later step) is refused while the lock cannot be read or the style is broken.
   const chooseWhy = takes?.lockUnread
