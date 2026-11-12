@@ -1258,3 +1258,78 @@ describe('the failure of a model’s last take', () => {
     expect(await health(file)).toEqual({})
   })
 })
+
+describe('a fine-tuned take', () => {
+  it('says what it was fine-tuned from, and a take made before says nothing', async () => {
+    const { takes, file, root } = setup(undefined, {
+      'content-studio/cache/images/inn.json': {
+        next: 3,
+        takes: [1, 2].map((n) => ({
+          n,
+          seed: n,
+          model: 'black-forest-labs/FLUX.2-klein-4B',
+          width: 1024,
+          height: 640,
+          madeFrom: { words: 'a low inn', style: 'x', width: 320, height: 200 },
+          ...(n === 2 ? { fineTunedFrom: { take: 1, words: 'Add a cat' } } : {}),
+        })),
+      },
+    })
+    for (const n of [1, 2]) {
+      mkdirSync(join(root, 'content-studio/cache/image-takes/inn'), { recursive: true })
+      writeFileSync(
+        join(root, `content-studio/cache/image-takes/inn/${n}.png`),
+        fakePng(1024, 640, n),
+      )
+    }
+    const view = await takes.view(file, 'inn')
+    if (!view || !('takes' in view)) throw new Error('no view')
+    expect(view.takes.map((t) => t.fineTunedFrom)).toEqual([
+      undefined,
+      { take: 1, words: 'Add a cat' },
+    ])
+  })
+})
+
+describe('adding a fine-tuned take', () => {
+  const made = {
+    png: fakePng(1024, 640, 9),
+    model: 'black-forest-labs/FLUX.2-klein-4B',
+    seed: 9,
+    words: 'Add a cat',
+  }
+  it('adds the next take with its picture and what it came from, made from the image’s words now', async () => {
+    const { takes, file, read, row, root } = setup()
+    await takes.make(file, 'inn', { count: 1 })
+    const first = await takes.view(file, 'inn')
+    if (!first || !('takes' in first)) throw new Error('no view')
+    const answer = await takes.addTake(file, 'inn', { ...made, from: null })
+    expect(answer).toEqual({ ok: true, n: 2 })
+    expect(read('content-studio/cache/image-takes/inn/2.png')).toBe(bytes(made.png))
+    const board = JSON.parse(read('content-studio/cache/images/inn.json'))
+    expect(board.next).toBe(3)
+    expect(board.takes[1]).toMatchObject({
+      n: 2,
+      seed: 9,
+      width: 1024,
+      height: 640,
+      madeFrom: (await row()).madeFrom,
+      fineTunedFrom: { take: null, words: 'Add a cat' },
+      seen: false,
+    })
+    expect(existsSync(join(root, 'content-studio/cache/image-takes/inn/1.png'))).toBe(true)
+  })
+  it('copies the words and style of the take it came from, not the image’s now', async () => {
+    const { takes, file, read } = setup()
+    await takes.make(file, 'inn', { count: 1 })
+    await setImageWords(file, 'inn', 'a high inn')
+    expect(await takes.addTake(file, 'inn', { ...made, from: 1 })).toEqual({ ok: true, n: 2 })
+    const board = JSON.parse(read('content-studio/cache/images/inn.json'))
+    expect(board.takes[1].madeFrom).toEqual(board.takes[0].madeFrom)
+    expect(board.takes[1].fineTunedFrom).toEqual({ take: 1, words: 'Add a cat' })
+  })
+  it('is null for an image the game does not list', async () => {
+    const { takes, file } = setup()
+    expect(await takes.addTake(file, 'nowhere', { ...made, from: null })).toBeNull()
+  })
+})

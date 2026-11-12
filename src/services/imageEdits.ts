@@ -10,6 +10,7 @@ import {
   type AreaBox,
   applyPatchWordsChange,
   applyStyleChange,
+  carryAreas,
   applyWordsChange,
   formatImageEdits,
   resolveCompare,
@@ -176,6 +177,35 @@ export function adoptImageAreas(
       }
     }
     return { ok: true }
+  })
+}
+
+/**
+ * Gives take `to` of an image the boxes of take `from` (the boxes of no take yet go onto `from`
+ * first), and says how many boxes that is. Nothing is written when there are none.
+ */
+export function carryImageAreas(
+  projectFile: string,
+  id: string,
+  from: number,
+  to: number,
+): Promise<{ ok: true; areas: number } | { ok: false; problems: Problem[] }> {
+  return serial.run(projectFile, async () => {
+    const root = dirname(projectFile)
+    const read = await readImageEdits(root)
+    if (read.problems.length) return { ok: false as const, problems: read.problems }
+    const next = carryAreas(read.edits, id, from, to)
+    const areas = Object.keys(next.images[id]?.takeAreas?.[String(to)] ?? {}).length
+    if (next === read.edits) return { ok: true as const, areas }
+    try {
+      await writeAtomic(root, IMAGES_EDITS_FILE, formatImageEdits(next))
+    } catch (error) {
+      return {
+        ok: false as const,
+        problems: [{ file: IMAGES_EDITS_FILE, path: '', message: writeFailure(error) }],
+      }
+    }
+    return { ok: true as const, areas }
   })
 }
 

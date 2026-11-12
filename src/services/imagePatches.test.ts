@@ -377,6 +377,25 @@ describe('takes of a declared patch', () => {
     ).toEqual([11, 12, 13])
   })
 
+  it('puts every take of one press in line in number order before it answers, so they are made in that order', async () => {
+    const serial = createSerial()
+    let turns = 0
+    const queue: Serial = {
+      run: (key, job) => {
+        turns++
+        return serial.run(key, job)
+      },
+    }
+    const { root, file, patches, requests, work } = setup({ queue })
+    await patches.make(file, 'inn', 'door', { count: 3, area })
+    // In line already: no take waits on a read of its own first, which could finish out of order.
+    expect(turns).toBe(3)
+    await work()
+    expect(requests.map((r) => r.editing)).toEqual(
+      [1, 2, 3].map((n) => join(root, FOLDER, `editing-${n}.png`)),
+    )
+  })
+
   it("times a finished patch take under the model's own key, klein's patches apart from its takes", async () => {
     let clock = 0
     const { root, file, patches, work } = setup({ now: () => (clock += 3000) })
@@ -551,6 +570,18 @@ describe('takes of a declared patch', () => {
     const bad = setup()
     writeFileSync(join(bad.root, TAKE), 'not a picture')
     expect(await bad.patches.view(bad.file, 'inn')).toMatchObject({ take: null, pictureGone: true })
+  })
+
+  it('refuses, and queues nothing, when the chosen take reads as a picture but its pixels cannot be', async () => {
+    const { root, file, patches, requests, work } = setup()
+    // The size reads from the header; the body after it is cut off.
+    writeFileSync(join(root, TAKE), fakePng(256, 256, 9).slice(0, 40))
+    expect(await patches.make(file, 'inn', 'door', { count: 2, area })).toEqual({
+      ok: false,
+      message: "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
+    })
+    expect((await work()).making).toEqual([])
+    expect(requests).toEqual([])
   })
 
   it('says in the view why takes cannot be made on this computer', async () => {

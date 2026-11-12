@@ -17,6 +17,7 @@ import { ActStyleBox } from './ActStyleBox'
 import { ActStyleMenu } from './ActStyleMenu'
 import { ActLinks } from './ActLinks'
 import { NamedAreasPanel } from './NamedAreasPanel'
+import { FineTunePanel } from './FineTunePanel'
 import { GamePatchesPanel } from './GamePatchesPanel'
 import { TakesSection } from './TakesSection'
 import { WordsField, type SaveWordsNow } from './WordsField'
@@ -213,6 +214,7 @@ export function ImagePage({
           </section>
         }
       />
+      <FineTunePanel key={`fine-tune-${row.id}`} row={row} />
       <NamedAreasPanel key={`areas-${row.id}`} row={row} />
       <GamePatchesPanel key={`patches-${row.id}`} row={row} />
     </>

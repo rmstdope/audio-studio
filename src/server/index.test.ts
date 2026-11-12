@@ -5563,6 +5563,111 @@ describe('the image takes routes', () => {
   })
 })
 
+describe('the image fine-tune routes', () => {
+  const root = tempRepo({
+    'content-studio.json': projectJson({
+      images: {
+        from: { part: 'tts/{part}/images.json' },
+        clips: 'web/images',
+        manifest: 'web/images/manifest.json',
+      },
+    }),
+    'tts/act1/images.json': [
+      { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 },
+    ],
+    'content-studio/images/edits.json': {
+      style: { look: 'pixel art', keepOut: 'text', palette: ['#000000'] },
+      images: {},
+    },
+    'content-studio/images/lock.json': {
+      inn: { take: 3, inputs: { text: 'a low inn', width: 320, height: 200 } },
+    },
+    'content-studio/cache/images/inn.json': {
+      next: 4,
+      takes: [
+        {
+          n: 3,
+          seed: 1,
+          model: 'black-forest-labs/FLUX.2-klein-4B',
+          width: 256,
+          height: 256,
+          madeFrom: { words: 'a low inn', style: 'x', width: 320, height: 200 },
+        },
+      ],
+    },
+    'web/images/manifest.json': { inn: { file: 'inn.png', width: 320, height: 200 } },
+  })
+  mkdirSync(join(root, 'content-studio/cache/image-takes/inn'), { recursive: true })
+  writeFileSync(join(root, 'content-studio/cache/image-takes/inn/3.png'), fakePng(256, 256, 1))
+  const studio = startServer({
+    projectFile: join(root, 'content-studio.json'),
+    port: 0,
+    transcriber: null,
+    images: {
+      ready: () => ({ ok: true }),
+      installed: () => true,
+      generate: async (request) => ({
+        png: fakePng(request.width, request.height, request.seed),
+        seed: request.seed,
+      }),
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const send = (method: string, path: string, body?: unknown, origin = studio.url.origin) =>
+    fetch(new URL(`/api/images/inn/fine-tunes${path}`, studio.url), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+
+  it('takes changes from the studio’s own page only', async () => {
+    for (const [method, path, body] of [
+      ['POST', '', { count: 1, words: 'x', area: null }],
+      ['POST', '/stop', undefined],
+      ['POST', '/use', { n: 1 }],
+      ['DELETE', '/1', undefined],
+      ['POST', '/1/seen', undefined],
+    ] as const) {
+      expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
+    }
+  })
+
+  it('refuses a bad body, and answers 404 for an image the game does not list', async () => {
+    expect((await send('POST', '', { count: 7, words: 'x', area: null })).status).toBe(400)
+    expect((await send('POST', '', { count: 1, words: ' ', area: null })).status).toBe(400)
+    expect((await send('POST', '/use', { n: 'x' })).status).toBe(400)
+    expect((await fetch(new URL('/api/images/ghost/fine-tunes', studio.url))).status).toBe(404)
+    expect((await send('POST', '/use', { n: 1 })).status).toBe(409)
+  })
+
+  it('makes fine-tunes, serves their pictures, drops one, and uses another as a new take', async () => {
+    expect((await send('POST', '', { count: 2, words: 'Add a cat', area: null })).status).toBe(200)
+    let view = { making: [{}], tunes: [] as { n: number }[] }
+    for (let i = 0; i < 200 && view.making.length; i++) {
+      view = await (await send('GET', '')).json()
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(view.tunes.map((t) => t.n)).toEqual([1, 2])
+    const picture = await send('GET', '/1')
+    expect(picture.status).toBe(200)
+    expect((await picture.arrayBuffer()).byteLength).toBeGreaterThan(100)
+    expect((await send('GET', '/9')).status).toBe(404)
+    expect((await send('POST', '/1/seen')).status).toBe(200)
+    expect((await send('DELETE', '/2')).status).toBe(200)
+    expect((await send('DELETE', '/2')).status).toBe(409)
+    const used = await send('POST', '/use', { n: 1 })
+    expect(used.status).toBe(200)
+    expect(await used.json()).toEqual({
+      ok: true,
+      take: 4,
+      from: 3,
+      carried: { areas: 0, patches: 0 },
+    })
+    expect(((await (await send('GET', '')).json()) as { tunes: unknown[] }).tunes).toEqual([])
+    expect((await send('POST', '/stop')).status).toBe(200)
+  })
+})
+
 describe('the image patch routes', () => {
   const root = tempRepo({
     'content-studio.json': projectJson({

@@ -139,6 +139,14 @@ async function settle() {
   for (let i = 0; i < 5; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
 }
 
+/** Lets the page work until `element()` is on again, as a person waits to press it. */
+async function untilOn(element: () => Element) {
+  for (let i = 0; i < 100 && isOff(element()); i++) {
+    await act(async () => await new Promise((r) => setTimeout(r, 5)))
+  }
+  expect(isOff(element())).toBe(false)
+}
+
 /** The words in an element, those of neighbouring elements told apart by a space. */
 function words(node: Node): string {
   return node.nodeType === 3
@@ -667,7 +675,7 @@ describe('keys and focus around the question and Make', () => {
     expect(document.activeElement).toBe(thumbs(host)[0] ?? null)
   })
 
-  it('reloads the patches when a take of the image is chosen, dropped or un-chosen', async () => {
+  it('reloads the patches and the fine-tunes when a take of the image is chosen, dropped or un-chosen', async () => {
     const { useChooseImageTake } = await import('../../api')
     const client = new QueryClient()
     const asked: unknown[] = []
@@ -695,6 +703,8 @@ describe('keys and focus around the question and Make', () => {
     })
     await settle()
     expect(asked).toContainEqual(['image-patches', 'inn'])
+    // The fine-tunes belong to the picture in the game, which a choice changes.
+    expect(asked).toContainEqual(['image-fine-tunes', 'inn'])
   })
 })
 
@@ -1283,9 +1293,16 @@ describe('the model of new takes', () => {
 
   it('makes the takes with the model it is on', async () => {
     const { host, sent } = await render([patchRow('a')], () => withModels([work('a')]))
+    // The reload after a press is slow, as it can be: Make is off until it has come back.
+    const answer = globalThis.fetch
+    globalThis.fetch = (async (path: string, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'GET') await new Promise((r) => setTimeout(r, 30))
+      return answer(path, init)
+    }) as unknown as typeof fetch
     await open(host)
     await drag(stageOf(host), [100, 50], [300, 250])
     await act(async () => button(host, 'Make 2 takes')!.click())
+    await untilOn(() => button(host, 'Make 2 takes')!)
     await pick(menuOf(host), 'qwen-edit')
     await act(async () => button(host, 'Make 2 takes')!.click())
     expect(sent.map((s) => (s.body as { model: string }).model)).toEqual(['klein', 'qwen-edit'])
