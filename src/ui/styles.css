@@ -170,6 +170,12 @@ a {
   }
 }
 
+@media (min-width: 900px) {
+  .sidebar.sidebar-rail {
+    flex: 0 0 72px;
+  }
+}
+
 @media (max-width: 600px) {
   .content {
     padding: 20px 16px 32px;
@@ -199,6 +205,172 @@ a {
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.01em;
+  flex: 1;
+}
+
+.brand-fold,
+.rail-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.brand-fold:hover,
+.rail-fold:hover {
+  background: var(--glass);
+  color: var(--text);
+}
+
+/* The folded sidebar: an icon over a small word, the open workspace's acts as pills */
+.sidebar-rail {
+  padding: 14px 6px;
+  gap: 4px;
+  align-items: stretch;
+  overflow-x: hidden;
+}
+
+.rail-mark {
+  width: 30px;
+  height: 30px;
+  margin: 0 auto 2px;
+  border-radius: 9px;
+  background: var(--accent-grad);
+  box-shadow: var(--logo-glow);
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rail-fold {
+  margin: 0 auto 8px;
+}
+
+.rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-foot {
+  margin-top: auto;
+}
+
+.rail-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 2px 6px;
+  border-radius: 10px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 10.5px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.rail-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+.rail-item:hover {
+  background: var(--glass);
+  color: var(--text);
+}
+
+.rail-item[aria-current='page'] {
+  background: var(--glass-strong);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  color: var(--text);
+}
+
+.rail-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-grad);
+}
+
+.rail-badge {
+  position: absolute;
+  top: 3px;
+  right: 9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.rail-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 8px;
+}
+
+.rail-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 6px 6px;
+}
+
+.rail-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 10.5px;
+}
+
+.rail-pill:hover {
+  background: var(--glass);
+  color: var(--text);
+}
+
+.rail-pill[aria-current='page'] {
+  border-color: var(--accent);
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-ink);
+}
+
+.rail-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.rail-dot[data-dot='all'] {
+  background: var(--ok);
+}
+
+.rail-dot[data-dot='some'] {
+  background: var(--warn);
 }
 
 .project-box {

@@ -183,3 +183,21 @@ export function SparkIcon() {
     </Stroke>
   )
 }
+
+/** Fold the sidebar. */
+export function ChevronsLeftIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Stroke size={size}>
+      <path d="m11 17-5-5 5-5M18 17l-5-5 5-5" />
+    </Stroke>
+  )
+}
+
+/** Unfold the sidebar. */
+export function ChevronsRightIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Stroke size={size}>
+      <path d="m6 17 5-5-5-5M13 17l5-5-5-5" />
+    </Stroke>
+  )
+}
