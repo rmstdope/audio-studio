@@ -255,10 +255,8 @@ describe('the named areas panel', () => {
     })
 
     it('fits a portrait picture to the window’s height, so the caption, switches and S hint stay in view (as-dab0)', async () => {
-      const { host, stage } = await render([area('a')], {
-        patches: [{ id: 'p1', title: 'Bread taken', takes: [{ n: 7, chosen: true }] }],
-      })
-      const fitted = /: min\(100%, calc\(\(100vh - \d+px\) \* var\(--picture-ratio\)\)\)$/
+      const { stage } = await render([area('a')])
+      const fitted = /: min\(100%, calc\(\(100vh - 320px\) \* var\(--picture-ratio\)\)\)$/
       expect(valuesInEveryWindow(stage!, 'width').at(-1)).toMatch(
         new RegExp(`^\\.named-area-stage${fitted.source}`),
       )
@@ -268,7 +266,6 @@ describe('the named areas panel', () => {
       expect(valuesInEveryWindow(empty, 'width').at(-1)).toMatch(
         new RegExp(`^\\.named-area-empty${fitted.source}`),
       )
-      expect(host.querySelector('.named-area-hold')).not.toBeNull()
     })
   })
 

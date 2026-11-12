@@ -5269,7 +5269,6 @@ textarea[aria-disabled='true'][data-why] {
 }
 .named-area-stage {
   position: relative;
-  width: 100%;
   border-radius: 10px;
   overflow: hidden;
   cursor: crosshair;

@@ -426,7 +426,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
         ...boxes.filter((b) => b.area.id !== selected),
         ...boxes.filter((b) => b.area.id === selected),
       ]
-  // The ratio as a number too: a narrow window's stylesheet caps the picture's height through it.
+  // The ratio as a number too: the stylesheet caps the picture's height by the window through it.
   const pictureShape = {
     aspectRatio: `${row.width} / ${row.height}`,
     '--picture-ratio': row.width / row.height,
