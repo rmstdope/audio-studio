@@ -3302,9 +3302,11 @@ button.cue-chip[aria-expanded='true'] {
 .patches p {
   margin: 0;
 }
+/* The picture as wide as its column, but no taller than leaves the controls under it and the takes
+   below in view in the window: a portrait picture is fitted to the height. */
 .patch-stage {
   position: relative;
-  width: 100%;
+  width: min(100%, calc(max(240px, 100vh - 460px) * var(--picture-ratio, 1)));
   max-width: 1024px;
   cursor: crosshair;
   touch-action: none;

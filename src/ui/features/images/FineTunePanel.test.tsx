@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { FineTunesView } from '../../../core/imageFineTunes'
 import type { ImageRow } from '../../../core/images'
+import { valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -162,6 +163,16 @@ describe('the states of the panel', () => {
     await type(wordsBox(host), 'Add a black cat')
     expect(isOff(button(host, 'Make 4 fine-tunes')!)).toBe(false)
     expect(host.querySelectorAll('select.takes-count option')).toHaveLength(10)
+  })
+
+  it('fits a portrait picture to the window’s height, so its buttons and the strip stay in view', async () => {
+    const { host } = await render(() =>
+      view({ picture: { kind: 'take', n: 3, width: 160, height: 200 } }),
+    )
+    const stage = host.querySelector<HTMLElement>('.patch-stage')!
+    expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(160 / 200))
+    const widths = valuesInEveryWindow(stage, 'width')
+    expect(widths.at(-1)).toMatch(/^\.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
   })
 
   it('names the game’s own image when no take is chosen', async () => {
