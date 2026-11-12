@@ -1,0 +1,1355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Image page jobs</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root {
+        --bg: #06070c;
+        --sidebar: rgb(10 11 18 / 55%);
+        --glass: rgb(255 255 255 / 3.5%);
+        --glass-strong: rgb(255 255 255 / 6%);
+        --edge: rgb(255 255 255 / 8%);
+        --accent-grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+        --logo-glow: 0 6px 20px rgb(255 90 100 / 35%);
+        --line: rgb(255 255 255 / 7%);
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --info: #7aa7ff;
+        --panel: #10121a;
+        --inset: #0d0f14;
+        --chip: #1a1d26;
+        --tint-3: #8fb5ff;
+        --tint-4: #ff94a8;
+        --tint-5: #b9a9ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(900px 500px at 85% -10%, rgb(255 90 120 / 14%), transparent 60%),
+          radial-gradient(700px 500px at 10% 110%, rgb(90 120 255 / 12%), transparent 60%),
+          var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 20px 16px 40px;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      .intro {
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro ul {
+        margin: 6px 0 0;
+        padding-left: 18px;
+      }
+      .controls {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .controls .label {
+        margin-right: 6px;
+      }
+      .tab {
+        background: var(--glass-strong);
+        border: 1px solid var(--edge);
+        color: var(--text-soft);
+        border-radius: 999px;
+        padding: 5px 13px;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+      }
+      .tab[aria-pressed='true'] {
+        background: var(--accent-soft-bg);
+        border-color: var(--accent);
+        color: var(--accent-soft-ink);
+      }
+      .note {
+        color: var(--text-soft);
+        margin: 0 0 12px;
+        max-width: 900px;
+      }
+      .note b {
+        color: var(--accent-soft-ink);
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+      .muted {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+      }
+
+      /* Window */
+      .window {
+        height: 760px;
+        border: 1px solid var(--edge);
+        border-radius: 14px;
+        overflow: hidden;
+        display: flex;
+        background: rgb(6 7 12 / 70%);
+      }
+      .rail {
+        flex: 0 0 72px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--edge);
+        padding: 14px 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--accent-grad);
+        box-shadow: var(--logo-glow);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        margin: 0 auto 10px;
+      }
+      .r-item {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 7px 2px 6px;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 10.5px;
+      }
+      .r-item.on {
+        background: var(--glass-strong);
+        box-shadow: inset 0 0 0 1px var(--edge);
+        color: var(--text);
+      }
+      .r-item.on::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 10px;
+        bottom: 10px;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--accent-grad);
+      }
+      .pills {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 2px 6px 6px;
+      }
+      .pill {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        height: 22px;
+        border-radius: 6px;
+        font-size: 10.5px;
+        color: var(--muted);
+        border: 1px solid transparent;
+      }
+      .pill.on {
+        border-color: var(--accent);
+        color: var(--accent-soft-ink);
+        background: var(--accent-soft-bg);
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--faint);
+        display: inline-block;
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .dot.part {
+        background: var(--warn);
+      }
+      .rail-foot {
+        margin-top: auto;
+      }
+
+      .content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 14px 20px 14px;
+        gap: 12px;
+        overflow: hidden;
+      }
+      .head {
+        display: flex;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .crumbs {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      .head h2 {
+        margin: 2px 0 0;
+        font-size: 24px;
+        letter-spacing: -0.02em;
+      }
+      .head .id {
+        font-size: 12px;
+        color: var(--faint);
+        margin-left: 8px;
+        font-weight: 400;
+      }
+      .head .grow {
+        flex: 1;
+      }
+      .status {
+        font-size: 12.5px;
+        color: var(--muted);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .chip {
+        font-size: 11px;
+        border-radius: 999px;
+        padding: 1px 8px;
+        background: var(--chip);
+        color: var(--text-soft);
+        border: 1px solid var(--edge);
+        white-space: nowrap;
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+        border-color: transparent;
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-color: transparent;
+      }
+      .chip.accent {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+        border-color: transparent;
+      }
+
+      /* Job switchers */
+      .jobs-tabs {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--line);
+      }
+      .jt {
+        padding: 8px 14px 10px;
+        color: var(--muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 13.5px;
+      }
+      .jt:hover {
+        color: var(--text);
+      }
+      .jt.on {
+        color: var(--text);
+        border-bottom-color: var(--accent);
+      }
+      .jt .k {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 10px;
+        color: var(--faint);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        padding: 0 4px;
+      }
+
+      .stepper {
+        display: flex;
+        gap: 6px;
+        align-items: stretch;
+      }
+      .step {
+        flex: 1;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        cursor: pointer;
+        min-width: 0;
+      }
+      .step.on {
+        border-color: var(--accent);
+        background: var(--accent-soft-bg);
+      }
+      .step .n {
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        background: var(--chip);
+        color: var(--muted);
+      }
+      .step.done .n {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .step.on .n {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      .step b {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .step span.s {
+        font-size: 11.5px;
+        color: var(--faint);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+      }
+      .arrow {
+        align-self: center;
+        color: var(--faint);
+      }
+
+      .tiles {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 14px;
+        flex: 1;
+        min-height: 0;
+      }
+      .tile-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        align-content: start;
+      }
+      .tile {
+        border-radius: 16px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        padding: 14px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .tile:hover {
+        border-color: var(--accent);
+      }
+      .tile h3 {
+        margin: 0;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tile p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .tile .go {
+        margin-top: auto;
+        color: var(--accent-soft-ink);
+        font-size: 12.5px;
+      }
+      .back {
+        color: var(--accent-soft-ink);
+        cursor: pointer;
+        font-size: 12.5px;
+      }
+
+      /* A job's layout: stage + tools, strip below */
+      .job {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 12px;
+      }
+      .job.lefty {
+        grid-template-columns: 220px minmax(0, 1fr) 280px;
+      }
+      .stage {
+        border-radius: 16px;
+        border: 1px solid var(--edge);
+        background: var(--inset);
+        position: relative;
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        min-height: 0;
+      }
+      .pic {
+        flex: 1;
+        border-radius: 10px;
+        position: relative;
+        background:
+          linear-gradient(to bottom, #2a1d3d 0%, #a2486a 38%, #f08a4b 52%, transparent 53%),
+          linear-gradient(to bottom, transparent 53%, #1b2a44 53%, #0c1424 100%);
+        overflow: hidden;
+        min-width: 0;
+      }
+      .pic::before {
+        /* a lighthouse and a pier */
+        content: '';
+        position: absolute;
+        left: 18%;
+        bottom: 47%;
+        width: 4%;
+        height: 26%;
+        background: linear-gradient(#eee 0 20%, #c33 20% 40%, #eee 40% 60%, #c33 60% 80%, #eee 80%);
+        border-radius: 3px 3px 0 0;
+      }
+      .pic::after {
+        content: '';
+        position: absolute;
+        right: 6%;
+        bottom: 38%;
+        width: 46%;
+        height: 4%;
+        background: #3a2a22;
+        box-shadow:
+          30px 20px 0 -6px #3a2a22,
+          120px 20px 0 -6px #3a2a22;
+      }
+      .pic.alt {
+        filter: hue-rotate(-25deg) saturate(1.2);
+      }
+      .pic-cap {
+        position: absolute;
+        left: 8px;
+        bottom: 8px;
+        font-size: 11.5px;
+        background: rgb(0 0 0 / 55%);
+        padding: 2px 8px;
+        border-radius: 6px;
+        color: var(--text-soft);
+        z-index: 2;
+      }
+      .pic-btns {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        display: flex;
+        gap: 6px;
+        z-index: 2;
+      }
+      .box {
+        position: absolute;
+        border: 2px solid var(--tint-3);
+        background: rgb(143 181 255 / 10%);
+        border-radius: 3px;
+        z-index: 1;
+      }
+      .box.sel {
+        border-color: var(--accent);
+        background: rgb(255 107 44 / 12%);
+      }
+      .box span {
+        position: absolute;
+        top: -20px;
+        left: -2px;
+        font-size: 11px;
+        background: var(--tint-3);
+        color: #0b1020;
+        padding: 0 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      .box.sel span {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      .box .pt {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+        border: 2px solid #fff;
+        left: 40%;
+        top: 55%;
+      }
+      .dash {
+        position: absolute;
+        border: 2px dashed #fff;
+        border-radius: 3px;
+        z-index: 1;
+      }
+      .tools {
+        border-radius: 16px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow: auto;
+        min-height: 0;
+      }
+      .tools h3,
+      .side-list h3 {
+        margin: 0;
+        font-size: 14px;
+      }
+      .field {
+        border-radius: 10px;
+        border: 1px solid var(--edge);
+        background: var(--inset);
+        padding: 8px 10px;
+        color: var(--text-soft);
+        font-size: 13px;
+        min-height: 64px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .sel-box {
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        background: var(--chip);
+        padding: 5px 10px;
+        font-size: 12.5px;
+        color: var(--text-soft);
+      }
+      .btn {
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        background: var(--glass-strong);
+        padding: 5px 12px;
+        font-size: 12.5px;
+        color: var(--text);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.pri {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: rgb(0 0 0 / 55%);
+      }
+      .hint {
+        font-size: 11.5px;
+        color: var(--faint);
+      }
+      .kbd {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 10.5px;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        padding: 0 4px;
+        color: var(--muted);
+      }
+      .strip {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 8px;
+        align-items: stretch;
+        border-radius: 14px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        padding: 8px 10px;
+        overflow-x: auto;
+      }
+      .strip .label {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        align-self: center;
+      }
+      .thumb {
+        flex: 0 0 120px;
+        height: 82px;
+        border-radius: 8px;
+        position: relative;
+        border: 2px solid transparent;
+        overflow: hidden;
+      }
+      .thumb .pic {
+        position: absolute;
+        inset: 0;
+        border-radius: 6px;
+      }
+      .thumb.on {
+        border-color: var(--accent);
+      }
+      .thumb.chosen {
+        border-color: var(--ok);
+      }
+      .thumb .t {
+        position: absolute;
+        left: 4px;
+        top: 4px;
+        font-size: 10.5px;
+        background: rgb(0 0 0 / 60%);
+        padding: 0 5px;
+        border-radius: 4px;
+        z-index: 2;
+      }
+      .thumb.making {
+        background: var(--inset);
+        border: 1px dashed var(--edge);
+        display: grid;
+        place-items: center;
+        color: var(--faint);
+        font-size: 11.5px;
+      }
+      .thumb.making i {
+        position: absolute;
+        left: 6px;
+        right: 6px;
+        bottom: 6px;
+        height: 3px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, var(--accent) 40%, var(--chip) 40%);
+      }
+      .side-list {
+        border-radius: 16px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        padding: 12px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        overflow: auto;
+        min-height: 0;
+      }
+      .side-list h3 {
+        padding: 0 8px 6px;
+      }
+      .li {
+        padding: 7px 8px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        cursor: pointer;
+      }
+      .li:hover {
+        background: var(--glass);
+      }
+      .li.on {
+        background: var(--glass-strong);
+        box-shadow: inset 0 0 0 1px var(--edge);
+      }
+      .li .top {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .li .top .grow {
+        flex: 1;
+      }
+      .li .sub {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .notice {
+        border-radius: 10px;
+        background: var(--warn-bg);
+        color: var(--warn);
+        padding: 7px 12px;
+        font-size: 12.5px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .notice .grow {
+        flex: 1;
+        color: var(--text-soft);
+      }
+      details.prompt summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .check {
+        font-size: 12.5px;
+        color: var(--text-soft);
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .sw {
+        width: 26px;
+        height: 14px;
+        border-radius: 7px;
+        background: var(--ok);
+        position: relative;
+        display: inline-block;
+      }
+      .sw::after {
+        content: '';
+        position: absolute;
+        right: 2px;
+        top: 2px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #fff;
+      }
+      .sw.off {
+        background: var(--chip);
+      }
+      .sw.off::after {
+        right: auto;
+        left: 2px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .toggles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        padding-top: 2px;
+      }
+      .toggles .label {
+        margin-right: 4px;
+      }
+      .toggles .grow {
+        flex: 1;
+      }
+      .tg {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        padding: 3px 10px 3px 6px;
+        font-size: 12px;
+        color: var(--text-soft);
+        cursor: pointer;
+      }
+      .tg.on {
+        border-color: var(--tint-5);
+      }
+      .tg.off {
+        opacity: 0.45;
+        cursor: default;
+        padding-left: 10px;
+      }
+      .peek .box {
+        display: none;
+      }
+      /* v2: pictures keep the image's shape, fitted by script */
+      .stage {
+        align-items: stretch;
+      }
+      .slot {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .slot .frame {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        place-items: center;
+      }
+      .slot .pic {
+        flex: none;
+      }
+      .slot .under {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--text-soft);
+        min-height: 28px;
+      }
+      .slot .under .btns {
+        display: flex;
+        gap: 6px;
+      }
+      .stage-bar {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 4;
+        display: flex;
+        gap: 6px;
+      }
+      .pop {
+        position: absolute;
+        top: 34px;
+        right: 0;
+        width: 240px;
+        background: var(--panel);
+        border: 1px solid var(--edge);
+        border-radius: 12px;
+        box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 260px;
+        overflow: auto;
+      }
+      .pop .check {
+        padding: 5px 6px;
+        border-radius: 6px;
+      }
+      .pop .check:hover {
+        background: var(--glass);
+      }
+      .pop .row {
+        padding: 4px 6px 6px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 4px;
+      }
+      .ov {
+        position: absolute;
+        border-radius: 3px;
+        background: rgb(185 169 255 / 25%);
+        border: 1px dotted var(--tint-5);
+        z-index: 1;
+      }
+      .history {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .hs {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 5px 6px;
+        border-radius: 8px;
+        cursor: pointer;
+        position: relative;
+      }
+      .hs:hover {
+        background: var(--glass);
+      }
+      .hs .dotc {
+        width: 12px;
+        height: 12px;
+        flex: 0 0 12px;
+        border-radius: 50%;
+        border: 2px solid var(--faint);
+        margin-top: 3px;
+        background: var(--inset);
+        position: relative;
+        z-index: 1;
+      }
+      .hs:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 11px;
+        top: 17px;
+        bottom: -7px;
+        width: 2px;
+        background: var(--line);
+      }
+      .hs.now .dotc {
+        border-color: var(--ok);
+        background: var(--ok);
+      }
+      .hs.later {
+        opacity: 0.55;
+      }
+      .hs b {
+        font-size: 12.5px;
+        font-weight: 600;
+        display: block;
+      }
+      .hs span.w {
+        font-size: 11.5px;
+        color: var(--faint);
+        display: block;
+      }
+      .chipbar {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .pchip {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        border-radius: 10px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        padding: 5px 10px;
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .pchip.on {
+        border-color: var(--accent);
+        background: var(--accent-soft-bg);
+      }
+      .pchip .sub {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .job.wide {
+        grid-template-columns: minmax(0, 1fr) 280px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+      .job.wide .chipbar {
+        grid-column: 1 / -1;
+      }
+      .side-list.capped {
+        align-self: start;
+        max-height: 100%;
+      }
+      .side-list .scroll {
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-height: 0;
+        flex: 1;
+      }
+      .q {
+        border-left: 3px solid var(--accent);
+        padding: 4px 0 4px 10px;
+        color: var(--text-soft);
+        margin: 4px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>The image page, one job at a time</h1>
+        Agreed (as-kw3x.2 to .6): tabs in the order Make, Fine-tune, Patches, Named areas. Each job
+        keeps one frame: the picture as large as fits, the job's tools on the right, its results in
+        a strip along the bottom. Built for a desktop window; narrow screens only need to keep
+        working.
+      </div>
+      <div class="controls">
+        <span
+          ><span class="label">Job</span>
+          <button class="tab" data-job="make" aria-pressed="true">Make</button>
+          <button class="tab" data-job="tune" aria-pressed="false">Fine-tune</button>
+          <button class="tab" data-job="patches" aria-pressed="false">Patches</button>
+          <button class="tab" data-job="areas" aria-pressed="false">Named areas</button></span
+        >
+        <span
+          ><span class="label">Image shape</span>
+          <button class="tab" data-shape="land" aria-pressed="true">Landscape 640 × 360</button>
+          <button class="tab" data-shape="port" aria-pressed="false">
+            Portrait 360 × 640
+          </button></span
+        >
+        <span id="variants"></span>
+      </div>
+      <p class="note" id="jobnote"></p>
+      <div class="window" id="win"></div>
+    </div>
+
+    <script>
+      const I = {
+        layers: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+        mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+        music:
+          '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+        image:
+          '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 9"/>',
+        speaker: '<path d="M11 5 6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',
+        people:
+          '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>',
+        changes:
+          '<circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M6 7.5v9M8.3 6.2c4.4 1 7.1 2.9 7.6 3.9"/>',
+        spending: '<circle cx="12" cy="12" r="9"/><path d="M12 6.3v11.4"/>',
+        check: '<path d="m5 12 5 5L20 7"/>',
+        spark:
+          '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+        wand: '<path d="m15 4 5 5L9 20H4v-5L15 4Z"/>',
+        target:
+          '<rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="2"/>',
+        patch:
+          '<rect x="3" y="3" width="18" height="18" rx="2"/><rect x="10" y="10" width="8" height="8" rx="1"/>',
+        undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+      }
+      const svg = (n, s = 16) =>
+        `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`
+
+      const JOBS = [
+        {
+          id: 'make',
+          icon: 'spark',
+          title: 'Make',
+          key: '1',
+          chip: '<span class="chip ok">Take 8 chosen</span>',
+        },
+        {
+          id: 'tune',
+          icon: 'wand',
+          title: 'Fine-tune',
+          key: '2',
+          chip: '<span class="chip accent">2 new</span>',
+        },
+        {
+          id: 'patches',
+          icon: 'patch',
+          title: 'Patches',
+          key: '3',
+          chip: '<span class="chip warn">2 of 5</span>',
+        },
+        {
+          id: 'areas',
+          icon: 'target',
+          title: 'Named areas',
+          key: '4',
+          chip: '<span class="chip warn">5 of 9</span>',
+        },
+      ]
+
+      const NOTES = {
+        make: '<b>Make.</b> The picture in the game and the compared take always side by side, each with its buttons under it. <span class="kbd">←</span> <span class="kbd">→</span> step through the takes in the strip, <span class="kbd">C</span> chooses the compared take, <span class="kbd">D</span> drops it. Make 1 to 10 takes, 4 unless changed.',
+        tune: '<b>Fine-tune.</b> <span class="kbd">←</span> <span class="kbd">→</span> step through the fine-tunes, <span class="kbd">C</span> chooses, <span class="kbd">D</span> drops, <span class="kbd">S</span> flicks before / after. Make 1 to 10, 4 unless changed. <b>History</b> on the right is the undo: see the answer below the window.',
+        patches:
+          "<b>Patches.</b> Two layouts, picked by the image's shape (switch the shape above to see each). Portrait: the list of patches on the left. Landscape: the patches as a row of chips above the picture, so the picture gets the full width less the tools.",
+        areas:
+          '<b>Named areas.</b> The list is never taller than the picture and scrolls inside itself (nine areas here). What the picture shows is controlled under it: a switch per patch with a chosen take (patches with none are greyed), one click each, wrapping onto a second line when there are many. <b>Hold S</b> and the area boxes and their points are hidden, so the picture can be seen clean; let go and they come back. Try it.',
+      }
+
+      const state = { job: 'make', shape: 'land', patchLayout: 'auto', shownPatches: [0, 3] }
+      const ratio = () => (state.shape === 'land' ? 640 / 360 : 360 / 640)
+
+      function rail() {
+        const ws = [
+          ['mic', 'Narration'],
+          ['music', 'Music'],
+          ['image', 'Images', true],
+          ['speaker', 'Effects'],
+          ['layers', 'Scenes'],
+        ]
+        const pills = `<div class="pills">
+          <div class="pill"><span class="dot ok"></span>Act 1</div>
+          <div class="pill on"><span class="dot part"></span>Act 2</div>
+          <div class="pill"><span class="dot"></span>Act 3</div>
+          <div class="pill">Style</div></div>`
+        return `<aside class="rail"><div class="mark">${svg('layers', 18)}</div>
+          ${ws.map(([i, t, on]) => `<div class="r-item ${on ? 'on' : ''}">${svg(i, 20)}<span>${t}</span></div>${on ? pills : ''}`).join('')}
+          <div class="rail-foot">${[
+            ['people', 'Cast'],
+            ['changes', 'Changes'],
+            ['spending', 'Spending'],
+            ['check', 'Setup'],
+          ]
+            .map(([i, t]) => `<div class="r-item">${svg(i, 20)}<span>${t}</span></div>`)
+            .join('')}</div></aside>`
+      }
+
+      function header() {
+        const size = state.shape === 'land' ? '640 × 360' : '360 × 640'
+        return `<div class="head"><div>
+            <div class="crumbs">Images › Act 2: Under the Pier</div>
+            <h2>Harbour at dusk <span class="id mono">harbour-at-dusk · ${size}</span></h2></div></div>
+          <div class="jobs-tabs">${JOBS.map((j) => `<div class="jt ${j.id === state.job ? 'on' : ''}" data-j="${j.id}">${svg(j.icon, 15)} ${j.title} ${j.chip}<span class="k">${j.key}</span></div>`).join('')}</div>`
+      }
+
+      const slot = (cap, under, extra = '', alt = false, below = '') =>
+        `<div class="slot"><div class="frame"><div class="pic ${alt ? 'alt' : ''}">${extra}</div></div><div class="under">${cap}${under ? `<span class="btns">${under}</span>` : ''}</div>${below}</div>`
+
+      function thumbs(list) {
+        return list
+          .map(([t, cls, alt]) =>
+            cls === 'making'
+              ? `<div class="thumb making">${t}<i></i></div>`
+              : `<div class="thumb ${cls}"><div class="pic ${alt ? 'alt' : ''}"></div><span class="t">${t}</span></div>`,
+          )
+          .join('')
+      }
+      const count = (what) =>
+        `<div class="row"><span class="sel-box" title="1 to 10">4 ▾</span><span class="btn pri">Make 4 ${what}</span></div><span class="hint">1 to 10 at a time · about 1 min 20 s for 4</span>`
+
+      function jobMake() {
+        return `<div class="job">
+          <div class="stage">
+            ${slot('<span>In the game · <b>Take 8</b> <span class="muted">fine-tuned from Take 7</span></span>', '<span class="btn">Un-choose</span>')}
+            ${slot('<span>Comparing · <b>Take 5</b> <span class="chip accent">new</span></span>', '<span class="btn">Drop <span class="kbd">D</span></span><span class="btn pri">Choose <span class="kbd">C</span></span>', '', true)}
+          </div>
+          <div class="tools">
+            <h3>Prompt</h3>
+            <div class="field">The harbour at dusk, the lighthouse lit, fishing boats tied along the pier, gulls over the water.</div>
+            <label class="check"><input type="checkbox" checked /> Add Act 2's style to this image</label>
+            <details class="prompt"><summary>The whole prompt the model gets</summary></details>
+            <h3>Make takes</h3>
+            <div class="sel-box">FLUX.2 klein · about 20 s a take ▾</div>
+            ${count('takes')}
+            <label class="check" style="margin-top:auto"><input type="checkbox" checked /> What the game gets</label>
+            <span class="hint"><span class="kbd">←</span> <span class="kbd">→</span> takes · <span class="kbd">C</span> choose · <span class="kbd">D</span> drop</span>
+          </div>
+          <div class="strip"><span class="label">Takes · 8</span>${thumbs([
+            ['Take 1'],
+            ['Take 2', '', true],
+            ['Take 3'],
+            ['Take 4', '', true],
+            ['Take 5', 'on', true],
+            ['Take 6'],
+            ['Take 7 · fine-tuned'],
+            ['Take 8 · fine-tuned', 'chosen'],
+          ])}</div>
+        </div>`
+      }
+
+      function jobTune() {
+        return `<div class="job">
+          <div class="stage">
+            ${slot('<span>In the game · Take 8, with <b>Fine-tune 2</b> over it <span class="chip accent">new</span></span>', '<span class="btn">Before / after <span class="kbd">S</span></span><span class="btn">Drop <span class="kbd">D</span></span><span class="btn pri">Choose <span class="kbd">C</span></span>', '<div class="dash" style="left:52%;top:62%;width:24%;height:18%"></div>')}
+          </div>
+          <div class="tools">
+            <h3>History</h3>
+            <div class="history">
+              <div class="hs" title="Choose Take 3 again"><span class="dotc"></span><div><b>Take 3</b><span class="w">made from the prompt</span></div></div>
+              <div class="hs" title="Choose Take 7 again"><span class="dotc"></span><div><b>Take 7</b><span class="w">“Add a rowing boat by the pier”</span></div></div>
+              <div class="hs now"><span class="dotc"></span><div><b>Take 8 · in the game</b><span class="w">“Light the lighthouse lamp”</span></div></div>
+            </div>
+            <div class="row"><span class="btn">${svg('undo', 13)} Undo: back to Take 7 <span class="kbd">Z</span></span></div>
+            <h3>What to change</h3>
+            <div class="field">Add a gull on the end post of the pier.</div>
+            <span class="hint">Drag on the picture to change only part of it; with no mark the whole picture is changed.</span>
+            <div class="sel-box">FLUX.2 klein edit · about 20 s ▾</div>
+            ${count('fine-tunes')}
+          </div>
+          <div class="strip"><span class="label">Fine-tunes</span>${thumbs([
+            ['Fine-tune 1', '', true],
+            ['Fine-tune 2', 'on'],
+            ['Fine-tune 3', '', true],
+            ['Fine-tune 4 · 8 s', 'making'],
+          ])}</div>
+        </div>`
+      }
+
+      const PATCHES = [
+        ['Lamp lit', 'lamp-lit', '<span class="chip ok">Take 2 chosen</span>', 'ok'],
+        ['Rowing boat gone', 'boat-gone', '<span class="chip">3 takes</span>', '', true],
+        ['Gull on post', 'gull', '<span class="chip">no takes yet</span>', ''],
+        ['Rope pile', 'rope', '<span class="chip ok">Take 1 chosen</span>', 'ok'],
+        ['Open door', 'door', '<span class="chip">no takes yet</span>', ''],
+      ]
+
+      function patchTools() {
+        return `<div class="tools">
+            <h3>Rowing boat gone</h3>
+            <div class="field" style="min-height:52px">The rowing boat is gone; only rippled water.</div>
+            <span class="hint">Marked from the named area “Boats”. Drag on the picture to mark it yourself.</span>
+            <div class="sel-box">FLUX.2 klein edit · about 20 s ▾</div>
+            <div class="row"><span class="sel-box">2 ▾</span><span class="btn pri">Make 2 takes</span></div>
+            <span class="hint" style="margin-top:auto"><span class="kbd">←</span> <span class="kbd">→</span> takes · <span class="kbd">C</span> choose · <span class="kbd">D</span> drop · <span class="kbd">S</span> patch off</span>
+          </div>`
+      }
+      function patchStage() {
+        return `<div class="stage">${slot('<span>Take 8 with “Rowing boat gone” <b>Take 2</b> over it</span>', '<span class="btn">Patch off <span class="kbd">S</span></span><span class="btn">Drop <span class="kbd">D</span></span><span class="btn pri">Choose <span class="kbd">C</span></span>', '<div class="dash" style="left:58%;top:62%;width:20%;height:16%"></div>')}</div>`
+      }
+      const patchStrip = () =>
+        `<div class="strip"><span class="label">Takes</span>${thumbs([
+          ['Take 1', '', true],
+          ['Take 2', 'on'],
+          ['Take 3', '', true],
+        ])}</div>`
+
+      function jobPatches() {
+        const wide =
+          state.patchLayout === 'chips' || (state.patchLayout === 'auto' && state.shape === 'land')
+        if (wide)
+          return `<div class="job wide">
+            <div class="chipbar"><span class="label" style="margin-right:4px">Patches · 2 of 5 chosen</span>
+              ${PATCHES.map(([t, id, c, tone, on]) => `<div class="pchip ${on ? 'on' : ''}" title="${id}"><span class="dot ${tone}"></span>${t}</div>`).join('')}
+            </div>
+            ${patchStage()}${patchTools()}${patchStrip()}
+          </div>`
+        return `<div class="job lefty">
+          <div class="side-list">
+            <h3>Patches · 2 of 5 chosen</h3>
+            ${PATCHES.map(([t, id, c, tone, on]) => `<div class="li ${on ? 'on' : ''}"><div class="top"><span class="grow">${t}</span></div><span class="sub mono">${id}</span>${c}</div>`).join('')}
+          </div>
+          ${patchStage()}${patchTools()}${patchStrip()}
+        </div>`
+      }
+
+      function jobAreas() {
+        const areas = [
+          ['Lighthouse', 'lighthouse', true],
+          ['Pier', 'pier', true],
+          ['Boats', 'boats', true, true],
+          ['Gull', 'gull', false],
+          ['Rope pile', 'rope', true],
+          ['Door', 'door', true],
+          ['Barrels', 'barrels', false],
+          ['Nets', 'nets', false],
+          ['Bell', 'bell', false],
+        ]
+        const shown = (i) => state.shownPatches.includes(i)
+        const toggles = `<div class="toggles"><span class="label">Patches on the picture</span>
+            ${PATCHES.map(([t, id, c, tone], i) =>
+              tone === 'ok'
+                ? `<span class="tg ${shown(i) ? 'on' : ''}" data-tg="${i}"><span class="sw ${shown(i) ? '' : 'off'}"></span>${t}</span>`
+                : `<span class="tg off" title="No take chosen yet">${t}</span>`,
+            ).join('')}
+            <span class="grow"></span><span class="hint">Hold <span class="kbd">S</span> to hide the areas</span></div>`
+        return `<div class="job" style="grid-template-rows:minmax(0,1fr)">
+          <div class="stage">
+            ${slot(
+              '<span>Take 8 · drag on the picture to place “Boats”</span>',
+              '',
+              `
+              ${shown(0) ? '<div class="ov" style="left:14%;top:12%;width:14%;height:12%" title="Lamp lit"></div>' : ''}
+              ${shown(3) ? '<div class="ov" style="left:30%;top:68%;width:10%;height:10%" title="Rope pile"></div>' : ''}
+              <div class="box" style="left:16%;top:18%;width:9%;height:36%"><span>Lighthouse</span></div>
+              <div class="box" style="left:48%;top:56%;width:46%;height:10%"><span>Pier</span></div>
+              <div class="box sel" style="left:55%;top:70%;width:30%;height:16%"><span>Boats</span><i class="pt"></i></div>
+              <div class="box" style="left:28%;top:66%;width:14%;height:14%"><span>Rope pile</span></div>
+              <div class="box" style="left:4%;top:60%;width:8%;height:18%"><span>Door</span></div>`,
+              false,
+              toggles,
+            )}
+          </div>
+          <div class="side-list capped" id="arealist">
+            <h3>Named areas · 5 of 9 placed</h3>
+            <div class="scroll">
+            ${areas.map(([t, id, placed, on]) => `<div class="li ${on ? 'on' : ''}"><div class="top"><span class="grow">${t}</span>${placed ? '<span class="chip ok">Placed</span>' : '<span class="chip">To place</span>'}</div><span class="sub mono">${id}</span>${on ? '<div class="row" style="margin-top:4px"><span class="btn">Clear</span><span class="hint">Click inside to set its point</span></div>' : ''}</div>`).join('')}
+            </div>
+          </div>
+        </div>`
+      }
+
+      const BODY = { make: jobMake, tune: jobTune, areas: jobAreas, patches: jobPatches }
+
+      function fit() {
+        const r = ratio()
+        document.querySelectorAll('.slot .frame').forEach((f) => {
+          const pic = f.querySelector('.pic')
+          const W = f.clientWidth
+          const H = f.clientHeight
+          let w = W
+          let h = w / r
+          if (h > H) ((h = H), (w = h * r))
+          pic.style.width = Math.floor(w) + 'px'
+          pic.style.height = Math.floor(h) + 'px'
+        })
+        const list = document.getElementById('arealist')
+        const stage = document.querySelector('.stage')
+        if (list && stage) list.style.maxHeight = stage.clientHeight + 'px'
+      }
+
+      function render() {
+        document.getElementById('jobnote').innerHTML = NOTES[state.job]
+        document.getElementById('variants').innerHTML =
+          state.job === 'patches'
+            ? `<span class="label">Patches layout</span> ${[
+                ['auto', 'By shape'],
+                ['list', 'List left'],
+                ['chips', 'Chips on top'],
+              ]
+                .map(
+                  ([v, t]) =>
+                    `<button class="tab" data-pl="${v}" aria-pressed="${state.patchLayout === v}">${t}</button>`,
+                )
+                .join(' ')}`
+            : ''
+        document.getElementById('win').innerHTML =
+          rail() + `<main class="content">${header()}${BODY[state.job]()}</main>`
+        document
+          .querySelectorAll('[data-job]')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.job === state.job)))
+        document
+          .querySelectorAll('[data-shape]')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.shape === state.shape)))
+        fit()
+      }
+
+      document.addEventListener('click', (e) => {
+        const j = e.target.closest('[data-j],[data-job]')
+        if (j) state.job = j.dataset.j || j.dataset.job
+        const s = e.target.closest('[data-shape]')
+        if (s) state.shape = s.dataset.shape
+        const pl = e.target.closest('[data-pl]')
+        if (pl) state.patchLayout = pl.dataset.pl
+        const tg = e.target.closest('[data-tg]')
+        if (tg) {
+          const i = Number(tg.dataset.tg)
+          state.shownPatches = state.shownPatches.includes(i)
+            ? state.shownPatches.filter((x) => x !== i)
+            : [...state.shownPatches, i]
+        }
+        if (j || s || pl || e.target.closest('#win')) render()
+      })
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 's' && state.job === 'areas')
+          document.getElementById('win').classList.add('peek')
+        const j = JOBS.find((x) => x.key === e.key)
+        if (j) ((state.job = j.id), render())
+      })
+      document.addEventListener('keyup', (e) => {
+        if (e.key === 's') document.getElementById('win').classList.remove('peek')
+      })
+      window.addEventListener('resize', fit)
+      render()
+    </script>
+  </body>
+</html>
