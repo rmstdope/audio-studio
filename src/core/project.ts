@@ -36,14 +36,13 @@ export const STUDIO_DIR = 'content-studio'
 /** What the studio keeps for itself on this machine, never committed: takes, notes, settings. */
 export const CACHE_DIR = `${STUDIO_DIR}/cache`
 
-/** Where the cache was before format version 2; never read, only reported. */
-export const OLD_CACHE_DIR = '.content-studio'
-
-/** The project file's name before the rename to Content Studio; never read, only reported. */
-export const OLD_PROJECT_FILE = 'audio-studio.json'
-
-/** The working folder's name before the rename; never read, only reported. */
-export const OLD_STATE_DIR = '.audio-studio'
+/** What the terminal says when no project file is found from `cwd` upwards. */
+export function noProjectMessage(cwd: string): string {
+  return (
+    `No content-studio.json in ${cwd} or any folder above it.\n` +
+    'Run content-studio from the game repository that has one, or pass --project <file>.'
+  )
+}
 
 /**
  * A model for a stage: any whose price the studio knows, so a plan can say what it costs. The

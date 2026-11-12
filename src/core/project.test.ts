@@ -12,6 +12,7 @@ import {
   MUSIC_LOCK_FILE,
   ProjectSchema,
   narrationFile,
+  noProjectMessage,
   parseProject,
   partPathFor,
   problemsFrom,
@@ -29,6 +30,15 @@ function problems(value: unknown) {
   if (result.success) throw new Error('expected the project to be invalid')
   return problemsFrom('content-studio.json', result.error)
 }
+
+describe('noProjectMessage', () => {
+  it('names the folder searched and what to do', () => {
+    expect(noProjectMessage('/games/x')).toBe(
+      'No content-studio.json in /games/x or any folder above it.\n' +
+        'Run content-studio from the game repository that has one, or pass --project <file>.',
+    )
+  })
+})
 
 describe('the format version', () => {
   const refusal = {

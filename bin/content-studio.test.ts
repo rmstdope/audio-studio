@@ -22,56 +22,7 @@ async function run(cwd: string, ...args: string[]) {
   return { stdout, stderr, code }
 }
 
-describe('content-studio on a game still set up for Audio Studio', () => {
-  it('stops with all three renames, no server', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson(), '.audio-studio/x.json': {} })
-    const { stdout, stderr, code } = await run(root)
-    expect(code).toBe(1)
-    expect(stdout).toBe('')
-    expect(stderr).toBe(
-      [
-        'This game is set up for Audio Studio, which is now Content Studio.',
-        'Rename these, then run content-studio again:',
-        '  git mv audio-studio.json content-studio.json',
-        '  mkdir -p content-studio && mv .audio-studio content-studio/cache',
-        '  in .gitignore, remove .audio-studio/',
-        '',
-      ].join('\n'),
-    )
-  })
-
-  it('stops with the both-files message when both project files exist', async () => {
-    const root = tempRepo({
-      'audio-studio.json': projectJson(),
-      'content-studio.json': projectJson(),
-    })
-    const { stdout, stderr, code } = await run(root)
-    expect(code).toBe(1)
-    expect(stdout).toBe('')
-    expect(stderr).toBe(
-      'This game has both audio-studio.json and content-studio.json.\n' +
-        'Keep one, named content-studio.json, then run content-studio again.\n',
-    )
-  })
-
-  it('stops with the file rename alone', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
-    const { stdout, stderr, code } = await run(root)
-    expect(code).toBe(1)
-    expect(stdout).toBe('')
-    expect(stderr).toContain('Rename this, then run content-studio again:')
-    expect(stderr).not.toContain('mv .audio-studio')
-  })
-
-  it('stops with the folder rename alone, even with --project', async () => {
-    const root = tempRepo({ 'content-studio.json': projectJson(), '.audio-studio/x.json': {} })
-    const { stdout, stderr, code } = await run(root, '--project', join(root, 'content-studio.json'))
-    expect(code).toBe(1)
-    expect(stdout).toBe('')
-    expect(stderr).not.toContain('git mv')
-    expect(stderr).toContain('  mkdir -p content-studio && mv .audio-studio content-studio/cache')
-  })
-
+describe('content-studio without a project file', () => {
   it('says so when there is no project file', async () => {
     const root = tempRepo({ 'README.md': 'x' })
     const { stdout, stderr, code } = await run(root)
@@ -84,7 +35,7 @@ describe('content-studio on a game still set up for Audio Studio', () => {
   })
 })
 
-describe('content-studio on a game that is renamed', () => {
+describe('content-studio on a game', () => {
   it('greets with Content Studio and the project file, and serves', async () => {
     const root = tempRepo({ 'content-studio.json': projectJson() })
     const child = Bun.spawn([process.execPath, CLI, '--no-open'], {

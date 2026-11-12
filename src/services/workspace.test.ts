@@ -3,8 +3,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { narrationInLanguages, projectJson, tempRepo } from '../../test/helpers'
 import { clipInputs, fingerprint } from '../core/fingerprint'
-import { ProjectSchema } from '../core/project'
-import { noProjectMessage, renameNotice } from '../core/renames'
+import { ProjectSchema, noProjectMessage } from '../core/project'
 import {
   adoptPart,
   clipFile,
@@ -34,96 +33,21 @@ describe('locateProject', () => {
     expect(locateProject(root)).toEqual({ ok: false, message: noProjectMessage(root) })
   })
 
-  it('opens when everything is renamed', () => {
+  it('passes over a folder named like the project file, to the project file above it', () => {
     const root = tempRepo({
       'content-studio.json': projectJson(),
-      'content-studio/cache/x.json': {},
+      'game/content-studio.json/x': 'x',
     })
-    expect(locateProject(root)).toEqual({ ok: true, file: join(root, 'content-studio.json') })
-  })
-
-  it('stops with every rename left when the file and the folder are old', () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson(), '.audio-studio/x.json': {} })
-    expect(locateProject(root)).toEqual({
-      ok: false,
-      message: renameNotice({ oldFile: true, newFile: false, oldFolder: true })!,
+    expect(locateProject(join(root, 'game'))).toEqual({
+      ok: true,
+      file: join(root, 'content-studio.json'),
     })
   })
 
-  it('stops with the file rename alone when only the file is old, from a folder below', () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
-    const deep = join(root, 'web')
-    mkdirSync(deep, { recursive: true })
-    expect(locateProject(deep)).toEqual({
-      ok: false,
-      message: renameNotice({ oldFile: true, newFile: false, oldFolder: false })!,
-    })
-  })
-
-  it('stops with the folder rename alone when only the folder is old', () => {
-    const root = tempRepo({ 'content-studio.json': projectJson(), '.audio-studio/x.json': {} })
-    expect(locateProject(root)).toEqual({
-      ok: false,
-      message: renameNotice({ oldFile: false, newFile: true, oldFolder: true })!,
-    })
-  })
-
-  it('stops while the cache is still in .content-studio, saying how to move it', () => {
-    const root = tempRepo({ 'content-studio.json': projectJson(), '.content-studio/x.json': {} })
-    expect(locateProject(root)).toEqual({
-      ok: false,
-      message: [
-        'This game’s studio cache is still in .content-studio/, where it was before version 2.',
-        'Move it, then run content-studio again:',
-        '  mkdir -p content-studio && mv .content-studio content-studio/cache',
-      ].join('\n'),
-    })
-    expect(locateProject(root, join(root, 'content-studio.json')).ok).toBe(false)
-  })
-
-  it('stops when both caches are there, asking to merge or remove one by hand', () => {
-    const root = tempRepo({
-      'content-studio.json': projectJson(),
-      '.content-studio/x.json': {},
-      'content-studio/cache/y.json': {},
-    })
-    expect(locateProject(root)).toEqual({
-      ok: false,
-      message: [
-        'This game has both .content-studio/ and content-studio/cache/.',
-        'Merge them by hand, or remove one, then run content-studio again.',
-      ].join('\n'),
-    })
-  })
-
-  it('stops with the both-files message when both project files exist', () => {
-    const root = tempRepo({
-      'audio-studio.json': projectJson(),
-      'content-studio.json': projectJson(),
-    })
-    const found = locateProject(root)
-    expect(found.ok).toBe(false)
-    expect(found.ok ? '' : found.message).toContain('This game has both')
-  })
-
-  it('does not count a leftover .audio-studio that is a file, or a folder named like a project file', () => {
-    const root = tempRepo({
-      'content-studio.json': projectJson(),
-      '.audio-studio': 'x',
-      'audio-studio.json/x': 'x',
-    })
-    expect(locateProject(root)).toEqual({ ok: true, file: join(root, 'content-studio.json') })
-  })
-
-  it('uses the named file, and still checks the old folder in its folder', () => {
+  it('uses the named file as it is', () => {
     const root = tempRepo({ 'game/other.json': projectJson() })
     const file = join(root, 'game', 'other.json')
     expect(locateProject('/', file)).toEqual({ ok: true, file })
-    mkdirSync(join(root, 'game', '.audio-studio'))
-    expect(locateProject('/', file)).toEqual({
-      ok: false,
-      message: renameNotice({ oldFile: false, newFile: true, oldFolder: true })!,
-    })
   })
 })
 
