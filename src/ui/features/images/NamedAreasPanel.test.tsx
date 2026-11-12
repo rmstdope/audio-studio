@@ -253,6 +253,20 @@ describe('the named areas panel', () => {
       const { stage } = await render([area('a')])
       expect(stage!.style.getPropertyValue('--picture-ratio')).toBe('1.6')
     })
+
+    it('fits a portrait picture to the window’s height, so the caption, switches and S hint stay in view (as-dab0)', async () => {
+      const { stage } = await render([area('a')])
+      const fitted = /: min\(100%, calc\(\(100vh - 320px\) \* var\(--picture-ratio\)\)\)$/
+      expect(valuesInEveryWindow(stage!, 'width').at(-1)).toMatch(
+        new RegExp(`^\\.named-area-stage${fitted.source}`),
+      )
+      const empty = (
+        await render([area('a')], { answer: () => new Promise<Response>(() => {}) })
+      ).host.querySelector<HTMLElement>('.named-area-empty')!
+      expect(valuesInEveryWindow(empty, 'width').at(-1)).toMatch(
+        new RegExp(`^\\.named-area-empty${fitted.source}`),
+      )
+    })
   })
 
   describe('without a picture to mark on', () => {
