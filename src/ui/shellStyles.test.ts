@@ -42,6 +42,38 @@ describe('the room the shell leaves the pages', () => {
     expect(dot).toContain('flex-shrink: 0')
   })
 
+  // The Stingers pill is the widest: at verification its dot, gap and label ran 50px across while
+  // its border left only 45px inside, so the dot sat on the left border and the s on the right
+  // (as-1iaf). Every pill's room is what the rail, its padding, the pills' padding and the pill's
+  // own border and padding leave of the 72px.
+  it('leaves the widest rail pill, Stingers, room inside its border for its dot and label', () => {
+    /** The pixel numbers of `property` in `declarations`, as written (`0` when it is not). */
+    const lengths = (declarations: string, property: string): number[] => {
+      const value = new RegExp(`(?:^|[;\\s{])${property}:\\s*([^;]+);`).exec(declarations)?.[1]
+      return (value ?? '0')
+        .trim()
+        .split(/\s+/)
+        .map((part) => parseFloat(part) || 0)
+    }
+    /** The left-and-right padding of a `padding` shorthand of one to four lengths. */
+    const sidePadding = (declarations: string): number => {
+      const [top = 0, right = top, , left = right] = lengths(declarations, 'padding')
+      return right + left
+    }
+    /** A rule outside any media query, its selector alone at the start of a line. */
+    const top = (selector: string): string => rule(css, `\n${selector}`)
+    const pill = top('.rail-pill')
+    const inside =
+      72 -
+      lengths(top('.sidebar'), 'border-right')[0]! -
+      sidePadding(top('.sidebar-rail')) -
+      sidePadding(top('.rail-pills')) -
+      2 * lengths(pill, 'border')[0]! -
+      sidePadding(pill)
+    const content = 6 + lengths(pill, 'gap')[0]! + 40 // dot, gap, "Stingers" at 10.5px as measured
+    expect(inside - content).toBeGreaterThanOrEqual(2 * 2) // at least 2px clear at each side
+  })
+
   // Folded, the rail is a full-height column on the left at every width (as-zlty).
   it('keeps the folded rail a sticky full-height column beside the page at any width', () => {
     const rail = rule(css, '.sidebar.sidebar-rail')
