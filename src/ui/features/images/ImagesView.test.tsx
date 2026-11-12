@@ -1262,7 +1262,7 @@ describe('the named areas the game declares', () => {
       'Patches the game asks for',
       'Named areas',
     ])
-    expect(text(page.querySelector('.named-areas-head'))).toBe('Named areas0 of 2 placed')
+    expect(text(page.querySelector('.named-areas-head'))).toBe('Named areas · 0 of 2 placed')
     expect([...page.querySelectorAll('.named-area')].map((r) => text(r))).toEqual([
       'FountainfountainTo place',
       'Old noticeold-noticeTo place',

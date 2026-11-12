@@ -11,6 +11,7 @@ const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { NamedAreasPanel } = await import('./NamedAreasPanel')
+const { JobOpenProvider } = await import('./ImageJobTabs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -82,6 +83,8 @@ interface Options {
   /** Patches the game lists on the image, with their takes on its chosen take. */
   patches?: ListedPatch[]
   chosenTake?: number | null
+  /** Whether the panel's tab is the open one (default true). */
+  open?: boolean
 }
 
 /** Renders the panel for an image of 320 x 200 with these areas; gives what was saved. */
@@ -102,6 +105,7 @@ async function render(areas: AreaRow[], options: Options = {}) {
   document.body.append(host)
   const root = createRoot(host)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  let open = options.open ?? true
   const draw = async (now: AreaRow[], chosenTake: number | null) => {
     const row = {
       id: 'inn',
@@ -113,7 +117,11 @@ async function render(areas: AreaRow[], options: Options = {}) {
     } as ImageRow
     await act(async () => {
       root.render(
-        createElement(QueryClientProvider, { client }, createElement(NamedAreasPanel, { row })),
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(JobOpenProvider, { value: open }, createElement(NamedAreasPanel, { row })),
+        ),
       )
     })
   }
@@ -127,7 +135,11 @@ async function render(areas: AreaRow[], options: Options = {}) {
   if (stage) {
     stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 200 }) as DOMRect
   }
-  return { host, puts, stage, draw }
+  const setOpen = async (now: boolean) => {
+    open = now
+    await draw(areas, options.chosenTake ?? null)
+  }
+  return { host, puts, stage, draw, setOpen }
 }
 
 /** Lets pending requests, state updates and animation frames run. */
@@ -182,10 +194,8 @@ describe('the named areas panel', () => {
   it('opens with its heading, the count and the line, then a row per area in order', async () => {
     const { host } = await render([area('b'), area('a')])
     expect(host.querySelector('h2')!.textContent).toBe('Named areas')
-    expect(host.querySelector('.named-areas-head')!.textContent).toBe('Named areas0 of 2 placed')
-    expect(host.querySelector('.named-areas-intro')!.textContent).toBe(
-      'The parts of this picture the game names, so that a player can click them.',
-    )
+    expect(host.querySelector('.named-areas-head')!.textContent).toBe('Named areas · 0 of 2 placed')
+    expect(host.querySelector('.named-areas-intro')).toBeNull()
     expect(rows(host).map((r) => r.querySelector('b')!.textContent)).toEqual([
       'Title of b',
       'Title of a',
@@ -220,7 +230,7 @@ describe('the named areas panel', () => {
         area('c'),
       ])
       expect(selectedIds(host)).toEqual([1])
-      expect(line(host)).toBe('Drag over the picture to mark “Old notice”.')
+      expect(line(host)).toBe('Take 2 · drag on the picture to place “Old notice”')
       expect(host.querySelector('.named-area-clear')).toBeNull()
     })
 
@@ -228,7 +238,7 @@ describe('the named areas panel', () => {
       const box = { x: 10, y: 10, width: 20, height: 20 }
       const { host } = await render([placedAt('a', box), placedAt('b', box)])
       expect(selectedIds(host)).toEqual([])
-      expect(line(host)).toBe('Press an area in the list or on the picture to change it.')
+      expect(line(host)).toBe('Take 2 · press an area in the list or on the picture to change it.')
     })
 
     it('shows the chosen take’s picture in the shape of the image', async () => {
@@ -311,7 +321,7 @@ describe('the named areas panel', () => {
       const { host } = await render([area('a'), placedAt('b', box, { title: 'Well' })])
       await act(async () => mainOf(host, 1).click())
       expect(selectedIds(host)).toEqual([1])
-      expect(line(host)).toContain('Drag the box to move it')
+      expect(line(host)).toContain('Take 2 · drag the box to move it')
       expect(rows(host)[1]!.querySelector('.named-area-clear')!.textContent).toBe('Clear')
       await act(async () => mainOf(host, 0).click())
       expect(selectedIds(host)).toEqual([0])
@@ -501,7 +511,7 @@ describe('the named areas panel', () => {
       expect(selectedIds(host)).toEqual([0])
       expect(host.querySelector('.named-area-clear')).toBeNull()
       expect(document.activeElement).toBe(mainOf(host, 0))
-      expect(line(host)).toContain('Drag over the picture to mark')
+      expect(line(host)).toContain('drag on the picture to place')
     })
 
     it('clears with the Delete key, focus staying on the row', async () => {
@@ -670,8 +680,9 @@ describe('the named areas panel', () => {
 
     it('has no switches and no heading without chosen patches', async () => {
       const { host } = await render([area('a')])
-      expect(host.textContent).not.toContain('Show on the picture:')
+      expect(host.textContent).not.toContain('Patches on the picture')
       expect(host.querySelector('input[type=checkbox]')).toBeNull()
+      expect(host.querySelector('.named-area-hold')!.textContent).toBe('Hold S to hide the areas')
     })
 
     it('has a switch only for a patch with a chosen take, laying that take over', async () => {
@@ -691,6 +702,11 @@ describe('the named areas panel', () => {
       })
       const labels = [...host.querySelectorAll('.named-area-switch')].map((l) => l.textContent)
       expect(labels).toEqual(['Bread taken'])
+      const greyed = [...host.querySelectorAll('.named-area-switch-off')]
+      expect(greyed.map((l) => [l.textContent, l.getAttribute('title')])).toEqual([
+        ['Lamp lit', 'No take chosen yet'],
+        ['No takes', 'No take chosen yet'],
+      ])
       await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
       expect(host.querySelector<HTMLImageElement>('img.named-area-patch')!.src).toContain(
         '/api/images/inn/patches/p1/takes/3',
@@ -717,7 +733,10 @@ describe('the named areas panel', () => {
     it('has a switch per patch, all off, that lays the patch over the picture', async () => {
       const { host } = await render([area('a'), area('b')], { patches })
       expect(host.querySelector('.named-area-switches')!.textContent).toContain(
-        'Show on the picture:',
+        'Patches on the picture',
+      )
+      expect(host.querySelector('.named-area-switches')!.textContent).toEndWith(
+        'Hold S to hide the areas',
       )
       const switches = [...host.querySelectorAll<HTMLInputElement>('input[type=checkbox]')]
       expect(switches.map((s) => s.checked)).toEqual([false, false])
@@ -726,6 +745,96 @@ describe('the named areas panel', () => {
       expect(host.querySelector<HTMLImageElement>('img.named-area-patch')!.src).toContain(
         '/api/images/inn/patches/p2/takes/7',
       )
+    })
+
+    it('hides the boxes while S is held and shows them again on letting go', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([placedAt('a', box), area('b')], { patches })
+      await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
+      expect(boxes(host)).toHaveLength(1)
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }))
+      })
+      expect(boxes(host)).toHaveLength(0)
+      expect(host.querySelector('[data-point-of]')).toBeNull()
+      expect(host.querySelectorAll('img.named-area-patch').length).toBe(1)
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 's', bubbles: true }))
+      })
+      expect(boxes(host)).toHaveLength(1)
+    })
+
+    it('shows the boxes again when the window loses focus while S is held', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([placedAt('a', box)])
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', bubbles: true }))
+      })
+      expect(boxes(host)).toHaveLength(0)
+      await act(async () => {
+        window.dispatchEvent(new Event('blur'))
+      })
+      expect(boxes(host)).toHaveLength(1)
+    })
+
+    it('ignores S while typing in a field and with Command, Control or Option held', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([placedAt('a', box)])
+      const field = document.createElement('input')
+      document.body.append(field)
+      cleanups.push(() => field.remove())
+      await act(async () => {
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }))
+      })
+      expect(boxes(host)).toHaveLength(1)
+      for (const mod of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }]) {
+        await act(async () => {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, ...mod }))
+        })
+        expect(boxes(host)).toHaveLength(1)
+      }
+    })
+
+    it('ignores S while its tab is not open, and shows the boxes again when the tab is left', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const closed = await render([placedAt('a', box)], { open: false })
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }))
+      })
+      expect(boxes(closed.host)).toHaveLength(1)
+      const { host, setOpen } = await render([placedAt('a', box)])
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }))
+      })
+      expect(boxes(host)).toHaveLength(0)
+      await setOpen(false)
+      expect(boxes(host)).toHaveLength(1)
+    })
+
+    it('lets go of S on key-up even from inside a field', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host } = await render([placedAt('a', box)])
+      const field = document.createElement('input')
+      document.body.append(field)
+      cleanups.push(() => field.remove())
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }))
+      })
+      await act(async () => {
+        field.dispatchEvent(new KeyboardEvent('keyup', { key: 's', bubbles: true }))
+      })
+      expect(boxes(host)).toHaveLength(1)
+    })
+
+    it('does not draw, select or nudge unseen while S is held', async () => {
+      const box = { x: 10, y: 10, width: 20, height: 20 }
+      const { host, stage, puts } = await render([placedAt('a', box), area('b')])
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }))
+      })
+      await drag(stage!, [100, 100], [150, 150])
+      await press(mainOf(host, 0), 'ArrowRight')
+      expect(puts).toEqual([])
     })
 
     it('stays as left while moving between areas', async () => {
@@ -758,18 +867,11 @@ describe('areas to place again', () => {
     expect(line.nextElementSibling?.classList.contains('named-area-list')).toBe(true)
     // The picture is clean: only the box of the take in the game shows.
     expect(boxes(host)).toHaveLength(1)
-    // The body's class gives the line its own grid cell above the list, in the right column.
-    expect(host.querySelector('.named-areas-body')?.classList.contains('has-place-again')).toBe(
-      true,
-    )
   })
 
   it('has no line while nothing reads Place again', async () => {
     const { host } = await render([placedAt('a', box), area('b')], { chosenTake: 4 })
     expect(note(host)).toBeUndefined()
-    expect(host.querySelector('.named-areas-body')?.classList.contains('has-place-again')).toBe(
-      false,
-    )
   })
 
   it('says the singular words for one, and names every earlier take', async () => {
@@ -1020,7 +1122,7 @@ describe('the point of a box', () => {
   it('says how to choose where What’s there marks the area', async () => {
     const { host } = await setup()
     expect(line(host)).toBe(
-      'Drag the box to move it, or its corners and sides to resize it. Drag the point to choose where What’s there marks it. Arrow keys move the box; with Shift they resize it; with Alt they move the point.',
+      'Take 2 · drag the box to move it, or its corners and sides to resize it. Drag the point to choose where What’s there marks it. Arrow keys move the box; with Shift they resize it; with Alt they move the point.',
     )
   })
 })

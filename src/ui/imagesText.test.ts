@@ -9,6 +9,7 @@ import {
   bringFailureText,
   bringingText,
   chosenLine,
+  areaCaptionText,
   areasCountText,
   areasToPlaceText,
   disagreeText,
@@ -190,6 +191,17 @@ describe('the words of an image several acts list', () => {
   it('says named areas among the things the lists disagree about', () => {
     expect(disagreeText(['Act I', 'Act III'], ['words', 'named areas'])).toContain(
       'give it different words and named areas.',
+    )
+  })
+  it('captions the picture of the named areas with its take and what can be done', () => {
+    expect(areaCaptionText(8, { title: 'Boats', placed: false })).toBe(
+      'Take 8 · drag on the picture to place “Boats”',
+    )
+    expect(areaCaptionText(8, { title: 'Boats', placed: true })).toStartWith(
+      'Take 8 · drag the box to move it',
+    )
+    expect(areaCaptionText(8, null)).toBe(
+      'Take 8 · press an area in the list or on the picture to change it.',
     )
   })
   it('counts the named areas placed and left to place', () => {

@@ -103,14 +103,21 @@ describe('a named areas picture taller than a narrow window (as-e39)', () => {
   })
 })
 
-describe('the Place again line above the named areas list (as-7dz)', () => {
-  it('stays at the list, the picture’s spare height going to the list’s row', () => {
-    expect(rule('.named-areas-body.has-place-again')).toMatch(/grid-template-rows:\s*auto 1fr/)
+describe('the list beside the named areas picture (as-kw3x.6)', () => {
+  const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
+  const block = narrow.slice(0, narrow.indexOf('\n}\n'))
+
+  it('is never taller than the picture, and scrolls inside itself', () => {
+    expect(rule('.named-areas-side')).toMatch(/contain:\s*size/)
+    expect(rule('.named-areas-side')).toMatch(/align-self:\s*stretch/)
+    expect(rule('.named-area-list')).toMatch(/overflow-y:\s*auto/)
+    expect(rule('.named-area-list')).toMatch(/flex:\s*1 1 0/)
+    // Never squeezed away by a wide, short picture: a few rows stay in reach.
+    expect(rule('.named-area-list')).toMatch(/min-height:\s*7rem/)
   })
 
-  it('leaves the rows to their content once picture, line and list are stacked', () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
-    const block = narrow.slice(0, narrow.indexOf('\n}\n'))
-    expect(rule('.named-areas-body.has-place-again', block)).toMatch(/grid-template-rows:\s*none/)
+  it('takes the height of its rows once stacked under the picture, capped by the window', () => {
+    expect(rule('.named-areas-side', block)).toMatch(/contain:\s*none/)
+    expect(rule('.named-area-list', block)).toMatch(/max-height:\s*50vh/)
   })
 })

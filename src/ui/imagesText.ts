@@ -336,6 +336,18 @@ export function areaLineText(selected: { title: string; placed: boolean } | null
     : `Drag over the picture to mark “${selected.title}”.`
 }
 
+/** The caption under the picture of the Named areas panel: the take shown and what can be done now. */
+export function areaCaptionText(
+  take: number,
+  selected: { title: string; placed: boolean } | null,
+): string {
+  if (selected && !selected.placed) {
+    return `Take ${take} · drag on the picture to place “${selected.title}”`
+  }
+  const line = areaLineText(selected)
+  return `Take ${take} · ${line.charAt(0).toLowerCase()}${line.slice(1)}`
+}
+
 /** The red line when a box could not be saved: the area's title and the reason. */
 export function areaSaveFailedText(title: string, reason: string): string {
   return `“${title}” could not be saved: ${reason.replace(/\.$/, '')}.`

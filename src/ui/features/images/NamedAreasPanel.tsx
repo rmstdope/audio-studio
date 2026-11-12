@@ -28,7 +28,7 @@ import {
   type Point,
 } from '../../imageAreaBox'
 import {
-  areaLineText,
+  areaCaptionText,
   areaRowWhy,
   areaSaveFailedText,
   areaTagText,
@@ -36,26 +36,34 @@ import {
   placeAgainLine,
 } from '../../imagesText'
 
-/** A patch with a chosen take on the image's take, which can be laid over the picture for looking. */
-interface ChosenPatch {
+/** A patch the game asks for, which can be laid over the picture for looking when it has a chosen take. */
+interface ListedPatch {
   id: string
   title: string
-  /** Where the patch's picture is. */
-  src: string
+  /** Where the chosen take's picture is; null while the patch has no chosen take. */
+  src: string | null
 }
 
-/** The patches that have a chosen take, in the game's order, with where each take's picture is. */
-function chosenPatchesOf(
-  row: ImageRow,
-  view: ReturnType<typeof useImagePatches>['data'],
-): ChosenPatch[] {
+/** The patches of the image in the game's order, with where each chosen take's picture is. */
+function patchesOf(row: ImageRow, view: ReturnType<typeof useImagePatches>['data']): ListedPatch[] {
   if (!view || !('patches' in view)) return []
-  return row.patches.flatMap((patch) => {
+  return row.patches.map((patch) => {
     const take = view.patches.find((p) => p.id === patch.id)?.takes.find((t) => t.chosen)
-    if (!take) return []
-    const src = `/api/images/${encodeURIComponent(row.id)}/patches/${encodeURIComponent(patch.id)}/takes/${take.n}`
-    return [{ id: patch.id, title: patch.title, src }]
+    const src = take
+      ? `/api/images/${encodeURIComponent(row.id)}/patches/${encodeURIComponent(patch.id)}/takes/${take.n}`
+      : null
+    return { id: patch.id, title: patch.title, src }
   })
+}
+
+/** Whether a key is pressed in a field or menu, where the letters are the person's typing. */
+function typingIn(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    !!target.closest(
+      'textarea, select, input:not([type=checkbox]):not([type=radio]):not([type=button]), [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="listbox"]',
+    )
+  )
 }
 
 /** How far, in screen pixels, a press may move and still be a click. */
@@ -130,7 +138,7 @@ function placedStyle(box: AreaBox, row: { width: number; height: number }) {
  */
 export function NamedAreasPanel({ row }: { row: ImageRow }) {
   const picture = useImagePatches(row.id).data
-  const chosenPatches = chosenPatchesOf(row, picture)
+  const patches = patchesOf(row, picture)
   const save = useSetImageAreaBox(row.id)
   const [selected, select] = useState<string | null>(
     () => row.areas.find((area) => !area.placed)?.id ?? null,
@@ -175,6 +183,33 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
   const jobOpen = useJobOpen()
   useEffect(() => {
     if (jobOpen) remeasure((n) => n + 1)
+  }, [jobOpen])
+
+  // Holding S shows the picture clean: the boxes, their names and points are hidden meanwhile.
+  const [clean, setClean] = useState(false)
+  useEffect(() => {
+    if (!jobOpen) {
+      setClean(false)
+      return
+    }
+    const hold = (event: globalThis.KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 's') return
+      if (event.metaKey || event.ctrlKey || event.altKey || typingIn(event.target)) return
+      setClean(true)
+      setGesture(null)
+    }
+    const release = (event: globalThis.KeyboardEvent) => {
+      if (event.key.toLowerCase() === 's') setClean(false)
+    }
+    const lose = () => setClean(false)
+    window.addEventListener('keydown', hold)
+    window.addEventListener('keyup', release)
+    window.addEventListener('blur', lose)
+    return () => {
+      window.removeEventListener('keydown', hold)
+      window.removeEventListener('keyup', release)
+      window.removeEventListener('blur', lose)
+    }
   }, [jobOpen])
 
   // Esc cancels a drag in progress.
@@ -249,7 +284,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     )
 
   const down = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || event.ctrlKey || !ready) return
+    if (event.button !== 0 || event.ctrlKey || !ready || clean) return
     event.preventDefault()
     const at = pointAt(event)
     const handle = (event.target as HTMLElement).dataset?.handle as Handle | undefined
@@ -349,7 +384,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
   }
 
   const keys = (event: KeyboardEvent<HTMLElement>, area: AreaRow) => {
-    if (area.id !== selected || !area.box) return
+    if (clean || area.id !== selected || !area.box) return
     if (event.target !== rowButtons.current[area.id]) return
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
@@ -385,10 +420,12 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
   /** The box is so small that its point would cover it: the dot lets presses through to the box. */
   const tiny = (box: AreaBox) => under(box, POINT_PASS_THROUGH)
   const drawing = gesture?.mode === 'draw' ? gesture.preview : null
-  const ordered = [
-    ...boxes.filter((b) => b.area.id !== selected),
-    ...boxes.filter((b) => b.area.id === selected),
-  ]
+  const ordered = clean
+    ? []
+    : [
+        ...boxes.filter((b) => b.area.id !== selected),
+        ...boxes.filter((b) => b.area.id === selected),
+      ]
   // The ratio as a number too: a narrow window's stylesheet caps the picture's height through it.
   const pictureShape = {
     aspectRatio: `${row.width} / ${row.height}`,
@@ -397,84 +434,83 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
 
   return (
     <section className="panel named-areas" aria-label="Named areas">
-      <div className="brief-panel-head named-areas-head">
-        <h2>Named areas</h2>
-        <span className="muted">{areasCountText(placedCount, areas.length)}</span>
-      </div>
-      <p className="muted named-areas-intro">
-        The parts of this picture the game names, so that a player can click them.
-      </p>
       {failure && (
         <p className="adopt-error" role="alert">
           {failure}
         </p>
       )}
-      <div className={`named-areas-body${again.length > 0 ? ' has-place-again' : ''}`}>
+      <div className="named-areas-body">
         {/* The list comes first so Tab reaches the switches after it; the grid puts the picture left. */}
-        {again.length > 0 && (
-          <p className="place-again-line">
-            {placeAgainLine(againTakes, row.chosenTake, again.length)}
-          </p>
-        )}
-        <ul className="named-area-list">
-          {areas.map((area) => {
-            const isSelected = ready && area.id === selected
-            return (
-              <li
-                key={area.id}
-                className={`named-area${isSelected ? ' selected' : ''}`}
-                onKeyDown={(event) => keys(event, area)}
-              >
-                <button
-                  type="button"
-                  className="named-area-main"
-                  ref={(el) => {
-                    rowButtons.current[area.id] = el
-                  }}
-                  {...off(areaRowWhy(state))}
-                  aria-pressed={isSelected}
-                  onClick={() => select(area.id)}
+        <div className="named-areas-side">
+          <div className="named-areas-head">
+            <h2>Named areas</h2>
+            <span className="muted"> · {areasCountText(placedCount, areas.length)}</span>
+          </div>
+          {again.length > 0 && (
+            <p className="place-again-line">
+              {placeAgainLine(againTakes, row.chosenTake, again.length)}
+            </p>
+          )}
+          <ul className="named-area-list">
+            {areas.map((area) => {
+              const isSelected = ready && area.id === selected
+              return (
+                <li
+                  key={area.id}
+                  className={`named-area${isSelected ? ' selected' : ''}`}
+                  onKeyDown={(event) => keys(event, area)}
                 >
-                  <span className="named-area-text">
-                    <b>{area.title}</b>
-                    <span className="mono muted">{area.id}</span>
-                  </span>
-                </button>
-                {isSelected && area.box && !isCentred(area.box) && (
                   <button
                     type="button"
-                    className="btn named-area-point-centre"
-                    onClick={() => {
-                      commit(area, centred(area.box!))
-                      focusRow(area.id)
+                    className="named-area-main"
+                    ref={(el) => {
+                      rowButtons.current[area.id] = el
                     }}
+                    {...off(areaRowWhy(state))}
+                    aria-pressed={isSelected}
+                    onClick={() => select(area.id)}
                   >
-                    Centre the point
+                    <span className="named-area-text">
+                      <b>{area.title}</b>
+                      <span className="mono muted">{area.id}</span>
+                    </span>
                   </button>
-                )}
-                {isSelected && area.placed && (
-                  <button
-                    type="button"
-                    className="btn named-area-clear"
-                    onClick={() => {
-                      commit(area, null)
-                      focusRow(area.id)
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
-                {area.placed ? (
-                  <span className="chip chip-ok">Placed</span>
-                ) : area.elsewhere.length > 0 || area.elsewhereGone ? (
-                  <span className="chip chip-attention">Place again</span>
-                ) : (
-                  <span className="chip chip-attention">To place</span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+                  {isSelected && area.box && !isCentred(area.box) && (
+                    <button
+                      type="button"
+                      className="btn named-area-point-centre"
+                      onClick={() => {
+                        commit(area, centred(area.box!))
+                        focusRow(area.id)
+                      }}
+                    >
+                      Centre the point
+                    </button>
+                  )}
+                  {isSelected && area.placed && (
+                    <button
+                      type="button"
+                      className="btn named-area-clear"
+                      onClick={() => {
+                        commit(area, null)
+                        focusRow(area.id)
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {area.placed ? (
+                    <span className="chip chip-ok">Placed</span>
+                  ) : area.elsewhere.length > 0 || area.elsewhereGone ? (
+                    <span className="chip chip-attention">Place again</span>
+                  ) : (
+                    <span className="chip chip-attention">To place</span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
         <div className="named-areas-picture">
           {ready && view?.take ? (
             <>
@@ -494,8 +530,11 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                   draggable={false}
                   onError={() => setUnreadable(view.take?.n ?? null)}
                 />
-                {chosenPatches
-                  .filter((patch) => shown.has(patch.id))
+                {patches
+                  .filter(
+                    (patch): patch is ListedPatch & { src: string } =>
+                      !!patch.src && shown.has(patch.id),
+                  )
                   .map((patch) => (
                     <img
                       key={patch.id}
@@ -541,11 +580,11 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                     </div>
                   )
                 })}
-                {drawing && (
+                {drawing && !clean && (
                   <div className="named-area-box drawing" style={placedStyle(drawing, row)} />
                 )}
               </div>
-              <p className="muted named-area-line">{areaLineText(current)}</p>
+              <p className="muted named-area-line">{areaCaptionText(view.take.n, current)}</p>
             </>
           ) : (
             <div
@@ -558,26 +597,33 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                 "The chosen take's picture is missing or cannot be read, so the areas cannot be marked on it."}
             </div>
           )}
-          {ready && chosenPatches.length > 0 && (
+          {ready && (
             <div className="named-area-switches">
-              <span className="muted">Show on the picture:</span>
-              {chosenPatches.map((patch) => (
-                <label key={patch.id} className="named-area-switch">
-                  <input
-                    type="checkbox"
-                    checked={shown.has(patch.id)}
-                    onChange={(event) =>
-                      setShown((now) => {
-                        const next = new Set(now)
-                        if (event.target.checked) next.add(patch.id)
-                        else next.delete(patch.id)
-                        return next
-                      })
-                    }
-                  />
-                  {patch.title}
-                </label>
-              ))}
+              {patches.length > 0 && <span className="muted">Patches on the picture</span>}
+              {patches.map((patch) =>
+                patch.src ? (
+                  <label key={patch.id} className="named-area-switch">
+                    <input
+                      type="checkbox"
+                      checked={shown.has(patch.id)}
+                      onChange={(event) =>
+                        setShown((now) => {
+                          const next = new Set(now)
+                          if (event.target.checked) next.add(patch.id)
+                          else next.delete(patch.id)
+                          return next
+                        })
+                      }
+                    />
+                    {patch.title}
+                  </label>
+                ) : (
+                  <span key={patch.id} className="named-area-switch-off" title="No take chosen yet">
+                    {patch.title}
+                  </span>
+                ),
+              )}
+              <span className="muted named-area-hold">Hold S to hide the areas</span>
             </div>
           )}
         </div>
