@@ -6,7 +6,7 @@ const EFFECT_SEAM_SECONDS = 1
 
 /**
  * What the model is asked for beyond the loop and its seam, in seconds, and dropped: Small SFX
- * fades out in its last tenth of a second to under a second (§13, decision 9), and a faded tail
+ * fades out in its last tenth of a second to under a second (§12, decision 9), and a faded tail
  * would dip at the seam.
  */
 export const EFFECT_LOOP_SPARE_SECONDS = 1

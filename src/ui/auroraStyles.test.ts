@@ -9,7 +9,7 @@ function rule(selector: string): string {
   return new RegExp(`(?:^|\\n)${escaped} \\{([^}]*)\\}`).exec(css)?.[1] ?? ''
 }
 
-// Aurora (docs/ui/restyle.html, A): translucent glass panels on a deep background with two faint
+// Aurora: translucent glass panels on a deep background with two faint
 // glows, rounder corners, and the accent as a gradient on the main action and the logo only.
 describe('the Aurora look', () => {
   it('lays the page on a deep background with two faint glows that stay put', () => {

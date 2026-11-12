@@ -6,9 +6,9 @@ voice files and their metadata **in place**. Committing and pushing is left to t
 
 The first workspace is **Narration**: casting a voice for every character by audition, and
 recording every line of dialog with the cast voice, regenerating only what is missing or out of
-date. The second is **Music** (§8.5, planned): looping background tracks and short stingers, each
-chosen by audition from takes generated locally with ACE-Step. Sound effects are a later workspace
-on the same foundation (§12 step 16).
+date. The second is **Music** (§8.5): looping background tracks and short stingers, each
+chosen by audition from takes generated locally with ACE-Step. Sound effects (§8.8–§8.10) are built
+on the same foundation.
 
 The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py`,
 `tts/narrate.py`) this tool replaces.
@@ -37,7 +37,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects: the list and the studio's own descriptions (§8.9), the model (§8.8) and the takes — made, compared, chosen, looping ones seamless — (§8.10) are built (§12 step 16; §13 decision 9).
+- Sound effects: the list and the studio's own descriptions (§8.9), the model (§8.8) and the takes — made, compared, chosen, looping ones seamless — (§8.10) are built (§12 decision 9).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
@@ -65,8 +65,8 @@ retroquest/                      ← user runs `content-studio` here
     │   ├── *.mp3                ← clips (written)
     │   └── manifest.json        ← key → file, speaker, duration, word timings (written)
     └── music/generated/
-        ├── *.mp3                ← tracks (written; planned)
-        └── manifest.json        ← track → file, duration (written; planned)
+        ├── *.mp3                ← tracks (written)
+        └── manifest.json        ← track → file, duration (written)
 ```
 
 1. `content-studio` walks up from the current directory to find `content-studio.json`. That directory
@@ -101,17 +101,17 @@ Installed once from this repo with `bun link` (later `bun add -g`), then run in 
 
 ## 3. Technology
 
-| Concern                                     | Choice                                                           | Why                                                                                                                                                                                                             |
-| ------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime, server, bundler, tests             | **Bun** (`Bun.serve` with HTML imports, `bun test`)              | One tool for everything; serves the React app with no separate build step.                                                                                                                                      |
-| UI                                          | **React 19 + TypeScript**, TanStack Query for server state       | Bun bundles JSX with no extra setup; Query handles caching and refetching.                                                                                                                                      |
-| Styling                                     | Plain CSS with design tokens (custom properties), one stylesheet | Small, no framework lock-in; dark-first theme, the Aurora look (`docs/ui/restyle.html`, A): glass panels on a deep background with two faint glows, the accent a gradient on the main action and the logo only. |
-| Waveforms and playback                      | **wavesurfer.js**                                                | Waveform, seek, and region playback for the audition and line inspector.                                                                                                                                        |
-| Validation                                  | **zod**                                                          | One schema per file type gives validation, types and readable errors.                                                                                                                                           |
-| TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                                                                          |
-| Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines.                                                         |
-| Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                                                                                |
-| Music generation (§8.5)                     | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free and local; why, in §13 decision 4.                                                                                                                                                                         |
+| Concern                                     | Choice                                                           | Why                                                                                                                                                                                 |
+| ------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime, server, bundler, tests             | **Bun** (`Bun.serve` with HTML imports, `bun test`)              | One tool for everything; serves the React app with no separate build step.                                                                                                          |
+| UI                                          | **React 19 + TypeScript**, TanStack Query for server state       | Bun bundles JSX with no extra setup; Query handles caching and refetching.                                                                                                          |
+| Styling                                     | Plain CSS with design tokens (custom properties), one stylesheet | Small, no framework lock-in; dark-first theme, the Aurora look: glass panels on a deep background with two faint glows, the accent a gradient on the main action and the logo only. |
+| Waveforms and playback                      | **wavesurfer.js**                                                | Waveform, seek, and region playback for the audition and line inspector.                                                                                                            |
+| Validation                                  | **zod**                                                          | One schema per file type gives validation, types and readable errors.                                                                                                               |
+| TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                                              |
+| Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines.                             |
+| Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                                                    |
+| Music generation (§8.5)                     | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free and local; why, in §12 decision 4.                                                                                                                                             |
 
 A native window (Electrobun) can wrap the same web UI later; nothing in the design depends on it.
 
@@ -153,7 +153,7 @@ content-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish and ElevenLabs API keys, from the environment or the env file
-│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription, music, tts, voice; more with step 14)
+│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription, music, tts, voice, shared voices, design)
 │   │   ├── elevenMusic.ts       Eleven Music as a MusicGenerator: the brief, the key, the MP3 decoded
 │   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice, designVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
@@ -195,7 +195,7 @@ content-studio/
 └── docs/
 ```
 
-**Previous and next** (as-5wz; drawn in `docs/ui/as-5wz-pager.html` and `docs/ui/as-5wz-image-arrows.html`). Every
+**Previous and next** (as-5wz). Every
 one-item page (a music loop or stinger, an image, a sound effect, a character, a part's overview and
 lines page, a scene) ends its header with `components/Pager.tsx`: ‹ and › around "3 of 12", built
 from the list the breadcrumb goes back to (`core/neighbours.ts`, `ui/pager.ts` `pagerFor`), never
@@ -218,7 +218,7 @@ audio, network or disk.
 ## 5. The project file
 
 The format the studio reads, version 2, is described for the people who write the files in
-[docs/project-files.md](project-files.md) (epic as-6u9, §12 step 18), which is where the format of
+[docs/project-files.md](project-files.md) (epic as-6u9), which is where the format of
 every file is described. This section and §6 say how the studio uses them.
 
 `content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
@@ -497,8 +497,6 @@ the truth.
 
 ### 8.1 Audition (casting a voice)
 
-This is the audition built in step 9 (§12).
-
 Every character has a **character page** (`#/characters/<id>`), the one place about it: its
 cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish; the take
 records by itself when missing; a note when another character has the same voice), its lines per part, its delivery (the style cue and its own speed) and casting
@@ -650,7 +648,7 @@ An audition is for a character, not for a part: the result applies to every part
    today's rules (a job of kind `check`: Check N weak lines again on the Generate panel).
 3. **Generate** queues one job per line. For each line:
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
-   2. TTS each chunk (WAV), join them with a short gap;
+   2. TTS each chunk (WAV), join them with a 0.25 s pause (`GAP_SECONDS`);
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the share
       of shown words heard; punctuation on its own ("—", "…"), which nobody says, is no word and is
       only timed). Alignment is narrate.py's, with these departures. Words are compared without
@@ -698,7 +696,9 @@ An audition is for a character, not for a part: the result applies to every part
       (`core/numbers.ts`). A title-case word mid-sentence ("The Call") is taken for a name, outside
       German;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
-   5. encode MP3 into the clips folder, update the manifest and lock entries, write both; then
+   5. encode MP3 into the clips folder, update the manifest and lock entries, write both (the
+      manifest exactly as Python's `json.dumps(indent=1)` writes it, `core/pyjson.ts`, so untouched
+      entries keep their bytes); then
       keep what Whisper heard of the take in the cache if it was heard below full (forgotten
       when heard in full). Measuring a clip keeps it the same way. On the lines page, a score
       below 100% opens the line's text with the missed words marked beside what Whisper heard.
@@ -835,8 +835,7 @@ The music workspace makes the game's **tracks**: looping background music, each 
 room or region as the game chooses, and short **stingers** (victory, game over) for the whole game.
 As with characters and lines, the game says which tracks it needs; the studio makes them. A track
 is made like a voice is cast: a brief, several generated takes to listen to, and one take chosen.
-The steps are in §12, step 12; the spike's findings (12.1) are in §13, decision 5. The screens are
-drawn in `docs/ui/music-workspace.html`.
+The spike's findings are in §12, decision 5.
 
 **Files.** The music files' format is in [docs/project-files.md](project-files.md): the `music`
 section of the project file (`from.part` for each act's loops, `from.shared` for the stingers, each
@@ -873,7 +872,7 @@ it, shown under its name), `file` (the music file the game plays for the track n
 project root to an `.mp3`, `.ogg`, `.wav`, `.m4a` or `.flac`; read only, never moved, levelled,
 re-encoded or written, and never taken as a chosen take) and `bpm` and `key` are optional; `text` and `seconds` are the game's
 starting point. Tracks are always instrumental (no lyrics). `bpm` and `key` ("D major") are passed
-to ACE-Step as its own fields; their allowed values are settled in 12.2. A stinger is at most 10
+to ACE-Step as its own fields. A stinger is at most 10
 seconds.
 
 **Edits** (`content-studio/music/edits.json`, read and written by the studio): what the studio
@@ -936,7 +935,7 @@ the board is what the game will play:
   trailing silence trimmed) or at `seconds`, whichever comes first, with a short fade-out (a
   fanfare asked for at 10 seconds ends after about 6).
 
-The numbers are fixed in `core/musicTake.ts` and its tests (built, 12.4). A take is cached in
+The numbers are fixed in `core/musicTake.ts` and its tests. A take is cached in
 `content-studio/cache/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (brief, kind,
 seconds, bpm, key; the hash still begins with Balanced's recipe, so choosing a model never changes it) and a take number counted from 1 per hash, with `<hash>.<n>.json` beside it
 (seed, length, waveform bars). The same seed does not make the same take again on the Mac, so the cache keeps the take
@@ -998,9 +997,9 @@ levels its music to −20 today) and encodes it into the clips folder as `<track
 160 kbps, with ffmpeg's LAME encoder, which writes the header that tells a decoder how much
 padding to drop. Chrome decoded such an MP3 to its exact length (80.000 s, no silence at either
 end, against the WAV), so the game loops it without a gap through Web Audio; a looping `<audio>`
-element is not relied on. Safari and Firefox are checked with the game (12.8). As for narration,
+element is not relied on. Safari and Firefox are checked with the game. As for narration,
 the encoder writes a hidden temporary file in the clips folder, renamed into place together with
-the manifest and lock update (built, 12.6): the temporary file is renamed over the clip, the manifest written, the lock last, all in one turn per project. A failure of the encode, or of reading the manifest or lock, leaves everything as it was (Choose and Un-choose then say which of the two could not be read and that nothing was changed, the manifest first when both are broken, as-kvz); a write that fails after the rename (a full disk) leaves the new clip beside the old lock, and choosing again repairs it. A take is chosen and dropped in the track's board turn, so neither slips between the other's check and write, and a drop is refused while the lock cannot be read. **In the game** (as-7o1): what the game plays is shown on its own block between the Brief and Takes panels, and the Takes panel lists only the takes that are not chosen (a drop of the chosen one is still refused, 409). The block is one of three things, from the track row (`inTheGame` in `core/musicChoose.ts`; `TrackRow.gameFile` is the game's own file whether or not a take is chosen): the chosen take (green, "chosen", play, waveform, length, Hear the seam, **Un-choose**), the game's own file when none is chosen (green, "The game's own file" and its path, no Un-choose; amber and "The file is not there." when it is not on disk), or a dashed "Nothing plays here yet", also on a brand-new track. While the music lock cannot be read, what a track plays is not known (`CurrentMusic` `unknown`, as-77u): the block is amber, "The music lock could not be read", with no Un-choose (an Un-choose pressed before the lock broke is refused, 409, and its red "Take N could not be un-chosen: the music lock could not be read. Nothing was changed." stays under that amber block after the page re-reads, with focus on the block), and the list's Plays cell says "Not known", never the game's own file, since the lock is what says a take is chosen (as-x73): the same holds elsewhere: every track's Status chip says "not known" (amber) and the list's line says which are chosen is not known instead of counting; the Takes panel (`MusicTakesView.lockUnread`) lists every take, the chosen one among them, with Choose and Drop disabled and one amber line saying why once there is a take card. A chosen take whose clip is gone turns the block amber ("music file missing") with Un-choose and **Choose again**, which writes the file again. **Un-choose** asks first, since it deletes the take's music file from the game, then (`POST /api/music/tracks/:id/unchoose`, in the board's turn and the project's choice turn) deletes the manifest entry, the clip and, last, the lock entry, so a failure part-way can be pressed again; a write the disk refuses (a read-only folder, a full disk) is said as "the game’s file could not be written", never the system's error and a temporary file's path (as-8ql); the take stays on the board, to be chosen or dropped, and the game goes back to its own file or plays nothing. The game's own file is never un-chosen, written or deleted. A track with no chosen take is refused (409). Clips are served only as plain files in the music clips folder (`GET /api/music/clips/<track>.mp3`: no folders, links, hidden files or the manifest). **Red failure lines** (as-usv): a track's page shows at most one, the line of the action pressed last (Choose, Choose again, Drop, Trim silence, Undo trim, Save fades, Remove fades, Un-choose once confirmed, Make more takes, Stop, Accept, Move once confirmed). The Takes panel holds the last pressed action's key (`ui/features/music/trackActions.tsx`, a context for the cards, the In the game block, the Fades editor and the Move dialog); each line shows only while its key is the last, so opening or cancelling an editor or a question clears nothing, and the lines never outlive the page.
+the manifest and lock update: the temporary file is renamed over the clip, the manifest written, the lock last, all in one turn per project. A failure of the encode, or of reading the manifest or lock, leaves everything as it was (Choose and Un-choose then say which of the two could not be read and that nothing was changed, the manifest first when both are broken, as-kvz); a write that fails after the rename (a full disk) leaves the new clip beside the old lock, and choosing again repairs it. A take is chosen and dropped in the track's board turn, so neither slips between the other's check and write, and a drop is refused while the lock cannot be read. **In the game** (as-7o1): what the game plays is shown on its own block between the Brief and Takes panels, and the Takes panel lists only the takes that are not chosen (a drop of the chosen one is still refused, 409). The block is one of three things, from the track row (`inTheGame` in `core/musicChoose.ts`; `TrackRow.gameFile` is the game's own file whether or not a take is chosen): the chosen take (green, "chosen", play, waveform, length, Hear the seam, **Un-choose**), the game's own file when none is chosen (green, "The game's own file" and its path, no Un-choose; amber and "The file is not there." when it is not on disk), or a dashed "Nothing plays here yet", also on a brand-new track. While the music lock cannot be read, what a track plays is not known (`CurrentMusic` `unknown`, as-77u): the block is amber, "The music lock could not be read", with no Un-choose (an Un-choose pressed before the lock broke is refused, 409, and its red "Take N could not be un-chosen: the music lock could not be read. Nothing was changed." stays under that amber block after the page re-reads, with focus on the block), and the list's Plays cell says "Not known", never the game's own file, since the lock is what says a take is chosen (as-x73): the same holds elsewhere: every track's Status chip says "not known" (amber) and the list's line says which are chosen is not known instead of counting; the Takes panel (`MusicTakesView.lockUnread`) lists every take, the chosen one among them, with Choose and Drop disabled and one amber line saying why once there is a take card. A chosen take whose clip is gone turns the block amber ("music file missing") with Un-choose and **Choose again**, which writes the file again. **Un-choose** asks first, since it deletes the take's music file from the game, then (`POST /api/music/tracks/:id/unchoose`, in the board's turn and the project's choice turn) deletes the manifest entry, the clip and, last, the lock entry, so a failure part-way can be pressed again; a write the disk refuses (a read-only folder, a full disk) is said as "the game’s file could not be written", never the system's error and a temporary file's path (as-8ql); the take stays on the board, to be chosen or dropped, and the game goes back to its own file or plays nothing. The game's own file is never un-chosen, written or deleted. A track with no chosen take is refused (409). Clips are served only as plain files in the music clips folder (`GET /api/music/clips/<track>.mp3`: no folders, links, hidden files or the manifest). **Red failure lines** (as-usv): a track's page shows at most one, the line of the action pressed last (Choose, Choose again, Drop, Trim silence, Undo trim, Save fades, Remove fades, Un-choose once confirmed, Make more takes, Stop, Accept, Move once confirmed). The Takes panel holds the last pressed action's key (`ui/features/music/trackActions.tsx`, a context for the cards, the In the game block, the Fades editor and the Move dialog); each line shows only while its key is the last, so opening or cancelling an editor or a question clears nothing, and the lines never outlive the page.
 
 **Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take chosen),
 "changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo or key), "music file missing" (a take was chosen but its clip is gone from disk), "not known" (`unknown`, amber, while the music lock cannot be read), and "making 2
@@ -1024,10 +1023,10 @@ it was chosen. The model is not a cause: a take keeps the model that made it, an
 making takes with another) never marks a track `changed`. A track is `not-chosen` (no lock entry), `chosen`, `changed` (its brief, length, tempo or key
 differs from the chosen take's own: the old one keeps playing in the game until
 another is chosen; the page says which) or `missing` (a take was chosen but its clip is gone from
-disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
+disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans).
 Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
 while its list is there, is an orphan, shown on the page of the list its lock entry names under
-"Music the game no longer asks for" (built, 12.7): a play button, its name (its id as words, since
+"Music the game no longer asks for": a play button, its name (its id as words, since
 the lock keeps no title) with its file name under it, when it was chosen, and **Remove**. Remove
 asks first ("Remove the music for Castle gates?", saying what goes) and then deletes, in this
 order so a failure can be repeated, its manifest entry, its clip, its board and takes and its lock
@@ -1122,7 +1121,7 @@ fresh install gets the libraries that made takes; `musicLive.test.ts` makes one 
 model, opt-in. It guides with plain classifier-free guidance (`apg_scale=0.0`), since 0.0.20's
 default APG needs float64, which the Mac's GPU lacks. Takes are shaped as ACE-Step's are and record
 the recipe `stable-audio-open-1.0` or `-small`. Short's time per take, about 100 s, is measured: the
-effects spike measured Open 1.0 at 95–112 s a take (§13 decision 9), since it always makes its full
+effects spike measured Open 1.0 at 95–112 s a take (§12 decision 9), since it always makes its full
 47 seconds at 100 steps. Shortest's 10 s is still an estimate, not measured. ACE-Step and Whisper
 share the one GPU and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`,
 a process-wide `createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a
@@ -1130,7 +1129,7 @@ Whisper check at a time. In the spike, with both loaded and running together, 42
 in use (20 GB of it compressed), and Whisper ran 2.5 times slower. The setup checklist (§10) names
 ACE-Step's environment and its model download, and, in its own optional row, Stable Audio's.
 
-### 8.6 ElevenLabs (planned, step 14)
+### 8.6 ElevenLabs
 
 ElevenLabs is a second, hosted provider, beside Fish for narration and beside the local models for
 music. Nothing changes for a project that does not use it, and nothing already recorded or chosen
@@ -1141,8 +1140,7 @@ the API's own pricing says usage is billed in dollars ($0.08 per 1,000 character
 Multilingual v2, $0.04 for Flash, music $0.15 a minute, October 2026), and usage beyond the
 allowance is billed only if the account allows it. The studio therefore counts **characters**
 against what the subscription reports (`character_limit − character_count`), and shows dollars for
-what would go beyond it. Which of these the account actually draws on is checked by the user in step
-14.2, and the plan changes there if it is wrong.
+what would go beyond it.
 
 **The key.** `ELEVENLABS_API_KEY`, read as Fish's key is: the environment wins, else the project's
 `env` file, never stored. Setup has two optional rows, as Stable Audio has: _ElevenLabs API key_
@@ -1172,14 +1170,12 @@ chosen, as every take is.
 
 **Models, per provider.** Each provider's prices are a table of their own, in their own unit: Fish's
 stay `core/prices.ts` (dollars per million bytes), ElevenLabs' speech models get a table beside it
-(credits per character, `core/elevenSpeech.ts`, built in 14.7a), and Eleven Music's price per minute is on its music model
-(14.5). A stage accepts only its own provider's models: `narration.models.fish` (Fish's, as
+(credits per character, `core/elevenSpeech.ts`), and Eleven Music's price per minute is on its music model. A stage accepts only its own provider's models: `narration.models.fish` (Fish's, as
 today) and `narration.models.elevenlabs` (`audition`, `draft`, `final`; default `eleven_v3`) are
 validated and listed each against its own provider's list, so Fish is never sent an ElevenLabs
 model.
 
-**Narration: per voice** (built in 14.6 and 14.7a: the ids, the stage model, the settings, the
-speed, and speaking). A character's voice says whose it is. An ElevenLabs voice is stored as
+**Narration: per voice.** A character's voice says whose it is. An ElevenLabs voice is stored as
 `eleven:<voice_id>` (in `cast.json`, its languages, the lock, sessions, ruled-out voices and take
 keys); a bare id is Fish's, so every existing file stays as it is. `core/voices.ts` (`providerOf`)
 is the one place that reads the prefix; the server's voice-id check and the UI's voice links follow
@@ -1188,13 +1184,13 @@ with that provider's model for the stage. Recasting a character from a Fish voic
 one makes its lines stale for the voice, as any recast does; since a model is valid for one provider
 only, the fingerprint needs no provider of its own.
 
-- **Settings** (saved from Setup since 14.9.2). ElevenLabs' voice settings, `narration.generate.elevenlabs`
+- **Settings** (saved from Setup). ElevenLabs' voice settings, `narration.generate.elevenlabs`
   (`stability`, `similarityBoost`, `style`; defaults 0.5, 0.75, 0, ElevenLabs' own), are one set for
   every ElevenLabs voice at every stage, and stand in for temperature and top-p in an ElevenLabs
   line's fingerprint and take key, so changing them puts every line recorded with them out of date
   (stale for its `settings`). Stability is one of 0, 0.5 and 1 (Creative, Natural, Robust), the only
   ones Eleven v3 takes; similarity and style run from 0 to 1. The Models panel's ElevenLabs voice
-  row (`docs/ui/elevenlabs-voice.html`) edits them and saves them with its own button
+  row edits them and saves them with its own button
   (`PUT /api/elevenlabs/tts` with `{ tts, was }`, refused while a part records or a character
   auditions), at once, or after a question naming each change, the lines recorded on an
   ElevenLabs model in use that go out of date and the credits to record them again on that model
@@ -1202,16 +1198,16 @@ only, the fingerprint needs no provider of its own.
   `narration.generate.fish.speed`) is sent as `speed`; ElevenLabs takes 0.7–1.2, so a character with an
   ElevenLabs voice whose speed in use lies outside it has each of its lines refused when recorded,
   with the reason, and its page says why under its speed. Nothing is clamped.
-- **Cues** (built in 14.8). Eleven v3 reads `[bracket]` tags as directions, as Fish does, so cues
+- **Cues.** Eleven v3 reads `[bracket]` tags as directions, as Fish does, so cues
   are sent as they are. Multilingual v2 and Flash would speak them (`readsCues`), so with those
   models cues are left out of the text and out of the fingerprint (`clipInputs` gives `cue` and
   `inside` empty), so editing a cue never re-records audio that would not change, and out of what a
-  plan counts (`sentPieces`). The page still shows a line's cues (`cueInputs`), and from 14.9, when
-  such a model can be chosen, the cue editor says they are not spoken. The text is chunked at
+  plan counts (`sentPieces`). The page still shows a line's cues (`cueInputs`), and when such a model
+  is chosen, the cue editor says they are not spoken. The text is chunked at
   `generate.chunkLimit` as for Fish.
 - **Languages.** Each language's voice may be either provider's; `language_code` is sent with models
   that take it.
-- **Credits, confirmed** (built in 14.7c). A part's plan prices each line by its voice's provider
+- **Credits, confirmed.** A part's plan prices each line by its voice's provider
   (`elevenModelOf`): Fish's lines in dollars as before (`bytes`, `cost`, `ceiling`), and the lines
   with ElevenLabs voices in credits (`plan.eleven`: their keys, the model, the characters sent, the
   credits of one take each and at most, every take). The plan's answer carries the account
@@ -1225,13 +1221,13 @@ only, the fingerprint needs no provider of its own.
   used, plus the allowed overage: none, a number, or without limit) less what running ElevenLabs
   recordings were given, all of which is held back until they end. Each line is charged to its
   provider's budget before it is sent. Whether running music takes draw on the same allowance is
-  checked by hand (step 14's test script); they are not counted yet. If ElevenLabs refuses a
+  not yet checked with a real key (as-9u9a); they are not counted yet. If ElevenLabs refuses a
   request (its quota among the reasons), that line fails with ElevenLabs' words.
-- **Page takes and tries** (built in 14.10a, `docs/ui/elevenlabs-takes.html`). Fish's are made
+- **Page takes and tries.** Fish's are made
   with its free model. ElevenLabs has none, so the cast voice's take on its character's page and
   a cue try (Hear it, in the cue, scene cue and cue-inside editors) with an ElevenLabs voice use
   `narration.models.elevenlabs.audition` (chosen on Setup's ElevenLabs audition row, saved at
-  once, since 14.10b-1) with the project's voice settings at the character's
+  once) with the project's voice settings at the character's
   speed (refused, with the reason, outside 0.7–1.2), in ElevenLabs' requests at once. They are not
   confirmed (a try is a line's worth of characters). On a model that would speak cues the text is
   sent without them (the style, the opening cue and the cues inside) and the page says so. The
@@ -1242,7 +1238,7 @@ only, the fingerprint needs no provider of its own.
   ElevenLabs' WAV: `GET /api/takes/:file` serves a file that starts with `RIFF` as `audio/wav`. One
   already kept costs nothing. What one costs is added to the spending record's `tries` as soon as
   ElevenLabs has made it, even if it then cannot be kept. Board
-  takes with an ElevenLabs voice (14.10b-2) are the same take, on the same key, paid from the
+  takes with an ElevenLabs voice are the same take, on the same key, paid from the
   audition's sitting in credits instead: `start` takes `creditsUpTo` beside `spendUpTo`, `POST …/sitting`
   a fresh sitting's `{ amount?, credits? }` (its dollars needed on a paid model, refused with
   nothing to give on a free one), and `…/sitting/add` `{ amount }` or `{ credits }` to top it up.
@@ -1259,7 +1255,7 @@ only, the fingerprint needs no provider of its own.
   `DELETE …/sitting`) ends its credits too. The sitting's view adds `eleven`: ElevenLabs' audition
   model, a take's credits, the credits to suggest (about 50 takes, to the next hundred) and the
   sitting's credits. Each board take that cost credits is a row of the spending record's `tries`
-  (`audition`). On the board (14.10b-3, `docs/ui/elevenlabs-audition.html`) the credits are asked
+  (`audition`). On the board the credits are asked
   for only when they are needed, not by Start: while the sitting has none, ElevenLabs voices on
   the board without a take say "Take waits for credits", record nothing, and a bar above the
   voices says how many wait, what a take costs and what is left on the plan (`GET
@@ -1274,7 +1270,7 @@ only, the fingerprint needs no provider of its own.
   meters stay at the top of the board as it scrolls; the bar, much taller, scrolls away with the
   voices, so it never hides a card's title. A resume asks for them again the same way.
 
-**Spending** (built in 14.7d). The log (`content-studio/cache/spending.json`) moves to version 2 when it
+**Spending.** The log (`content-studio/cache/spending.json`) moves to version 2 when it
 first needs to, with its first ElevenLabs credits or music take (`needsVersion2`), so a Fish-only
 project's log stays version 1 and readable by an older studio (which cannot read a version 2 log,
 and then logs nothing of its own). In version 2 a recording's row keeps its Fish dollars (`cost`)
@@ -1285,10 +1281,10 @@ track and its title, the model, the seconds made and billed, the dollars at the 
 minute, and whether it was made (billed, also when the studio then could not keep it) or stopped
 while being made, which may still be billed; a take that fails before ElevenLabs makes it costs
 nothing and is not listed). Only credits spent are kept, so a recording given credits but
-spending none stays a version 1 row. Takes and tries with ElevenLabs voices (14.10a) are a list
-of their own too (`tries`: when, `take`, `try`, `audition` or, since 14.12, `design`, the character, a try's part, the language, the
+spending none stays a version 1 row. Takes and tries with ElevenLabs voices are a list
+of their own too (`tries`: when, `take`, `try`, `audition` or `design`, the character, a try's part, the language, the
 model, the characters sent and the credits), absent from a version 2 log written before them. A
-studio from before 14.10a reads such a log but drops `tries` when it next writes it; tries are
+studio older than `tries` reads such a log but drops `tries` when it next writes it; tries are
 small and the bills are ElevenLabs', so this is accepted rather than a version 3. A
 version 1 log is read with no credits, no music and no tries.
 The Spending page and the sidebar total dollars and credits apart (`$0.78 · 1,200 credits`), for
@@ -1298,8 +1294,7 @@ says "Music take · The cave" and how long it was made. Takes and tries count in
 on a tile of their own ("ElevenLabs takes, tries and designs"), never as rows: there can be
 hundreds.
 
-**Casting.** The audition board searches either provider (built in 14.11a,
-`docs/ui/elevenlabs-library.html`: a switch beside Bring in more, _Fish Audio_, _ElevenLabs_; the
+**Casting.** The audition board searches either provider (a switch beside Bring in more, _Fish Audio_, _ElevenLabs_; the
 audition still starts from Fish's library, and ElevenLabs' voices come in a round at a time,
 straight to hear, leaving Fish's queue as it is). ElevenLabs' search is its shared voice library (`GET /v1/shared-voices`: the
 keywords, the board's language, gender and age when the character's brief names them), shown as
@@ -1318,7 +1313,7 @@ added it, when it is the id it became; once added, the board marks it so and no 
 or cast will add it. When ElevenLabs
 will not add one, its take fails with ElevenLabs' answer and its credits are given back, or it is
 not cast. The studio remembers which voices it added (`content-studio/cache/eleven-voices.json`: the
-library id, the id on the account, its name, the character and when), so each is added once. **Voice slots** (built in 14.11b): below Bring in more, once a library
+library id, the id on the account, its name, the character and when), so each is added once. **Voice slots**: below Bring in more, once a library
 voice is on the board or ElevenLabs' library is chosen, the board says how many of the plan's
 slots are used (from the subscription's `voice_limit` and `voice_slots_used`). A voice the studio
 added that nothing in this project uses (not cast for any character in any language, and on no
@@ -1333,11 +1328,10 @@ record; while the account is being read none does, and a take that may have adde
 as a slot used until the account is read again, which the server then asks ElevenLabs for afresh,
 as it does after a cast adds one or a free; if that read fails the board says so, with Try again),
 recording by themselves once slots are freed. Whether a library voice can speak before it is added
-is checked by hand at the end of step 14 (no key in CI); if it can, nothing need be added before
+is not yet checked with a real key (as-9u9a, no key in CI); if it can, nothing need be added before
 casting. **Add by id** takes an id from the
 user's own ElevenLabs voices (one made or added on ElevenLabs' site), with the provider chosen
-beside the field; a library voice is found by search. **Design** offers ElevenLabs beside Fish (built in 14.12,
-`docs/ui/elevenlabs-design.html`: a switch at the top of the design box): `POST
+beside the field; a library voice is found by search. **Design** offers ElevenLabs beside Fish (a switch at the top of the design box): `POST
 /v1/text-to-voice/design` (`eleven_ttv_v3`, the description, MP3 previews) gives three previews,
 kept as Fish's designs are (numbered, under the description, the preview as the design's take),
 each with its `generated_voice_id`. The previews say the audition phrase, then the character's own
@@ -1349,13 +1343,13 @@ to 1,000 credits" for ElevenLabs' own text), and the server holds them back from
 designs, as a recording's are, and sends the text it confirmed (not one made again since); the
 description takes 20 to 1,000 characters there (ElevenLabs' reference names no limit; to be checked
 by hand), checked before anything is held; what was charged (the text's characters) is logged in the spending
-record's `tries` as a `design` (a studio from 14.10a to 14.11 cannot read a record holding one). An answer with no voices is a failure that may have been charged. Casting one saves it
+record's `tries` as a `design` (an older studio that knows `tries` but not designs cannot read a record holding one). An answer with no voices is a failure that may have been charged. Casting one saves it
 (`POST /v1/text-to-voice`, named "Mara (designed)" each time, since ElevenLabs takes the same name
 twice and the studio does not list the user's voices, a voice slot) and casts `eleven:<new id>`; a save that worked is remembered as Fish's
 is, so a cast that then failed saves nothing twice. If ElevenLabs no longer takes a kept preview's
 id, nothing is cast and its card says a design from an earlier session may need designing again. Cloning stays Fish's.
 
-**Music** (built in 14.4, 14.5 and, the spending log, 14.7d). One more family, `elevenlabs`,
+**Music.** One more family, `elevenlabs`,
 with one model, _Eleven Music_ (id `eleven`, recipe `eleven-music-v2.5`, `longest` 600 s, so loops
 up to 580 s, no folders, no download, about a minute a take until measured), in its own menu group,
 "ElevenLabs · in the cloud, paid". A take is `POST /v1/music` with `model_id` `music_v2_5`, the
@@ -1375,22 +1369,21 @@ read by an older studio.
   Eleven Music, and the Models panel's Music row says it is made in the cloud and is Paid.
 - **No GPU.** The take queue chooses by family: local takes wait for the GPU as before
   (`musicTakes`, `queue.run(GPU, …)`), Eleven Music takes for each other only (a queue of their own,
-  one at a time), beside local takes and Whisper. The router is a table from family to generator
-  (built, 14.3), and a take made in the cloud stops no local worker.
+  one at a time), beside local takes and Whisper. The router is a table from family to generator,
+  and a take made in the cloud stops no local worker.
 - **Price.** A music model has a price a minute (`perMinute`: Eleven Music $0.15, ElevenLabs' API
   price; null for the free ones), and a take costs it for the whole take, the 20 seconds a loop is
   made longer included (`takePrice`). A track's menu entry says "about 1 min and $0.28 a take",
   Setup's menu "about 1 min a take, $0.15 a minute of music" with "$0.15 a minute" beside it, and
   the make button the price of all N takes, N times a take's as the menu shows it ("Make 2 more
   takes · $0.56"; the count menu lists each total, "3 takes · $0.84"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed;
-  each is logged in the spending record (14.7d). Stop aborts the request; ElevenLabs may still
+  each is logged in the spending record. Stop aborts the request; ElevenLabs may still
   bill a take stopped while being made, which Stop's title says while a paid take is being made.
 
 **Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
 (`CONTENT_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,
 search the library once and make one 10-second stinger, and spend money doing it. Nobody but the
-user can run them, so each pull request of step 14 says how to verify it by hand. Each pull request
-adds its new modules to the layout in §4.
+user can run them.
 
 ---
 
@@ -1400,8 +1393,7 @@ The images workspace shows the game's **images**: what each is called, its size 
 made from, beside the game's **style**. As with music, the game says which it needs; the studio
 never writes the game's lists. This section is the reading, the studio's own words and staleness
 (as-yag.3), the takes: making, comparing and choosing them (as-yag.2 and as-yag.4), and the game's
-look every take is brought to (as-yag.5). The screens are drawn in `docs/ui/as-yag.3-images.html`,
-`docs/ui/as-yag.4-image-takes.html` and `docs/ui/as-yag.5-take-look.html`.
+look every take is brought to (as-yag.5).
 
 **Files.** The images files' format is in [docs/project-files.md](project-files.md): the `images`
 section of the project file (`from.part` for each act's images, `model`, `clips`, `manifest`), the
@@ -1455,7 +1447,7 @@ leave its act's addition out (as-1au): a tick box on its page, "Add Act IV's sty
 ticked by default and shown only while the act has an addition. The choice is saved at once
 (`PATCH /api/images/:id/act-style`, `{ on }`) as the image's `partStyle: null` in the edits,
 kept when the act later has no addition, and the prompt and staleness key then carry no
-addition. The screens are drawn in `docs/ui/as-1au-act-style.html`.
+addition.
 
 **An image several acts list** (as-94e). A game may list one id in more than one act's list (a
 recurring character's portrait). When the copies agree on title, words (`text`) and size it is
@@ -1470,8 +1462,7 @@ in the game's order), the page of such an image shows only the reason, and the b
 problem per list naming another list that differs. The act style of a shared image is one pick for
 all acts, not the tick box: the menu "Act style for this image" lists the listing acts that add a
 style and None. `partStyle: null` in the image's edit means None; `partStyle: <act id>` names the
-act, and a missing, unlisted or style-less pick is the first listing act (None when it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`. The
-screens are drawn in `docs/ui/as-94e-shared-images.html`.
+act, and a missing, unlisted or style-less pick is the first listing act (None when it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`.
 
 **The patches the game asks for** (as-bo8.1; `ImageRow.patches`, `ui/features/images/GamePatchesPanel.tsx`).
 An image whose list carries patches gets a full-width panel, "Patches the game asks for", directly
@@ -1486,7 +1477,7 @@ cell. A patch the game no longer lists leaves the panel but its words stay in th
 with the id. Patches are one more thing the lists of a shared image can disagree on (`ConflictKind`
 `patches`: id, title or words differ; the same patches in another order do not, and the page uses
 the first listing act's order). A rewording changes no prompt or take: it never makes an image out
-of date. Refresh's panel says nothing of patches. Screens: `docs/ui/as-bo8.1-image-patches.html`.
+of date. Refresh's panel says nothing of patches.
 
 **The named areas the game declares** (as-qg4.1; `ImageRow.areas`, `ui/features/images/NamedAreasPanel.tsx`).
 An image whose list carries areas gets a full-width panel, "Named areas", directly below the
@@ -1516,14 +1507,13 @@ for want of an entry). Choosing a take, bringing to a look and Bring all keep th
 un-choosing takes the entry with them. Refresh from the game on an act (`passAreasToGame`) brings every
 image of the act up to date, which is also how boxes marked earlier arrive; the manifest is written
 only when something changed, and a failure is the result `reason: 'areas'`. The manifest is one more
-file of the Changes page's Images section. Screens: `docs/ui/as-qg4.3-placed-areas-reach-the-game.html`.
+file of the Changes page's Images section.
 The act's list adds "4 of 5 areas to place" under an image's
 status while some are left; it changes neither "n of m chosen" nor the needs-attention view. Areas
 are no part of what a picture is made from, so changing them never makes an image out of date, and
 Refresh's panel says nothing of them. They are one more thing a shared image's lists can disagree
 on (`ConflictKind` `named areas`: id or title differs or an area is missing; the same areas in
-another order do not, and the page uses the first listing act's order). Screens:
-`docs/ui/as-qg4.1-named-areas.html`, `docs/ui/as-qg4.2-marking-named-areas.html`.
+another order do not, and the page uses the first listing act's order).
 
 **The studio's own words** are the edits' `images`, committed like the music edits and joining the
 Changes panel: `{ <id>: { text, gameWas, partStyle, patches, areas } }`. `gameWas` is the game's text when the words
@@ -1565,25 +1555,25 @@ computer (`ImageGenerator.installed`: its weights are in the Hugging Face cache)
 and **Try again** remakes with the model the take was asked with. Takes cannot be made only when mflux is
 missing or no model is installed. The Images up to date panel's long waits (§8.7) read in hours and minutes from an hour ("2 h 24 min", "2 h"); under an hour as before, and music's panel unchanged.
 
-**Patches** (as-b9x, as-bo8.2; `core/imagePatches.ts`, `services/imagePatches.ts`, `ui/features/images/PatchWorkbench.tsx`). An experiment in painting a change into a chosen picture, with the model given a window of the picture round the marked area for context, so it blends in where a separately made picture would not. On an open patch of "Patches the game asks for", the user drags a rectangle over the image's chosen take (the mark; a click or a drag too small to patch changes nothing, and a drag stops at the picture's edges, a side within 4 screen pixels of an edge counting as on it, and a side on an edge of the game's version carried out to the model's own edge, past what the game crops, so no fade shows inside the game's picture, as-lxo) and makes 1 to 4 takes of it from the patch's words. `mflux-generate-flux2-edit` then edits a window of the take's model picture round the marked area (`editWindow`, see Patch models below), with the picked model, on the GPU queue as a take is (`ImageRequest.editing`; the spike: about 15 s, 13.6 GB). A model also changes things it was not asked to, so a patch keeps only what the edit changed that touches the mark (as-wdim; `keepChanged`): every connected region where the colour-matched edit differs from the take (the worst channel, averaged over 3 pixels round each place) by more than 30 of 255, or 14 inside the mark, so a faint remnant or glow of what was removed goes too, that touches the mark (a changed place inside it) and is at least 40 pixels, with a soft edge (two 5-pixel blurs); a region of 40 pixels or more within 12 pixels (of the smoothed difference, about 14 to 18 in the picture) of one that touches the mark is kept with it (as-l71a), one step only so that nothing chains on from there, so a part parted from the rest only by a thin line of no change stays on (both of Qwen Image Edit 2511's black cats lost their heads above the mark, the neck black on the black shadow under a bed); the rest is transparent and the take shows. An object the edit grew past the mark is thus kept whole instead of cut off at it, and the few levels a model drifts inside the mark leave no rectangle of another tone (a trial on RetroQuest takes, adding a bucket, a basket, a cat and a trough and removing bread, a fire and a hen). Before the change is measured the edit's colours are matched, the mark first (`matchToTake`, described next) and then the rest of the window (`matchOutside`): every pixel outside the mark moves by the median offset of them all (values within 8 of black or white left out of the median, and the move easing out over the 32 tones nearest black and white, which a drift of the middle tones leaves where they are, so outlines and highlights do not read as changed), so a drift of the whole window, however large, is no change, and an object kept past the mark shows no step of colour at the mark's edge or ring of drift round it. At a side of the model's window that lies inside the picture the patch fades out over 16 pixels, and its last 4 pixels never count, so a change reaching it shows no line; at the picture's own edge it does not fade. Limits: a drift that differs across the window (parts lighter than others, or a horizon whose parts drift apart) is matched only by its median, so a part drifting more than 30 from it and touching what changed is kept, and a kept object can step in colour at the mark's edge by the difference; when what the edit changed covers more than half of the window outside the mark, the median is the change's and the rest of the window is kept in its tint; a big change leaves the middle of the mark as painted (see the matching below), so a drift above 14 left there is kept in patches round the object; a change smaller than about 8 pixels across never reaches full strength, and one under 40 pixels is left alone. The overlap warning still compares the marks. The mark's colours are matched to the take (as-c8q; `matchToTake`): the strip 8 pixels outside each side not on the picture's edge, compared with the take place by place along the side, gives the drift of the edit from the take there. A small difference (what is left inside the area after that correction, worst channel's mean up to 30 of 255) is a drift and is corrected across the whole area; a big one is taken as asked for, so it is corrected at the sides and eases in over 48 pixels, leaving the middle as painted. The sides follow a step such as a horizon (a median along the side, 24 places each way), and a place that differs from the drift around the area (the drift reference is described next) by more than 22 (of 255) fades to that drift by 30, so something the edit painted just outside the area, narrow, wide or soft-edged, is not carried into it as a streak. The drift reference is, of the tones many places of the strip agree on (within 8), the one nearest the median offset of the whole picture, judged on the places themselves before the median, so objects covering most of the strip cannot outvote the sky, and a gradual drift keeps its middle. A tone more than 22 from that median is refused as objects only while at least a tenth of the strip's places agree with the median; when none does, the edit shifted all that lies around the area (a sky moved far while the rest of the picture stayed) and the strip's own tone is the drift. Limits: a drift that changes by more than about 44 across the area, or two parts whose drifts differ by more than 22, leave the part furthest from the picture's own median unmatched; objects covering most of the strip around a sky shifted that far are taken for the drift. A difference up to 22 is indistinguishable from drift and is followed, as is a horizon whose two parts drift up to 22 apart. Nothing is adjustable and patches already made are not rewritten. A take is `content-studio/cache/image-patches/<image>/<patch>/<n>.png`, as big as the image's take and transparent outside what it keeps, on `board.json` in the same folder: `{ next, takes: [{ n, base, seed, words, area, seen, look?, model? }], chosen: { <base take>: <n> }, inGame: { <base take>: <n> } }`. `base` is the image's take it was painted on, `words` the patch's words it was made from (a take whose words differ from the patch's now is "earlier words") and `area` the area it was made with, so a new mark changes no earlier take; `chosen` keeps one choice per take of the image, so choosing another take of the image shows the patch's takes made on it, and choosing the first again brings its takes and their choice back. Choosing reaches the game (as-bo8.3, below). The old trial's `<image>/board.json` and `<image>/<n>.png` are no longer read and not deleted. Takes are queued on the GPU queue as an image's are (a second patch of the image waits behind the first, "Waiting"), Stop stops only this patch's, a failed take keeps its area and words for Try again, and what is waiting, being made or failed is in memory. Only one press of Make runs per patch at a time. Takes are made from the words on disk, so a press of Make first sees the field of words saved: it waits for a save under way, or saves words a failed save left in the field, with Make off meanwhile, and asks for no takes if the words could not be saved (as-d3b). The page lays one take over the one large picture with a switch to take it off (the dashes of the mark step aside when the take shown covers the mark's area), shows each take as a close-up framed on itself (`ui/patchCloseUp.ts`): the box round what the take keeps (`keptBox`, any pixel with opacity, on `PatchTakeView.kept`, read from the take's file and cached by its time and size) joined with the mark, with 25% of that box's sides round it, inside the picture, so an object grown past the mark shows whole; never taller than 1.5 times its width nor wider than 2.5 times its height (a thinner frame is widened round the change, moved inward at an edge, and stops at the picture); a take that keeps nothing, is still being made or cannot be read is framed on the mark, and no close-up moves when another take arrives (as-0ebj), and a closed row says "no takes yet", "2 takes, none chosen" or "3 takes" with the chip "Take 1 chosen" (`patchSummary`). Inside a patch ← → step its takes, C chooses, D drops (not the chosen one), S turns the patch off and on, and the image's own keys rest. Routes: `GET /api/images/:id/patches` (every declared patch's takes on the chosen take, and whether takes can be made), `POST …/patches/:patch/takes` (`{ count, area }` 1 to 4, or `{ retry }`), `GET`/`DELETE …/takes/:n`, `POST …/takes/:n/seen`, `POST …/choose` (`{ n }`), `…/unchoose`, `…/stop`. A patch tied to a placed named area (as-qg4.5) has no mark of the person's own until they drag or press a take: its mark is then computed from the area (`markFromArea`, the area grown by 24 pixels on every side, stopping at the picture's edges), so it follows the area at once as the area is placed, moved or cleared, and starts from it again after a reload. A line ("Marked from the named area…") shows while the mark is at that place, "Back to “<title>”" while it is not (it drops the person's own mark and focuses Make), and a line says so when the area has no place yet. Nothing is stored and a patch never moves the area. The image list and the lock are not touched by a patch. Screens: `docs/ui/as-bo8.2-patch-takes.html`, `docs/ui/as-qg4.5-patch-from-named-area.html`.
+**Patches** (as-b9x, as-bo8.2; `core/imagePatches.ts`, `services/imagePatches.ts`, `ui/features/images/PatchWorkbench.tsx`). An experiment in painting a change into a chosen picture, with the model given a window of the picture round the marked area for context, so it blends in where a separately made picture would not. On an open patch of "Patches the game asks for", the user drags a rectangle over the image's chosen take (the mark; a click or a drag too small to patch changes nothing, and a drag stops at the picture's edges, a side within 4 screen pixels of an edge counting as on it, and a side on an edge of the game's version carried out to the model's own edge, past what the game crops, so no fade shows inside the game's picture, as-lxo) and makes 1 to 4 takes of it from the patch's words. `mflux-generate-flux2-edit` then edits a window of the take's model picture round the marked area (`editWindow`, see Patch models below), with the picked model, on the GPU queue as a take is (`ImageRequest.editing`; the spike: about 15 s, 13.6 GB). A model also changes things it was not asked to, so a patch keeps only what the edit changed that touches the mark (as-wdim; `keepChanged`): every connected region where the colour-matched edit differs from the take (the worst channel, averaged over 3 pixels round each place) by more than 30 of 255, or 14 inside the mark, so a faint remnant or glow of what was removed goes too, that touches the mark (a changed place inside it) and is at least 40 pixels, with a soft edge (two 5-pixel blurs); a region of 40 pixels or more within 12 pixels (of the smoothed difference, about 14 to 18 in the picture) of one that touches the mark is kept with it (as-l71a), one step only so that nothing chains on from there, so a part parted from the rest only by a thin line of no change stays on (both of Qwen Image Edit 2511's black cats lost their heads above the mark, the neck black on the black shadow under a bed); the rest is transparent and the take shows. An object the edit grew past the mark is thus kept whole instead of cut off at it, and the few levels a model drifts inside the mark leave no rectangle of another tone (a trial on RetroQuest takes, adding a bucket, a basket, a cat and a trough and removing bread, a fire and a hen). Before the change is measured the edit's colours are matched, the mark first (`matchToTake`, described next) and then the rest of the window (`matchOutside`): every pixel outside the mark moves by the median offset of them all (values within 8 of black or white left out of the median, and the move easing out over the 32 tones nearest black and white, which a drift of the middle tones leaves where they are, so outlines and highlights do not read as changed), so a drift of the whole window, however large, is no change, and an object kept past the mark shows no step of colour at the mark's edge or ring of drift round it. At a side of the model's window that lies inside the picture the patch fades out over 16 pixels, and its last 4 pixels never count, so a change reaching it shows no line; at the picture's own edge it does not fade. Limits: a drift that differs across the window (parts lighter than others, or a horizon whose parts drift apart) is matched only by its median, so a part drifting more than 30 from it and touching what changed is kept, and a kept object can step in colour at the mark's edge by the difference; when what the edit changed covers more than half of the window outside the mark, the median is the change's and the rest of the window is kept in its tint; a big change leaves the middle of the mark as painted (see the matching below), so a drift above 14 left there is kept in patches round the object; a change smaller than about 8 pixels across never reaches full strength, and one under 40 pixels is left alone. The overlap warning still compares the marks. The mark's colours are matched to the take (as-c8q; `matchToTake`): the strip 8 pixels outside each side not on the picture's edge, compared with the take place by place along the side, gives the drift of the edit from the take there. A small difference (what is left inside the area after that correction, worst channel's mean up to 30 of 255) is a drift and is corrected across the whole area; a big one is taken as asked for, so it is corrected at the sides and eases in over 48 pixels, leaving the middle as painted. The sides follow a step such as a horizon (a median along the side, 24 places each way), and a place that differs from the drift around the area (the drift reference is described next) by more than 22 (of 255) fades to that drift by 30, so something the edit painted just outside the area, narrow, wide or soft-edged, is not carried into it as a streak. The drift reference is, of the tones many places of the strip agree on (within 8), the one nearest the median offset of the whole picture, judged on the places themselves before the median, so objects covering most of the strip cannot outvote the sky, and a gradual drift keeps its middle. A tone more than 22 from that median is refused as objects only while at least a tenth of the strip's places agree with the median; when none does, the edit shifted all that lies around the area (a sky moved far while the rest of the picture stayed) and the strip's own tone is the drift. Limits: a drift that changes by more than about 44 across the area, or two parts whose drifts differ by more than 22, leave the part furthest from the picture's own median unmatched; objects covering most of the strip around a sky shifted that far are taken for the drift. A difference up to 22 is indistinguishable from drift and is followed, as is a horizon whose two parts drift up to 22 apart. Nothing is adjustable and patches already made are not rewritten. A take is `content-studio/cache/image-patches/<image>/<patch>/<n>.png`, as big as the image's take and transparent outside what it keeps, on `board.json` in the same folder: `{ next, takes: [{ n, base, seed, words, area, seen, look?, model? }], chosen: { <base take>: <n> }, inGame: { <base take>: <n> } }`. `base` is the image's take it was painted on, `words` the patch's words it was made from (a take whose words differ from the patch's now is "earlier words") and `area` the area it was made with, so a new mark changes no earlier take; `chosen` keeps one choice per take of the image, so choosing another take of the image shows the patch's takes made on it, and choosing the first again brings its takes and their choice back. Choosing reaches the game (as-bo8.3, below). The old trial's `<image>/board.json` and `<image>/<n>.png` are no longer read and not deleted. Takes are queued on the GPU queue as an image's are (a second patch of the image waits behind the first, "Waiting"), Stop stops only this patch's, a failed take keeps its area and words for Try again, and what is waiting, being made or failed is in memory. Only one press of Make runs per patch at a time. Takes are made from the words on disk, so a press of Make first sees the field of words saved: it waits for a save under way, or saves words a failed save left in the field, with Make off meanwhile, and asks for no takes if the words could not be saved (as-d3b). The page lays one take over the one large picture with a switch to take it off (the dashes of the mark step aside when the take shown covers the mark's area), shows each take as a close-up framed on itself (`ui/patchCloseUp.ts`): the box round what the take keeps (`keptBox`, any pixel with opacity, on `PatchTakeView.kept`, read from the take's file and cached by its time and size) joined with the mark, with 25% of that box's sides round it, inside the picture, so an object grown past the mark shows whole; never taller than 1.5 times its width nor wider than 2.5 times its height (a thinner frame is widened round the change, moved inward at an edge, and stops at the picture); a take that keeps nothing, is still being made or cannot be read is framed on the mark, and no close-up moves when another take arrives (as-0ebj), and a closed row says "no takes yet", "2 takes, none chosen" or "3 takes" with the chip "Take 1 chosen" (`patchSummary`). Inside a patch ← → step its takes, C chooses, D drops (not the chosen one), S turns the patch off and on, and the image's own keys rest. Routes: `GET /api/images/:id/patches` (every declared patch's takes on the chosen take, and whether takes can be made), `POST …/patches/:patch/takes` (`{ count, area }` 1 to 4, or `{ retry }`), `GET`/`DELETE …/takes/:n`, `POST …/takes/:n/seen`, `POST …/choose` (`{ n }`), `…/unchoose`, `…/stop`. A patch tied to a placed named area (as-qg4.5) has no mark of the person's own until they drag or press a take: its mark is then computed from the area (`markFromArea`, the area grown by 24 pixels on every side, stopping at the picture's edges), so it follows the area at once as the area is placed, moved or cleared, and starts from it again after a reload. A line ("Marked from the named area…") shows while the mark is at that place, "Back to “<title>”" while it is not (it drops the person's own mark and focuses Make), and a line says so when the area has no place yet. Nothing is stored and a patch never moves the area. The image list and the lock are not touched by a patch.
 
-**Patch models** (as-ilw; `EDIT_MODELS` in `core/imageModels.ts`, `EditModelMenu`; screens `docs/ui/as-ilw-patch-model-takes.html`). Patch takes are made by one of two edit models, picked per patch in a menu above the count ("Model for new takes"): FLUX.2 klein 4B (about 20 s) first, then Qwen Image Edit (`Qwen/Qwen-Image-Edit-2511`, Apache-2.0, 58 GB, 4 to 9 min a take on a window of about 300 × 300; the label does not scale with the window). Until as-3l6k it was the first weights, `Qwen/Qwen-Image-Edit`: mflux runs Qwen edits only the way the 2509 and 2511 weights were made (a 384 × 384 view of the picture beside the words), and the first weights run that way painted a new scene instead of editing (a trial on RetroQuest takes: a dark room, another fireplace, a red dress, a hen turned into a white blob, at guidance 2.5 and 4 alike), where 2511 removed the bread, the fire and the hen. Qwen was found by trying candidates on the sample inn's sign: klein left a ghost of the stag and the lettering, Qwen with a plain instruction ("Remove the hanging wooden sign with the lettering from the wall above the door. Fill the place with plain timber wall.") left none (the same words on a fresh 1024 × 640 inn: the whole picture took 20 min and removed the sign, a 512 × 320 window round it took 8 min and removed it). The model is therefore given a window round the marked area, the area plus at least 96 px or half its side of context, sides in multiples of 16 (`editWindow`), pasted back into the take before the colours are matched and the area kept, so a take costs about the window and not the picture. It runs as `mflux-generate-qwen-edit --model Qwen/Qwen-Image-Edit-2511 --base-model qwen-image-edit --quantize 8 --steps 40 --guidance 4` (the weights' own advice; mflux's default guidance is 2.5): mflux's own alias `qwen-image-edit` downloads the 2509 weights, so the repository is named, and unquantized it is killed on a 48 GB Mac (8 bits peaks near 38 GB). The edit models are separate from `ImageModelId`, which stays the project's two models for an image's own takes (`images.model`, Setup's main-model row). Each take on the board gains `model` (absent on a take made before the choice, which klein made and which reads "FLUX.2 klein"); the page names it under "Take n", beside "Looking at" and in a take being made. New takes use the menu's model (`{ count, area, model }`; klein when the body names none), Try again the model that failed, and "Remake patches on this take" has a menu of its own (`{ count, marks, model }`) that follows no patch's. Picks live in `GamePatchesPanel` and end with the page; every menu starts on FLUX.2 klein (`DEFAULT_EDIT_MODEL`, `startEditModel`), whether or not Qwen is here, unless klein is not whole and Qwen is (a project whose own image model is another), so a menu never opens on a model that cannot work while the other could: a trial on RetroQuest takes (as-jgto) had klein remove the bread, a fire and a hen cleanly in seconds where Qwen, then the first weights, at about 9 min a take, left a mug, a fire still burning or a glow; with the 2511 weights (as-3l6k) Qwen removes them about as cleanly, but in 4 to 9 min, so klein stays first and Qwen a choice. Qwen's take times on this computer keep their key (`qwen-edit`), so times measured with the first weights are the figure until five 2511 takes replace them; a person who had the first weights downloaded sees Qwen as not on this computer and downloads the 2511 ones, and the first weights are not deleted. A picked model that is not on this computer shows "not on this computer" or "download incomplete" under the menu with Make off (`view.models`, the download of each edit model); a failed take marks its model "last take failed" until a take of that model works (`failedModels`, held in memory like the takes being made, never swapping models by itself). Setup's Image models row lists Qwen Image Edit as optional for patches, with its download command, while it is not whole (`facts.images.patchModel`); it never changes the row's state.
+**Patch models** (as-ilw; `EDIT_MODELS` in `core/imageModels.ts`, `EditModelMenu`). Patch takes are made by one of two edit models, picked per patch in a menu above the count ("Model for new takes"): FLUX.2 klein 4B (about 20 s) first, then Qwen Image Edit (`Qwen/Qwen-Image-Edit-2511`, Apache-2.0, 58 GB, 4 to 9 min a take on a window of about 300 × 300; the label does not scale with the window). Until as-3l6k it was the first weights, `Qwen/Qwen-Image-Edit`: mflux runs Qwen edits only the way the 2509 and 2511 weights were made (a 384 × 384 view of the picture beside the words), and the first weights run that way painted a new scene instead of editing (a trial on RetroQuest takes: a dark room, another fireplace, a red dress, a hen turned into a white blob, at guidance 2.5 and 4 alike), where 2511 removed the bread, the fire and the hen. Qwen was found by trying candidates on the sample inn's sign: klein left a ghost of the stag and the lettering, Qwen with a plain instruction ("Remove the hanging wooden sign with the lettering from the wall above the door. Fill the place with plain timber wall.") left none (the same words on a fresh 1024 × 640 inn: the whole picture took 20 min and removed the sign, a 512 × 320 window round it took 8 min and removed it). The model is therefore given a window round the marked area, the area plus at least 96 px or half its side of context, sides in multiples of 16 (`editWindow`), pasted back into the take before the colours are matched and the area kept, so a take costs about the window and not the picture. It runs as `mflux-generate-qwen-edit --model Qwen/Qwen-Image-Edit-2511 --base-model qwen-image-edit --quantize 8 --steps 40 --guidance 4` (the weights' own advice; mflux's default guidance is 2.5): mflux's own alias `qwen-image-edit` downloads the 2509 weights, so the repository is named, and unquantized it is killed on a 48 GB Mac (8 bits peaks near 38 GB). The edit models are separate from `ImageModelId`, which stays the project's two models for an image's own takes (`images.model`, Setup's main-model row). Each take on the board gains `model` (absent on a take made before the choice, which klein made and which reads "FLUX.2 klein"); the page names it under "Take n", beside "Looking at" and in a take being made. New takes use the menu's model (`{ count, area, model }`; klein when the body names none), Try again the model that failed, and "Remake patches on this take" has a menu of its own (`{ count, marks, model }`) that follows no patch's. Picks live in `GamePatchesPanel` and end with the page; every menu starts on FLUX.2 klein (`DEFAULT_EDIT_MODEL`, `startEditModel`), whether or not Qwen is here, unless klein is not whole and Qwen is (a project whose own image model is another), so a menu never opens on a model that cannot work while the other could: a trial on RetroQuest takes (as-jgto) had klein remove the bread, a fire and a hen cleanly in seconds where Qwen, then the first weights, at about 9 min a take, left a mug, a fire still burning or a glow; with the 2511 weights (as-3l6k) Qwen removes them about as cleanly, but in 4 to 9 min, so klein stays first and Qwen a choice. Qwen's take times on this computer keep their key (`qwen-edit`), so times measured with the first weights are the figure until five 2511 takes replace them; a person who had the first weights downloaded sees Qwen as not on this computer and downloads the 2511 ones, and the first weights are not deleted. A picked model that is not on this computer shows "not on this computer" or "download incomplete" under the menu with Make off (`view.models`, the download of each edit model); a failed take marks its model "last take failed" until a take of that model works (`failedModels`, held in memory like the takes being made, never swapping models by itself). Setup's Image models row lists Qwen Image Edit as optional for patches, with its download command, while it is not whole (`facts.images.patchModel`); it never changes the row's state.
 
-**A chosen patch in the game** (as-bo8.3; `gamePatch` in `core/imagePatches.ts`, `services/imagePatchGame.ts`; screens `docs/ui/as-bo8.3-patch-in-game.html`). Every patch take has a _game version_ beside it, `<n>.game.png`: the image take it was painted on, with the patch blended over it by its own transparency, and the take alone, are both brought to the game's look (`bringToLook`, the image's size, palette and dithering), and only the dots that differ are kept, each fully solid; the rest is fully transparent (`gamePatch`). The soft edge thus fades out in the look's own dither, and laid over the image's game version the result is exactly the painted take brought to the look. It is made as soon as the take is (the board's `take.look` notes the look it was brought to; "bringing" in between), and a take that cannot be brought stays as the model made it. Choose (`services/imagePatches.ts`) writes that picture as `<clips>/<image>.<patch>.png` and the manifest entry `patches.<patch> = { file, width, height }` under the image (the manifest is written in the image's choice queue, like an image's choice; unreadable, it refuses and changes nothing), then the board: `chosen[base]` and `inGame[base]`, the take the game has on each take of the image (a choice made before this step is in `chosen` only, so it is not in the game until Un-choose and Choose). Un-choose takes the entry (and an empty `patches`), the picture and the board's entry away, in that order, so pressing again finishes a half-done job. The image's own choices carry the patches (`publish` in `services/imageTakes.ts`): choosing another take lists only the patches with `inGame` on it, written again from their game versions (one file name is shared by every take of the image), so the patches of the previous take leave the list in the same save and come back with the original; un-choosing the image removes its manifest entry with the patches; patch pictures stay in the folder. A look change brings the patches along with their image (`bringImage`): every patch take's game version is made again from the model's pictures, the pictures in the game are rewritten, and the image counts once in the notice (`readTakeLooks` adds the patch takes' looks); a patch that cannot be brought is named in the failure ("the model's picture of its patch "Bread taken" is missing") and keeps its old look, which shows as the chip "Old look" on its row and above its picture (`PatchWorkView.oldLook`). The page has a box "What the game gets" in each patch's Takes heading, ticked when the page opens and kept per patch while the page is open (`GamePatchesPanel`); ticked, the large picture and close-ups show the game's version at the game's size (`ui/patchGameSpace.ts` maps a mark between the model's picture and the game's, whose crop is `cropWindow`), unticked what the model made, captioned "640 × 400" or "1024 × 640 · cropped to fit". Choose waits while a take is being brought, when the style cannot be read ("Fix the style to choose this take.") and while the lock cannot be read. `GET /api/images/:id/patches/:patch/takes/:n/game` serves the game version.
+**A chosen patch in the game** (as-bo8.3; `gamePatch` in `core/imagePatches.ts`, `services/imagePatchGame.ts`). Every patch take has a _game version_ beside it, `<n>.game.png`: the image take it was painted on, with the patch blended over it by its own transparency, and the take alone, are both brought to the game's look (`bringToLook`, the image's size, palette and dithering), and only the dots that differ are kept, each fully solid; the rest is fully transparent (`gamePatch`). The soft edge thus fades out in the look's own dither, and laid over the image's game version the result is exactly the painted take brought to the look. It is made as soon as the take is (the board's `take.look` notes the look it was brought to; "bringing" in between), and a take that cannot be brought stays as the model made it. Choose (`services/imagePatches.ts`) writes that picture as `<clips>/<image>.<patch>.png` and the manifest entry `patches.<patch> = { file, width, height }` under the image (the manifest is written in the image's choice queue, like an image's choice; unreadable, it refuses and changes nothing), then the board: `chosen[base]` and `inGame[base]`, the take the game has on each take of the image (a choice made before this step is in `chosen` only, so it is not in the game until Un-choose and Choose). Un-choose takes the entry (and an empty `patches`), the picture and the board's entry away, in that order, so pressing again finishes a half-done job. The image's own choices carry the patches (`publish` in `services/imageTakes.ts`): choosing another take lists only the patches with `inGame` on it, written again from their game versions (one file name is shared by every take of the image), so the patches of the previous take leave the list in the same save and come back with the original; un-choosing the image removes its manifest entry with the patches; patch pictures stay in the folder. A look change brings the patches along with their image (`bringImage`): every patch take's game version is made again from the model's pictures, the pictures in the game are rewritten, and the image counts once in the notice (`readTakeLooks` adds the patch takes' looks); a patch that cannot be brought is named in the failure ("the model's picture of its patch "Bread taken" is missing") and keeps its old look, which shows as the chip "Old look" on its row and above its picture (`PatchWorkView.oldLook`). The page has a box "What the game gets" in each patch's Takes heading, ticked when the page opens and kept per patch while the page is open (`GamePatchesPanel`); ticked, the large picture and close-ups show the game's version at the game's size (`ui/patchGameSpace.ts` maps a mark between the model's picture and the game's, whose crop is `cropWindow`), unticked what the model made, captioned "640 × 400" or "1024 × 640 · cropped to fit". Choose waits while a take is being brought, when the style cannot be read ("Fix the style to choose this take.") and while the lock cannot be read. `GET /api/images/:id/patches/:patch/takes/:n/game` serves the game version.
 
-**Patches set aside** (as-bo8.4; `setAsideQuestion` and `makeAgainOf` in `core/imagePatches.ts`, `PatchRow.chosenOn` / `chosenOnGone` in `core/images.ts`, `readPatchChoices` in `services/imageLists.ts`; screens `docs/ui/as-bo8.4-patches-set-aside.html`). Nothing new is stored: choosing another take of the image already lists only the patches with `inGame` on it (above), so the patches of the previous take are set aside, not deleted, and come back with the original. What the page adds is asking first and marking. Each patch row carries the takes of the image its patch has a chosen take on (`board.chosen`; `chosenOn` for those still on the image's board, `chosenOnGone` for one since dropped), read with the images summary. Choose (or C) and Un-choose on an image whose take in the game has chosen patches ask first, in the place of "In the game" (the same `Confirm` as Un-choose), naming the patches by title in the game's order and, when the take chosen has chosen patches of its own, which come back; the yes is the ordinary choose or un-choose and the question stays open with the studio's message if it cannot be saved. Drop (or D) of a take with chosen patches set aside asks in the place of that take's picture; the patches then stay marked with no take to go back to. A patch needs making again when it is asked for, has a chosen take on some take of the image other than the one in the game and none on that one (`makeAgainOf`); its closed row has the chip "Make again", its opened row a line saying where it was chosen, and the act's row a line "make again: …" beside "the game changed a patch's words". A patch chosen before as-bo8.3 (`chosen` without `inGame`) is counted and named like any other, though the game never had it.
+**Patches set aside** (as-bo8.4; `setAsideQuestion` and `makeAgainOf` in `core/imagePatches.ts`, `PatchRow.chosenOn` / `chosenOnGone` in `core/images.ts`, `readPatchChoices` in `services/imageLists.ts`). Nothing new is stored: choosing another take of the image already lists only the patches with `inGame` on it (above), so the patches of the previous take are set aside, not deleted, and come back with the original. What the page adds is asking first and marking. Each patch row carries the takes of the image its patch has a chosen take on (`board.chosen`; `chosenOn` for those still on the image's board, `chosenOnGone` for one since dropped), read with the images summary. Choose (or C) and Un-choose on an image whose take in the game has chosen patches ask first, in the place of "In the game" (the same `Confirm` as Un-choose), naming the patches by title in the game's order and, when the take chosen has chosen patches of its own, which come back; the yes is the ordinary choose or un-choose and the question stays open with the studio's message if it cannot be saved. Drop (or D) of a take with chosen patches set aside asks in the place of that take's picture; the patches then stay marked with no take to go back to. A patch needs making again when it is asked for, has a chosen take on some take of the image other than the one in the game and none on that one (`makeAgainOf`); its closed row has the chip "Make again", its opened row a line saying where it was chosen, and the act's row a line "make again: …" beside "the game changed a patch's words". A patch chosen before as-bo8.3 (`chosen` without `inGame`) is counted and named like any other, though the game never had it.
 
-**Patches that overlap** (as-bo8.5; `overlappingPatches` and `patchBoxesOverlap` in `core/imagePatches.ts`, `PatchRow.chosenArea` in `core/images.ts`, `readPatchChoices` in `services/imageLists.ts`; screens `docs/ui/as-bo8.5-patches-overlap.html`). Patches of one image are made independently from the same take, so two chosen patches whose marked areas share a dot may show badly together. Nothing is stored and nothing is stopped: each patch row carries `chosenArea`, the area its chosen take on the image's take in the game was made with (read from the patch boards with the images summary, only while that take's picture is there), and `overlappingPatches` lists the pairs of asked-for patches whose chosen areas intersect (a shared border is not an overlap; the soft edge counts), each once, in the game's order. The image's page shows one amber warning in "Patches the game asks for" (nothing until the patches have loaded, nor when the chosen picture or the lock cannot be read), an opened patch a line naming what its chosen take overlaps, and the act's row a line beside "make again". A patch's choose, un-choose or drop reloads the project (`usePatchTakesChange`) so the rows follow what was saved.
+**Patches that overlap** (as-bo8.5; `overlappingPatches` and `patchBoxesOverlap` in `core/imagePatches.ts`, `PatchRow.chosenArea` in `core/images.ts`, `readPatchChoices` in `services/imageLists.ts`). Patches of one image are made independently from the same take, so two chosen patches whose marked areas share a dot may show badly together. Nothing is stored and nothing is stopped: each patch row carries `chosenArea`, the area its chosen take on the image's take in the game was made with (read from the patch boards with the images summary, only while that take's picture is there), and `overlappingPatches` lists the pairs of asked-for patches whose chosen areas intersect (a shared border is not an overlap; the soft edge counts), each once, in the game's order. The image's page shows one amber warning in "Patches the game asks for" (nothing until the patches have loaded, nor when the chosen picture or the lock cannot be read), an opened patch a line naming what its chosen take overlaps, and the act's row a line beside "make again". A patch's choose, un-choose or drop reloads the project (`usePatchTakesChange`) so the rows follow what was saved.
 
 **Fine-tuning the picture** (as-2xwj, and as-oure for the form and a card's Stop, `docs/ui/as-oure-card-stop.html`; `core/imageFineTunes.ts`, `services/imageFineTunes.ts`, `services/imageEditStep.ts`, `ImageTakes.addTake`, `carryAreas` in `core/images.ts`, `ui/features/images/FineTunePanel.tsx`; screens `docs/ui/as-2xwj-fine-tune.html`). An image's page has a full-width panel "Fine-tune the picture" below Takes: it changes the picture in the game (the chosen take, or the game's own image when no take is chosen) from words, the way a patch does but with the result replacing the picture. The edit is the patch's: the shared step `editStep` gives the edit model a window round the marked area and keeps what changed there (`keepChanged`, transparent elsewhere), or, with no mark, the whole picture and the whole edited picture; patches use the same step. The game's own image is scaled to the take size (`fitToSize`) first, so what comes of it is take-sized. Fine-tunes are made 1 to 6 at a time on the GPU queue with the patch edit models (`EDIT_MODELS`), one press at a time per image, timed under the patch keys (`klein-edit`, `qwen-edit`). A fine-tune is `content-studio/cache/image-fine-tunes/<image>/<n>.png` on `board.json` `{ next, tunes: [{ n, base, seed, words, area, seen, model }] }` in the gitignored cache; `base` is the take it was made from, 0 for the game's own image, and the panel shows only those of the picture in the game, so choosing another take shows that take's (none, usually) and the first take's come back with it. What is waiting, being made or failed is in memory, as patches'. Routes: `GET /api/images/:id/fine-tunes`, `POST …` (`{ count 1..6, words, area|null, model? }` or `{ retry }`), `POST …/stop` (all of them), `GET`/`DELETE …/:n` (a ready or failed one is dropped; one waiting or being made is stopped and removed, which is the Stop under a card being made, and the next waiting one starts), `POST …/:n/seen`, `POST …/use` (`{ n }`). **Use this** (`use`) acts at once: the fine-tune, laid over the picture it came from when it is marked (`layOver`), is added as the image's next take (`addTake`: its picture, a board take with the madeFrom of the take it came from, so it goes out of date with the words and style as that did, and `fineTunedFrom: { take|null, words }`, which the Takes section shows as "Fine-tuned from Take 3: “…”"); the take's named-area boxes are copied to it (`carryImageAreas`) and each chosen patch's take is copied as a patch take painted on it (`carryPatch`: picture, game version, `chosen` and `inGame`), so the patch's workbench shows and can choose it there; nothing is set aside; it is chosen through the ordinary choose, which writes the picture, the manifest and the lock; and last every fine-tune of the image is dropped and any waiting or being made stopped. Uses of one image go one at a time. A refused choose drops the added take and the patch takes copied for it and leaves the fine-tunes, so pressing again is the retry (the boxes stay on the dropped take, as those of any dropped take do). For the game's own image the panel draws `GET …/fine-tunes/base`, the image fitted to the take size, the picture the model was given. Only marked fine-tunes are timed (under the patch keys): a whole-picture edit would skew a patch's figure. The take it replaces stays among the takes as an ordinary take, and the game's own file is never changed. The answer (`UseFineTuneAnswer`) carries what came along for the page's green line (`cameAlongLine`). A card that turns ready while the page is open keeps Use this and Drop off for one second ("Just finished — a moment…"; as-0tqz, `docs/ui/as-0tqz-late-click.html`) so a click meant for its Stop does not use it; cards ready when the page loads are on at once.
 
-**Take times** (as-l00; `core/takeTimes.ts`, `services/takeTimes.ts`, `useFigures` in `ui/api.ts`; screens `docs/ui/as-l00-take-times.html`). Every time figure for image and patch takes is how long takes have really taken on this computer: the median of the last five finished takes of a model, kept in `content-studio/cache/take-times.json` (the gitignored cache, so per computer, never in the game's repository). Klein's patches are timed apart from its takes (`klein-edit`), so there are five keys: `klein`, `z-image-turbo`, `qwen-image`, `qwen-edit`, `klein-edit`. A take records `now - startedAt` when it finishes, where `startedAt` is when it starts making, so waiting its turn is not counted; a failed or stopped take records nothing. Until a model has a timed take its figure is a starting guess (klein 20 s, Z-Image-Turbo 1 min, Qwen-Image 4 min, Qwen Image Edit 8 min, klein patches 20 s) and the menus say "a guess: about 20 s a take". A missing or unreadable file reads as no timings. Rounding is shared (`timeText`): under a minute to five seconds (at least 5), then whole minutes; menus round to the nearest, time-left lines up; "taking longer than expected" once the figure is used up. The closed model menus that carry the figure (an image's Takes menu, the patch models' menu, Setup's Images row) wrap, and so does Setup's Music menu, whose longest entry (Eleven Music's) otherwise widened the page past a narrow window (as-kila): `MenuFace` draws the closed words in a box that grows to as many lines as it needs and lays the native select over it, invisible, so the open list, Tab, the arrow keys and the disabled state stay the computer's own (screens `docs/ui/as-l00-menu-wraps.html`). Music's and sound effects' figures are untouched.
+**Take times** (as-l00; `core/takeTimes.ts`, `services/takeTimes.ts`, `useFigures` in `ui/api.ts`). Every time figure for image and patch takes is how long takes have really taken on this computer: the median of the last five finished takes of a model, kept in `content-studio/cache/take-times.json` (the gitignored cache, so per computer, never in the game's repository). Klein's patches are timed apart from its takes (`klein-edit`), so there are five keys: `klein`, `z-image-turbo`, `qwen-image`, `qwen-edit`, `klein-edit`. A take records `now - startedAt` when it finishes, where `startedAt` is when it starts making, so waiting its turn is not counted; a failed or stopped take records nothing. Until a model has a timed take its figure is a starting guess (klein 20 s, Z-Image-Turbo 1 min, Qwen-Image 4 min, Qwen Image Edit 8 min, klein patches 20 s) and the menus say "a guess: about 20 s a take". A missing or unreadable file reads as no timings. Rounding is shared (`timeText`): under a minute to five seconds (at least 5), then whole minutes; menus round to the nearest, time-left lines up; "taking longer than expected" once the figure is used up. The closed model menus that carry the figure (an image's Takes menu, the patch models' menu, Setup's Images row) wrap, and so does Setup's Music menu, whose longest entry (Eleven Music's) otherwise widened the page past a narrow window (as-kila): `MenuFace` draws the closed words in a box that grows to as many lines as it needs and lays the native select over it, invisible, so the open list, Tab, the arrow keys and the disabled state stay the computer's own. Music's and sound effects' figures are untouched.
 
-**Remaking patches on a new take** (as-qoj; `remakeCovered`, `planRemake`, `tieOf` in `core/imagePatches.ts`, `remake` / `stopRemake` / `closeRemake` in `services/imagePatches.ts`, `ui/features/images/RemakeLine.tsx`; screens `docs/ui/as-qoj-remake-patches.html`). Under the intro of "Patches the game asks for", when the image has a chosen take and a patch is covered, a line counts them with a menu (1 to 4 takes each, starting at 2, page state) and "Remake patches on this take". A patch is covered when it needs making again (`makeAgainOf`) and has no take on the take in the game, none finished, waiting, being made or failed (`remakeCovered`). The press starts at once and chooses nothing: each covered patch gets the number of takes on the take in the game, in the game's order, through the same per-patch start as Make (so on the same GPU queue, with the patch's words as they stand). Each is made from the first place that exists and fits the picture (`planRemake`): the mark the person drew on the patch (the page sends the marks it holds, `POST /api/images/:id/patches/remake` `{ count, marks }`), the place its named area has now (`markFromArea`), else the area of the take chosen on the newest earlier take of the image (`ImagePatchesView.remake.earlier`, read from the patch boards). A patch with none is left out and named under the press; nothing moves a saved or a named area. The page and the server compute the plan with the same pure functions. The latest press of each image is kept in memory (`contentStudioPatchRemakes`, the takes it queued by patch, like the takes being made); `ImagePatchesView.remake.press` derives its counts: made (on the board on the take it was made on), failed, stopped (neither), and the seconds left. While it runs the line is a progress line with Stop (`POST …/patches/remake/stop`, only this press's waiting or running takes; a patch's own Stop still stops all of that patch's), then a summary with Close (`…/remake/close`, which does not forget a running press). A page that has just loaded reads with `?fresh=1`, which drops a finished press, so a summary is not kept across a reload (a running one is); the time left says "about N s" under a minute. Closed rows say "Making 2 takes" with a bar or "Waiting", add " · 1 could not be made" for failed takes, and carry the chip "new" until a take has been looked at; a failed patch in the summary is a link that opens and scrolls to its row. If any patch cannot be started, the takes already queued by the press are stopped and nothing is kept.
+**Remaking patches on a new take** (as-qoj; `remakeCovered`, `planRemake`, `tieOf` in `core/imagePatches.ts`, `remake` / `stopRemake` / `closeRemake` in `services/imagePatches.ts`, `ui/features/images/RemakeLine.tsx`). Under the intro of "Patches the game asks for", when the image has a chosen take and a patch is covered, a line counts them with a menu (1 to 4 takes each, starting at 2, page state) and "Remake patches on this take". A patch is covered when it needs making again (`makeAgainOf`) and has no take on the take in the game, none finished, waiting, being made or failed (`remakeCovered`). The press starts at once and chooses nothing: each covered patch gets the number of takes on the take in the game, in the game's order, through the same per-patch start as Make (so on the same GPU queue, with the patch's words as they stand). Each is made from the first place that exists and fits the picture (`planRemake`): the mark the person drew on the patch (the page sends the marks it holds, `POST /api/images/:id/patches/remake` `{ count, marks }`), the place its named area has now (`markFromArea`), else the area of the take chosen on the newest earlier take of the image (`ImagePatchesView.remake.earlier`, read from the patch boards). A patch with none is left out and named under the press; nothing moves a saved or a named area. The page and the server compute the plan with the same pure functions. The latest press of each image is kept in memory (`contentStudioPatchRemakes`, the takes it queued by patch, like the takes being made); `ImagePatchesView.remake.press` derives its counts: made (on the board on the take it was made on), failed, stopped (neither), and the seconds left. While it runs the line is a progress line with Stop (`POST …/patches/remake/stop`, only this press's waiting or running takes; a patch's own Stop still stops all of that patch's), then a summary with Close (`…/remake/close`, which does not forget a running press). A page that has just loaded reads with `?fresh=1`, which drops a finished press, so a summary is not kept across a reload (a running one is); the time left says "about N s" under a minute. Closed rows say "Making 2 takes" with a bar or "Waiting", add " · 1 could not be made" for failed takes, and carry the chip "new" until a take has been looked at; a failed patch in the summary is a link that opens and scrolls to its row. If any patch cannot be started, the takes already queued by the press are stopped and nothing is kept.
 
-**Named areas set aside** (as-qg4.4; `adoptAreas`, `applyAreaBox` and `areaFractionsOn` in `core/images.ts`, `AreaRow.boxes` / `elsewhere` / `elsewhereGone`, `setAsideQuestion` in `core/imagePatches.ts`, `adoptImageAreas` in `services/imageEdits.ts`; screens `docs/ui/as-qg4.4-areas-set-aside.html`). Each take of an image keeps its own boxes: the image's edit gains `takeAreas` (by take number, then area id); `areas` stays as the boxes of no take yet (placed before this, or with no take chosen), which count on the take in the game and move onto it (`adoptAreas`) when a box is placed there or the take in the game changes (Choose, Un-choose; before the save, so a failed choose can leave them on the new take). A row's `box` and `placed` are those of the take in the game, so the head's count, the act's "areas to place" and `areaFractions` are unchanged; `boxes` has the row's box on every take still on the board, `elsewhere` the other takes when it has none on the take in the game (the chip "Place again"), `elsewhereGone` a box on a dropped take (the board's take numbers are never reused, so a dropped take is found by the board, read for images with `takeAreas`, like the patch choices). The game's manifest gets the boxes of the take being published (`areaFractionsOn` in `publish`), so choosing another take takes the old boxes out of the game in the same save and choosing the original brings them back; nothing is deleted, and Drop needs no write. The Choose, Un-choose and Drop questions of as-bo8.4 name the areas too (`setAsideQuestion` gives `leavingAreas`, `returningAreas`; `setAsideLead`, `setAsideDim` in `ui/imagesText.ts`), one question with two lists when patches and areas both leave. The Named areas panel shows the line `placeAgainLine` above its list while any row reads "Place again", and selects the first area still needing a place when the take in the game changes.
+**Named areas set aside** (as-qg4.4; `adoptAreas`, `applyAreaBox` and `areaFractionsOn` in `core/images.ts`, `AreaRow.boxes` / `elsewhere` / `elsewhereGone`, `setAsideQuestion` in `core/imagePatches.ts`, `adoptImageAreas` in `services/imageEdits.ts`). Each take of an image keeps its own boxes: the image's edit gains `takeAreas` (by take number, then area id); `areas` stays as the boxes of no take yet (placed before this, or with no take chosen), which count on the take in the game and move onto it (`adoptAreas`) when a box is placed there or the take in the game changes (Choose, Un-choose; before the save, so a failed choose can leave them on the new take). A row's `box` and `placed` are those of the take in the game, so the head's count, the act's "areas to place" and `areaFractions` are unchanged; `boxes` has the row's box on every take still on the board, `elsewhere` the other takes when it has none on the take in the game (the chip "Place again"), `elsewhereGone` a box on a dropped take (the board's take numbers are never reused, so a dropped take is found by the board, read for images with `takeAreas`, like the patch choices). The game's manifest gets the boxes of the take being published (`areaFractionsOn` in `publish`), so choosing another take takes the old boxes out of the game in the same save and choosing the original brings them back; nothing is deleted, and Drop needs no write. The Choose, Un-choose and Drop questions of as-bo8.4 name the areas too (`setAsideQuestion` gives `leavingAreas`, `returningAreas`; `setAsideLead`, `setAsideDim` in `ui/imagesText.ts`), one question with two lists when patches and areas both leave. The Named areas panel shows the line `placeAgainLine` above its list while any row reads "Place again", and selects the first area still needing a place when the take in the game changes.
 
-**The point of a named area** (as-5qaj; `AreaBox.point`, `checkAreaBox` in `core/images.ts`, `pointOf`, `movePoint`, `nudgePoint`, `keepPoint`, `centred` in `ui/imageAreaBox.ts`; screens `docs/ui/as-5qaj-area-point.html`). Where RetroQuest's What's there marks a thing: a box may carry `point: { x, y }` in the image's pixels, inside the box, kept in the image's edits with the box (so each take's box keeps its own and Clear takes both). No `point` means the centre, and a point put on the centre is not stored. On the selected box the panel draws it as a full-size dot (small under 40 screen pixels each way; other boxes always show a small dot), drag it or press Alt with the arrow keys (the box's step) to move it, stopping at the box's edges; moving or resizing the box keeps the point on the same spot of the picture, pushed to the nearest edge when no longer covered (a point never moved stays central; a point placed stays placed even if the new centre falls on it). "Centre the point" on the selected row puts it back. The point is saved with the box (`PUT …/areas/:area`, `{ box: { x, y, width, height, point? } }`) and passed to the game in the same save, as the area's `mark: { x, y }` in the images manifest, fractions of the picture (as-lgp5; the game's half is rq-lcy5).
+**The point of a named area** (as-5qaj; `AreaBox.point`, `checkAreaBox` in `core/images.ts`, `pointOf`, `movePoint`, `nudgePoint`, `keepPoint`, `centred` in `ui/imageAreaBox.ts`). Where RetroQuest's What's there marks a thing: a box may carry `point: { x, y }` in the image's pixels, inside the box, kept in the image's edits with the box (so each take's box keeps its own and Clear takes both). No `point` means the centre, and a point put on the centre is not stored. On the selected box the panel draws it as a full-size dot (small under 40 screen pixels each way; other boxes always show a small dot), drag it or press Alt with the arrow keys (the box's step) to move it, stopping at the box's edges; moving or resizing the box keeps the point on the same spot of the picture, pushed to the nearest edge when no longer covered (a point never moved stays central; a point placed stays placed even if the new centre falls on it). "Centre the point" on the selected row puts it back. The point is saved with the box (`PUT …/areas/:area`, `{ box: { x, y, width, height, point? } }`) and passed to the game in the same save, as the area's `mark: { x, y }` in the images manifest, fractions of the picture (as-lgp5; the game's half is rq-lcy5).
 
 **The game's look** (as-yag.5; `core/imageLook.ts`, `core/imagePixels.ts`, `services/png.ts`). The
 game's version of a take is the model's stored picture (`<n>.png`, never changed) brought to the
@@ -1625,7 +1615,7 @@ read. The game's own `file` is never written or deleted. Where the pictures of t
 the game's own are served from: `GET /api/images/:id/current` (the chosen clip, else the game's file).
 
 **The workbench** (an image's page, under its notices) keeps the whole round, words, make, look,
-choose or drop, in view at once (`docs/ui/image-workspace.html`, layout A). Its first column holds
+choose or drop, in view at once. Its first column holds
 the Prompt panel, then **Make takes** (the menu "Model for new takes" on a line of its own, which
 starts on the project's model, or on the model that is here when that one is missing, with a faint
 line saying so, a pick holding only while the page is open; closed it reads "FLUX.2 klein — a guess: about 20 s
@@ -1660,7 +1650,7 @@ take and **D** drops it, each only when its button is on, once per press (a held
 repeat) and not while the last choice or drop is still being saved. Pressing Make N takes puts focus on the compared take in the
 grid (on the Comparing label when there is none yet), so the switched-off button does not lose it
 (as-99s). The status of an image on its act's list says "making 2 takes · about 50 s" while takes
-are made, the time left rounded up like every image time (as-l00). The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.html`.
+are made, the time left rounded up like every image time (as-l00).
 
 **Make takes for the whole act (as-23x.3).** The "Images up to date" panel on an act's page has a
 button, "Make 4 takes each", beside the count. `planImagesMakeAll` (`src/core/imagesMakeAll.ts`)
@@ -1678,7 +1668,7 @@ out from `GET /api/images/making`, which now also counts `failed` and `stopped` 
 those reports `takes: 0`; both live in memory until the studio restarts, and the summary line takes the difference since the press); the summary is remembered by the running studio, not on disk (as-4m0: `contentStudioImageBatches`
 in `services/imageTakes.ts`, one per act, `GET /api/image-acts/:id/batch`, `POST …/batch/close`),
 with the same rules as the music lists': it survives a reload and shows in every tab, until Close, a
-new press or a hand start on an image of the act, and a quit forgets it. Mockup: `docs/ui/as-23x.3-make-all.html`.
+new press or a hand start on an image of the act, and a quit forgets it.
 
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
@@ -1694,7 +1684,7 @@ the studio's own page only.
 
 ### 8.8 Sound effects: the models (as-5wc.3, as-5wc.5)
 
-Sound effects are made with Stable Audio 3 Small SFX on the CPU (§13 decision 9), by a worker of its
+Sound effects are made with Stable Audio 3 Small SFX on the CPU (§12 decision 9), by a worker of its
 own, `worker/effects.py`, run with uv from `src/services/effects.ts` (`createEffectsWorker`). It is
 a JSON-lines worker like the music workers, started on the first effect (the model loads in about
 4 s) and stopped with the studio. An effect is a description, a length and a seed; the worker
@@ -1753,8 +1743,7 @@ longer lists it.
 
 The Sound effects workspace shows the game's **sound effects**: one game-wide list, as the stingers
 are. This section is the reading and the studio's own descriptions (as-5wc.2); making, comparing and
-choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
-`docs/ui/as-5wc.2-sound-effects.html`.
+choosing takes come with as-5wc.3 and as-5wc.4.
 
 ```json
 "effects": {
@@ -1809,8 +1798,7 @@ written as `words`, say) is reported at its path and never written over.
 
 An effect's page is a stinger's page without the brief's tempo and key: the **Description** panel, a
 green **In the game** block (the chosen take on its own, or a dashed "Nothing plays here yet"), and
-the **Takes** panel (the others as cards, two to a row in take-number order). The screens are drawn in
-`docs/ui/as-5wc.4-effect-takes.html`.
+the **Takes** panel (the others as cards, two to a row in take-number order).
 
 **Takes.** A take is the description in use (the studio's over the game's) generated for the
 `seconds` the game asks, with a new seed, by `EffectGenerator` (§8.8) one at a time: Small SFX's takes on their own queue
@@ -1845,8 +1833,7 @@ refuses Make takes ("No takes were made: content-studio/cache/effect-boards/<id>
 Drop ("The take could not be dropped: … could not be written.", the take kept) with a line naming it, never a bare
 500 (as-ct9).
 
-**Trim silence** (built, as-dgh.1; one-shot effects only, as stingers' in §8.5 and drawn in
-`docs/ui/as-dgh.1-effect-trim-silence.html`): a take card, and the take in the In the game block, has **Trim silence**
+**Trim silence** (built, as-dgh.1; one-shot effects only, as stingers' in §8.5): a take card, and the take in the In the game block, has **Trim silence**
 at the left of its bottom row (Drop and Choose at the right). It is offered only on a take made to play once for
 an effect that plays once (`effectTrimOffered`); a take made to loop never has it. One press cuts the
 near-silent start and end (`findTrim` with `EFFECT_TRIM_RULES` in `core/effectTrim.ts`: samples at or under 300
@@ -1880,7 +1867,7 @@ unchanged. **Accept** (`POST /api/effects/:id/accept`) counts the chosen take as
 description now, when the description alone changed; a changed length needs a new take (409).
 `CONTENT_STUDIO_FAKE_EFFECTS=1` swaps the generator for a stand-in that makes short tones.
 
-**Fades of a one-shot sound effect take** (as-dgh.2; drawn in `docs/ui/as-dgh.2-effect-fades.html`). The stingers' fade editor
+**Fades of a one-shot sound effect take** (as-dgh.2). The stingers' fade editor
 (above, §8.5: `FadesEditorBody`, shared) on every take made to play once of an effect that plays once, and on the take in the
 In the game block; a take made to loop, and every take of a looping effect, gets none (`effectFadable`, `effectFadesOf` in
 `core/effectTakes.ts`), and a take keeps its saved fades while its effect loops, shown and played again when it goes back to
@@ -1898,7 +1885,7 @@ the In the game block, "The chosen, then this", the editor) asks for the take wi
 (`heardAs`); the editor, its states and its words are the stingers', with the lock line "Choosing, dropping and fading wait
 until the sound effects lock can be read." A trim (as-dgh.1) is applied before the fades, as on stingers.
 
-**Effects that loop** (as-5wc.6; drawn in `docs/ui/as-5wc.6-looping-effects.html`). The list's `loops` flag is read
+**Effects that loop** (as-5wc.6). The list's `loops` flag is read
 on every read, never stored. A looping effect's take is asked of the model at `seconds` plus a seam
 plus a spare second (`loopRequestSeconds` in `core/effectLoop.ts`; the seam is 1 s, at most half of a
 short loop, and the spare is dropped because Small SFX fades out in its last tenth of a second to
@@ -1919,7 +1906,7 @@ music's. When the game switches an effect between once and looping, the lock's i
 marked "made to play once" / "made to loop", and can be played, compared and dropped but not
 chosen (the service refuses with 409). Choosing a take of the new kind clears the box.
 
-**Make all** (as-23x.4; drawn in `docs/ui/as-23x.4-make-all.html`). The list's "Effects up to date" panel
+**Make all** (as-23x.4). The list's "Effects up to date" panel
 carries, beside the count, "N effects have no chosen take" and "Make 4 takes each" (`EffectsMakeAll.tsx`;
 the sorting and every sentence are `src/core/effectsMakeAll.ts`). An effect is started when no take is
 chosen (a chosen one whose description changed or clip is missing is left out) and it is not already
@@ -1940,8 +1927,7 @@ press has ended; a quit forgets it. `GET /api/effects/models` says which models 
 A **scene** is a place the game plays sound in (RetroQuest: a room, with its music track): its music
 loop and level, and the sound effects that play with it, how, in which state and how loud. Until
 now this lived in the game's code (`ROOM_AMBIENCE`, `effectVolumes.json`). The Scenes workspace
-edits it and plays it as the game would. The screens are drawn in `docs/ui/as-p86.1-scenes.html`;
-what a person sees is the acceptance of bead as-p86.1. This section is the **contract** the game
+edits it and plays it as the game would. What a person sees is the acceptance of bead as-p86.1. This section is the **contract** the game
 (RetroQuest beads rq-xazj, rq-xfkn) and the studio (as-p86.2 to .4) are built against.
 
 **Two files per act, each with one writer.** The game's refresh writes the **declarations**; the
@@ -2127,7 +2113,7 @@ carries a `problem` derived on every read from what the Music page knows (`take`
 "file not there"; neither chosen nor in the game: an amber "no take chosen"; none when the lock cannot be
 read), and the chip links to the track's page and follows the track chosen in the menu before saving.
 
-**Loudness** (as-gdf.1; the screens are `docs/ui/as-gdf.1-scene-loudness.html`). The project file may
+**Loudness** (as-gdf.1). The project file may
 say what the game's scenes should sound like: `scenes.output` is `{ "lufs": -20, "tolerance": 2 }`
 (integrated LUFS and dB, both or neither; the studio calls `lufs` the target), edited by hand and
 only read; without it nothing is flagged. The open
@@ -2164,7 +2150,7 @@ cannot be read is reported and read as empty, never written over, and Measure lo
 is refused naming it; the other acts are not affected. The figures reach the page with
 `ProjectSummary.scenes` (`SceneRow.loudness`, `ScenesSummary.loudnessTarget`).
 
-**Bringing a scene back to the target** (as-gdf.2; `docs/ui/as-gdf.2-loudness-suggestion.html`). When
+**Bringing a scene back to the target** (as-gdf.2). When
 a measure puts a scene off the target, one line under the Loudness table offers a single change for
 the whole scene (`suggestChange` in `core/sceneLoudness.ts`): the even dB that puts the middle of the
 measured states on the target, one decimal; the closest one when no change fits every state; only as
@@ -2180,7 +2166,7 @@ page is what the measure is compared with, saved press or not. A music with no t
 press leaves it alone and the expected scene does too. The levels a press moved show in amber on the page
 (with "was N%" for a screen reader) until saved or discarded.
 
-**When a louder change has no room** (as-w5p; `docs/ui/as-w5p-loudness-ceiling.html`). A scene that
+**When a louder change has no room** (as-w5p). A scene that
 needs to be louder while a sound is within 0.1 dB of 300% gets `suggestChange` kind `limit` instead
 of nothing: a muted line, no button, naming every sound at the limit with its real level (the music
 as "the music"), or saying the sounds themselves are too quiet when every playing sound is there
@@ -2315,7 +2301,7 @@ GET    /api/changes                              git status of project paths
 WS     /api/events                               file changes (later; job progress is polled)
 ```
 
-Planned (step 6): the server watches the resource files, so an edit made in the editor (or a
+Planned: the server watches the resource files, so an edit made in the editor (or a
 `git checkout`) shows up in the UI at once. Until then the UI reloads when its window regains focus.
 
 ---
@@ -2399,443 +2385,7 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 
 ---
 
-## 12. Delivery plan
-
-Small, independently useful increments:
-
-1. **Skeleton**: CLI finds and validates the project, server and UI shell, parts and characters
-   shown read-only.
-2. **Status**: fingerprint, planner, lock, _Adopt existing clips_; line table with statuses. No API
-   calls yet.
-3. **Audition**, in three pull requests:
-   1. **Voice search**: Fish client, API key from the env file, keywords saved in the cast, ranked
-      candidates with Fish's own samples.
-   2. **Takes**: the audition phrase spoken by each candidate in the character's style, cached.
-   3. **Rounds and casting**: keep/drop, bring in more, add by id, saved sessions, the chosen voice
-      written to `cast.json`.
-4. **Generate**, in two pull requests:
-   1. **Record a line**: TTS per chunk (WAV, the draft model), joined with a 0.25 s pause, encoded
-      with ffmpeg; the manifest (written exactly as Python's `json.dumps(indent=1)`, so untouched
-      entries keep their bytes) and the lock updated. Word timings are spread evenly over the clip
-      until step 5 transcribes it. A _Record_ button per line on the lines page.
-   2. **Generate a part**: a plan for a scope (the part, a character), run as a job with progress and
-      cancel, orphaned clips removed after confirmation.
-5. **Quality**, in two pull requests:
-   1. **Checked takes**: a Whisper worker (`worker/transcribe.py`, mlx-whisper through uv, the
-      model loaded once; it exits when the studio does), narrate.py's alignment ported exactly
-      (difflib's matching and Python's rounding; fuzz-compared on 300 cases), and up to
-      `quality.takes` (`generate.takes` since as-6u9.3) takes per line until one is heard at
-      `minHeard`, keeping the best: real word timings in the manifest, the heard share and takes in
-      the lock. `quality.transcriber: "none"` (`generate.transcriber` since as-6u9.3) records one
-      unchecked take, as before.
-   2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when asked,
-      accepted as they are (Accept, until recorded again), or checked again by Whisper without new
-      audio (Check again); clips never checked (adopted from narrate.py, or recorded unchecked)
-      measured without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from
-      that and what Whisper hears in that WAV (not the MP3, which Whisper hears slightly
-      differently), so the timings match narrate.py's exactly; a poorly heard clip shows as weak.
-      (Since then, names Whisper spells one letter off count as heard, see §8.2, so such lines
-      differ.)
-6. **Editing**, in small pull requests:
-   1. **Style and cues** (built): a character's style on its audition page, saved in the cast; a
-      line's own cue in the lines table, saved in the part's cues file (its order kept, written
-      with two-space indent, a cleared cue removed; a number-like key refused, as JavaScript would
-      move it). Affected lines show as stale. Orphaned cues (their line's key changed with its
-      wording) are shown and re-keyed on the part's overview (6.4.2).
-   2. **Pronunciations** (built): the table edited on All characters as a whole (add, change,
-      reorder, remove) and saved at once, refused if the file changed since editing began.
-      Nothing is trimmed (spaces anchor an entry: `"Al "`), an empty said form leaves the words
-      out (as narrate.py does); each written form once, no `__proto__`, and no number-like key
-      among others. The table is shown in the order the studio applies it.
-      Under it, **Words that sound the same** (built): the project's own sound-alike groups,
-      one a row, words separated by commas, saved as a whole in the project file's
-      `narration.quality.soundAlike` (`narration.generate.soundAlike` since as-6u9.3), refused if
-      the file's groups changed since editing began.
-   3. **Changes panel** (built): `git status` for the project's own files only (the project file,
-      the cast, each part's dialog, cues, lock, manifest and clips), grouped by part with clips
-      counted, merge conflicts marked; read again every few seconds, and counted in the sidebar.
-      Only reads, without optional locks (`GIT_OPTIONAL_LOCKS=0`), so it never touches the index
-      either, and without `GIT_DIR` and the like from the environment.
-   4. **Refresh dialog**, in two pull requests:
-      1. **Run it** (built): **Refresh dialog** on a part's overview runs the project's command
-         with `sh` in the project root (`{part}` replaced; part ids are safe in a shell), one at a
-         time per part, at most 10 minutes; then the dialog is read again and the lines added,
-         removed and changed are shown (unknown when the dialog could not be read before), or
-         the command's output when it fails. The command runs in its own process group: a
-         timeout, the studio exiting (also on Ctrl-C) and the end of the command itself stop
-         everything it started. A refresh and a generation of the same part refuse each other,
-         on the server.
-      2. **Orphaned cues** (built): a part's overview lists the cues whose line left the dialog,
-         with their text; each is given to a line (in its place in the cues file; lines without a
-         clip offered first, since a reworded line has none yet, and suggested when it is the only
-         one; numbered as in the dialog) or removed. Listed in the cues file's order. A line with its own
-         cue is not offered over. Scene cues whose scene left the dialog are listed there too, given
-         to a scene without a cue of its own, or removed.
-7. **RetroQuest switch-over**. RetroQuest's narration moved on meanwhile (Acts II–IV recorded with
-   `narrate.py`, clips levelled to −16 LUFS by `level.py`, a cast per act, `extract-act.ts`), so:
-   1. **Parity** (built): measured clips are transcribed from their decoded WAV, as
-      `narrate.py --retime` does; on Act I the manifest was byte-identical to its (until names
-      spelled one letter off counted as heard).
-   2. **Loudness** (built): `output.lufs` levels each new clip as `level.py` does, command for
-      command (`pyFixed` formats numbers as Python does); clips come out byte-identical. Not in
-      the fingerprint: changing the target does not make clips stale.
-   3. **The switch** (built, RetroQuest #508): in RetroQuest, one shared `tts/cast.json`
-      (`content-studio/narration/cast.json` since as-6u9.3) from the four act casts (the
-      grandmother's recast everywhere; the mother's Act III style as cues on her Act III lines),
-      `content-studio.json` for all four acts with the new extractor, every act's clips adopted,
-      `.content-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
-      (`level.py` stays for the music).
-8. **Paid models**, in pull requests:
-   1. **Prices and credit** (built): a dated price list (`core/prices.ts`, from Fish's pricing
-      page; a promotion ends at its moment, so `drama-3` costs $10 until 2026-11-12 17:00 UTC and
-      $50 after), plans priced when they are made, and the account's API credit
-      (`GET /wallet/self/api-credit`; Fish gives it as a string without a unit, taken to be
-      dollars) shown under the project, read again after recording and every five minutes, or
-      "unknown" when Fish does not answer.
-   2. **Paid models per stage** (built): `draft` and `final` may name a priced model (`audition`
-      stays free); a paid job or line asks to "Pay up to $X" with a second click, X being the most
-      it can cost, and the server refuses one without that confirmation or beyond the credit
-      (`core/spend.ts`).
-   3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
-      models differ; final clips marked in the line table and left alone by draft plans.
-   4. **Choose the models** (built, as-3h4): the Models panel on Setup, which saves each stage's
-      model in the project file (§8.4, "Choose the stage models").
-
-   What a paid account could still have (paid auditions, the `s1` retirement, your own voices) —
-   everything is built or filed: cloning (as-5gk.5), voice design (as-5gk.6), the rate tier on
-   Setup (as-5gk.7) and the spend log (as-5gk.8); the rest is in `docs/paid-account.md`, not planned yet.
-
-9. **Audition rework** (§8.1), in small pull requests:
-   1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in
-      `content-studio/cache/ruled-out/`, left out of every later search for it; listed on the character
-      page, each allowed again or all forgotten.
-   2. **Shortlist board** (built): voices to hear, Drop (gone at once, the last undone from a
-      notice) and Shortlist, bring in more or a specific voice (also one dropped before), cast any
-      shortlisted voice after saying what goes stale; Pause, and Stop audition after saying what
-      it means. Takes record by themselves. Rounds are gone; an audition saved in rounds is no
-      longer one in progress.
-   3. **Character page** (built): the cast voice (Fish's details, its take, recorded by itself,
-      and sample, its page on Fish), the lines per part, delivery and casting brief, ruled-out
-      voices, and the audition in progress (resume, or stop after saying what it means). The
-      audition page shows only the board; the list of matching voices before an audition is gone.
-   4. **Hear it in the game** (built): the character's recorded lines on its page, part by part
-      in dialog order, with cue and status, played one by one or all in turn.
-10. **The lines page as a studio**, in small pull requests:
-    1. **Hear it** (built): a line's cue heard before it is saved, as a free take (§8.3).
-       **Cues inside a line** (built, as-vhm): cues placed between a line's words, shown as chips,
-       placed from the gaps on hover or the `p` key, heard before they are saved.
-    2. **Playthrough** (built): the lines shown played in turn, from the first or from a row, the
-       row playing marked and kept in view (§8.3).
-       2a. **Scene cues** (built, as-2qh): a cue per scene that its narrator lines follow, edited in a
-       band above the scene's lines (§ Cues).
-    3. **A character's speed** (built): `speed` in the cast, edited on the character page; its
-       lines, takes and tries spoken at it, and its lines stale when it changes (§6, §7).
-    4. **Setup page** (built): what the machine and the project lack, with the fix for each (§10).
-    5. **Shared voices** (built): a character cast with another's voice says so on its page, card
-       and the characters page; it may be meant, so it is a note, not a problem.
-    6. **Notes on lines** (built): a note to oneself per line, in the tool cache (§6, §8.3).
-    7. **Keys** (built): the lines table worked from the keyboard (§8.3).
-    8. **Extra takes** (built): more takes of a line in the cache, compared by ear, one made the
-       clip (§8.3); the recording split into speaking, checking and committing a take for it.
-11. **What was heard**, in two pull requests:
-    1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
-       when it is checked; the lines page shows it beside the text, missed words marked.
-    2. **Listen again**: a line checked before that has Whisper hear its clip again, from the
-       comparison, keeping what it heard.
-12. **Music** (§8.5), in small pull requests:
-    1. **Spike** (done: §13, decision 5): ACE-Step 1.5
-       on the M5 Pro, run from Python through uv. Its models, sizes and licence of the weights;
-       time and memory for a 90-second take with the larger and smaller model, also with Whisper
-       loaded; quality of instrumental loops and stingers in RetroQuest's style; whether tempo
-       and key in the brief come through; whether a take runs on to its end or closes as a song
-       does (which the loop's crossfade needs to know); whether the same seed makes the same
-       take; whether the crossfaded seam is heard; and how a loop plays without a click in the
-       game's browsers (MP3 in `<audio>`, another codec, or Web Audio).
-    2. **Track lists** (built): the project file's `music` section, the game's loop and stinger lists and
-       the studio's briefs (schemas, problems with file and path), and the Music pages, a page per
-       act and one for the stingers, listing the tracks, read only; Refresh from the game on an
-       act's page, and on the Stingers page running `refreshShared` (`refresh.shared` since
-       as-6u9.2; CLAUDE.md's consumer rules
-       updated in that step to name both buttons and the new command); the sample project in
-       `test/fixtures/sample` gains loop and stinger lists.
-    3. **Briefs** (built): a track's page (a track opens from its row), its brief, length, tempo
-       and key changed and saved in the studio's briefs as each field is left, marked "changed
-       here", and the game's taken back; `PATCH /api/music/tracks/:id`, one field at a time.
-    4. **Takes** (built): the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
-       generated, shaped and cached per click on a track's page, and played, loops around their
-       seam too.
-    5. **Board** (built): a track's takes as cards, Make N more takes (N chosen, 1 to 6, in the background), Drop;
-       takes from an earlier brief marked; Stop and Try again; the board saved in
-       `content-studio/cache/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
-    6. **Choose** (built): the chosen take levelled, encoded and written with the manifest and lock; each
-       track's status on the Music pages; the music files in the Changes panel.
-    7. **Orphans** (built): the music of a track the game no longer lists, shown on its list's page and
-       removed after confirmation; the briefs and boards of unlisted tracks never chosen dropped.
-    8. **Hear a track from the list** (built): `file` in the track lists, the Plays column and
-       `GET /api/music/tracks/:id/current`.
-    9. **RetroQuest** (in the game's repository, not the studio's): the game's extractor writes
-       each act's loops and the stingers with their first briefs, and the game reads the music
-       manifest and plays a track per room or region, and the stingers, looping through Web Audio;
-       checked in Chrome, Safari and Firefox. If a browser pads an MP3, the manifest gains loop
-       points.
-    10. **Music models** (built): `music.model` in the project file, saved from a Music row in Setup's
-        Models panel; four models (Balanced, Quick, Quickest, Careful); a menu "Model for new
-        takes" on a track's Takes panel; every take names its model; the model is no longer a cause of
-        "changed since chosen".
-    11. **Stable Audio Open** (built): Short and Shortest in every music menu, grouped under
-        headings, greyed on a track too long for them; their own worker and optional Setup row.
-    12. **In the game** (built): what a track plays shown above its other takes, and a chosen take
-        that can be un-chosen (§8.5).
-    13. **Move a take** (built, as-824): Move… on a take card moves it to another loop in any act, or
-        another stinger, counted as made for the track it joins (§8.5).
-        13a. **Trim silence on a stinger take** (built, as-k7i.1): one press cuts the near-silent start and end,
-        kept with the take and written into the game's file when the take is chosen (§8.5).
-    14. **Make takes for every track with no chosen take** (built, as-23x.1): one press on an act's or the
-        Stingers page makes four takes for every track with no chosen take, on the project's model (§8.5).
-    15. **The same press on the Stingers page** (built, as-23x.2): the page says "stinger", and Refresh from
-        the game and the press are greyed while the other runs (§8.5).
-13. **Languages** (epic as-170), in small pull requests:
-    1. **Show a part's lines in each declared language** (built): `narration.languages` (top-level `languages` since as-6u9.2),
-       `{language}` in the paths, a language switch on the lines page with each language's
-       progress, untranslated lines, read only (no recording yet).
-    2. **Cast each character per language** (built): a voice, speed and phrase per language in the
-       cast, an audition and ruled-out voices per language, a language switch on a character's
-       page and its audition, and a chip on a card for each language without a voice.
-    3. **Record a part's lines per language** (built): recording, Whisper's check (told the
-       language in a project with several), measuring, accepting, extra takes, orphans and jobs
-       (one per part and language) work in every declared language, into its own clips, manifest and
-       lock; cues follow the source language's; pronunciations and words that sound the same are
-       per language; the overview, All characters and the cards follow the language switch.
-14. **ElevenLabs** (§8.6), in small pull requests, each verified by hand by the user (no key in CI):
-    1. **The plan**: §8.6, this step and decision 7.
-    2. **Key and account** (built): `ELEVENLABS_API_KEY`, the client with `subscription` only,
-       Setup's two optional rows. The user checks what the account draws on (allowance or dollars,
-       and whether music and speech share it) and its concurrency, and the plan follows.
-    3. **Music, ready for a second provider** (built): an optional seed (board, view, move, lock),
-       the music router as a table from family to generator. No behaviour changes. Each provider's
-       prices stay in tables of their own, so nothing needed splitting.
-    4. **Eleven Music takes** (built): the family and model in every music menu, takes made, decoded
-       and shaped, outside the GPU queue (the take queue by family), ready by key, Setup's Music
-       row, an opt-in live take.
-    5. **What music costs** (built): the price on the menus, the make button, and Stop's
-       warning. Music rows in the spending log came with its version 2, in 14.7d.
-    6. **A voice says whose it is** (built): `eleven:` voice ids (`core/voices.ts`: `providerOf`,
-       `providerId`, `elevenVoice`, `FISH_VOICE_ID` and `VOICE_ID`), and no Fish page linked for an
-       ElevenLabs voice. The routes that would reach Fish or the cast (a take, adding, moving and
-       casting a voice) still take Fish's ids only, until 14.7 can speak with an ElevenLabs one;
-       allowing a ruled-out voice again takes either. No behaviour changes. The speaking seam moves
-       to 14.7, which first needs it.
-    7. **Record lines with an ElevenLabs voice**, in four pull requests:
-       1. **Speak a line with ElevenLabs** (built): ElevenLabs' speech models and their credits a
-          character (`core/elevenSpeech.ts`), a voice's stage model from its provider (Eleven v3
-          for every stage until 14.9, so its lines have no final step), its settings in the
-          fingerprint, the budget charged from the text in the model's unit, the client's `tts`
-          (24 kHz WAV), and `speakerFor`: a line and an extra take spoken by the voice's provider,
-          refused without its key or at a speed ElevenLabs does not take. Nothing makes an
-          ElevenLabs voice yet, and the server gives recording no ElevenLabs client, so nothing
-          can be spent.
-       2. **Cast an ElevenLabs voice** (built): Add by id with the provider chosen beside the
-          field (_Fish Audio_, _ElevenLabs_; an ElevenLabs id is a bare id), the voice looked up
-          with the client's `voice` (its preview as its sample, shown as "ElevenLabs preview"),
-          moved, shortlisted and cast as any other; the character's page shows it as ElevenLabs
-          gives it. It records no take by itself and offers no Record take (on the board or its
-          page), and a take or a cue try with it is refused, saying so; Fish is asked nothing
-          about it. Its lines are not recorded yet: without the server's ElevenLabs client for
-          recording, a line is refused as without a key.
-       3. **Record an ElevenLabs voice's lines** (built): the server's ElevenLabs client for
-          recording and extra takes, its own limiter (two at once), a part's plan split by
-          provider, credits in the confirm and admission against what the plan has left, and the
-          speed refusal on the character's page (under its speed).
-       4. **The spending log's version 2** (built): a recording's ElevenLabs credits, a row for
-          each paid music take, and the Spending page's totals in dollars and credits apart.
-    8. **Cues by model** (built): cues left out of the text, the fingerprint and the plan's count
-       for models that would speak them, so that choosing such a model (next) never reads a cue
-       aloud; the page still shows them. Nothing changes on screen yet: no such model can be
-       chosen.
-    9. **Choose ElevenLabs' models and settings**, in two pull requests:
-       1. **ElevenLabs' models** (built): `narration.elevenlabs.models` (`audition`, `draft`,
-          `final`; Eleven v3 unless named; only ElevenLabs' speech models, so `readsCues` knows
-          each) in the project file, each ElevenLabs voice's stage model taken from it; the Models
-          panel's ElevenLabs draft and final rows (shown in a project with an ElevenLabs voice: a
-          menu of the models with their credits a character and whether they speak cues, saved at
-          once or after a question naming the lines going out of date and the credits to record
-          them again, as Fish's rows do); a final step for a part when one of its voices'
-          own stages differ (`finalStepFor`), the part's generate panel naming both providers'
-          models; the credits
-          budget on the stage's ElevenLabs model; the cue editor saying a line's model speaks
-          cues, so none are sent. A line recorded with cues and now on such a model is stale for
-          its model and its cue. The audition row came with 14.10b-1. The
-          consumer rules in CLAUDE.md name the new saved keys.
-       2. **ElevenLabs' voice settings** (built): `narration.elevenlabs.tts` (stability,
-          similarity, style) in the project file, spoken with and fingerprinted in place of the
-          fixed defaults, and saved from the Models panel's ElevenLabs voice row, asking first
-          when recorded lines go out of date. The consumer rules in CLAUDE.md name the key.
-    10. **Page takes, tries and auditions with an ElevenLabs voice**, in two steps:
-        1. **The page take and cue tries** (built): on ElevenLabs' audition model, not
-           confirmed, their credits shown and kept in the spending record's `tries` (totals and
-           a tile of their own on the Spending page); a try on a model that reads no cues says
-           so rather than sending the line's cues or dropping them unseen.
-        2. **Auditions on ElevenLabs**, a credits sitting beside Fish's dollars (chosen over a
-           Record button per card, so a board of ElevenLabs voices fills with takes by itself), in
-           three pull requests:
-           1. **The ElevenLabs audition row** (built) on the Models panel, saved at once as
-              Fish's audition row is.
-           2. **The credits sitting** (built) on the server: started and added to in credits,
-              held back from the plan as a recording's credits are, board takes with ElevenLabs
-              voices charged to it.
-           3. **The board's screens** for it (built): credits asked for on the board when an
-              ElevenLabs voice there waits for them (chosen over asking at every Start), the
-              credits meter, Add, and "Take waits for credits" / "for more credits".
-    11. **Find a voice in ElevenLabs' library**, in two pull requests:
-        1. **Search and add** (built): the client's `sharedVoices` and `addSharedVoice`, the
-           provider switch beside Bring in more, library cards and previews, a library voice added
-           on its first board take (once charged, its credits given back if ElevenLabs will not)
-           or when cast, and the voices added remembered.
-        2. **Voice slots** (built): shown on the board, takes that would add a voice waiting at
-           the plan's limit, and the voices the studio added that nothing uses offered for
-           removal (the client's `deleteVoice`).
-    12. **Design a voice with ElevenLabs** (built): the design box's switch, previews saying the
-        phrase and the character's lines kept as designs, confirmed and held in credits, logged
-        as `design` tries, and saved as a voice when cast (the client's `designVoices` and
-        `saveDesignedVoice`).
-15. **Images** (epic as-yag), in small pull requests; the tool is renamed Content Studio last:
-    1. **Spike** (done: §13, decision 8): FLUX.2 klein 4B and Z-Image-Turbo through mflux, their
-       time, memory and licence on the M5 Pro, and whether one style text and the game's colours
-       keep about ten RetroQuest rooms one set.
-    2. **The game's image list and style** (as-yag.3, done: §8.7), read-only, with the studio's own
-       prompt overrides.
-    3. **An image take** (as-yag.2, done) with either model, on the GPU queue with music and Whisper.
-    4. **Takes and choosing** (as-yag.4, done: §8.7): an image's takes compared with the chosen one.
-    5. **The game's look** (as-yag.5, done: §8.7): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
-    6. **Two models** (as-yag.7, done: §8.7): Setup says which are installed and chooses the main one;
-       takes can be made with the other.
-    7. **Shared images** (as-94e, done: §8.7): an image the game lists in several acts is one image shown in each, with one act-style pick; lists that disagree are reported.
-    8. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.
-    9. **Make takes for the whole act** (as-23x.3, done: §8.7): one press on an act's Images page makes four
-       takes for every image with no chosen take, after a question in the panel.
-    10. **Patches** (as-b9x, an experiment, done: §8.7): an area of a chosen take edited in context and shown over it; nothing reaches the game.
-    11. **The game's patches listed** (as-bo8.1, done: §8.7): the image list carries patches, an image's
-        page lists them and they can be reworded.
-    12. **The game's patches made and chosen** (as-bo8.2, done: §8.7): takes of a declared patch are made
-        on the image's chosen take, compared and chosen.
-    13. **A chosen patch in the game** (as-bo8.3, done: §8.7): its transparent picture beside the image's and an
-        entry under the image in the manifest; the game's own use of it is in the game's repository.
-    14. **The game's named areas listed** (as-qg4.1, done: §8.7): the image list carries named areas, an image's
-        page and the act's list show which are left to place; placing them is the next step of as-qg4.
-    15. **Named areas marked** (as-qg4.2, done: §8.7): a box per area on the chosen take, kept in the image's edits.
-    16. **Placed areas reach the game** (as-qg4.3, done: §8.7): each placed box goes into the image's images-manifest entry as fractions, in the same save, and on Refresh from the game.
-    17. **A patch tied to a named area** (as-qg4.5, done: §8.7): a patch starts marked from its named area, so a spot is defined once.
-    18. **A chosen patch in the game** (as-bo8.3, done: §8.7): its transparent picture beside the image's and an
-        entry under the image in the manifest; the game's own use of it is in the game's repository.
-    19. **Patches set aside** (as-bo8.4, done: §8.7): choosing, un-choosing or dropping a take whose chosen
-        patches would stop showing asks first; patches to make again are marked on the image's page and the act's row.
-    20. **Patches that overlap** (as-bo8.5, done: §8.7): two chosen patches whose areas share a dot are warned about
-        on the image's page, in the open patch and on the act's row.
-    21. **Remake patches on this take** (as-qoj, done: §8.7): one press makes 1 to 4 takes of every patch to make
-        again that has none on the take in the game; nothing is chosen.
-    22. **Named areas set aside** (as-qg4.4, done: §8.7): each take keeps its own boxes; choosing, un-choosing or dropping a take whose
-        placed areas would stop being used asks first, with the patches; areas to place again are marked in the Named areas panel.
-    23. **Patch models** (as-ilw, done: §8.7): a menu of two edit models on each patch and on Remake, Qwen Image Edit and FLUX.2 klein;
-        each take names its model.
-    24. **Patches start on klein** (as-jgto, done: §8.7): every patch menu and the Remake menu start on FLUX.2 klein, listed
-        first; Qwen Image Edit stays a choice (with the 2511 weights since as-3l6k).
-    25. **A patch keeps what changed** (as-wdim, done: §8.7): a patch keeps the regions its edit changed that
-        touch the mark, with a lower bar inside it, instead of the whole marked box.
-    26. **Qwen edits with the 2511 weights** (as-3l6k, done: §8.7): Qwen Image Edit downloads and runs
-        `Qwen/Qwen-Image-Edit-2511`, guidance 4, 40 steps, which mflux runs as they were made.
-    27. **A patch bridges thin gaps** (as-l71a, done: §8.7): a changed region within 12 pixels of one that
-        touches the mark is kept with it, one step only, so a cat keeps its head.
-    28. **Fine-tune the picture** (as-2xwj, done: §8.7): a panel on an image's page makes 1 to 6 edits of the picture in the
-        game from words, optionally within a marked area; using one makes it the next chosen take, with its named areas and
-        chosen patches, and the old picture stays among the takes.
-16. **Sound effects** (epic as-5wc), in small pull requests:
-    1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
-       their time, memory, licence and how a take ends, on the M5 Pro.
-    2. **The model** (as-5wc.3, done: §8.8): a worker making one effect with Small SFX on the CPU, its
-       trailing silence trimmed, and Setup's Sound-effect models row.
-    3. **The game's effects list and the studio's descriptions** (as-5wc.2, done: §8.9), read-only,
-       with the studio's own description overrides and the Sound effects workspace.
-    4. **Takes** (as-5wc.4, done: §8.10): make, hear, compare, choose, un-choose, drop and accept; the
-       lock, manifest and clips; statuses in the list.
-    5. **Looping effects** (as-5wc.6, done: §8.10): the list marks which effects loop; their takes are
-       made seamless at the game's length, play round, have Hear the seam, and a change of how an
-       effect plays is a change since chosen.
-    6. **The second model** (as-5wc.5, done: §8.8): Stable Audio Open 1.0 on the GPU queue, Setup checking both
-       models and choosing the main one (`effects.model`), and a model menu on an effect's page.
-    7. **Trim silence on a one-shot effect take** (as-dgh.1, done: §8.10): one press cuts the near-silent start and
-       end, kept with the take and written into the game's file when the take is chosen.
-    8. **Fades on a one-shot take** (as-dgh.2, done: §8.10, `docs/ui/as-dgh.2-effect-fades.html`): the stingers'
-       Fades… editor on each take made to play once, in steps of 0.01 s, written into the game's clip.
-
-17. **Scenes** (epic as-p86), in small pull requests:
-    1. **The mockup round and the contract** (as-p86.1, done: §8.11, `docs/ui/as-p86.1-scenes.html`): the
-       Scenes page, its editor and play bar, and the declarations and mix files.
-    2. **The game reads scenes from JSON** (RetroQuest rq-xazj): `ROOM_AMBIENCE` and
-       `effectVolumes.json` become the declarations (written by the game's refresh) and the mix (read by
-       the game); the game sounds as before. The studio's page waits for it.
-    3. **The Scenes page** (as-p86.2, done: §8.11): the sidebar entry, the act's scene list and the open
-       scene read only, with ▶ on the music and each effect, the not-yet-listed, Refresh and failed
-       states; the `scenes` section of the project file; the sample project has scenes.
-    4. **Editing a scene** (as-p86.3, done: §8.11): the music, effects, add menu, unsaved changes, Save,
-       Discard and the leave dialog, saved to the mix only (`PUT /api/scenes/:part/:id`, 409 with the
-       saved entry when it changed meanwhile).
-    5. **Playing a scene** (as-p86.4, done: §8.11): the play bar with State and Triggers, the
-       scheduler of §8.11, the Now column, Mute and Solo, edits heard at once.
-    6. **Triggers in the game** (RetroQuest rq-xfkn): the game fires the declared triggers and plays the
-       effects the mix binds to them. The studio's play bar fires them from as-p86.4 on; a scene with no
-       triggers declared shows none.
-    7. **Loudness of the scenes** (as-gdf.1, done: §8.11): a kept loudness per scene and state against
-       the target in the project file, warnings in the Loudness panel and the scene list. Suggesting
-       and applying a change (as-gdf.2, done) is in the same section.
-
-18. **One format for the project's files** (epic as-6u9), each step converting the studio, the sample
-    project and RetroQuest together, in this order:
-    1. **The reference** (as-6u9.1, built): `docs/project-files.md`, the format of version 2 for
-       the people who write the files.
-    2. **The project file** (as-6u9.2, built): `version` and `$schema` (the JSON Schema made by
-       `bun run schema`), the top-level parts, languages and refresh (`part`, and one `shared`
-       command for the stingers and the effects), the studio folder `content-studio/` with its
-       `.gitignore` and its cache (what `.content-studio/` held), and the personal settings
-       (`fishTier`, `takeFade`) moved into `content-studio/cache/settings.json`.
-    3. **Narration** (as-6u9.3, built): the `narration` section (`from.part`, `models.fish` and
-       `models.elevenlabs`, `generate` with the checks and `soundAlike` by language, `audition`
-       with `phrase` by language and `searchLanguage`, `clips`, `manifest`), dialog lines by `id`,
-       and the cast, the cues (`{ cues, scenes }`) and the lock (`hashes`) at fixed places in
-       `content-studio/narration/`. The fingerprint is unchanged, so a converted game's clips stay
-       as they stood.
-    4. **Music and stingers** (as-6u9.4, built): the `music` section (`from.part`, `from.shared`,
-       `model`, `clips`, `manifest`), tracks' words as `text`, the edits (`{ text, gameWas,
-seconds, bpm, key }`, the game's changed brief shown with Use the game's and Keep mine) and
-       the lock (`inputs.text`, `list: "shared"`) at fixed places in `content-studio/music/`. The
-       take hashes and the cache are unchanged, so a converted game's tracks stay as they stood.
-    5. **Images** (as-6u9.5, built): the `images` section (`from.part`, `model`, `clips`,
-       `manifest`), images' words as `text`, the edits (the studio's own style, `parts` in place of
-       `acts`, edited directly with no notice for a changed style; rewordings `{ text, gameWas }`
-       and `partStyle`) and the lock (flat by id, `inputs` in the clear) at fixed places in
-       `content-studio/images/`. The staleness keys and the cache are unchanged, so a converted
-       game's images stay as they stood.
-    6. **Sound effects** (as-6u9.6, built): the `effects` section (`from.shared`, `model`, `clips`,
-       `manifest`), effects' words as `text` with an optional `title` (the name shown), the
-       rewordings (`{ text, gameWas }`) moved from the gitignored cache into the committed edits,
-       and the lock (`inputs.text`) at fixed places in `content-studio/effects/`. The take hashes,
-       the boards and the takes in the cache are unchanged, so a converted game's effects stay as
-       they stood.
-    7. **Scenes** (as-6u9.7, built): the `scenes` section (`from.part`,
-       `output: { lufs, tolerance }`, `mix`), scenes' names as `title`, and the kept loudness moved
-       from the gitignored cache into each part's committed scenes lock,
-       `content-studio/scenes/<part>.lock.json`.
-       The mix's format and the measures' fields are unchanged, so a converted game's figures stay
-       as they stood.
-    8. **RetroQuest end to end** (as-6u9.8, built): the studio run on RetroQuest through every
-       section's pages, with no problems listed and a narration clip, a track, a stinger, an effect
-       and a scene mix played, and the game playing its narration, music, stingers, images, effects
-       and scene mixes in Act I from the converted files. No file of the old format is left in
-       either repository; a few delivery-plan steps above name the old places they were built with,
-       with the new name beside them.
-
----
-
-## 13. Decisions
+## 12. Decisions
 
 1. **Characters are shared by name across parts.** The same name in two parts is one character
    with one voice. Different voices need different names (`narrator-act1`, `narrator-act2`).
@@ -2852,7 +2402,7 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
    (as-ui4) as an alternative for stingers and short loops, with the same weights-outside-the-studio rule;
    ACE-Step stays the one that makes the game's act loops. ElevenLabs Music was added later beside
    them, paid (decision 7).
-5. **ACE-Step's XL turbo model with the 4B language model** (the spike, 12.1, on a MacBook M5 Pro
+5. **ACE-Step's XL turbo model with the 4B language model** (the spike, on a MacBook M5 Pro
    with 48 GB, MLX). A 96-second take takes 2 to 4 minutes with it, about a minute more for the
    first after a start, while the models load; the length matters little (with the 1.7B language
    model a 10-second take took 33 to 55 seconds, a 96-second one 52 to 67). The 1.7B language model
@@ -2871,14 +2421,13 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
 7. **ElevenLabs beside Fish and the local music models, per voice and per model.** Asked for by the
    user (October 2026) for its quality, in narration and in music. A character's voice belongs to
    one provider, so a game can mix them and nothing recorded with Fish changes; each provider has
-   its own stage models. ElevenLabs' plans include characters and bill dollars beyond them (checked
-   in 14.2), so its recordings are confirmed in characters against what the plan has left, with the
+   its own stage models. ElevenLabs' plans include characters and bill dollars beyond them (checked by hand), so its recordings are confirmed in characters against what the plan has left, with the
    dollars of any overage; music takes show their price but are not confirmed, as each costs cents.
    This reverses decision 4's reason for staying local, not its outcome: the local models stay the
    free default. Music through the API needs a paid plan, and commercial use Starter or above,
    within ElevenLabs' indie-game limits; Setup says so.
 8. **Images are made locally with FLUX.2 klein 4B and Z-Image-Turbo, through mflux** (the spike,
-   15.1, on a MacBook M5 Pro with 48 GB, MLX, mflux 0.20.0). Ten Act I rooms of RetroQuest, each
+   on a MacBook M5 Pro with 48 GB, MLX, mflux 0.20.0). Ten Act I rooms of RetroQuest, each
    made at 1024×576 with seed 42 from a style text and the room's description, the model loaded once and MLX's cache cleared after each take (klein's times are with the reworded style text below; schnell's without clearing the cache):
 
    | Model                     | Steps | Time per take | Memory (MLX peak) | On disk | Licence           |
@@ -2893,7 +2442,7 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
    gouache but leaves out parts of a description; schnell's rooms do not hold together as a set
    (half flat poster on a cream ground, half painted). Both klein and Z-Image-Turbo are kept, at
    the navigator's choice: klein for speed and closeness to the brief, Z-Image-Turbo for its
-   painting. Which one is the project's main model, and making takes with the other, is planned in
+   painting. Which one is the project's main model, and making takes with the other, came with
    as-yag.7. Klein 9B was left out: its weights are non-commercial. As with music, the weights are
    downloaded once, outside the studio. No free image API is kept as a fallback, since a local take
    costs nothing.
@@ -2911,9 +2460,7 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
    lettering on signs. Reworded to "soft warm light", "one single full-bleed image with no fold,
    frame or border" and "no text or lettering anywhere", the folds, lettering and stray lanterns
    went and the set still held. The soft, worn-page edges remain; cropping to the game's size can
-   take them off. The sheets are in `docs/spike-images/`: `klein-4b-game-style.jpg`,
-   `klein-4b-adjusted-style.jpg` (RetroQuest's rq-mh5r rewords its text so), `z-image-turbo.jpg`
-   and `flux1-schnell.jpg`.
+   take them off. RetroQuest's style text was reworded this way (rq-mh5r).
 
    **Qwen-Image, a third model for takes** (as-epo). `Qwen/Qwen-Image` (the weights `mflux-generate-qwen`
    loads with `--base-model qwen-image`; 54 GB on disk, Apache-2.0), made from words, picked per image
@@ -2934,7 +2481,7 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
    rather than within one.
 
 9. **Sound effects are made locally with Stable Audio 3 Small SFX, on the CPU; Stable Audio Open
-   1.0 is kept as a second effects model** (the spike, 16.1, as-5wc.1, on a MacBook M5 Pro with
+   1.0 is kept as a second effects model** (the spike, as-5wc.1, on a MacBook M5 Pro with
    48 GB). Ten RetroQuest-style effects (footsteps, a door creak, a pickup chime, a UI click, forest
    ambience, a sword draw, a chest opening, a fireplace, coins, distant thunder; 1 to 10 seconds),
    each from the same text with both models:
@@ -2967,7 +2514,7 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
    come from the gated `stabilityai/stable-audio-3-small-sfx`, accepted once by the user on Hugging
    Face, and `from_pretrained` downloads them into the Hugging Face cache with the user's token.
    That departs from §8.5's rule for Stable Audio Open (its own folder in `~/.cache/stable-audio`,
-   no token read); the step that builds the effects worker chooses between the two (as-5wc.3 chose the Hugging Face cache, §8.8). Stability also
+   no token read); as-5wc.3, which built the effects worker, chose the Hugging Face cache (§8.8). Stability also
    publishes the weights ungated for MLX (`stable-audio-3-optimized`), not tried.
 
    **The takes' edges.** Every Small SFX take ends in silence (the last 10 ms below −59 dB), and
@@ -2976,9 +2523,8 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
    length and then fade out themselves in their last tenth of a second to under a second, so no
    take loops as it is. The one-shots start within 0.13 s, most of them quietly (−41 to −63 dB in
    the first 10 ms); the chime and one of the sword draws start at once (−17 to −30 dB), and the
-   ambience starts at full level. So a later step trims a take's trailing silence, and an effect
-   that loops (ambience) would need a crossfaded seam as the music loops do (§8.5) or a step of
-   its own. Two of Open 1.0's ten takes were cut off at the end (footsteps and ambience, −15 to
+   ambience starts at full level. So a one-shot take's trailing silence can be trimmed (as-dgh.1), and
+   an effect that loops (ambience) gets a crossfaded seam as the music loops do (as-5wc.6, §8.5). Two of Open 1.0's ten takes were cut off at the end (footsteps and ambience, −15 to
    −28 dB in the last 10 ms).
 
    Ruled out before the spike: ElevenLabs Sound Effects (the Free plan's output is non-commercial;
@@ -2988,7 +2534,7 @@ seconds, bpm, key }`, the game's changed brief shown with Use the game's and Kee
    Small SFX's memory on the GPU, its time beside a running Whisper check, offline loading
    (`HF_HUB_OFFLINE`) once downloaded, and effects RetroQuest actually lists.
 
-**Focus after Stop all (as-dxo; drawn in `docs/ui/as-dxo-stop-all-focus.html`).** On the four Make-all panels
+**Focus after Stop all (as-dxo).** On the four Make-all panels
 (Music, Stingers, Images, Sound effects) Stop all is greyed with `aria-disabled` while the stop is under
 way, so it keeps focus and its words. `useStopFocus` (`src/ui/components/useStopFocus.ts`) remembers whether
 focus was on Stop all when the running line ends, whether by the stop or by the takes finishing, and then
