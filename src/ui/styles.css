@@ -5277,6 +5277,12 @@ textarea[aria-disabled='true'][data-why] {
   user-select: none;
   background: var(--inset);
 }
+/* As large as fits: a tall picture keeps its caption, switches and S hint in the window, the
+   320 px being the page above the picture and the panel's rows below it (as-dab0). */
+.named-area-stage,
+.named-area-empty {
+  width: min(100%, calc((100vh - 320px) * var(--picture-ratio)));
+}
 .named-area-take {
   position: absolute;
   inset: 0;
