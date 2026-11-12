@@ -381,6 +381,8 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     choose.mutate(n, {
       onSuccess: (answer) => {
         if (!answer.ok) return
+        // The line named the take a use put in the game; the person has now chosen another.
+        setCame(null)
         setLooking(null)
         setMarked(null)
       },
