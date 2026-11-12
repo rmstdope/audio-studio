@@ -5221,9 +5221,6 @@ textarea[aria-disabled='true'][data-why] {
 .named-areas p {
   margin: 0;
 }
-.named-areas-head {
-  flex-wrap: wrap;
-}
 .named-areas-body {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
@@ -5234,17 +5231,24 @@ textarea[aria-disabled='true'][data-why] {
 .named-areas-picture {
   grid-area: picture;
 }
-.named-area-list {
+/* The list column is as tall as the picture's (`contain: size` leaves its rows out of the row's height). */
+.named-areas-side {
   grid-area: list;
+  align-self: stretch;
+  contain: size;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
-.named-areas-body.has-place-again {
-  grid-template-areas:
-    'picture again'
-    'picture list';
-  grid-template-rows: auto 1fr;
+.named-areas-side h2 {
+  margin: 0;
 }
-.place-again-line {
-  grid-area: again;
+.named-areas-side .named-areas-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
 }
 .named-areas-picture {
   position: sticky;
@@ -5413,6 +5417,16 @@ textarea[aria-disabled='true'][data-why] {
   align-items: center;
   gap: 8px 16px;
 }
+.named-area-hold {
+  margin-left: auto;
+  font-size: 13px;
+}
+.named-area-switch-off {
+  font-size: 13px;
+  color: var(--faint);
+  opacity: 0.6;
+  cursor: default;
+}
 .named-area-switch {
   display: inline-flex;
   align-items: center;
@@ -5426,6 +5440,9 @@ textarea[aria-disabled='true'][data-why] {
   margin: 0;
   padding: 0;
   min-width: 0;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 .named-area {
   display: flex;
@@ -5471,12 +5488,12 @@ textarea[aria-disabled='true'][data-why] {
       'picture'
       'list';
   }
-  .named-areas-body.has-place-again {
-    grid-template-areas:
-      'picture'
-      'again'
-      'list';
-    grid-template-rows: none;
+  .named-areas-side {
+    contain: none;
+  }
+  .named-area-list {
+    flex: none;
+    max-height: 50vh;
   }
   /* Stacked, the list scrolls under the held picture: opaque and in front, up to the window's top. */
   .named-areas-picture {
@@ -5770,6 +5787,7 @@ textarea[aria-disabled='true'][data-why] {
 }
 
 .place-again-line {
+  flex: none;
   background: var(--raised);
   border-radius: 9px;
   padding: 8px 10px;
