@@ -61,6 +61,7 @@ import { failureLine, progressOf } from '../../musicTakesText'
 import { imageTimeLeftText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
+import { scrollWithin } from '../../scrollWithin'
 
 /** The inputs that are pressed rather than typed into, which leave the page's keys to it. */
 const PRESSED_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset'])
@@ -256,7 +257,8 @@ export function TakesSection({
   })
   // The strip scrolls on its own: the take on the right is kept in view as ← and → step.
   useEffect(() => {
-    if (onRight !== null) thumbs.current.get(onRight)?.scrollIntoView?.({ block: 'nearest' })
+    const thumb = onRight === null ? undefined : thumbs.current.get(onRight)
+    scrollWithin(thumb, thumb?.closest<HTMLElement>('[data-strip]'))
   }, [onRight])
   useEffect(() => {
     if (!stage || typeof ResizeObserver === 'undefined') return

@@ -1468,16 +1468,32 @@ describe('the workbench', () => {
     expect(changes(s)).toEqual(['POST /api/images/inn/choose'])
   })
 
-  it('brings the thumb of the take stepped to into view', async () => {
-    const s = await show(view({ takes: three }))
-    const seen: string[] = []
+  it('brings the thumb of the take stepped to into view in the strip, never moving the page', async () => {
+    const pageMoves: string[] = []
     const real = HTMLElement.prototype.scrollIntoView
     HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
-      seen.push(this.textContent ?? '')
+      pageMoves.push(this.textContent ?? '')
     }
     cleanups.push(() => (HTMLElement.prototype.scrollIntoView = real))
+    // Opening the page keeps the newest take in view without moving the page.
+    const s = await show(view({ takes: three }))
+    expect(pageMoves).toEqual([])
+    // The strip shows 300px and is scrolled to its end; the thumbs stand 150px apart, so Take 3
+    // (on the right) is in view and Takes 1 and 2 are out of view to the left.
+    const strip = s.container.querySelector<HTMLElement>('[data-strip]')!
+    const rect = (left: number, width: number) =>
+      ({ left, right: left + width, top: 0, bottom: 100, width, height: 100 }) as DOMRect
+    strip.scrollLeft = 300
+    strip.getBoundingClientRect = () => rect(0, 300)
+    const thumbs = [...strip.querySelectorAll<HTMLElement>('.image-thumb')]
+    thumbs.forEach((thumb, i) => {
+      thumb.getBoundingClientRect = () => rect(i * 150 - strip.scrollLeft, 140)
+    })
     await s.key('ArrowLeft')
-    expect(seen.at(-1)).toBe('Take 2')
+    expect(strip.scrollLeft).toBe(150)
+    await s.key('ArrowLeft')
+    expect(strip.scrollLeft).toBe(0)
+    expect(pageMoves).toEqual([])
   })
 
   it('keeps the words being written in the prompt while the takes come and go', async () => {

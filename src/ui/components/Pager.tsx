@@ -17,10 +17,14 @@ export interface PagerProps {
   keys?: boolean
 }
 
-/** The button a press went from, kept for the page it opens, so focus can stay on that button. */
-let pending: { side: 'previous' | 'next'; href: string; at: number } | null = null
+/**
+ * A step taken, kept for the page it opens: that page starts at the top, and after a press of a
+ * button focus stays on that button (`byButton`).
+ */
+let pending: { side: 'previous' | 'next'; href: string; at: number; byButton: boolean } | null =
+  null
 
-/** How long a press may wait for its page to open before it is forgotten. */
+/** How long a press may wait for its page to open and still keep focus on its button. */
 const PENDING_MS = 3000
 
 /**
@@ -35,17 +39,20 @@ export function Pager({ place, previous, next, keys = true }: PagerProps) {
   })
   const go = (side: 'previous' | 'next', step: PagerStep | null, byButton: boolean) => {
     if (!step) return
-    if (byButton) pending = { side, href: step.href, at: Date.now() }
+    pending = { side, href: step.href, at: Date.now(), byButton }
     window.location.hash = step.href
   }
-  // The page opened by a press of a button: focus the same button, greyed out or not.
+  // The page opened by a step, whether it was opened afresh or kept with new neighbours: it starts
+  // at the top, so the arrow stays under the pointer; after a press of a button, focus the same
+  // button, greyed out or not.
   useEffect(() => {
     const kept = pending
     pending = null
-    if (kept && kept.href === window.location.hash && Date.now() - kept.at < PENDING_MS) {
-      buttons.current[kept.side]?.focus()
-    }
-  }, [])
+    if (!kept || kept.href !== window.location.hash) return
+    // However long a leave question held the step, the page it opens starts at the top.
+    window.scrollTo(0, 0)
+    if (kept.byButton && Date.now() - kept.at < PENDING_MS) buttons.current[kept.side]?.focus()
+  }, [place.position])
   const latest = useRef({ previous, next })
   latest.current = { previous, next }
   useEffect(() => {

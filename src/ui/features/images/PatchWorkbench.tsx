@@ -53,6 +53,7 @@ import { tag } from './TakePicture'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { imageTimeLeftText } from '../../imageTakesText'
 import { closeUp, closeUpLayer } from '../../patchCloseUp'
+import { scrollWithin } from '../../scrollWithin'
 
 /** How many takes one press can make. */
 const MAX_AT_ONCE = 4
@@ -265,7 +266,8 @@ export function PatchWorkbench({
   })
   // The grid scrolls on its own: the take looked at is kept in view as ← and → step.
   useEffect(() => {
-    if (lookingAt !== null) thumbs.current.get(lookingAt)?.scrollIntoView?.({ block: 'nearest' })
+    const thumb = lookingAt === null ? undefined : thumbs.current.get(lookingAt)
+    scrollWithin(thumb, thumb?.closest<HTMLElement>('.patch-thumbs'))
   }, [lookingAt])
   useEffect(() => {
     if (landOnMake && work.making.length === 0) {
