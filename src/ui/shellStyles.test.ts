@@ -21,6 +21,9 @@ describe('the room the shell leaves the pages', () => {
   it('keeps the sidebar slim beside the page', () => {
     expect(rule(media('(min-width: 900px)'), '.sidebar')).toContain('flex: 0 0 212px')
     expect(rule(css, '.sidebar')).toContain('padding: 16px 10px')
+    // The unfolded sidebar keeps its own sticky full-height rules (the folded rail repeats them)
+    expect(rule(media('(min-width: 900px)'), '.sidebar')).toContain('position: sticky')
+    expect(rule(media('(min-width: 900px)'), '.sidebar')).toContain('height: 100vh')
   })
 
   it('folds the sidebar to a 72px rail with its dots coloured by how far each act is', () => {
@@ -37,6 +40,14 @@ describe('the room the shell leaves the pages', () => {
     expect(dot).toContain('height: 6px')
     expect(dot).toContain('border-radius: 50%')
     expect(dot).toContain('flex-shrink: 0')
+  })
+
+  // Folded, the rail is a full-height column on the left at every width (as-zlty).
+  it('keeps the folded rail a sticky full-height column beside the page at any width', () => {
+    const rail = rule(css, '.sidebar.sidebar-rail')
+    for (const d of ['position: sticky', 'top: 0', 'height: 100vh', 'overflow-y: auto'])
+      expect(rail).toContain(d)
+    expect(rule(css, '.shell:has(> .sidebar-rail)')).toContain('flex-wrap: nowrap')
   })
 
   it('gives the page small margins at its sides', () => {

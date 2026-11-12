@@ -897,7 +897,9 @@ count as a badge). Under the open workspace the rail keeps its acts as pills ("A
 nothing to count), the open one outlined in the accent; every entry's tip is its full name and
 count. The choice is the person's, kept in the browser's local storage (`content-studio.sidebar-folded`,
 `src/ui/sidebarFold.ts`), never in the project; where the browser keeps nothing the sidebar opens
-unfolded.
+unfolded. The rail is a sticky full-height column on the left at every width (scrolling on its own
+when the window is short) and the page fills the rest; only the unfolded sidebar stacks above the
+page in a narrow window.
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
