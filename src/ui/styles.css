@@ -172,6 +172,15 @@ a {
 
 .sidebar.sidebar-rail {
   flex: 0 0 72px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+/* Folded, the rail stays beside the page at every width, never stacked above it */
+.shell:has(> .sidebar-rail) {
+  flex-wrap: nowrap;
 }
 
 @media (max-width: 600px) {

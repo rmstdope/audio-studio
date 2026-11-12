@@ -39,6 +39,14 @@ describe('the room the shell leaves the pages', () => {
     expect(dot).toContain('flex-shrink: 0')
   })
 
+  // Folded, the rail is a full-height column on the left at every width (as-zlty).
+  it('keeps the folded rail a sticky full-height column beside the page at any width', () => {
+    const rail = rule(css, '.sidebar.sidebar-rail')
+    for (const d of ['position: sticky', 'top: 0', 'height: 100vh', 'overflow-y: auto'])
+      expect(rail).toContain(d)
+    expect(rule(css, '.shell:has(> .sidebar-rail)')).toContain('flex-wrap: nowrap')
+  })
+
   it('gives the page small margins at its sides', () => {
     expect(rule(css, '.content')).toContain('padding: 20px 24px 32px')
   })
