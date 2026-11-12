@@ -5678,3 +5678,45 @@ textarea[aria-disabled='true'][data-why] {
   flex-wrap: wrap;
   white-space: normal;
 }
+
+/* An image page's job tabs. */
+.job-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+  margin: 0 0 16px;
+}
+.job-tab {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 14px 10px;
+  margin-bottom: -1px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.job-tab:hover,
+.job-tab-open {
+  color: var(--text);
+}
+.job-tab-open {
+  border-bottom-color: var(--accent);
+}
+.job-tab-key {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  color: var(--faint);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.chip-accent {
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-ink);
+}

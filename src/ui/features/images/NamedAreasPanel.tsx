@@ -1,3 +1,4 @@
+import { useJobOpen } from './ImageJobTabs'
 import { off } from '../../off'
 import {
   useEffect,
@@ -170,6 +171,11 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
     window.addEventListener('resize', again)
     return () => window.removeEventListener('resize', again)
   }, [])
+  // Measured again when its tab opens: while hidden the picture has no size.
+  const jobOpen = useJobOpen()
+  useEffect(() => {
+    if (jobOpen) remeasure((n) => n + 1)
+  }, [jobOpen])
 
   // Esc cancels a drag in progress.
   useEffect(() => {

@@ -108,13 +108,13 @@ async function show(
     act(() => root.unmount())
     container.remove()
   })
-  const draw = (now: Partial<ImageRow>) =>
+  const draw = (now: Partial<ImageRow>, active = true) =>
     act(() =>
       root.render(
         createElement(
           QueryClientProvider,
           { client },
-          createElement(TakesSection, { row: { ...row, ...over, ...now }, prompt }),
+          createElement(TakesSection, { row: { ...row, ...over, ...now }, prompt, active }),
         ),
       ),
     )
@@ -140,7 +140,21 @@ async function show(
   const right = () => container.querySelector('[data-side="right"] b')?.textContent
   const left = () => container.querySelector('[data-side="left"] b')?.textContent
   const rerender = (now: Partial<ImageRow>) => draw(now)
-  return { client, container, calls, buttons, button, click, key, text, right, left, rerender }
+  const setActive = (active: boolean) => draw({}, active)
+  return {
+    setActive,
+    client,
+    container,
+    calls,
+    buttons,
+    button,
+    click,
+    key,
+    text,
+    right,
+    left,
+    rerender,
+  }
 }
 
 const three = [take(1), take(2), take(3)]
@@ -1442,6 +1456,14 @@ describe('the workbench', () => {
     })
     expect(changes(s)).toEqual(['DELETE /api/images/inn/takes/3'])
     await act(async () => answer())
+  })
+
+  it('hears no keys while its tab is not open', async () => {
+    const s = await show(view({ takes: three }))
+    s.setActive(false)
+    await s.key('c', document.body)
+    await s.key('d', document.body)
+    expect(changes(s)).toEqual([])
   })
 
   it('hears the keys while the box is focused', async () => {

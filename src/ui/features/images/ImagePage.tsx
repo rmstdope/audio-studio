@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   acceptableReasons,
   type ImageRow,
@@ -7,7 +7,15 @@ import {
 } from '../../../core/images'
 import { Pager } from '../../components/Pager'
 import { Problems } from '../../components/Problems'
-import { useAcceptImageChange, useImageCompare, useSetImageWords } from '../../api'
+import {
+  useAcceptImageChange,
+  useFineTunes,
+  useImageCompare,
+  useImagePatches,
+  useImageTakes,
+  useSetImageWords,
+} from '../../api'
+import { imageJobTabs, type ImageJob } from '../../imageJobs'
 import { shortTitle } from '../../format'
 import { off } from '../../off'
 import { outOfDateText, WAIT_FOR_CHANGE } from '../../imagesText'
@@ -16,15 +24,25 @@ import { routeHref } from '../../route'
 import { ActStyleBox } from './ActStyleBox'
 import { ActStyleMenu } from './ActStyleMenu'
 import { ActLinks } from './ActLinks'
+import { ImageJobTabs, JobOpenProvider } from './ImageJobTabs'
 import { NamedAreasPanel } from './NamedAreasPanel'
 import { FineTunePanel } from './FineTunePanel'
 import { GamePatchesPanel } from './GamePatchesPanel'
 import { TakesSection } from './TakesSection'
 import { WordsField, type SaveWordsNow } from './WordsField'
 
+/** One job's section of the page: shown when its tab is open, kept (with its state and running work) when not. */
+function Job({ job, open, children }: { job: ImageJob; open: ImageJob; children: ReactNode }) {
+  return (
+    <div id={`job-${job}`} role="tabpanel" aria-labelledby={`job-tab-${job}`} hidden={job !== open}>
+      <JobOpenProvider value={job === open}>{children}</JobOpenProvider>
+    </div>
+  )
+}
+
 /**
- * An image's own page: what is out of date above, then its workbench: the prompt (the words,
- * editable, and the whole prompt) beside its takes.
+ * An image's own page: what is out of date above, then its jobs as tabs, one open at a time: Make
+ * (the prompt, the words, editable, beside the takes), Fine-tune, Patches and Named areas.
  */
 export function ImagePage({
   act,
@@ -40,16 +58,40 @@ export function ImagePage({
     return found ? shortTitle(found.title) : null
   }
   const [saved, setSaved] = useState(false)
+  const [job, setJob] = useState<ImageJob>('make')
+  const takesView = useImageTakes(row.id).data
+  const tunesView = useFineTunes(row.id).data
+  const patchesView = useImagePatches(row.id).data
+  const tabs = imageJobTabs({
+    row,
+    makingTakes: !!takesView && 'making' in takesView && takesView.making.length > 0,
+    newFineTunes:
+      tunesView && 'tunes' in tunesView ? tunesView.tunes.filter((t) => t.isNew).length : 0,
+    makingFineTunes: !!tunesView && 'making' in tunesView && tunesView.making.length > 0,
+    makingPatches:
+      !!patchesView &&
+      'patches' in patchesView &&
+      (patchesView.patches.some((p) => p.making.length > 0) || !!patchesView.remake.press?.running),
+  })
   const save = useSetImageWords(row.id)
   const compare = useImageCompare(row.id)
   const accept = useAcceptImageChange(row.id)
   const canAccept = acceptableReasons(row.reasons)
   const field = useRef<HTMLTextAreaElement>(null)
   const saveNow = useRef<SaveWordsNow>(null)
+  // Asked for after settling the game's words: the field is focused once Make is showing.
+  const [focusAsk, setFocusAsk] = useState(0)
+  useEffect(() => {
+    if (focusAsk > 0) field.current?.focus()
+  }, [focusAsk])
   const settle = (choice: 'keep' | 'game') =>
     compare.mutate(choice, {
       onSuccess: (result) => {
-        if (result.ok) field.current?.focus()
+        if (result.ok) {
+          // The words are on Make: focus them once that tab is showing.
+          setJob('make')
+          setFocusAsk((n) => n + 1)
+        }
       },
     })
   // The act's images in the list's order; one with no row (the lists disagree) is not stepped to.
@@ -165,58 +207,70 @@ export function ImagePage({
           </div>
         </section>
       )}
-      <TakesSection
-        row={row}
-        saveWords={() => saveNow.current?.() ?? null}
-        prompt={
-          <section className="panel brief-panel" aria-label="Prompt">
-            <div className="brief-panel-head">
-              <h2>Prompt</h2>
-              {saved && (
-                <span className="saved" role="status">
-                  Saved
-                </span>
-              )}
-            </div>
-            <WordsField
-              label="What the image shows"
-              words={row.words}
-              changed={row.changed}
-              save={save}
-              onSaved={() => setSaved(true)}
-              onEdit={() => setSaved(false)}
-              saveNow={saveNow}
-              inputRef={field}
-            />
-            {row.changed && <span className="muted">The game&apos;s words: {row.description}</span>}
-            {row.actStyle?.choices ? (
-              <ActStyleMenu
-                imageId={row.id}
-                actStyle={row.actStyle}
+      <ImageJobTabs tabs={tabs} open={job} onOpen={setJob} />
+      <Job job="make" open={job}>
+        <TakesSection
+          active={job === 'make'}
+          row={row}
+          saveWords={() => saveNow.current?.() ?? null}
+          prompt={
+            <section className="panel brief-panel" aria-label="Prompt">
+              <div className="brief-panel-head">
+                <h2>Prompt</h2>
+                {saved && (
+                  <span className="saved" role="status">
+                    Saved
+                  </span>
+                )}
+              </div>
+              <WordsField
+                label="What the image shows"
+                words={row.words}
+                changed={row.changed}
+                save={save}
                 onSaved={() => setSaved(true)}
                 onEdit={() => setSaved(false)}
+                saveNow={saveNow}
+                inputRef={field}
               />
-            ) : (
-              row.actStyle && (
-                <ActStyleBox
+              {row.changed && (
+                <span className="muted">The game&apos;s words: {row.description}</span>
+              )}
+              {row.actStyle?.choices ? (
+                <ActStyleMenu
                   imageId={row.id}
-                  actName={shortTitle(act.title)}
                   actStyle={row.actStyle}
                   onSaved={() => setSaved(true)}
                   onEdit={() => setSaved(false)}
                 />
-              )
-            )}
-            <details className="images-whole">
-              <summary>The whole prompt the model gets</summary>
-              <pre className="images-ro mono">{row.prompt}</pre>
-            </details>
-          </section>
-        }
-      />
-      <FineTunePanel key={`fine-tune-${row.id}`} row={row} />
-      <NamedAreasPanel key={`areas-${row.id}`} row={row} />
-      <GamePatchesPanel key={`patches-${row.id}`} row={row} />
+              ) : (
+                row.actStyle && (
+                  <ActStyleBox
+                    imageId={row.id}
+                    actName={shortTitle(act.title)}
+                    actStyle={row.actStyle}
+                    onSaved={() => setSaved(true)}
+                    onEdit={() => setSaved(false)}
+                  />
+                )
+              )}
+              <details className="images-whole">
+                <summary>The whole prompt the model gets</summary>
+                <pre className="images-ro mono">{row.prompt}</pre>
+              </details>
+            </section>
+          }
+        />
+      </Job>
+      <Job job="fine-tune" open={job}>
+        <FineTunePanel key={`fine-tune-${row.id}`} row={row} />
+      </Job>
+      <Job job="patches" open={job}>
+        <GamePatchesPanel key={`patches-${row.id}`} row={row} />
+      </Job>
+      <Job job="areas" open={job}>
+        <NamedAreasPanel key={`areas-${row.id}`} row={row} />
+      </Job>
     </>
   )
 }

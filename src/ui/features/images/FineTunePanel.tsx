@@ -1,3 +1,4 @@
+import { useJobOpen } from './ImageJobTabs'
 import {
   useEffect,
   useLayoutEffect,
@@ -107,6 +108,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const drop = useDropFineTune(row.id)
   const use = useUseFineTune(row.id)
   const seen = useMarkFineTuneSeen(row.id)
+  const jobOpen = useJobOpen()
   const [words, setWords] = useState('')
   // The mark belongs to the picture it was dragged on; another picture has none.
   const [marked, setMarked] = useState<{ picture: string; area: PatchArea } | null>(null)
@@ -169,7 +171,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   })
   // A fine-tune laid over the picture once is no longer "new".
   useEffect(() => {
-    if (shown?.isNew && !asked.current.has(shown.n)) {
+    if (jobOpen && shown?.isNew && !asked.current.has(shown.n)) {
       asked.current.add(shown.n)
       seen.mutate(shown.n)
     }
