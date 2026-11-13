@@ -27,8 +27,7 @@ import {
   useMakeAllEffects,
   useStopAllEffects,
 } from '../../api'
-import { useStopFocus } from '../../components/useStopFocus'
-import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
+import { useMakeAllPanel } from '../../components/useMakeAllPanel'
 import { routeHref } from '../../route'
 
 /**
@@ -43,54 +42,23 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   const { batch, close: closeBatch } = useEffectsBatch(running)
   const make = useMakeAllEffects()
   const stopAll = useStopAllEffects()
-  const [asking, setAsking] = useState(false)
   const [failed, setFailed] = useState(false)
-  const opener = useRef<HTMLButtonElement | null>(null)
-  const makeButton = useRef<HTMLButtonElement | null>(null)
-  const stopButton = useRef<HTMLButtonElement | null>(null)
-  const closeButton = useRef<HTMLButtonElement | null>(null)
-  const focusStop = useRef(false)
-  const focusAfterClose = useRef(false)
-  const refocus = useFocusWhenClosed(asking, opener)
-  useEffect(() => {
-    // Takes started elsewhere take the question's place; it does not come back by itself.
-    if (running) setAsking(false)
-  }, [running])
   const finished = Boolean(batch && !batch.running && !running)
-  useEffect(() => {
-    // The press ended before the running line was ever drawn: nothing is left to focus.
-    if (finished) focusStop.current = false
-  }, [finished])
-  useEffect(() => {
-    // Close removes the summary and brings the button back: focus it once it is there.
-    if (!focusAfterClose.current) return
-    focusAfterClose.current = false
-    if (makeButton.current) makeButton.current.focus()
-    else document.querySelector<HTMLElement>('.status-panel')?.focus()
+  const ui = useMakeAllPanel({
+    busy: running || Boolean(batch?.running),
+    summary: Boolean(batch),
+    settled: finished,
+    resetStop: stopAll.reset,
+    fallback: () => document.querySelector<HTMLElement>('.status-panel'),
   })
-  useEffect(() => {
-    if (running && focusStop.current && stopButton.current) {
-      focusStop.current = false
-      stopButton.current.focus()
-    }
-  })
-  // Where focus goes when Stop all goes away: the summary's Close, else the panel's button or the panel.
-  const stopFocus = useStopFocus(running || Boolean(batch?.running), () => {
-    if (closeButton.current) closeButton.current.focus()
-    else if (makeButton.current) makeButton.current.focus()
-    else document.querySelector<HTMLElement>('.status-panel')?.focus()
-  })
-  const { reset: resetStop } = stopAll
-  useEffect(() => {
-    if (!running) resetStop()
-  }, [running, resetStop])
+  const { open: asking, setOpen: setAsking, stopFocus } = ui
   const plan = planMakeAll(effects.rows, making)
   if (plan.lockUnread) return null
   const names = Object.fromEntries(effects.rows.map((row) => [row.id, row.name]))
   const summary = batch && !batch.running && !running ? batchSummary(batch) : null
   const close = () => {
     closeBatch()
-    focusAfterClose.current = true
+    ui.closed()
   }
   const summaryLine = summary && (
     <p className="effects-make-all-summary" role="status">
@@ -106,7 +74,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
         ))}
         {summary.after}
       </span>
-      <button ref={closeButton} className="btn btn-ghost" type="button" onClick={close}>
+      <button ref={ui.closeButton} className="btn btn-ghost" type="button" onClick={close}>
         Close
       </button>
     </p>
@@ -117,7 +85,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
         <p className="effects-make-all-running">
           <span>{runningLine(making)}</span>
           <button
-            ref={stopButton}
+            ref={ui.stopButton}
             className="btn"
             type="button"
             {...off(stopAll.isPending && EFFECTS_PENDING)}
@@ -156,10 +124,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
       <p className="effects-make-all-line">
         <span>{makeAllLine(plan.startable.length)}</span>
         <button
-          ref={(element) => {
-            makeButton.current = element
-            opener.current = element
-          }}
+          ref={ui.button}
           className="btn btn-primary"
           type="button"
           onClick={() => {
@@ -189,8 +154,8 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
           models={models}
           pending={make.isPending}
           onCancel={() => {
-            refocus()
             setAsking(false)
+            ui.goTo('button')
           }}
           onMake={() =>
             make.mutate(
@@ -198,7 +163,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
               {
                 onSuccess: (result) => {
                   setAsking(false)
-                  if (result.ok && result.started.length > 0) focusStop.current = true
+                  if (result.ok && result.started.length > 0) ui.goTo('stop')
                   else setFailed(true)
                 },
                 onError: () => {

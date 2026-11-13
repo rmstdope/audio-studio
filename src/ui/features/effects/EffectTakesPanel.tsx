@@ -1,3 +1,4 @@
+import { useAfterSaved } from '../../useAfterSaved'
 import {
   EFFECTS_LOCK_UNREAD,
   EFFECTS_PENDING,
@@ -46,6 +47,7 @@ import { failureLine, progressOf } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { compareClips, takePlayId } from '../../effectsPlay'
 import type { SaveWordsNow } from '../images/WordsField'
+import { TrackActionsContext, useTrackActions, useTrackActionsState } from '../../trackActions'
 import { EffectFadesEditor } from './EffectFadesEditor'
 import { EffectTrimmedTag, useEffectTrimControl } from './effectTrim'
 import { EffectInTheGame, HearTheSeam, KindChip, Playback, type Player } from './EffectInTheGame'
@@ -96,10 +98,11 @@ export function EffectTakesPanel({
     else fadeOpeners.current.delete(n)
   }
   // How many takes the next press makes: 4 at first, then the pick, while the page stays open.
+  const actions = useTrackActionsState()
   const [count, setCount] = useState(4)
   // The model the next press uses: Setup's, until a pick, which lasts while the page stays open.
   const [picked, setPicked] = useState<EffectModelId | null>(null)
-  const [waitingForWords, setWaitingForWords] = useState(false)
+  const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   const view = takes.data
   if (!view) {
     return (
@@ -132,16 +135,6 @@ export function EffectTakesPanel({
   const none = !others.length && !view.making.length
   const busy = view.making.length > 0
   const canMake = view.canMake
-  /** Takes are made from the saved words, so `ask` waits until they are the words in the field. */
-  const afterWordsSaved = (ask: () => void) => {
-    const saving = saveWords?.() ?? null
-    if (saving === null) return ask()
-    setWaitingForWords(true)
-    void saving.then((wordsSaved) => {
-      setWaitingForWords(false)
-      if (wordsSaved) ask()
-    })
-  }
   const makeState = { canMake, busy, waitingForWords, pending: make.isPending }
   const makeWhy = effectsMakeWhy(makeState)
   const countWhy = effectsMakeWhy({ ...makeState, pending: false })
@@ -192,7 +185,7 @@ export function EffectTakesPanel({
   }
   const changed = row.changed
   return (
-    <>
+    <TrackActionsContext.Provider value={actions}>
       {!canMake && (
         <div className="errbox" role="alert">
           <div className="errbox-text">
@@ -338,7 +331,7 @@ export function EffectTakesPanel({
         {stop.isError && <span className="adopt-error">{stop.error.message}</span>}
         {make.isError && <span className="adopt-error">{make.error.message}</span>}
       </section>
-    </>
+    </TrackActionsContext.Provider>
   )
 }
 
@@ -381,6 +374,7 @@ function TakeCard({
   const seamPlaying = player.playing === `${id}-seam`
   const drop = useDropEffectTake(effect)
   const choose = useChooseEffectTake(effect)
+  const actions = useTrackActions()
   const trim = useEffectTrimControl({
     effect,
     take,
@@ -390,8 +384,10 @@ function TakeCard({
       if (playing || seamPlaying) player.stop()
     },
   })
-  const failedChoose = choose.isError || (choose.data && !choose.data.ok)
-  const failedDrop = drop.isError || (drop.data && !drop.data.ok)
+  const failedChoose =
+    actions.shows(`choose:${take.n}`) && (choose.isError || (choose.data && !choose.data.ok))
+  const failedDrop =
+    actions.shows(`drop:${take.n}`) && (drop.isError || (drop.data && !drop.data.ok))
   const editing = fading === take.n
   const otherOpen = fading !== null && !editing
   const fades = effectFadesOf(take, effectLoops)
@@ -411,7 +407,9 @@ function TakeCard({
           chosen={false}
           player={player}
           onClose={() => onFadesClosed(take.n)}
-          onSaved={trim.clear}
+          onSaved={() => {
+            if (!trim.pending) actions.press(`fades:${take.n}`)
+          }}
         />
       ) : (
         <>
@@ -459,6 +457,7 @@ function TakeCard({
               )}
               onClick={() => {
                 if (playing || comparing || seamPlaying) player.stop()
+                actions.press(`drop:${take.n}`)
                 drop.mutate(take.file)
               }}
             >
@@ -472,7 +471,10 @@ function TakeCard({
                   locked && EFFECTS_LOCK_UNREAD,
                   (choose.isPending || drop.isPending) && EFFECTS_PENDING,
                 )}
-                onClick={() => choose.mutate(take.file)}
+                onClick={() => {
+                  actions.press(`choose:${take.n}`)
+                  choose.mutate(take.file)
+                }}
               >
                 {choose.isPending ? 'Choosing…' : 'Choose'}
               </button>

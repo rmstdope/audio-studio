@@ -5,6 +5,7 @@ import { effectCutLine } from '../../../core/effectTrim'
 import type { EffectTakeView } from '../../../core/effectTakes'
 import { NOTHING_LINE, SILENT_LINE, trimFailure } from '../../../core/musicTrim'
 import { useTrimEffectTake } from '../../api'
+import { useTrackActions } from '../../trackActions'
 
 /** The tag beside a trimmed take's name. */
 export function EffectTrimmedTag({ take }: { take: EffectTakeView }) {
@@ -17,7 +18,9 @@ export function EffectTrimmedTag({ take }: { take: EffectTakeView }) {
  * waveform: how much was cut, or why the button is greyed out) and `failure` (the red line, next to
  * the button), and `clear`, which the card calls when a later action on the take works, so the red
  * line never outlives the take it was about. The line is only ever about the take shown now, and goes
- * for good once another take (or none) is shown.
+ * for good once another take (or none) is shown; a later action on the page hides it too (the page's
+ * {@link TrackActions}, which this presses as a trim begins), except while the trim is still working:
+ * its answer is still to come, and its failure to be said (`pending`).
  * `onPress` runs as a press begins, to stop a take that is playing, since its sound is about to
  * change.
  */
@@ -36,13 +39,10 @@ export function useEffectTrimControl({
   /** The effects lock cannot be read: whether the take is in the game is not known, so Trim waits. */
   locked: boolean
   onPress: () => void
-}): { button: ReactNode; note: ReactNode; failure: ReactNode; clear: () => void } {
+}): { button: ReactNode; note: ReactNode; failure: ReactNode; pending: boolean } {
   const trim = useTrimEffectTake(effect)
+  const actions = useTrackActions()
   const noteId = useId()
-  // A trim still working is left alone: its answer is still to come, and its failure to be said.
-  const clear = () => {
-    if (!trim.isPending) trim.reset()
-  }
   // Another take shown (or none), the old failure goes: it is never shown again, even when that take
   // comes back.
   const shown = take?.file
@@ -56,7 +56,7 @@ export function useEffectTrimControl({
   // A trimmed take always keeps Undo trim; the studio says an untrimmed one has something to cut,
   // or why not, only when it can go into the game.
   if (!take || (!undo && !take.trimmable)) {
-    return { button: null, note: null, failure: null, clear }
+    return { button: null, note: null, failure: null, pending: trim.isPending }
   }
   const greyed = !undo && take.trimmable !== 'cut'
   const working = trim.isPending
@@ -69,7 +69,7 @@ export function useEffectTrimControl({
         : null
   // A failure about another take (the game now plays a different one) is not this take's.
   const reason =
-    trim.variables?.file !== take.file
+    trim.variables?.file !== take.file || !actions.shows(`trim:${take.n}`)
       ? null
       : trim.isError
         ? trim.error.message
@@ -79,7 +79,7 @@ export function useEffectTrimControl({
             : `${trim.data.file} could not be read`
           : null
   return {
-    clear,
+    pending: trim.isPending,
     button: (
       <button
         type="button"
@@ -92,6 +92,7 @@ export function useEffectTrimControl({
         aria-describedby={note ? noteId : undefined}
         onClick={() => {
           onPress()
+          actions.press(`trim:${take.n}`)
           trim.mutate({ file: take.file, undo })
         }}
       >

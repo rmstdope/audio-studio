@@ -1,3 +1,5 @@
+import { fieldOwnsKeys, useDocumentKeys, usePendingFocus } from './useWorkbenchKeys'
+import { useAfterSaved } from '../../useAfterSaved'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
@@ -62,9 +64,6 @@ import { imageTimeLeftText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 import { scrollWithin } from '../../scrollWithin'
-
-/** The inputs that are pressed rather than typed into, which leave the page's keys to it. */
-const PRESSED_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset'])
 
 /** How many takes the count menu starts on. */
 const STARTING_COUNT = 4
@@ -200,14 +199,18 @@ export function TakesSection({
     take: 0,
   })
   const [saved, setSaved] = useState(0)
-  const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
-  const [waitingForWords, setWaitingForWords] = useState(false)
+  const focusOn = usePendingFocus<'choose' | 'right' | number>((want) =>
+    want === 'choose'
+      ? chooseButton.current
+      : want === 'right'
+        ? rightHeading.current
+        : thumbs.current.get(want),
+  )
+  const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   const [showing, setShowing] = useState<Showing>('game')
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState({ width: 0, height: 0 })
   const asked = useRef(new Set<number>())
-  // Focus asked for by a press of Make does not scroll: a mouse press stays where it was.
-  const focusQuietly = useRef(false)
   const chooseButton = useRef<HTMLButtonElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
   const dropButton = useRef<HTMLButtonElement>(null)
@@ -215,20 +218,7 @@ export function TakesSection({
   const rightHeading = useRef<HTMLSpanElement>(null)
   const thumbs = useRef(new Map<number, HTMLButtonElement>())
   // The page's keys (← → C D) are heard anywhere on the page, by the handler of the last render.
-  const keys = useRef<(event: KeyboardEvent) => void>(() => {})
-  const activeNow = useRef(active)
-  let onKey: (event: KeyboardEvent) => void = () => {}
-  useEffect(() => {
-    keys.current = onKey
-    activeNow.current = active
-  })
-  useEffect(() => {
-    const listen = (event: KeyboardEvent) => {
-      if (activeNow.current) keys.current(event)
-    }
-    document.addEventListener('keydown', listen)
-    return () => document.removeEventListener('keydown', listen)
-  }, [])
+  const keys = useDocumentKeys(active)
   // A choice or drop asked for by a key and not yet settled: a second press waits for it, since the
   // handler it would reach still sees the take as it was.
   const changing = useRef(false)
@@ -273,20 +263,9 @@ export function TakesSection({
     observer.observe(stage)
     return () => observer.disconnect()
   }, [stage])
-  useEffect(() => {
-    if (pendingFocus === null) return
-    const target =
-      pendingFocus === 'choose'
-        ? chooseButton.current
-        : pendingFocus === 'right'
-          ? rightHeading.current
-          : thumbs.current.get(pendingFocus)
-    // Asked for once the change has settled: tried once, and given up on if the target cannot take it.
-    target?.focus(focusQuietly.current ? { preventScroll: true } : undefined)
-    focusQuietly.current = false
-    setPendingFocus(null)
-  }, [pendingFocus])
 
+  // While the takes load, no key does anything: the last render's handler must not outlive its takes.
+  keys.current = () => {}
   if (!view || !ready) {
     // The same shape as the workbench below, so the prompt is not made again (losing words being
     // written) when the takes come and go.
@@ -402,7 +381,7 @@ export function TakesSection({
       },
       onSettled: (answer) => {
         changing.current = false
-        if (!confirmed || answer?.ok) setPendingFocus(focus)
+        if (!confirmed || answer?.ok) focusOn(focus)
       },
     })
   }
@@ -424,7 +403,7 @@ export function TakesSection({
       },
       onSettled: (answer) => {
         changing.current = false
-        if (!confirmed || answer?.ok) setPendingFocus(next ?? 'right')
+        if (!confirmed || answer?.ok) focusOn(next ?? 'right')
       },
     })
   }
@@ -447,20 +426,14 @@ export function TakesSection({
     for (const mutation of [choose, drop, unchoose]) mutation.reset()
     setAsking(null)
   }
-  onKey = (event: KeyboardEvent) => {
+  keys.current = (event: KeyboardEvent) => {
     const target = event.target
     if (event.defaultPrevented || open) return
     if (event.metaKey || event.ctrlKey || event.altKey) return
     if (target instanceof HTMLElement && target.isContentEditable) return
     // Keys typed into a field or menu are its own; a box or button leaves them to the page, but
     // a radio keeps its arrows.
-    const box = target instanceof HTMLInputElement && PRESSED_INPUTS.has(target.type)
-    if (
-      target instanceof HTMLSelectElement ||
-      target instanceof HTMLTextAreaElement ||
-      (target instanceof HTMLInputElement && !box)
-    )
-      return
+    if (fieldOwnsKeys(target)) return
     const arrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight'
     if (arrow && target instanceof HTMLInputElement && target.type === 'radio') return
     if (arrow) {
@@ -479,17 +452,6 @@ export function TakesSection({
       event.preventDefault()
       request({ kind: 'drop', n: rightTake.n })
     }
-  }
-
-  /** Takes are made from the saved words, so `ask` waits until they are the words in the field. */
-  const afterWordsSaved = (ask: () => void) => {
-    const saving = saveWords?.() ?? null
-    if (saving === null) return ask()
-    setWaitingForWords(true)
-    void saving.then((wordsSaved) => {
-      setWaitingForWords(false)
-      if (wordsSaved) ask()
-    })
   }
 
   const controls = (
@@ -529,8 +491,7 @@ export function TakesSection({
         onClick={() => {
           // The button is off while takes are made, and the browser drops focus from it; focus
           // goes to the take on the right in the strip, so ← and → keep stepping it.
-          focusQuietly.current = true
-          setPendingFocus(onRight ?? 'right')
+          focusOn(onRight ?? 'right', true)
           afterWordsSaved(() => make.mutate({ count, model }))
         }}
       >

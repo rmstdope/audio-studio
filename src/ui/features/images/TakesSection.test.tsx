@@ -388,6 +388,15 @@ describe('comparing takes', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
+  it('hears no keys while the takes load again', async () => {
+    const s = await show(view({ takes: three }))
+    await act(async () => s.client.removeQueries({ queryKey: ['image-takes', 'inn'] }))
+    await s.rerender({ id: 'other' })
+    const before = s.calls.length
+    await s.key('d')
+    expect(s.calls).toHaveLength(before)
+  })
+
   it('Drop removes the take on the right at once, and the next one comes to the right', async () => {
     const s = await show(view({ takes: three }))
     await s.click(s.container.querySelector<HTMLButtonElement>('[data-strip] button')!)

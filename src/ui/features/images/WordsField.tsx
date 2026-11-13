@@ -1,5 +1,6 @@
+import { useLatestSave } from '../../useAfterSaved'
 import type { UseMutationResult } from '@tanstack/react-query'
-import { useId, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import { useId, useImperativeHandle, useState, type Ref } from 'react'
 import type { ImageEditResult } from '../../../services/imageEdits'
 import { Problems } from '../../components/Problems'
 
@@ -48,7 +49,7 @@ export function WordsField({
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? words
   // Set the moment the field is left: a press that left it comes before any render.
-  const saving = useRef<Promise<boolean> | null>(null)
+  const saving = useLatestSave()
   const send = (value: string | null) => {
     const saved = save
       .mutateAsync(value, {
@@ -62,11 +63,7 @@ export function WordsField({
         (result) => result.ok,
         () => false,
       )
-    saving.current = saved
-    void saved.then(() => {
-      if (saving.current === saved) saving.current = null
-    })
-    return saved
+    return saving.track(saved)
   }
   const leave = () => {
     if (draft === null) return null
@@ -76,7 +73,7 @@ export function WordsField({
     }
     return send(draft.trim() === '' ? null : draft)
   }
-  useImperativeHandle(saveNow, () => () => saving.current ?? leave())
+  useImperativeHandle(saveNow, () => () => saving.current() ?? leave())
   return (
     <div className="brief-field">
       <div className="brief-field-head">

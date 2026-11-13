@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { MusicListSummary } from '../../../core/music'
 import { planMakeAll, TAKES_EACH } from '../../../core/musicMakeAll'
 import { musicModel } from '../../../core/musicModels'
@@ -29,11 +29,8 @@ import {
 } from '../../musicMakeAllText'
 import { WAIT_FOR_CHANGE } from '../../musicTakesText'
 import { off } from '../../off'
-import { useStopFocus } from '../../components/useStopFocus'
+import { useMakeAllPanel } from '../../components/useMakeAllPanel'
 import { routeHref } from '../../route'
-
-/** What focus goes to once the panel has re-rendered after a press. */
-type Focus = 'button' | 'make' | 'stop' | 'close' | null
 
 /**
  * The action of the "Tracks up to date" (or "Stingers up to date") panel on a list: a button that makes four takes for every
@@ -57,15 +54,6 @@ export function MakeAllPanel({
   const state = useMusicModelState().data
   const make = useMakeAll(list.id)
   const stop = useStopAll(list.id)
-  const [open, setOpen] = useState(false)
-  const [focus, setFocus] = useState<Focus>(null)
-  const closing = useRef(false)
-  const panel = useRef<HTMLDivElement>(null)
-  const button = useRef<HTMLButtonElement>(null)
-  const makeButton = useRef<HTMLButtonElement>(null)
-  const stopButton = useRef<HTMLButtonElement>(null)
-  const closeButton = useRef<HTMLButtonElement>(null)
-
   const ids = new Set(list.tracks.map((t) => t.id))
   const mine = Object.entries(making).filter(([id]) => ids.has(id))
   const running = {
@@ -88,25 +76,14 @@ export function MakeAllPanel({
   // A question gives way to the running line when takes start elsewhere, and does not come back.
   const busy = running.takes > 0
   const { batch, dismiss } = useMakeAllBatch(list.id, busy)
-  // Focus moves after the render that shows its target.
-  useEffect(() => {
-    if (!focus) return
-    // After Close the summary may still be drawn for a moment; focus waits for what replaces it.
-    if (focus === 'button' && closing.current && batch) return
-    const target = { button, make: makeButton, stop: stopButton, close: closeButton }[focus].current
-    if (target) target.focus()
-    else if (focus === 'button') panel.current?.focus()
-    closing.current = false
-    setFocus(null)
-  }, [focus, batch])
-  const stopFocus = useStopFocus(busy, () => setFocus(batch ? 'close' : 'button'))
-  const { reset: resetStop } = stop
-  useEffect(() => {
-    if (!busy) resetStop()
-  }, [busy, resetStop])
-  useEffect(() => {
-    if (busy) setOpen(false)
-  }, [busy])
+  const settled = Boolean(batch && !batch.running && !busy)
+  const ui = useMakeAllPanel({
+    busy,
+    summary: Boolean(batch),
+    settled,
+    resetStop: stop.reset,
+  })
+  const { open, setOpen, stopFocus } = ui
   const setup = (
     <a className="btn" href={routeHref({ view: 'setup' })}>
       Open Setup
@@ -119,7 +96,7 @@ export function MakeAllPanel({
       <div className="make-all-line">
         <span>{runningLine({ ...running, noun })}</span>
         <button
-          ref={stopButton}
+          ref={ui.stopButton}
           type="button"
           className="btn btn-ghost"
           {...off(stop.isPending && WAIT_FOR_CHANGE)}
@@ -171,13 +148,12 @@ export function MakeAllPanel({
           {batch.stopped > 0 && ` ${summaryStopped(batch.stopped)}`}
         </span>
         <button
-          ref={closeButton}
+          ref={ui.closeButton}
           type="button"
           className="btn"
           onClick={() => {
-            closing.current = true
             dismiss()
-            setFocus('button')
+            ui.closed()
           }}
         >
           Close
@@ -205,14 +181,14 @@ export function MakeAllPanel({
       <div className="make-all-line">
         <span className="muted">{readyLine(plan.tracks.length, noun)}</span>
         <button
-          ref={button}
+          ref={ui.button}
           type="button"
           className="btn btn-primary"
           {...off(refreshing && MAKE_BLOCKED_BY_REFRESH)}
           onClick={() => {
             make.reset()
             setOpen(true)
-            setFocus('make')
+            ui.goTo('make')
           }}
         >
           {`Make ${TAKES_EACH} takes each`}
@@ -223,7 +199,7 @@ export function MakeAllPanel({
 
   const cancel = () => {
     setOpen(false)
-    setFocus('button')
+    ui.goTo('button')
   }
   let question: ReactNode = null
   if (open && !busy && model && plan?.kind === 'ready' && plan.tracks.length > 0) {
@@ -260,7 +236,7 @@ export function MakeAllPanel({
         )}
         <div className="make-all-buttons">
           <button
-            ref={makeButton}
+            ref={ui.makeButton}
             type="button"
             className="btn btn-primary"
             {...off(refreshing && MAKE_BLOCKED_BY_REFRESH, make.isPending && WAIT_FOR_CHANGE)}
@@ -268,11 +244,11 @@ export function MakeAllPanel({
               make.mutate(undefined, {
                 onSuccess: () => {
                   setOpen(false)
-                  setFocus('stop')
+                  ui.goTo('stop')
                 },
                 onError: () => {
                   setOpen(false)
-                  setFocus('button')
+                  ui.goTo('button')
                 },
               })
             }
@@ -288,7 +264,7 @@ export function MakeAllPanel({
   }
 
   return (
-    <div ref={panel} tabIndex={-1} className="make-all">
+    <div ref={ui.panel} tabIndex={-1} className="make-all">
       <div className="status-row">
         {children}
         {action}

@@ -1,3 +1,5 @@
+import { fieldOwnsKeys, usePendingFocus } from './useWorkbenchKeys'
+import { useAfterSaved } from '../../useAfterSaved'
 import { useJobOpen } from './ImageJobTabs'
 import {
   useEffect,
@@ -221,14 +223,14 @@ export function PatchWorkbench({
   const [showing, setShowing] = useState(true)
   const [count, setCount] = useState(2)
   const [asking, setAsking] = useState(false)
-  const [pendingFocus, setPendingFocus] = useState<number | 'heading' | null>(null)
-  const [waitingForWords, setWaitingForWords] = useState(false)
+  const focusOn = usePendingFocus<number | 'heading'>((want) =>
+    want === 'heading' ? heading.current : thumbs.current.get(want),
+  )
+  const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   // Focus goes to Make once a stopped press has left it free again.
   const [landOnMake, setLandOnMake] = useState(false)
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
-  // Focus asked for by a press of Make does not scroll: a mouse press stays where it was.
-  const focusQuietly = useRef(false)
   // A choice or drop asked for by a key and not yet settled: a second press waits for it.
   const changing = useRef(false)
   const heading = useRef<HTMLSpanElement>(null)
@@ -267,14 +269,6 @@ export function PatchWorkbench({
       setLandOnMake(false)
     }
   })
-  useEffect(() => {
-    if (pendingFocus === null) return
-    const target = pendingFocus === 'heading' ? heading.current : thumbs.current.get(pendingFocus)
-    // Asked for once the change has settled: tried once, and given up on if the target cannot take it.
-    target?.focus(focusQuietly.current ? { preventScroll: true } : undefined)
-    focusQuietly.current = false
-    setPendingFocus(null)
-  }, [pendingFocus])
 
   if (!take) {
     return (
@@ -347,7 +341,7 @@ export function PatchWorkbench({
     choose.mutate(n, {
       onSettled: () => {
         changing.current = false
-        setPendingFocus(lookingAt ?? 'heading')
+        focusOn(lookingAt ?? 'heading')
       },
     })
   }
@@ -359,7 +353,7 @@ export function PatchWorkbench({
     drop.mutate(n, {
       onSettled: () => {
         changing.current = false
-        setPendingFocus(next ?? 'heading')
+        focusOn(next ?? 'heading')
       },
     })
   }
@@ -385,12 +379,7 @@ export function PatchWorkbench({
     if (event.metaKey || event.ctrlKey || event.altKey) return
     if (!PATCH_KEYS.has(event.key.toLowerCase()) && !PATCH_KEYS.has(event.key)) return
     // Keys typed into a field or menu are its own.
-    if (
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement ||
-      (target instanceof HTMLInputElement && target.type !== 'checkbox')
-    )
-      return
+    if (fieldOwnsKeys(target)) return
     // The image's own keys rest while focus is inside a patch.
     event.stopPropagation()
     event.preventDefault()
@@ -433,7 +422,7 @@ export function PatchWorkbench({
           onClick={() =>
             unchoose.mutate(undefined, {
               onSuccess: (answer) => {
-                if (answer.ok) setPendingFocus(lookingAt ?? 'heading')
+                if (answer.ok) focusOn(lookingAt ?? 'heading')
                 else refocusUnchoose()
                 setAsking(false)
               },
@@ -599,7 +588,7 @@ export function PatchWorkbench({
                   makeButton.current.getAttribute('aria-disabled') !== 'true'
                 )
                   makeButton.current.focus()
-                else setPendingFocus('heading')
+                else focusOn('heading')
               }}
             >
               {backToAreaText(tie.title)}
@@ -638,16 +627,8 @@ export function PatchWorkbench({
               if (!marked) return
               // The button is off while takes are made, and the browser drops focus from it; focus
               // goes to the take looked at in the grid, so ← and → keep stepping it.
-              focusQuietly.current = true
-              setPendingFocus(lookingAt ?? 'heading')
-              const saving = saveWords()
-              if (saving === null) return make.mutate({ count, area: marked, model })
-              // The takes are made from the saved words, so they must be the words in the field.
-              setWaitingForWords(true)
-              void saving.then((saved) => {
-                setWaitingForWords(false)
-                if (saved) make.mutate({ count, area: marked, model })
-              })
+              focusOn(lookingAt ?? 'heading', true)
+              afterWordsSaved(() => make.mutate({ count, area: marked, model }))
             }}
           >
             {makeTakesText(count, hasTakes)}
