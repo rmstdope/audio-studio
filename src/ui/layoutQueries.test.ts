@@ -31,7 +31,7 @@ describe('a panel changes layout by its own width', () => {
     }
   })
 
-  it('stacks the rows in a 650 px panel and not in an 800 px one, whatever the window is', () => {
+  it('stacks the rows in a 650 px panel and not in an 800 px one (the panel's width is the only input; no window exists in this test)', () => {
     expect(selectorsAtPanelWidth(650)).toContain('.stack-table thead')
     expect(selectorsAtPanelWidth(800)).not.toContain('.stack-table thead')
   })
@@ -46,5 +46,20 @@ describe('a panel changes layout by its own width', () => {
         '@media (prefers-reduced-motion: reduce)',
       ].sort(),
     )
+  })
+})
+
+describe('the page column holds no fixed overlay (as-4rfy)', () => {
+  it('draws every fixed-position overlay through Overlay, since the column is a container and would become its containing block', () => {
+    const fixed = [...css.matchAll(/\n(\.[a-z-]+) \{\n  position: fixed;/g)].map((m) => m[1])
+    // .why-tip is portalled by WhyTip itself.
+    expect(fixed.sort()).toEqual(['.modal-back', '.scene-leave-backdrop', '.toast', '.why-tip'])
+    for (const file of [
+      './features/audition/ShortlistBoard.tsx',
+      './features/music/MoveTakeDialog.tsx',
+      './features/scenes/LeaveDialog.tsx',
+    ]) {
+      expect(read(file)).toContain('<Overlay>')
+    }
   })
 })

@@ -68,9 +68,6 @@ import { scrollWithin } from '../../scrollWithin'
 /** How many takes the count menu starts on. */
 const STARTING_COUNT = 4
 
-/** Below this window width the frame stacks (the stylesheet's `@media (max-width: 1000px)`) and the stage has no fixed height to fit. */
-const NARROW = 1000
-
 /** What a side takes besides its picture: caption, size line, buttons and the gaps between them. */
 const SIDE_CHROME = 100
 
@@ -252,12 +249,16 @@ export function TakesSection({
   }, [onRight])
   useEffect(() => {
     if (!stage || typeof ResizeObserver === 'undefined') return
-    // A narrow window stacks the frame and the stage grows with its pictures: only the width counts.
-    const measure = () =>
+    // A narrow panel stacks the frame (the stylesheet's `@container panel` rule, which has no grid
+    // rows then) and the stage grows with its pictures: only the width counts.
+    const measure = () => {
+      const frame = stage.closest('.image-workbench')
+      const stacked = frame !== null && getComputedStyle(frame).gridTemplateRows === 'none'
       setAvailable({
         width: stage.clientWidth,
-        height: window.innerWidth <= NARROW ? 0 : Math.max(0, stage.clientHeight - SIDE_CHROME),
+        height: stacked ? 0 : Math.max(0, stage.clientHeight - SIDE_CHROME),
       })
+    }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(stage)

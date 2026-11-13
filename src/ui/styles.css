@@ -3854,7 +3854,7 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--danger-ink);
 }
 
-/* Narrow window: the Brief column goes first. */
+/* Narrow panel: the Brief column goes first. */
 @container panel (max-width: 800px) {
   .music-table .music-brief-cell {
     display: none;
@@ -5091,7 +5091,7 @@ textarea[aria-disabled='true'][data-why] {
 }
 
 /* Each effect as a card, whenever the panel is narrower than the table needs while a scene plays
-   (about 1285 px of window and below, as-iix), not only in a narrow window. */
+   (as-iix), whatever the window is. */
 @container panel (max-width: 700px) {
   .scene-effects .table tr {
     display: grid;
