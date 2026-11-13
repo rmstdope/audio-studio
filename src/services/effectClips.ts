@@ -13,6 +13,7 @@ import {
   type EffectLockEntry,
   type EffectManifest,
 } from '../core/effectTakes'
+import { LOCK_UNREAD, type LockRead } from '../core/lockRead'
 import { resolveInRoot } from '../core/paths'
 import { EFFECTS_LOCK_FILE, type EffectsConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
@@ -50,22 +51,23 @@ async function manifestNow(
 
 /**
  * Every effect the lock says is chosen, with whether its clip is a plain file in the clips folder.
- * A lock that cannot be read adds its problems and gives null: which take is chosen is then not known.
+ * A lock that cannot be read adds its problems and is `LOCK_UNREAD`: which take is chosen is then not known.
  */
 export async function readEffectChosen(
   root: string,
   effects: EffectsConfig,
   problems: Problem[],
-): Promise<Record<string, { lock: EffectLockEntry; fileExists: boolean }> | null> {
+): Promise<LockRead<{ lock: EffectLockEntry; fileExists: boolean }>> {
   const lock = await lockNow(root, problems)
-  if (!lock) return null
+  if (!lock) return LOCK_UNREAD
   const files = await listFiles(resolveInRoot(root, effects.clips))
-  return Object.fromEntries(
+  const entries = Object.fromEntries(
     Object.entries(lock).map(([id, entry]) => [
       id,
       { lock: entry, fileExists: files.has(`${id}.mp3`) },
     ]),
   )
+  return { read: true, entries }
 }
 
 /** The queue key of a project's choices: one at a time, each reading what the one before wrote. */

@@ -516,7 +516,7 @@ export function createEffectTakes({
       const board = await readEffectBoard(root, id)
       if ('ok' in board) return board
       const chosenEffects = await readEffectChosen(root, found.effects, [])
-      const chosen = chosenEffects?.[id]?.lock
+      const chosen = chosenEffects.read ? chosenEffects.entries[id]?.lock : undefined
       const takes: EffectTakeView[] = []
       for (const take of board.takes) {
         const path = join(root, folder, fileOf(take))
@@ -568,7 +568,7 @@ export function createEffectTakes({
         takes,
         making,
         failed,
-        lockUnread: chosenEffects === null,
+        lockUnread: !chosenEffects.read,
       }
     },
 
@@ -670,10 +670,10 @@ export function createEffectTakes({
         async (board): Promise<EffectMakeResult | { dropped: EffectBoardTake }> => {
           const chosenEffects = await readEffectChosen(found.root, found.effects, [])
           // Which take the game plays is not known: nothing is dropped.
-          if (!chosenEffects) {
+          if (!chosenEffects.read) {
             return { ok: false, message: 'The sound effects lock could not be read.' }
           }
-          const chosen = chosenEffects[id]?.lock
+          const chosen = chosenEffects.entries[id]?.lock
           const take = board.takes.find((t) => fileOf(t) === name)
           if (!take) return { ok: false, message: 'That take is not on the board.' }
           if (chosen?.take === take.n && chosen.fp === take.hash) {
@@ -751,7 +751,7 @@ export function createEffectTakes({
         async (board): Promise<EffectMakeResult> => {
           const chosenEffects = await readEffectChosen(found.root, found.effects, [])
           // Which take the game plays is not known: nothing is changed.
-          if (!chosenEffects) {
+          if (!chosenEffects.read) {
             return { ok: false, message: 'The sound effects lock could not be read.' }
           }
           const take = board.takes.find((t) => fileOf(t) === name)
@@ -767,7 +767,7 @@ export function createEffectTakes({
           const next: EffectBoardTake = { ...take }
           delete next.fades
           if (fades && hasFades(fades)) next.fades = fades
-          const chosen = chosenEffects[id]?.lock
+          const chosen = chosenEffects.entries[id]?.lock
           if (chosen?.take === take.n && chosen.fp === take.hash) {
             let wav: Uint8Array
             try {
@@ -880,9 +880,9 @@ export function createEffectTakes({
           const { trim: _was, ...rest } = take
           const next: EffectBoardTake = trim ? { ...rest, trim } : rest
           const chosenEffects = await readEffectChosen(found.root, found.effects, [])
-          if (!chosenEffects)
+          if (!chosenEffects.read)
             return { ok: false, message: 'The sound effects lock could not be read.' }
-          const chosen = chosenEffects[id]
+          const chosen = chosenEffects.entries[id]
           // The take in the game, with its clip there, is rewritten first; with the clip missing only
           // the take changes, and Choose again writes it.
           if (chosen?.fileExists && chosen.lock.take === take.n && chosen.lock.fp === take.hash) {
@@ -1006,10 +1006,12 @@ export function createEffectTakes({
         ((await readEffects(root, project, []))?.rows ?? []).map((row) => row.id),
       )
       const chosen = await readEffectChosen(root, project.effects, [])
-      if (!chosen) return { ok: false, message: 'The sound effects lock could not be read.' }
+      if (!chosen.read) return { ok: false, message: 'The sound effects lock could not be read.' }
       const busy = (id: string) =>
         entriesOf(projectFile, id).some((entry) => entry.state !== 'failed')
-      const wanted = [...new Set(ids)].filter((id) => listed.has(id) && !chosen[id] && !busy(id))
+      const wanted = [...new Set(ids)].filter(
+        (id) => listed.has(id) && !chosen.entries[id] && !busy(id),
+      )
       if (!wanted.length) return { ok: true, started: [] }
       // The model every effect uses is a hand start's; when it cannot run, none is started.
       const model = defaultEffectModel(

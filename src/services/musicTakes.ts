@@ -534,7 +534,7 @@ export function createMusicTakes({
       const board = await readBoard(root, found.board)
       if ('ok' in board) return board
       const chosenTracks = await readChosen(root, found.music, [])
-      const chosen = chosenTracks?.[id]?.lock
+      const chosen = chosenTracks.read ? chosenTracks.entries[id]?.lock : undefined
       const takes: TakeView[] = []
       for (const take of board.takes) {
         const path = join(root, folder, fileOf(take))
@@ -593,7 +593,7 @@ export function createMusicTakes({
         takes,
         making,
         failed,
-        lockUnread: chosenTracks === null,
+        lockUnread: !chosenTracks.read,
       }
     },
 
@@ -814,9 +814,9 @@ export function createMusicTakes({
           const problems: Problem[] = []
           const chosenTracks = await readChosen(found.root, found.music, problems)
           // Which take the game plays is not known: nothing is dropped.
-          if (!chosenTracks || problems.length)
+          if (!chosenTracks.read || problems.length)
             return { ok: false, file: MUSIC_LOCK_FILE, problems }
-          const chosen = chosenTracks[id]?.lock
+          const chosen = chosenTracks.entries[id]?.lock
           const take = board.takes.find((t) => fileOf(t) === name)
           if (!take) return { ok: false, message: 'That take is not on the board.' }
           if (chosen?.take === take.n && chosen.fp === take.hash) {
@@ -846,7 +846,7 @@ export function createMusicTakes({
           const problems: Problem[] = []
           const chosenTracks = await readChosen(found.root, found.music, problems)
           // Which take the game plays is not known: nothing is changed.
-          if (!chosenTracks || problems.length)
+          if (!chosenTracks.read || problems.length)
             return { ok: false, file: MUSIC_LOCK_FILE, problems }
           if (found.inputs.kind !== 'stinger')
             return { ok: false, message: 'Only a stinger can fade.' }
@@ -860,7 +860,7 @@ export function createMusicTakes({
           const next: BoardTake = { ...take }
           delete next.fades
           if (fades && hasFades(fades)) next.fades = fades
-          const chosen = chosenTracks[id]?.lock
+          const chosen = chosenTracks.entries[id]?.lock
           if (chosen?.take === take.n && chosen.fp === take.hash) {
             let wav: Uint8Array
             try {
@@ -976,10 +976,10 @@ export function createMusicTakes({
         const next: BoardTake = trim ? { ...rest, trim } : rest
         const problems: Problem[] = []
         const chosenTracks = await readChosen(found.root, found.music, problems)
-        if (!chosenTracks || problems.length) {
+        if (!chosenTracks.read || problems.length) {
           return { ok: false, message: 'The music lock could not be read.' }
         }
-        const chosen = chosenTracks[id]?.lock
+        const chosen = chosenTracks.entries[id]?.lock
         if (chosen?.take === take.n && chosen.fp === take.hash) {
           let played: ReturnType<typeof playedOf>
           try {
@@ -1068,7 +1068,7 @@ export function createMusicTakes({
         boards.run(`${projectFile}\0${second}`, async (): Promise<MoveResult> => {
           const problems: Problem[] = []
           const chosenTracks = await readChosen(from.root, from.music, problems)
-          if (!chosenTracks || problems.length) {
+          if (!chosenTracks.read || problems.length) {
             return { ok: false, message: 'The music lock could not be read.' }
           }
           const source = await readBoard(from.root, from.board)
@@ -1077,7 +1077,7 @@ export function createMusicTakes({
           if ('ok' in target) return target
           const take = source.takes.find((t) => fileOf(t) === name)
           if (!take) return { ok: false, message: 'That take is not on the board.' }
-          const chosen = chosenTracks[id]?.lock
+          const chosen = chosenTracks.entries[id]?.lock
           if (chosen?.take === take.n && chosen.fp === take.hash) {
             return { ok: false, message: 'That take is the one in the game; choose another first.' }
           }

@@ -244,20 +244,22 @@ describe('acceptEffect', () => {
 })
 
 describe('readEffectChosen', () => {
-  it('lists the lock’s effects with whether the clip is a file there; null when unreadable', async () => {
+  it('lists the lock’s effects with whether the clip is a file there; unread when unreadable', async () => {
     const root = tempRepo({})
     await choose(root, 'door-creak', 1, fakeEncoder().encode)
     await choose(root, 'coins', 1, fakeEncoder().encode)
     const { rmSync } = await import('node:fs')
     rmSync(join(root, 'audio/effects/coins.mp3'))
     const chosen = await readEffectChosen(root, config, [])
-    expect(Object.entries(chosen!).map(([id, c]) => [id, c.fileExists])).toEqual([
+    expect(
+      Object.entries(chosen.read ? chosen.entries : {}).map(([id, c]) => [id, c.fileExists]),
+    ).toEqual([
       ['coins', false],
       ['door-creak', true],
     ])
     const broken = tempRepo({ 'content-studio/effects/lock.json': '{' })
     const problems: unknown[] = []
-    expect(await readEffectChosen(broken, config, problems as never)).toBeNull()
+    expect(await readEffectChosen(broken, config, problems as never)).toEqual({ read: false })
     expect(problems).toHaveLength(1)
   })
 })

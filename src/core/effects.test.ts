@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { LOCK_UNREAD } from './lockRead'
 import {
   applyDescription,
   effectName,
@@ -81,7 +82,7 @@ describe('an effect that loops', () => {
       overrides: {},
       canRefresh: false,
       state: {
-        chosen: { 'door-creak': { lock: lockEntry, fileExists: true } },
+        chosen: { read: true, entries: { 'door-creak': { lock: lockEntry, fileExists: true } } },
         takesMade: new Set(),
       },
     })
@@ -338,7 +339,7 @@ describe('summarizeEffects', () => {
     })
     const summarize = (state: EffectsState) =>
       summarizeEffects({ list: ok(), overrides: {}, canRefresh: false, state })
-    const none = { chosen: {}, takesMade: new Set<string>() }
+    const none = { chosen: { read: true as const, entries: {} }, takesMade: new Set<string>() }
 
     it('reads none yet, then not chosen once a take exists', () => {
       const rows = summarize({ ...none, takesMade: new Set(['coins']) }).rows
@@ -349,8 +350,11 @@ describe('summarizeEffects', () => {
       const state = {
         ...none,
         chosen: {
-          'door-creak': { lock: lock(2, door.description, 3), fileExists: true },
-          coins: { lock: lock(1, coins.description, 0.5), fileExists: false },
+          read: true as const,
+          entries: {
+            'door-creak': { lock: lock(2, door.description, 3), fileExists: true },
+            coins: { lock: lock(1, coins.description, 0.5), fileExists: false },
+          },
         },
       }
       const { rows, done } = summarize(state)
@@ -366,8 +370,11 @@ describe('summarizeEffects', () => {
       const state = {
         ...none,
         chosen: {
-          'door-creak': { lock: lock(2, 'Other words', 3), fileExists: true },
-          coins: { lock: lock(1, coins.description, 9), fileExists: true },
+          read: true as const,
+          entries: {
+            'door-creak': { lock: lock(2, 'Other words', 3), fileExists: true },
+            coins: { lock: lock(1, coins.description, 9), fileExists: true },
+          },
         },
       }
       const { rows, done } = summarize(state)
@@ -381,7 +388,10 @@ describe('summarizeEffects', () => {
     it('compares with the studio’s own words when they are in use', () => {
       const state = {
         ...none,
-        chosen: { coins: { lock: lock(1, 'Coins on glass', 0.5), fileExists: true } },
+        chosen: {
+          read: true as const,
+          entries: { coins: { lock: lock(1, 'Coins on glass', 0.5), fileExists: true } },
+        },
       }
       const summary = summarizeEffects({
         list: ok(),
@@ -393,7 +403,7 @@ describe('summarizeEffects', () => {
     })
 
     it('is not known everywhere while the lock cannot be read', () => {
-      const { rows, done } = summarize({ ...none, chosen: null })
+      const { rows, done } = summarize({ ...none, chosen: LOCK_UNREAD })
       expect(rows.map((r) => [r.status, r.current])).toEqual([
         ['unknown', { kind: 'unknown' }],
         ['unknown', { kind: 'unknown' }],

@@ -115,14 +115,14 @@ async function dropStale(
 ): Promise<string[]> {
   const problems: Problem[] = []
   const chosen = await readChosen(root, music, problems)
-  if (!chosen || problems.length) return []
+  if (!chosen.read || problems.length) return []
   const boards = [...(await listFiles(resolveInRoot(root, MUSIC_BOARD_DIR)))]
     .filter((name) => name.endsWith('.json'))
     .map((name) => name.slice(0, -'.json'.length))
   const stale = staleIds(
     summary,
     [...new Set([...Object.keys(briefs), ...boards])],
-    Object.keys(chosen),
+    Object.keys(chosen.entries),
   )
   for (const id of stale) {
     await boardQueue().run(`${projectFile}\0${id}`, () => deleteBoard(root, id))

@@ -7,6 +7,7 @@ import {
   type EffectLockEntry,
   type EffectStatus,
 } from './effectTakes'
+import { lockEntry, type LockRead } from './lockRead'
 import { problemsFrom, type Problem } from './project'
 
 /**
@@ -188,14 +189,14 @@ export interface EffectRow {
 
 /** What the studio knows of the effects' takes, read from the lock, the clips folder and the boards. */
 export interface EffectsState {
-  /** The lock's entries with whether each clip is a plain file there; null while the lock cannot be read. */
-  chosen: Record<string, { lock: EffectLockEntry; fileExists: boolean }> | null
+  /** The lock's entries with whether each clip is a plain file there; unread while the lock cannot be read. */
+  chosen: LockRead<{ lock: EffectLockEntry; fileExists: boolean }>
   /** The effects that have a take on their board. */
   takesMade: ReadonlySet<string>
 }
 
 /** Nothing chosen, made or being made. */
-const NO_STATE: EffectsState = { chosen: {}, takesMade: new Set() }
+const NO_STATE: EffectsState = { chosen: { read: true, entries: {} }, takesMade: new Set() }
 
 /** An effect the game no longer lists, whose description the studio still keeps. */
 export interface DroppedEffect {
@@ -251,9 +252,10 @@ export function summarizeEffects(input: {
     const description = own?.text ?? effect.description
     const loops = Boolean(effect.loops)
     const now = { description, seconds: effect.seconds, loops }
-    const entry = state.chosen?.[effect.id]
+    const standing = lockEntry(state.chosen, effect.id)
+    const entry = standing.standing === 'chosen' ? standing.entry : undefined
     const status = effectStatus({
-      lockUnread: state.chosen === null,
+      standing: standing.standing,
       chosen: entry,
       now,
       hasTakes: state.takesMade.has(effect.id),
@@ -269,7 +271,7 @@ export function summarizeEffects(input: {
       gameChanged: Boolean(own) && own!.gameWas !== effect.description,
       status,
       current:
-        state.chosen === null
+        standing.standing === 'unknown'
           ? ({ kind: 'unknown' } as const)
           : entry
             ? ({ kind: 'take', take: entry.lock.take, exists: entry.fileExists } as const)

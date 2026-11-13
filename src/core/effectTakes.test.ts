@@ -136,25 +136,25 @@ describe('the line for a loop that goes quiet early', () => {
 describe('an effect’s status', () => {
   const chosen = { lock, fileExists: true }
   it('is not known while the lock cannot be read, whatever else is true', () => {
-    expect(effectStatus({ lockUnread: true, chosen, now, hasTakes: true })).toBe('unknown')
+    expect(effectStatus({ standing: 'unknown', chosen, now, hasTakes: true })).toBe('unknown')
   })
   it('is none yet before any take, not chosen once there is one', () => {
-    expect(effectStatus({ lockUnread: false, chosen: undefined, now, hasTakes: false })).toBe(
+    expect(effectStatus({ standing: 'not-chosen', chosen: undefined, now, hasTakes: false })).toBe(
       'none-yet',
     )
-    expect(effectStatus({ lockUnread: false, chosen: undefined, now, hasTakes: true })).toBe(
+    expect(effectStatus({ standing: 'not-chosen', chosen: undefined, now, hasTakes: true })).toBe(
       'not-chosen',
     )
   })
   it('is chosen, changed, or missing (missing ahead of changed)', () => {
-    expect(effectStatus({ lockUnread: false, chosen, now, hasTakes: true })).toBe('chosen')
+    expect(effectStatus({ standing: 'chosen', chosen, now, hasTakes: true })).toBe('chosen')
     const changed = { ...now, seconds: 9 }
-    expect(effectStatus({ lockUnread: false, chosen, now: changed, hasTakes: true })).toBe(
+    expect(effectStatus({ standing: 'chosen', chosen, now: changed, hasTakes: true })).toBe(
       'changed',
     )
     expect(
       effectStatus({
-        lockUnread: false,
+        standing: 'chosen',
         chosen: { lock, fileExists: false },
         now: changed,
         hasTakes: true,

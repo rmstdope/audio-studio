@@ -2306,6 +2306,12 @@ Images' and scenes' routes are described with them:
 
 ## 10. Errors and safety
 
+- A lock that cannot be read is one value in core for music, sound effects and images alike
+  (`LockRead` in `core/lockRead.ts`, as-4bp0): `{ read: true, entries }` or `LOCK_UNREAD`, and
+  `lockEntry(lock, id)` says chosen, not chosen, or unknown. The services build it (an invalid
+  lock is unread, a missing one is read and empty) and the summaries take it, so a page cannot say
+  "none yet" or "not chosen" about a file it could not read; an unreadable images lock reads
+  "not known" on the act's list, as music's and effects' do.
 - An invalid project file or resource opens the UI on an error page that names the file, the path
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
