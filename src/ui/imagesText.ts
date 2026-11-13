@@ -497,8 +497,15 @@ export const BRINGING_WHY =
 /** Why a take's buttons are off while a question about it is open. */
 export const QUESTION_OPEN_WHY = 'Answer or cancel the question first.'
 
+/** What an image's page says in place of any claim about its take while the images lock cannot be read. */
+export const IMAGE_TAKE_UNKNOWN =
+  'Which take the game shows is not known until the images lock can be read; fix it, then reload.'
+
 /** Why a named area cannot be picked yet, by what its picture is doing; null when it can be. */
-export function areaRowWhy(state: 'loading' | 'gone' | 'none' | 'ready'): string | null {
+export function areaRowWhy(
+  state: 'loading' | 'gone' | 'none' | 'unknown' | 'ready',
+): string | null {
+  if (state === 'unknown') return IMAGE_TAKE_UNKNOWN
   if (state === 'loading') return 'The picture is still loading. Pick an area when it has.'
   if (state === 'gone')
     return "The chosen take's picture is missing or cannot be read, so areas cannot be placed on it."

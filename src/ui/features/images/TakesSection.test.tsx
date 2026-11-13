@@ -886,13 +886,33 @@ describe('what can go wrong', () => {
     expect(isOff(s.button('Drop'))).toBe(false)
   })
 
-  it('while the lock cannot be read, nothing is chosen, dropped or un-chosen', async () => {
-    const s = await show(view({ takes: [take(1, { chosen: true }), take(2)], lockUnread: true }), {
-      chosenTake: 1,
-    })
+  it('while the lock cannot be read, nothing is chosen or dropped', async () => {
+    const s = await show(view({ takes: [take(1), take(2)], lockUnread: true }))
     expect(isOff(s.button('Choose'))).toBe(true)
     expect(isOff(s.button('Drop'))).toBe(true)
-    expect(isOff(s.button('Un-choose'))).toBe(true)
+  })
+
+  it('while the lock cannot be read, the In the game side claims nothing about the take', async () => {
+    const hint =
+      'Which take the game shows is not known until the images lock can be read; fix it, then reload.'
+    for (const over of [{}, { gameFile: { file: 'a.png', exists: true } }]) {
+      for (const takes of [[], [take(1), take(2)]]) {
+        const s = await show(view({ takes, lockUnread: true }), over)
+        const left = s.container.querySelector('[data-side="left"]')!
+        expect(left.textContent).toContain('The images lock could not be read')
+        expect(left.textContent).toContain(hint)
+        expect(left.querySelector('.image-take-empty')).not.toBeNull()
+        expect(left.querySelector('[data-unknown="true"]')).not.toBeNull()
+        for (const claim of ['No picture yet', 'The game', 'Choose a take and', 'Un-choose'])
+          expect(left.textContent).not.toContain(claim)
+        if (takes.length > 0)
+          expect(s.text()).toContain(
+            'Choosing, dropping and un-choosing wait until the images lock',
+          )
+      }
+    }
+    const none = await show(view({ takes: [], lockUnread: true }))
+    expect(none.text()).toContain('Make takes to compare them here.')
   })
 
   it('shows only the latest action’s refusal', async () => {

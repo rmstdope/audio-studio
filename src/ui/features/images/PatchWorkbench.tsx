@@ -43,6 +43,7 @@ import {
   IMAGES_LOCK_WHY,
   makeTakesText,
   STYLE_BROKEN_WHY,
+  IMAGE_TAKE_UNKNOWN,
   modelCaption,
   modelMissingWhy,
   patchMakeWhy,
@@ -281,7 +282,9 @@ export function PatchWorkbench({
         <span className="muted small">
           {view.pictureGone
             ? "The chosen take's picture is missing or cannot be read, so it cannot be patched."
-            : 'Choose a take of the image first. Patches are painted onto the take the game shows.'}
+            : view.lockUnread
+              ? IMAGE_TAKE_UNKNOWN
+              : 'Choose a take of the image first. Patches are painted onto the take the game shows.'}
         </span>
       </>
     )

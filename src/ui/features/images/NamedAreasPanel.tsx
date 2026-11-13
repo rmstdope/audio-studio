@@ -25,6 +25,7 @@ import {
 import {
   areaCaptionText,
   areaRowWhy,
+  IMAGE_TAKE_UNKNOWN,
   areaSaveFailedText,
   areaTagText,
   areasCountText,
@@ -239,7 +240,9 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
         ? 'gone'
         : view.take
           ? 'ready'
-          : 'none'
+          : view.lockUnread
+            ? 'unknown'
+            : 'none'
   const ready = state === 'ready' && !!view?.take
 
   /** Sends a box (or a clear) to be saved, showing it at once and taking it back if it fails. */
@@ -587,6 +590,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
                 style={shape}
                 role={state === 'loading' ? undefined : 'status'}
               >
+                {state === 'unknown' && IMAGE_TAKE_UNKNOWN}
                 {state === 'none' && 'Choose a take to mark the areas on it.'}
                 {state === 'gone' &&
                   "The chosen take's picture is missing or cannot be read, so the areas cannot be marked on it."}
