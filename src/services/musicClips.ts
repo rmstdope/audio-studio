@@ -266,10 +266,7 @@ export async function uncommitChoice({
         clips: music.clips,
         id,
         manifest: id in manifest ? music.manifest : null,
-        manifestNow: () => {
-          delete manifest[id]
-          return `${pythonJson(sorted(manifest))}\n`
-        },
+        manifestNow: `${pythonJson(sorted(without(manifest, id)))}\n`,
         lock: MUSIC_LOCK_FILE,
         lockNow: formatMusicLock(lock),
       })
@@ -301,7 +298,7 @@ export async function takeOut({
   /** The manifest's path when it holds the entry; null to leave it alone. */
   manifest: string | null
   /** The manifest's text without the entry. */
-  manifestNow: () => string
+  manifestNow: string
   lock: string
   /** The lock's text without the entry. */
   lockNow: string
@@ -312,7 +309,7 @@ export async function takeOut({
   try {
     if (manifest) {
       const was = await Bun.file(resolveInRoot(root, manifest)).bytes()
-      await writeOrRefuse(root, manifest, manifestNow())
+      await writeOrRefuse(root, manifest, manifestNow)
       putBack.push(() => writeOrRefuse(root, manifest, was))
     }
     const moved = await rename(resolveInRoot(root, clip), aside).then(
@@ -387,6 +384,12 @@ export async function acceptChange({
   } catch (error) {
     return commitFailure(error)
   }
+}
+
+/** A record without one key, the record itself untouched. */
+export function without<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const { [key]: _gone, ...rest } = record
+  return rest
 }
 
 export function sorted<T>(record: Record<string, T>): Record<string, T> {

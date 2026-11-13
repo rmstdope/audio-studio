@@ -1831,8 +1831,10 @@ music's), the lock last, in the project's one choice turn (`services/effectClips
 (`content-studio/effects/lock.json`, `{ fp, model, seed, take, inputs: { text, seconds, loops? }, at }`
 per effect, one per line in id order through `formatEffectLock`, `text` read back as the
 description so the fingerprint and the comparison are as before) records the
-take's own inputs. **Un-choose** asks first, then deletes the manifest entry, the clip and the lock
-entry last; the take stays on the board. **Drop** removes a take that is not chosen, at once; a
+take's own inputs. **Un-choose** asks first, then takes the manifest entry, the clip and the lock
+entry last out of the game as music's does (`takeOut`, as-z8i5): a failed write puts back what was
+already changed, so "Nothing was changed." is true, or the red line says the game's files could not
+be put back; the take stays on the board. **Drop** removes a take that is not chosen, at once; a
 chosen take is refused (409), and the take's line under its buttons says why. A board that cannot be written
 refuses Make takes ("No takes were made: content-studio/cache/effect-boards/<id>.json could not be written.") and
 Drop ("The take could not be dropped: … could not be written.", the take kept) with a line naming it, never a bare

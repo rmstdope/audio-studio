@@ -33,6 +33,7 @@ import {
   commitFailure,
   sorted,
   takeOut,
+  without,
   type CommitResult,
 } from './musicClips'
 
@@ -221,8 +222,8 @@ export async function keepEffect({
 /**
  * Takes the chosen take back: in the project's turn, once the manifest and lock could be read, the
  * effect's manifest entry, then its clip, then its lock entry last (`takeOut`), so a failure
- * part-way puts back what was changed and the effect stays chosen. An effect with no lock entry is refused; the
- * caller has asked the user.
+ * part-way puts back what was changed and the effect stays chosen. An effect with no lock entry
+ * is refused; the caller has asked the user.
  */
 export async function uncommitEffect({
   root,
@@ -249,10 +250,7 @@ export async function uncommitEffect({
         clips: effects.clips,
         id,
         manifest: id in manifest ? effects.manifest : null,
-        manifestNow: () => {
-          delete manifest[id]
-          return `${pythonJson(sorted(manifest))}\n`
-        },
+        manifestNow: `${pythonJson(sorted(without(manifest, id)))}\n`,
         lock: EFFECTS_LOCK_FILE,
         lockNow: formatEffectLock(lock),
       })
