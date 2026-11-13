@@ -333,6 +333,26 @@ describe('Un-choose', () => {
     )
     expect(container.querySelector('[aria-label="In the game"]')).not.toBeNull()
   })
+
+  it('claims nothing was changed only when the game’s files were put back', async () => {
+    const refuse = () =>
+      Response.json(
+        {
+          ok: false,
+          message:
+            'content-studio/effects/lock.json could not be written, and the game’s files could not be put back.',
+          gameChanged: true,
+        },
+        { status: 409 },
+      )
+    const { container, text, click, button } = render(chosenRow(), data, refuse)
+    await click(button('Un-choose'))
+    await click(container.querySelector<HTMLButtonElement>('[role="alertdialog"] .btn-primary')!)
+    expect(text()).toContain(
+      'Take 2 could not be un-chosen: content-studio/effects/lock.json could not be written, and the game’s files could not be put back.',
+    )
+    expect(text()).not.toContain('Nothing was changed.')
+  })
 })
 
 describe('out of date', () => {

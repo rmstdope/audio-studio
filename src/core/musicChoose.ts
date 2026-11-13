@@ -222,9 +222,12 @@ export function unchooseQuestion(take: number, gameFile: string | null): string 
   return `${goes} Take ${take}'s music file is deleted from the game; Take ${take} stays with the other takes, to be chosen again.`
 }
 
-/** The red line when un-choosing failed. */
-export function unchooseFailure(take: number, reason: string): string {
+/**
+ * The red line when un-choosing failed: that nothing was changed, unless `gameChanged` says part
+ * of it reached the game's files and could not be put back, which `reason` then says.
+ */
+export function unchooseFailure(take: number, reason: string, gameChanged = false): string {
   const plain = reason.replace(/\.$/, '')
   const said = plain.charAt(0).toLowerCase() + plain.slice(1)
-  return `Take ${take} could not be un-chosen: ${said}. Nothing was changed.`
+  return `Take ${take} could not be un-chosen: ${said}.${gameChanged ? '' : ' Nothing was changed.'}`
 }

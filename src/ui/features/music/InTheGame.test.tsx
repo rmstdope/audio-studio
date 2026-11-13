@@ -278,6 +278,23 @@ describe('Un-choose', () => {
     )
   })
 
+  it('claims nothing was changed only when the game’s files were put back', async () => {
+    answer = {
+      ok: false,
+      message:
+        'content-studio/music/lock.json could not be written, and the game’s files could not be put back.',
+      gameChanged: true,
+    }
+    const page = chosen()
+    await click(page.button('Un-choose'))
+    await click(page.button('Un-choose'))
+    const block = page.block()!
+    expect(block.textContent).toContain(
+      'Take 3 could not be un-chosen: content-studio/music/lock.json could not be written, and the game’s files could not be put back.',
+    )
+    expect(block.textContent).not.toContain('Nothing was changed.')
+  })
+
   it('says why, with focus on the block, when refused for a lock that cannot be read', async () => {
     const refusal = { ok: false, message: 'The music lock could not be read.' }
     let answerNow = () => {}

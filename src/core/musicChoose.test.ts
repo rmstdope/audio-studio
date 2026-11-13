@@ -212,6 +212,18 @@ describe('the Un-choose question', () => {
       'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
     )
   })
+
+  it('claims nothing about what changed when the game’s files could not be put back', () => {
+    expect(
+      unchooseFailure(
+        3,
+        'content-studio/music/lock.json could not be written, and the game’s files could not be put back',
+        true,
+      ),
+    ).toBe(
+      'Take 3 could not be un-chosen: content-studio/music/lock.json could not be written, and the game’s files could not be put back.',
+    )
+  })
 })
 
 describe('acceptable', () => {

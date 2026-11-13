@@ -37,8 +37,11 @@ export const MUSIC_OUTPUT = { bitrate: '160k', channels: 2, lufs: -20 } as const
 /** What choosing a take answered: written, refused with a reason, or a lock or manifest that cannot be used. */
 export type CommitResult =
   | { ok: true }
-  /** `reason` is the failure without the framing around it, when the framing is the module's. */
-  | { ok: false; message: string; reason?: string }
+  /**
+   * `reason` is the failure without the framing around it, when the framing is the module's;
+   * `gameChanged` when part of the change reached the game's files and could not be put back.
+   */
+  | { ok: false; message: string; reason?: string; gameChanged?: true }
   | ProjectFailure
 
 /** A choice refused because the lock or manifest could not be read: nothing was changed. */
@@ -233,9 +236,9 @@ export async function keepMusicChoice({
 
 /**
  * Takes the chosen take back: in the project's choice turn, once the manifest and lock could be
- * read, the track's manifest entry, then its music file, then its lock entry last, so a failure
- * part-way leaves the track chosen and the same click can be pressed again (as removing an
- * orphan). A track with no lock entry is refused; the caller has asked the user.
+ * read, the track's manifest entry, then its music file, then its lock entry last (`takeOut`), so
+ * a failure part-way puts back what was changed and the track stays chosen. A track with no lock
+ * entry is refused; the caller has asked the user.
  */
 export async function uncommitChoice({
   root,
@@ -257,20 +260,84 @@ export async function uncommitChoice({
       if (!manifest) return { ok: false, message: 'The music manifest could not be read.' }
       if (!lock) return { ok: false, message: 'The music lock could not be read.' }
       if (!(id in lock)) return { ok: false, message: 'No take is chosen for this track.' }
-      if (id in manifest) {
-        delete manifest[id]
-        await writeOrRefuse(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
-      }
-      await rm(resolveInRoot(root, join(music.clips, `${id}.mp3`)), { force: true }).catch(
-        refuseWrite(join(music.clips, `${id}.mp3`)),
-      )
       delete lock[id]
-      await writeOrRefuse(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
-      return { ok: true }
+      return takeOut({
+        root,
+        clips: music.clips,
+        id,
+        manifest: id in manifest ? music.manifest : null,
+        manifestNow: `${pythonJson(sorted(without(manifest, id)))}\n`,
+        lock: MUSIC_LOCK_FILE,
+        lockNow: formatMusicLock(lock),
+      })
     })
   } catch (error) {
     return commitFailure(error)
   }
+}
+
+/**
+ * Takes one chosen clip out of the game, in a choice turn that has read the manifest and lock: the
+ * manifest entry (when `manifest` names the file holding it), then the clip, set aside under a
+ * hidden name, then the lock last. A write that fails puts back what was already changed, so the
+ * game's files and the lock still agree and "nothing was changed" is true; the clip is deleted only
+ * once the lock is written. A clip already gone is no failure.
+ */
+export async function takeOut({
+  root,
+  clips,
+  id,
+  manifest,
+  manifestNow,
+  lock,
+  lockNow,
+}: {
+  root: string
+  clips: string
+  id: string
+  /** The manifest's path when it holds the entry; null to leave it alone. */
+  manifest: string | null
+  /** The manifest's text without the entry. */
+  manifestNow: string
+  lock: string
+  /** The lock's text without the entry. */
+  lockNow: string
+}): Promise<CommitResult> {
+  const clip = join(clips, `${id}.mp3`)
+  const aside = resolveInRoot(root, join(clips, `.${id}.${randomUUID()}.mp3`))
+  const putBack: (() => Promise<unknown>)[] = []
+  try {
+    if (manifest) {
+      const was = await Bun.file(resolveInRoot(root, manifest)).bytes()
+      await writeOrRefuse(root, manifest, manifestNow)
+      putBack.push(() => writeOrRefuse(root, manifest, was))
+    }
+    const moved = await rename(resolveInRoot(root, clip), aside).then(
+      () => true,
+      (error: unknown) => {
+        if ((error as { code?: unknown }).code === 'ENOENT') return false
+        return refuseWrite(clip)(error)
+      },
+    )
+    if (moved) putBack.push(() => rename(aside, resolveInRoot(root, clip)))
+    await writeOrRefuse(root, lock, lockNow)
+  } catch (error) {
+    try {
+      for (const step of putBack.reverse()) await step()
+    } catch (stuck) {
+      console.error('putting the game’s files back failed', stuck)
+      const sentence =
+        refusalSentence(error) ?? (error instanceof Error ? error.message : String(error))
+      return {
+        ok: false,
+        message: `${sentence.replace(/\.$/, '')}, and the game’s files could not be put back.`,
+        gameChanged: true,
+      }
+    }
+    return commitFailure(error)
+  }
+  await rm(aside, { force: true }).catch(() => {})
+  return { ok: true }
 }
 
 /**
@@ -317,6 +384,12 @@ export async function acceptChange({
   } catch (error) {
     return commitFailure(error)
   }
+}
+
+/** A record without one key, the record itself untouched. */
+export function without<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const { [key]: _gone, ...rest } = record
+  return rest
 }
 
 export function sorted<T>(record: Record<string, T>): Record<string, T> {
