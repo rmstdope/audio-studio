@@ -505,6 +505,9 @@ a {
 .stat span:first-child {
   font-size: 12px;
   color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .stat strong {
@@ -818,12 +821,6 @@ article.card:hover {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.stat span:first-child {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
 }
 
 .stat-lead strong {
@@ -2246,6 +2243,7 @@ button.cue-chip[aria-expanded='true'] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .header-actions .btn {
@@ -3057,13 +3055,6 @@ button.cue-chip[aria-expanded='true'] {
 }
 
 /* Designing a voice from a description (as-5gk.6). */
-.header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
 .design {
   display: flex;
   flex-direction: column;
@@ -3693,9 +3684,6 @@ button.cue-chip[aria-expanded='true'] {
   background: var(--accent-soft-bg);
   border-radius: 999px;
   padding: 1px 8px;
-}
-.take-actions {
-  flex-wrap: wrap;
 }
 .wave .playhead {
   position: absolute;
@@ -5221,6 +5209,12 @@ textarea[aria-disabled='true'][data-why] {
 }
 .named-areas-picture {
   grid-area: picture;
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 /* The list column is as tall as the picture's (`contain: size` leaves its rows out of the row's height). */
 .named-areas-side {
@@ -5240,14 +5234,6 @@ textarea[aria-disabled='true'][data-why] {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0 6px;
-}
-.named-areas-picture {
-  position: sticky;
-  top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
 }
 .named-area-stage {
   position: relative;
@@ -6098,3 +6084,21 @@ textarea[aria-disabled='true'][data-why] {
   height: 4px;
   vertical-align: middle;
 }
+
+/*
+ * One section per feature, below everything above. New rules go at the end of their feature's
+ * section, never at the end of the file, so two features' changes do not meet in the same place.
+ * Rules shared by several features go above, with the shell and the common components.
+ */
+
+/* ===== Narration ===== */
+
+/* ===== Music ===== */
+
+/* ===== Images ===== */
+
+/* ===== Sound effects ===== */
+
+/* ===== Scenes ===== */
+
+/* ===== Setup ===== */
