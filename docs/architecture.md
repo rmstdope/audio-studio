@@ -140,9 +140,12 @@ content-studio/
 │   │                       stableAudio.ts, elevenMusic.ts and musicTakes.ts; images.ts (mflux) and
 │   │                       imageTakes.ts; effects.ts and effectTakes.ts; scenes.ts and
 │   │                       sceneLoudness.ts; refresh.ts (the game's commands), git.ts, setup.ts
-│   ├── server/index.ts     Bun.serve: every route of the JSON API (§9), the guards, the static UI
+│   ├── server/             Bun.serve (index.ts: composes the routes, the static UI); context.ts (what
+│   │                       the routes share: generators, queues, guards); shared.ts (request bodies);
+│   │                       routes/<medium>.ts (the JSON API of §9, one file per medium)
 │   └── ui/                 React app: index.html, main.tsx, App.tsx (routes by the address's hash,
-│       │                   route.ts), api.ts (every query and change), styles.css (the tokens), and
+│       │                   route.ts), api.ts (re-exports api/<medium>.ts: every query and change), styles.css
+│       │                   (the tokens, then a section per feature at its end), and
 │       │                   the pure helpers each page uses (player.ts, loopAudio.ts, pager.ts, off.ts,
 │       │                   *Text.ts for the pages' wording)
 │       ├── components/     shared pieces: Sidebar, Pager, WhyTip, Menu, Confirm, SpendConfirm, Problems
@@ -2166,7 +2169,7 @@ as "the music"), or saying the sounds themselves are too quiet when every playin
 
 ## 9. Server API
 
-Every route is in `src/server/index.ts`. Changes (POST, PUT, PATCH, DELETE) are taken only from
+Every route is in `src/server/routes/`, one file per medium (`narration`, `music`, `images`, `effects`, `scenes`, `setup`), composed in `startServer`; what they share is built once in `context.ts`. Tests follow the same split (`src/server/<medium>.test.ts`, with `test-support.ts`), and the client's hooks are in `src/ui/api/<medium>.ts`, so a change to one medium touches that medium's files; a new rule of the stylesheet goes at the end of its feature's section. Changes (POST, PUT, PATCH, DELETE) are taken only from
 the studio's own page (§2). A running job's progress is polled (`GET /api/parts/:part/jobs/latest`,
 `GET /api/jobs/:id`); nothing is pushed to the page, and the UI reads the project again when its
 window regains focus.
