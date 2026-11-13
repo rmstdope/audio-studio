@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { closeUp, closeUpLayer } from './patchCloseUp'
+import type { CSSProperties } from 'react'
+import { closeUp, closeUpBox, closeUpLayer } from './patchCloseUp'
 
 const take = { width: 256, height: 200 }
 
@@ -121,5 +122,14 @@ describe('closeUpLayer', () => {
     expect(
       closeUp({ x: -300, y: 10, width: 100, height: 100 }, { width: 640, height: 400 }),
     ).toEqual({ x: 0, y: 0, width: 640, height: 400 })
+  })
+})
+
+describe('closeUpBox', () => {
+  it('gives the box the crop’s shape, and its ratio for the stylesheet’s height cap', () => {
+    expect(closeUpBox({ x: 0, y: 0, width: 160, height: 200 })).toEqual({
+      aspectRatio: '160 / 200',
+      '--closeup-ratio': 0.8,
+    } as CSSProperties)
   })
 })

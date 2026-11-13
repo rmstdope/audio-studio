@@ -5,8 +5,8 @@ import type { PatchArea } from '../core/imagePatches'
 const AROUND = 0.25
 
 /**
- * The tallest a close-up is, as a multiple of its width: square at most, so a portrait picture's
- * thumbnails on Patches still end inside a short window (as-jkm2).
+ * The tallest a close-up is, as a multiple of its width: square, where the picture is wide enough
+ * to widen it to that (as-jkm2).
  */
 const TALLEST = 1
 
@@ -58,6 +58,17 @@ export function closeUp(
     return { ...frame, y: at, height: size }
   }
   return frame
+}
+
+/**
+ * The shape of a close-up's box: the crop's aspect ratio, and the ratio as `--closeup-ratio` for the
+ * stylesheet, which keeps the box no taller than its thumbnail is wide (as-jkm2).
+ */
+export function closeUpBox(crop: PatchArea): CSSProperties {
+  return {
+    aspectRatio: `${crop.width} / ${crop.height}`,
+    '--closeup-ratio': crop.width / crop.height,
+  } as CSSProperties
 }
 
 /**
