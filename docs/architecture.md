@@ -1826,10 +1826,11 @@ takes (starts on 4, page state); a batch goes on when the page is left or reload
 when takes are asked for), the WAV `content-studio/cache/effect-takes/<effect>/<hash>.<n>.wav`, the hash of
 the description and length (the model is the take's own field). A take made for an earlier description stays a take, with no mark.
 A take that fails is kept in memory as "could not be made" with **Try again**; success clears and
-failure records the model's health (Setup's row, §8.8), a stopped take neither. A made take whose board
-cannot be written is no failure of the model: it is "could not be made" with the board file as its reason
-("content-studio/cache/effect-boards/<id>.json could not be written."), its WAV removed, and no failure recorded
-(the model worked, so an earlier failure of it is cleared; as-ct9). **Stop** discards the one being made and the ones waiting.
+failure records the model's health (Setup's row, §8.8), a stopped take neither. A made take whose WAV or board
+cannot be written is no failure of the model: it is "could not be made" with that file, named in the project, as its reason
+("content-studio/cache/effect-boards/<id>.json could not be written.", never the system's error or a temporary path; as-o9n9),
+its WAV removed, and no failure recorded (for a board, the model worked, so an earlier failure of it is cleared; as-ct9;
+for a WAV, the model's health stays as it was; as-ng94). **Stop** discards the one being made and the ones waiting.
 
 **Compare.** "▶ The chosen, then this" plays the chosen take, one second of quiet, then the take
 (`Clip.after` in `ui/player.ts`); "■ Stop", a second press or any other sound ends it.
