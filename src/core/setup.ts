@@ -1,5 +1,10 @@
 import type { z } from 'zod'
-import { EFFECT_MODEL_IDS, effectModel, type EffectModelId } from './effectModels'
+import {
+  EFFECT_MODEL_IDS,
+  effectModel,
+  type EffectModelId,
+  type EffectModelSource,
+} from './effectModels'
 import {
   EDIT_MODELS,
   IMAGE_MODEL_IDS,
@@ -394,75 +399,78 @@ function music(facts: SetupFacts): SetupCheck {
 /** Where Stable Audio Open's models are looked for, as a person writes it. */
 const STABLE_AUDIO_HOME = '~/.cache/stable-audio'
 
-/** The Hugging Face repositories of the Stable Audio models, which the folders are named after. */
-const STABLE_AUDIO_REPOS = MUSIC_MODELS.filter((m) => m.family === 'stable-audio').flatMap(
-  (m) => m.folders,
+/** A Stable Audio model as its row needs it: its name and the folders (repositories) it is in. */
+export interface StableAudioModel {
+  id: string
+  name: string
+  folders: readonly string[]
+}
+
+/** The Stable Audio models of the music section, in menu order. */
+const STABLE_AUDIO_MODELS: StableAudioModel[] = MUSIC_MODELS.filter(
+  (m) => m.family === 'stable-audio',
 )
 
 function stableAudio(facts: SetupFacts): SetupCheck {
+  return stableAudioRow(facts.music, STABLE_AUDIO_MODELS)
+}
+
+/** What the row reads of the music facts. */
+interface StableAudioFacts {
+  model: string
+  stableAudioMissing: readonly string[]
+}
+
+/** The Stable Audio row, built from the list of the models: each one's name, folders and whether it is missing. */
+export function stableAudioRow(
+  music: StableAudioFacts | null,
+  models: readonly StableAudioModel[],
+): SetupCheck {
   const title = 'Music generator (Stable Audio Open)'
-  if (!facts.music) {
+  if (!music) {
     return { id: 'stableAudio', title, state: 'off', detail: 'The project has no music section.' }
   }
-  const { stableAudioMissing: missing, model } = facts.music
+  const { stableAudioMissing: missing, model } = music
+  const names = (list: readonly StableAudioModel[]) => listed(list.map((m) => m.name))
   if (!missing.length) {
     return {
       id: 'stableAudio',
       title,
       state: 'ok',
-      detail: 'Short and Shortest are in place; they load on the first take.',
+      detail: `${names(models)} ${isAre(models.length)} in place; ${models.length > 1 ? 'they load' : 'it loads'} on the first take.`,
     }
   }
+  const repos = models.flatMap((m) => m.folders)
   const steps = {
     list: [
+      licenceStep(repos.map((repo) => `stabilityai/${repo}`)),
+      tokenStep(),
       {
         parts: [
-          "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
-          ...STABLE_AUDIO_REPOS.flatMap((repo, i) => [
-            ...(i ? [' and '] : []),
-            { link: `stabilityai/${repo}`, href: `https://huggingface.co/stabilityai/${repo}` },
-          ]),
-          '.',
+          `Download ${models.length > 2 ? 'all of them' : models.length > 1 ? 'both' : 'it'} into ${STABLE_AUDIO_HOME}, where the studio looks for ${models.length > 1 ? 'them' : 'it'}:`,
         ],
-      },
-      {
-        parts: [
-          'Make a read token at ',
-          {
-            link: 'huggingface.co/settings/tokens',
-            href: 'https://huggingface.co/settings/tokens',
-          },
-          '.',
-        ],
-      },
-      {
-        parts: [`Download both into ${STABLE_AUDIO_HOME}, where the studio looks for them:`],
-        commands: STABLE_AUDIO_REPOS.map(
+        commands: repos.map(
           (repo) =>
             `HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/${repo} --local-dir ${STABLE_AUDIO_HOME}/${repo}`,
         ),
       },
     ],
-    note: 'The studio never asks for or keeps your token.',
+    note: STUDIO_TOKEN_NOTE,
   }
-  if (missing.includes(model)) {
-    const { name, folders } = musicModel(model)
+  const mine = models.find((m) => m.id === model)
+  if (mine && missing.includes(model)) {
     return {
       id: 'stableAudio',
       title,
       state: 'problem',
-      detail: `The project's music model, ${name}, is not on this computer: ${folders.join(', ')} is missing from ${STABLE_AUDIO_HOME}.`,
+      detail: `The project's music model, ${mine.name}, is not on this computer: ${mine.folders.join(', ')} is missing from ${STABLE_AUDIO_HOME}.`,
       steps,
     }
   }
   const detail =
-    missing.length === 2
+    missing.length === models.length
       ? 'Optional: for stingers and short loops. Its models are not on this computer.'
-      : `${MUSIC_MODELS.filter((m) => m.family === 'stable-audio' && !missing.includes(m.id))
-          .map((m) => m.name)
-          .join(
-            ' and ',
-          )} is in place; ${missing.map((id) => musicModel(id).name).join(' and ')} is missing from ${STABLE_AUDIO_HOME}.`
+      : `${names(models.filter((m) => !missing.includes(m.id)))} ${isAre(models.length - missing.length)} in place; ${names(models.filter((m) => missing.includes(m.id)))} ${isAre(missing.length)} missing from ${STABLE_AUDIO_HOME}.`
   return { id: 'stableAudio', title, state: 'off', label: 'Not set up', detail, steps }
 }
 
@@ -473,27 +481,33 @@ function listed(words: string[]): string {
     : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
 }
 
-/** The command that downloads an image model's weights. */
-function downloadCommand(id: ImageModelId): string {
-  return `uvx --from huggingface_hub hf download ${imageModel(id).repo}`
+/** What a download step needs of a model: its repository and about how big it is. */
+interface Download {
+  repo: string
+  gigabytes: number
 }
 
-/** The step that downloads some image models, once, from Hugging Face. */
-function downloadStep(ids: ImageModelId[]): SetupStep {
-  const about = `about ${listed(ids.map((id) => `${imageModel(id).gigabytes} GB`))}`
+/** The command that downloads a model's weights. */
+function downloadCommand({ repo }: Download): string {
+  return `uvx --from huggingface_hub hf download ${repo}`
+}
+
+/** The step that downloads some models, once, from Hugging Face. */
+function downloadStep(models: Download[]): SetupStep {
+  const about = `about ${listed(models.map((m) => `${m.gigabytes} GB`))}`
   return {
     parts: [
-      ids.length > 1 ? `Download the models, once (${about}):` : `Download it, once (${about}):`,
+      models.length > 1 ? `Download the models, once (${about}):` : `Download it, once (${about}):`,
     ],
-    commands: ids.map(downloadCommand),
+    commands: models.map(downloadCommand),
   }
 }
 
 /** The step that finishes an interrupted download; the same command picks up where it stopped. */
-function finishStep(id: ImageModelId): SetupStep {
+function finishStep(model: Download): SetupStep {
   return {
     parts: ['Finish the download (it picks up where it stopped):'],
-    commands: [downloadCommand(id)],
+    commands: [downloadCommand(model)],
   }
 }
 
@@ -519,23 +533,21 @@ function imageModels(facts: SetupFacts): SetupCheck {
         : `Optional: for an image's takes. ${name} is not on this computer.`,
     )
     steps.push(
-      extra === 'partial' ? finishStep(EXTRA_IMAGE_MODEL) : downloadStep([EXTRA_IMAGE_MODEL]),
+      extra === 'partial'
+        ? finishStep(imageModel(EXTRA_IMAGE_MODEL))
+        : downloadStep([imageModel(EXTRA_IMAGE_MODEL)]),
     )
   }
   if (facts.images.patchModel !== 'whole') {
-    const { name, repo, gigabytes } = EDIT_MODELS['qwen-edit']
+    const edit = EDIT_MODELS['qwen-edit']
+    const { name } = edit
     const partial = facts.images.patchModel === 'partial'
-    const command = `uvx --from huggingface_hub hf download ${repo}`
     notes.push(
       partial
         ? `Optional: for patches. ${name}'s download is incomplete.`
         : `Optional: for patches. ${name} is not on this computer.`,
     )
-    steps.push(
-      partial
-        ? { parts: ['Finish the download (it picks up where it stopped):'], commands: [command] }
-        : { parts: [`Download it, once (about ${gigabytes} GB):`], commands: [command] },
-    )
+    steps.push(partial ? finishStep(edit) : downloadStep([edit]))
   }
   if (!notes.length) return check
   return {
@@ -587,8 +599,8 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
     (id) => models[id].download === 'whole' && models[id].failure,
   )
   const downloadSteps = [
-    ...partial.map(finishStep),
-    ...(absent.length ? [downloadStep(absent)] : []),
+    ...partial.map((id) => finishStep(imageModel(id))),
+    ...(absent.length ? [downloadStep(absent.map(imageModel))] : []),
   ]
   const installMflux: SetupStep = {
     parts: ['Install mflux:'],
@@ -621,11 +633,11 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
             parts: [
               `Optional: for an image's takes. ${
                 models[EXTRA_IMAGE_MODEL].download === 'partial'
-                  ? `${name(EXTRA_IMAGE_MODEL)}'s download is incomplete. ${finishStep(EXTRA_IMAGE_MODEL).parts[0]}`
-                  : `${name(EXTRA_IMAGE_MODEL)} is not on this computer. ${downloadStep([EXTRA_IMAGE_MODEL]).parts[0]}`
+                  ? `${name(EXTRA_IMAGE_MODEL)}'s download is incomplete. ${finishStep(imageModel(EXTRA_IMAGE_MODEL)).parts[0]}`
+                  : `${name(EXTRA_IMAGE_MODEL)} is not on this computer. ${downloadStep([imageModel(EXTRA_IMAGE_MODEL)]).parts[0]}`
               }`,
             ],
-            commands: [downloadCommand(EXTRA_IMAGE_MODEL)],
+            commands: [downloadCommand(imageModel(EXTRA_IMAGE_MODEL))],
           },
         ]
       : []
@@ -717,73 +729,90 @@ function mainImageModels(facts: SetupFacts): SetupCheck {
 /** Where Open 1.0 is looked for: the Stable Audio folder the music's Short model is in. */
 const OPEN_DIR = '~/.cache/stable-audio'
 
-/** The command that downloads an effect model: into the cache for Small SFX, into the Stable Audio folder for Open 1.0. */
-function effectDownloadCommand(id: EffectModelId): string {
-  const { repo, source } = effectModel(id)
+/** An effect model as its row needs it: its names, its repository and where its weights go. */
+export interface EffectFamilyModel {
+  id: string
+  name: string
+  /** A shorter name. */
+  short: string
+  /** The gated Hugging Face repository the weights are downloaded from. */
+  repo: string
+  /** About how many GB the weights take on disk. */
+  gigabytes: number
+  source: EffectModelSource
+}
+
+/** The sound-effect models a row is built from, in menu order. */
+export interface EffectFamily {
+  models: readonly EffectFamilyModel[]
+}
+
+/** The studio's sound-effect models. */
+const EFFECT_FAMILY: EffectFamily = { models: EFFECT_MODEL_IDS.map(effectModel) }
+
+/** What the row reads of the effects facts: not tied to the ids the studio has today. */
+interface EffectFamilyFacts {
+  uv: boolean
+  listed: boolean
+  model: string
+  models: Record<string, SetupFacts['effects']['models'][EffectModelId]>
+}
+
+/** The command that downloads an effect model: into the cache for a hub model, into the Stable Audio folder for a folder one. */
+function effectDownloadCommand({ repo, source }: EffectFamilyModel): string {
   const base = `HF_TOKEN=… uvx --from huggingface_hub hf download ${repo}`
   return source.kind === 'folder' ? `${base} --local-dir ${OPEN_DIR}/${source.folder}` : base
 }
 
 /** The steps that fetch some effect models: one licence step, one token step, then a download or finish step each. */
-function effectFetchSteps(absent: EffectModelId[], partial: EffectModelId[]): SetupStep[] {
+function effectFetchSteps(absent: EffectFamilyModel[], partial: EffectFamilyModel[]): SetupStep[] {
   const several = absent.length + partial.length > 1
   const steps: SetupStep[] = []
-  if (absent.length) {
+  if (absent.length) steps.push(licenceStep(absent.map((m) => m.repo)), tokenStep())
+  for (const model of partial) {
     steps.push({
       parts: [
-        "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
-        ...absent.flatMap((id, i) => [
-          ...(i ? [' and '] : []),
-          { link: effectModel(id).repo, href: `https://huggingface.co/${effectModel(id).repo}` },
-        ]),
-        '.',
+        `Finish ${several ? `${model.name}'s` : 'the'} download (it picks up where it stopped):`,
       ],
-    })
-    steps.push({
-      parts: [
-        'Make a read token at ',
-        { link: 'huggingface.co/settings/tokens', href: 'https://huggingface.co/settings/tokens' },
-        '.',
-      ],
+      commands: [effectDownloadCommand(model)],
     })
   }
-  for (const id of partial) {
+  for (const model of absent) {
+    const what = several ? `Download ${model.name}` : 'Download it'
     steps.push({
       parts: [
-        `Finish ${several ? `${effectModel(id).name}'s` : 'the'} download (it picks up where it stopped):`,
-      ],
-      commands: [effectDownloadCommand(id)],
-    })
-  }
-  for (const id of absent) {
-    const { name, gigabytes, source } = effectModel(id)
-    const what = several ? `Download ${name}` : 'Download it'
-    steps.push({
-      parts: [
-        source.kind === 'folder'
+        model.source.kind === 'folder'
           ? `${what} into ${OPEN_DIR}, where the studio looks for it:`
-          : `${what}, once (about ${gigabytes} GB):`,
+          : `${what}, once (about ${model.gigabytes} GB):`,
       ],
-      commands: [effectDownloadCommand(id)],
+      commands: [effectDownloadCommand(model)],
     })
   }
   return steps
 }
 
-/**
- * The row for the sound-effect models, built like the image models' row: the project's own model
- * is the only one that makes a problem, and only while the game lists sound effects; the other
- * model's trouble is optional, "Not set up". What to fix first wins: uv, a download, a failed effect.
- */
+/** "is" for one, "are" for more. */
+const isAre = (n: number) => (n > 1 ? 'are' : 'is')
+
+/** The row for the sound-effect models of the studio. */
 function effectModels(facts: SetupFacts): SetupCheck {
+  return effectModelsRow(facts.effects, EFFECT_FAMILY)
+}
+
+/**
+ * The row for sound-effect models, built from the list of them: the project's own model is the
+ * only one that makes a problem, and only while the game lists sound effects; the others' trouble
+ * is optional, "Not set up". What to fix first wins: uv, a download, a failed effect.
+ */
+export function effectModelsRow(facts: EffectFamilyFacts, family: EffectFamily): SetupCheck {
   const title = 'Sound-effect models'
-  const { uv, listed, model, models } = facts.effects
-  const name = (id: EffectModelId) => effectModel(id).name
+  const { uv, listed: gameListsEffects, model, models } = facts
+  const all = family.models
   const optional = "Optional: for the game's sound effects."
   const noteSteps = (list: SetupStep[], note = 'Then press Check again.') => ({ list, note })
   /** A problem while the game lists effects; grey and optional before that. */
   const trouble = (problem: boolean) =>
-    problem && listed
+    problem && gameListsEffects
       ? { state: 'problem' as const }
       : { state: 'off' as const, label: 'Not set up' }
   if (!uv) {
@@ -792,7 +821,7 @@ function effectModels(facts: SetupFacts): SetupCheck {
       id: 'effectModels',
       title,
       ...trouble(true),
-      detail: listed ? `Sound effects can't be made: ${why}` : `${optional} ${why}`,
+      detail: gameListsEffects ? `Sound effects can't be made: ${why}` : `${optional} ${why}`,
       steps: noteSteps(
         [
           {
@@ -806,78 +835,76 @@ function effectModels(facts: SetupFacts): SetupCheck {
     }
   }
   // A download that is not whole beats a failed effect: it is the thing to fix.
-  const absent = EFFECT_MODEL_IDS.filter((id) => models[id].download === 'absent')
-  const partial = EFFECT_MODEL_IDS.filter((id) => models[id].download === 'partial')
-  const failed = EFFECT_MODEL_IDS.filter(
-    (id) => models[id].download === 'whole' && models[id].failure,
-  )
+  const absent = all.filter((m) => models[m.id]!.download === 'absent')
+  const partial = all.filter((m) => models[m.id]!.download === 'partial')
+  const failed = all.filter((m) => models[m.id]!.download === 'whole' && models[m.id]!.failure)
   const steps = effectFetchSteps(absent, partial)
   const broken = absent.length + partial.length
+  const names = all.map((m) => m.name)
   if (!broken && !failed.length) {
     return {
       id: 'effectModels',
       title,
       state: 'ok',
-      detail: `${EFFECT_MODEL_IDS.map(name).join(' and ')} are fully downloaded on this computer; a model loads on its first effect.`,
+      detail: `${listed(names)} ${isAre(all.length)} fully downloaded on this computer; a model loads on its first effect.`,
     }
   }
-  const cannot = (id: EffectModelId) =>
-    models[id].download === 'absent'
-      ? `${name(id)} is not on this computer`
-      : `${name(id)}'s download is incomplete`
-  if (broken === EFFECT_MODEL_IDS.length) {
+  const stepsNote = absent.length
+    ? `${STUDIO_TOKEN_NOTE} Then press Check again.`
+    : 'Then press Check again.'
+  const cannot = (m: EffectFamilyModel) =>
+    models[m.id]!.download === 'absent'
+      ? `${m.name} is not on this computer`
+      : `${m.name}'s download is incomplete`
+  if (broken === all.length) {
     const why =
-      absent.length === EFFECT_MODEL_IDS.length
-        ? `${EFFECT_MODEL_IDS.map(name).join(' and ')} are not on this computer.`
-        : `${EFFECT_MODEL_IDS.map(cannot).join(' and ')}.`
+      absent.length === all.length
+        ? `${listed(names)} ${isAre(all.length)} not on this computer.`
+        : `${listed(all.map(cannot))}.`
     return {
       id: 'effectModels',
       title,
       ...trouble(true),
-      detail: listed ? `Sound effects can't be made: ${why}` : `${optional} ${why}`,
-      steps: noteSteps(
-        steps,
-        absent.length ? `${STUDIO_TOKEN_NOTE} Then press Check again.` : 'Then press Check again.',
-      ),
+      detail: gameListsEffects ? `Sound effects can't be made: ${why}` : `${optional} ${why}`,
+      steps: noteSteps(steps, stepsNote),
     }
   }
-  // One model or both are affected, and at least one can still run.
-  const affected = EFFECT_MODEL_IDS.filter(
-    (id) => models[id].download !== 'whole' || models[id].failure,
-  )
+  // Some models are affected, and at least one can still run.
+  const affected = all.filter((m) => models[m.id]!.download !== 'whole' || models[m.id]!.failure)
   const single = affected.length === 1
-  /** The model that is in place, to close a sentence about the only affected one. */
-  const tail = (id: EffectModelId) => {
-    const other = EFFECT_MODEL_IDS.find((o) => o !== id)!
+  const mainAffected = affected.some((m) => m.id === model)
+  /** The models in place and well, to close a sentence about the only affected one. */
+  const tail = (id: string) => {
+    const inPlace = all.filter((m) => !affected.includes(m)).map((m) => m.name)
     return id === model
-      ? ` ${name(other)} is in place: an effect's takes can use it meanwhile.`
-      : ` ${name(other)} is in place.`
+      ? ` ${listed(inPlace)} ${isAre(inPlace.length)} in place: an effect's takes can use ${inPlace.length > 1 ? 'them' : 'it'} meanwhile.`
+      : ` ${listed(inPlace)} ${isAre(inPlace.length)} in place.`
   }
-  const lead = (id: EffectModelId) => (single && id !== model && listed ? 'Optional: ' : '')
-  const downloadSentence = (id: EffectModelId) => {
-    const main = id === model
-    if (models[id].download === 'absent') {
+  const lead = (id: string) => (single && id !== model && gameListsEffects ? 'Optional: ' : '')
+  const downloadSentence = (m: EffectFamilyModel) => {
+    const main = m.id === model
+    if (models[m.id]!.download === 'absent') {
       return main
-        ? `The project's sound-effects model, ${name(id)}, is not on this computer.`
-        : `${lead(id)}${name(id)} is not on this computer.`
+        ? `The project's sound-effects model, ${m.name}, is not on this computer.`
+        : `${lead(m.id)}${m.name} is not on this computer.`
     }
     return main
-      ? `The project's sound-effects model, ${name(id)}, is only partly downloaded, so it can't run.`
-      : `${lead(id)}${name(id)}'s download is incomplete, so it can't run.`
+      ? `The project's sound-effects model, ${m.name}, is only partly downloaded, so it can't run.`
+      : `${lead(m.id)}${m.name}'s download is incomplete, so it can't run.`
   }
   const detail = affected
-    .filter((id) => models[id].download !== 'whole')
-    .map((id) => downloadSentence(id) + (single ? tail(id) : ''))
+    .filter((m) => models[m.id]!.download !== 'whole')
+    .map((m) => downloadSentence(m) + (single ? tail(m.id) : ''))
     .join(' ')
-  const failures = failed.map((id) => {
-    const failure = models[id].failure!
+  const failures = failed.map((m) => {
+    const failure = models[m.id]!.failure!
     const on = failure.effect ? ` on ${failure.effect.title}` : ''
     const head =
-      id === model
-        ? `The last effect with ${name(id)}, the project's sound-effects model, failed${on}.`
-        : `${lead(id) ? 'Optional: the' : 'The'} last effect with ${name(id)} failed${on}.`
+      m.id === model
+        ? `The last effect with ${m.name}, the project's sound-effects model, failed${on}.`
+        : `${lead(m.id) ? 'Optional: the' : 'The'} last effect with ${m.name} failed${on}.`
     return {
-      sentence: head + (single ? tail(id) : ''),
+      sentence: head + (single ? tail(m.id) : ''),
       error: failure.error,
       ...(failure.effect
         ? {
@@ -887,16 +914,16 @@ function effectModels(facts: SetupFacts): SetupCheck {
             },
           }
         : {}),
-      clears: `This clears once an effect made with ${effectModel(id).short} works.`,
+      clears: `This clears once an effect made with ${m.short} works.`,
     }
   })
   // Before the game lists effects, everything opens with the one optional sentence.
   const quiet = (sentence: string) =>
-    listed ? sentence : `${optional} ${sentence.replace(/^Optional: /, '')}`
+    gameListsEffects ? sentence : `${optional} ${sentence.replace(/^Optional: /, '')}`
   return {
     id: 'effectModels',
     title,
-    ...trouble(affected.includes(model)),
+    ...trouble(mainAffected),
     detail: detail && quiet(detail),
     ...(failures.length
       ? {
@@ -905,21 +932,37 @@ function effectModels(facts: SetupFacts): SetupCheck {
           ),
         }
       : {}),
-    ...(steps.length
-      ? {
-          steps: noteSteps(
-            steps,
-            absent.length
-              ? `${STUDIO_TOKEN_NOTE} Then press Check again.`
-              : 'Then press Check again.',
-          ),
-        }
-      : {}),
+    ...(steps.length ? { steps: noteSteps(steps, stepsNote) } : {}),
   }
 }
 
 /** The note under the steps that download a gated model. */
 const STUDIO_TOKEN_NOTE = 'The studio never asks for or keeps your token.'
+
+/** The step that asks for the Stability AI licence on each repository, then the step's links. */
+function licenceStep(repos: string[]): SetupStep {
+  return {
+    parts: [
+      "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+      ...repos.flatMap((repo, i) => [
+        ...(i ? [i === repos.length - 1 ? ' and ' : ', '] : []),
+        { link: repo, href: `https://huggingface.co/${repo}` },
+      ]),
+      '.',
+    ],
+  }
+}
+
+/** The step that makes a Hugging Face read token. */
+function tokenStep(): SetupStep {
+  return {
+    parts: [
+      'Make a read token at ',
+      { link: 'huggingface.co/settings/tokens', href: 'https://huggingface.co/settings/tokens' },
+      '.',
+    ],
+  }
+}
 
 function elevenlabsKey(facts: SetupFacts): SetupCheck {
   const title = 'ElevenLabs API key'
