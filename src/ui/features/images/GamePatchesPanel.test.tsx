@@ -116,7 +116,7 @@ describe('GamePatchesPanel', () => {
       const { host } = await render(two(), undefined, { lockUnread: true }, { chosenTake: 1 })
       expect(heading(host)).toBe('Patches · 2')
       expect(host.querySelectorAll('.patch-pick .dot').length).toBe(0)
-      expect(pickButtons(host).map((b) => text(b))).toEqual(['Title a', 'Title b'])
+      expect(pickButtons(host).map((b) => text(b))).toEqual(['Title of a', 'Title of b'])
     })
     it('heads a tall picture’s list the same way', async () => {
       const shape = { chosenTake: 1, width: 600, height: 800 }
