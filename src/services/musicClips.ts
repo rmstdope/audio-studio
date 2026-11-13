@@ -24,6 +24,7 @@ import {
   listFiles,
   readResource,
   refuseWrite,
+  writeFailure,
   refusalSentence,
   writeOrRefuse,
 } from './files'
@@ -55,7 +56,11 @@ export function choiceRefused(n: number, reason: string): CommitResult {
  */
 export function commitFailure(error: unknown): CommitResult {
   const sentence = refusalSentence(error)
-  if (sentence !== null) return { ok: false, message: `${sentence}.`, reason: sentence }
+  if (sentence !== null) {
+    // Kept in the server log: the person is told which file, the log says why.
+    console.error('writing the game’s files failed', error)
+    return { ok: false, message: `${sentence}.`, reason: sentence }
+  }
   return { ok: false, message: error instanceof Error ? error.message : String(error) }
 }
 
@@ -146,7 +151,7 @@ export async function commitChoice({
     // The encoder knows only the temporary file's folder: the refusal names the game's file.
     return commitFailure(
       error instanceof FileNotWritten
-        ? new WriteRefused(join(music.clips, file), '', error)
+        ? new WriteRefused(join(music.clips, file), writeFailure(error), error)
         : error,
     )
   }

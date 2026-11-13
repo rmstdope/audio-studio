@@ -24,6 +24,7 @@ import {
   listFiles,
   readResource,
   refuseWrite,
+  writeFailure,
   writeOrRefuse,
 } from './files'
 import { choiceRefused, choices, commitFailure, sorted, type CommitResult } from './musicClips'
@@ -126,7 +127,7 @@ export async function commitEffect({
     // The encoder knows only the temporary file's folder: the refusal names the game's file.
     return commitFailure(
       error instanceof FileNotWritten
-        ? new WriteRefused(join(effects.clips, file), '', error)
+        ? new WriteRefused(join(effects.clips, file), writeFailure(error), error)
         : error,
     )
   }

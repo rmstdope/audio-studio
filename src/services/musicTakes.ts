@@ -1013,7 +1013,7 @@ export function createMusicTakes({
         }
         board.takes = board.takes.map((t) => (t === take ? next : t))
         return { ok: true }
-      }).catch(refusalAnswer('saving the trim failed', (sentence) => `${sentence}.`))
+      }).catch(refusalAnswer('saving the trim failed', (sentence) => sentence))
     },
 
     async trimmedSound(projectFile, id, name) {

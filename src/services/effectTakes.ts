@@ -48,7 +48,7 @@ import { readEffects } from './effectsLists'
 import type { EffectGenerator } from './effects'
 import type { EffectHealthStore } from './effectHealth'
 import { gpuInUse, gpuQueue, GPU, holdGpu } from './gpu'
-import { WriteRefused, refusalAnswer, writeAtomic, writeOrRefuse } from './files'
+import { WriteRefused, refusalAnswer, refusalSentence, writeAtomic, writeOrRefuse } from './files'
 import type { CommitResult } from './musicClips'
 import { createSerial, type Serial } from './serial'
 import { MAKE_ALL_TAKES, type EffectBatch } from '../core/effectsMakeAll'
@@ -785,8 +785,8 @@ export function createEffectTakes({
       ).catch((error): EffectMakeResult => {
         // Kept in the server log: the person is told the plain reason, not the stack.
         console.error('saving the fades failed', error)
-        const board =
-          error instanceof WriteRefused ? error.message : 'The take board could not be written'
+        const board = refusalSentence(error)
+        if (board === null) throw error
         return stuck
           ? {
               ok: false,
@@ -898,16 +898,17 @@ export function createEffectTakes({
             console.error('putting the game’s files back failed', error)
           }),
       ).catch((error): EffectTrimResult => {
-        if (!(error instanceof WriteRefused)) throw error
+        const sentence = refusalSentence(error)
+        if (sentence === null) throw error
         // Kept in the server log: the person is told which file, not the stack.
         console.error('saving the trim failed', error)
         return stuck
           ? {
               ok: false,
-              message: `${error.message}, and the game’s files could not be put back`,
+              message: `${sentence}, and the game’s files could not be put back`,
               gameChanged: true,
             }
-          : { ok: false, message: error.message }
+          : { ok: false, message: sentence }
       })
     },
 

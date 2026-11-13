@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { EffectLockSchema, type EffectBoardTake } from '../core/effectTakes'
 import { ProjectSchema } from '../core/project'
-import type { Encoder, EncodeOptions } from './audio'
+import { FileNotWritten, type Encoder, type EncodeOptions } from './audio'
 import {
   acceptEffect,
   commitEffect,
@@ -58,6 +58,23 @@ const choose = (root: string, id: string, n: number, encode: Encoder, hash?: str
   })
 
 describe('commitEffect', () => {
+  it('says which file could not be written when the encoder cannot write the clip', async () => {
+    const root = tempRepo({})
+    const encode: Encoder = async () => {
+      throw new FileNotWritten()
+    }
+    const quiet = console.error
+    console.error = () => {}
+    try {
+      expect(await choose(root, 'coins', 1, encode)).toMatchObject({
+        ok: false,
+        message: 'audio/effects/coins.mp3 could not be written.',
+      })
+    } finally {
+      console.error = quiet
+    }
+  })
+
   it('writes the clip, the manifest with its real length, and the lock', async () => {
     const root = tempRepo({})
     const { encode, calls } = fakeEncoder()
