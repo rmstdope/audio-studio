@@ -355,7 +355,7 @@ export function createEffectTakes({
           ...(shaped?.quietAt != null && { quietAt: shaped.quietAt }),
         }
         // The file first: a take is on the board only once its WAV is there.
-        await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, bytes)
+        await writeOrRefuse(found.root, `${found.folder}/${fileOf(made)}`, bytes)
         const saved = await changeBoard(projectFile, found, async (board) => {
           // A stopped take is no news of the model: its last failure stays.
           if (stop.aborted) return
@@ -374,7 +374,7 @@ export function createEffectTakes({
         if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       },
       async failed(error) {
-        // The model made the take; only its board could not be saved, which is no news of the model.
+        // The model made the take; only its file or its board could not be saved, which is no news of the model.
         if (error instanceof WriteRefused) {
           console.error('saving the take failed', error)
           await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
