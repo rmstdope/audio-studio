@@ -218,7 +218,8 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
     const titles = overlapsOf(id)
     return titles.length > 0 ? overlapOpenLine(titles) : null
   }
-  const heading = patchesHeading(row)
+  const lockUnread = view?.lockUnread === true
+  const heading = patchesHeading(row, lockUnread)
   const list = patchLayoutOf(row) === 'list'
   const workOf = (id: string) => view?.patches.find((p) => p.id === id) ?? null
   const pick = (p: PatchRow) => {
@@ -269,7 +270,9 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
             </>
           ) : (
             <>
-              <span className={`dot${patchChosen(row, p) ? ' ok' : ''}`} aria-hidden="true" />
+              {!lockUnread && (
+                <span className={`dot${patchChosen(row, p) ? ' ok' : ''}`} aria-hidden="true" />
+              )}
               {p.title}
               {again.has(p.id) && <span className="chip chip-warn">Make again</span>}
             </>

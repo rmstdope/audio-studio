@@ -32,10 +32,10 @@ import {
   choices,
   commitFailure,
   sorted,
-  takeOut,
   without,
   type CommitResult,
 } from './musicClips'
+import { takeOut } from './takeOut'
 
 /** How the game's sound effects are encoded: stereo, 160 kbps, at the level the model made them. */
 export const EFFECT_OUTPUT = { bitrate: '160k', channels: 2 } as const
@@ -248,11 +248,11 @@ export async function uncommitEffect({
       return takeOut({
         root,
         clips: effects.clips,
-        id,
+        file: `${id}.mp3`,
         manifest: id in manifest ? effects.manifest : null,
         manifestNow: `${pythonJson(sorted(without(manifest, id)))}\n`,
-        lock: EFFECTS_LOCK_FILE,
-        lockNow: formatEffectLock(lock),
+        last: EFFECTS_LOCK_FILE,
+        lastNow: formatEffectLock(lock),
       })
     })
   } catch (error) {

@@ -33,6 +33,7 @@ import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import {
   changePatchBoard,
+  boardText,
   patchBoardKey,
   patchClipName,
   patchFolder,
@@ -43,6 +44,7 @@ import {
 import { downloadOf, type ImageGenerator } from './images'
 import { describeFailure } from './imageTakes'
 import { editStep } from './imageEditStep'
+import { takeOut } from './takeOut'
 import { choices, sorted } from './musicClips'
 import { isSafeId } from './musicTakes'
 import { decodePng, pngSize } from './png'
@@ -871,19 +873,24 @@ export function createImagePatches({
             const manifest = await manifestNow(found)
             if (!manifest) return { ok: false, message: 'The images manifest could not be read.' }
             const entry = manifest[id]
-            if (entry?.patches && patch in (entry.patches as Record<string, unknown>)) {
-              const { [patch]: _gone, ...rest } = entry.patches as Record<string, unknown>
+            const listed = entry?.patches as Record<string, unknown> | undefined
+            const had = !!entry && !!listed && patch in listed
+            if (entry && listed && had) {
+              const { [patch]: _gone, ...rest } = listed
               const { patches: _all, ...others } = entry
               manifest[id] = Object.keys(rest).length ? { ...others, patches: rest } : others
-              await writeManifest(found, manifest)
             }
-            await rm(
-              resolveInRoot(found.root, join(found.config.clips, patchClipName(id, patch))),
-              {
-                force: true,
-              },
-            )
-            return { ok: true }
+            const { [base]: _chosen, ...chosen } = board.chosen
+            const { [base]: _inGame, ...inGame } = board.inGame
+            return takeOut({
+              root: found.root,
+              clips: found.config.clips,
+              file: patchClipName(id, patch),
+              manifest: had ? found.config.manifest : null,
+              manifestNow: `${JSON.stringify(sorted(manifest), null, 2)}\n`,
+              last: found.board,
+              lastNow: boardText({ ...board, chosen, inGame }),
+            })
           },
         )
         if (!answer || !answer.ok) return answer

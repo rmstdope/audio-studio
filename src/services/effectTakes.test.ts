@@ -329,17 +329,26 @@ describe('createEffectTakes', () => {
     expect(held.calls).toEqual([])
   })
 
-  it('records the model as failed when the board cannot be read after the WAV is written', async () => {
+  it('names the board file, not the model, when a take’s board cannot be read after its WAV is', async () => {
     const held = await heldAtTheBoard()
-    writeFileSync(join(held.root, 'content-studio/cache/effect-boards/coins.json'), '{ nope')
+    const board = join(held.root, 'content-studio/cache/effect-boards/coins.json')
+    writeFileSync(board, '{ nope')
     held.release()
-    for (let i = 0; i < 400 && !held.calls.some((c) => c.startsWith('record')); i++) {
+    // The take's sound is not kept without its place on the board.
+    const takes = join(held.root, 'content-studio/cache/effect-takes/coins')
+    for (let i = 0; i < 400 && readdirSync(takes).length; i++) {
       await new Promise((r) => setTimeout(r, 5))
     }
+    expect(readdirSync(takes)).toEqual([])
+    // Once the board is readable again, the failed take names the board file.
+    rmSync(board)
+    const view = await held.done()
+    expect(view.failed).toEqual([
+      { n: 1, message: 'content-studio/cache/effect-boards/coins.json cannot be used.' },
+    ])
+    // The model made the take: its health is left as it was.
     await new Promise((r) => setTimeout(r, 40))
-    expect(held.calls.at(-1)).toBe(
-      'record small-sfx content-studio/cache/effect-boards/coins.json cannot be used. on coins',
-    )
+    expect(held.calls).toEqual([])
   })
 
   it('names the board file, not the model, when a take’s board cannot be written after its WAV is', async () => {

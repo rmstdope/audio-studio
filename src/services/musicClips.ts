@@ -25,24 +25,15 @@ import {
   readResource,
   refuseWrite,
   writeFailure,
-  refusalSentence,
   writeOrRefuse,
 } from './files'
 import { createSerial, type Serial } from './serial'
-import type { ProjectFailure } from './workspace'
+import { commitFailure, takeOut, type CommitResult } from './takeOut'
+
+export { commitFailure, type CommitResult }
 
 /** How the game's music is encoded: stereo, 160 kbps, levelled to −20 LUFS as RetroQuest levels it. */
 export const MUSIC_OUTPUT = { bitrate: '160k', channels: 2, lufs: -20 } as const
-
-/** What choosing a take answered: written, refused with a reason, or a lock or manifest that cannot be used. */
-export type CommitResult =
-  | { ok: true }
-  /**
-   * `reason` is the failure without the framing around it, when the framing is the module's;
-   * `gameChanged` when part of the change reached the game's files and could not be put back.
-   */
-  | { ok: false; message: string; reason?: string; gameChanged?: true }
-  | ProjectFailure
 
 /** A choice refused because the lock or manifest could not be read: nothing was changed. */
 export function choiceRefused(n: number, reason: string): CommitResult {
@@ -51,20 +42,6 @@ export function choiceRefused(n: number, reason: string): CommitResult {
     message: `Take ${n} could not be chosen: ${reason}. Nothing was changed.`,
     reason,
   }
-}
-
-/**
- * What a choice, un-choice or accept that threw answers: a refused write names its file, anything
- * else gives its own message.
- */
-export function commitFailure(error: unknown): CommitResult {
-  const sentence = refusalSentence(error)
-  if (sentence !== null) {
-    // Kept in the server log: the person is told which file, the log says why.
-    console.error('writing the game’s files failed', error)
-    return { ok: false, message: `${sentence}.`, reason: sentence }
-  }
-  return { ok: false, message: error instanceof Error ? error.message : String(error) }
 }
 
 /** The music lock as it is now: empty if there is none; null (with the problems added) if broken. */
@@ -264,80 +241,16 @@ export async function uncommitChoice({
       return takeOut({
         root,
         clips: music.clips,
-        id,
+        file: `${id}.mp3`,
         manifest: id in manifest ? music.manifest : null,
         manifestNow: `${pythonJson(sorted(without(manifest, id)))}\n`,
-        lock: MUSIC_LOCK_FILE,
-        lockNow: formatMusicLock(lock),
+        last: MUSIC_LOCK_FILE,
+        lastNow: formatMusicLock(lock),
       })
     })
   } catch (error) {
     return commitFailure(error)
   }
-}
-
-/**
- * Takes one chosen clip out of the game, in a choice turn that has read the manifest and lock: the
- * manifest entry (when `manifest` names the file holding it), then the clip, set aside under a
- * hidden name, then the lock last. A write that fails puts back what was already changed, so the
- * game's files and the lock still agree and "nothing was changed" is true; the clip is deleted only
- * once the lock is written. A clip already gone is no failure.
- */
-export async function takeOut({
-  root,
-  clips,
-  id,
-  manifest,
-  manifestNow,
-  lock,
-  lockNow,
-}: {
-  root: string
-  clips: string
-  id: string
-  /** The manifest's path when it holds the entry; null to leave it alone. */
-  manifest: string | null
-  /** The manifest's text without the entry. */
-  manifestNow: string
-  lock: string
-  /** The lock's text without the entry. */
-  lockNow: string
-}): Promise<CommitResult> {
-  const clip = join(clips, `${id}.mp3`)
-  const aside = resolveInRoot(root, join(clips, `.${id}.${randomUUID()}.mp3`))
-  const putBack: (() => Promise<unknown>)[] = []
-  try {
-    if (manifest) {
-      const was = await Bun.file(resolveInRoot(root, manifest)).bytes()
-      await writeOrRefuse(root, manifest, manifestNow)
-      putBack.push(() => writeOrRefuse(root, manifest, was))
-    }
-    const moved = await rename(resolveInRoot(root, clip), aside).then(
-      () => true,
-      (error: unknown) => {
-        if ((error as { code?: unknown }).code === 'ENOENT') return false
-        return refuseWrite(clip)(error)
-      },
-    )
-    if (moved) putBack.push(() => rename(aside, resolveInRoot(root, clip)))
-    await writeOrRefuse(root, lock, lockNow)
-  } catch (error) {
-    try {
-      for (const step of putBack.reverse()) await step()
-    } catch (stuck) {
-      console.error('putting the game’s files back failed', stuck)
-      const sentence =
-        refusalSentence(error) ?? (error instanceof Error ? error.message : String(error))
-      return {
-        ok: false,
-        message: `${sentence.replace(/\.$/, '')}, and the game’s files could not be put back.`,
-        gameChanged: true,
-      }
-    }
-    return commitFailure(error)
-  }
-  await rm(aside, { force: true }).catch(() => {})
-  return { ok: true }
 }
 
 /**
