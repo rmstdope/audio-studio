@@ -84,8 +84,12 @@ export function patchChosen(row: ImageRow, patch: PatchRow): boolean {
   return row.chosenTake !== null && patch.chosenOn.includes(row.chosenTake)
 }
 
-/** The heading over the patches: how many are chosen of those the game asks for. */
-export function patchesHeading(row: ImageRow): string {
+/**
+ * The heading over the patches: how many are chosen of those the game asks for, or, while the
+ * images lock cannot be read, only how many the game asks for.
+ */
+export function patchesHeading(row: ImageRow, lockUnread = false): string {
+  if (lockUnread) return `Patches · ${row.patches.length}`
   const chosen = row.patches.filter((p) => patchChosen(row, p)).length
   return `Patches · ${chosen} of ${row.patches.length} chosen`
 }

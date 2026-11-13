@@ -146,6 +146,15 @@ describe('the Patches tab', () => {
     expect(patchesHeading(row({ chosenTake: 1, patches }))).toBe('Patches · 2 of 3 chosen')
   })
 
+  it('heads the patches with only how many the game asks for while the lock cannot be read', () => {
+    const patches = [
+      { id: 'a', chosenOn: [1] },
+      { id: 'b', chosenOn: [] },
+    ]
+    expect(patchesHeading(row({ chosenTake: 1, patches }), true)).toBe('Patches · 2')
+    expect(patchesHeading(row({ patches: patches.slice(0, 1) }), true)).toBe('Patches · 1')
+  })
+
   it('says how far a patch has come', () => {
     expect(patchStateText([])).toBe('no takes yet')
     expect(patchStateText([{ n: 1, chosen: false }])).toBe('1 take')

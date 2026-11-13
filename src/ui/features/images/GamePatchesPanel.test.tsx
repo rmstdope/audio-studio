@@ -108,6 +108,27 @@ async function reword(field: HTMLTextAreaElement, words: string) {
 }
 
 describe('GamePatchesPanel', () => {
+  describe('while the images lock cannot be read', () => {
+    const two = () => [patch('a', { chosenOn: [1] }), patch('b')]
+    const heading = (host: Element) =>
+      text(host.querySelector('.patches-chips .label, .patches-side h3'))
+    it('heads a wide picture’s chips with the count asked for and shows no dots', async () => {
+      const { host } = await render(two(), undefined, { lockUnread: true }, { chosenTake: 1 })
+      expect(heading(host)).toBe('Patches · 2')
+      expect(host.querySelectorAll('.patch-pick .dot').length).toBe(0)
+    })
+    it('heads a tall picture’s list the same way', async () => {
+      const shape = { chosenTake: 1, width: 600, height: 800 }
+      const { host } = await render(two(), undefined, { lockUnread: true }, shape)
+      expect(heading(host)).toBe('Patches · 2')
+    })
+    it('keeps the count of chosen and the dots when the lock is readable', async () => {
+      const { host } = await render(two(), undefined, {}, { chosenTake: 1 })
+      expect(heading(host)).toBe('Patches · 1 of 2 chosen')
+      expect(host.querySelectorAll('.patch-pick .dot').length).toBe(2)
+      expect(host.querySelectorAll('.patch-pick .dot.ok').length).toBe(1)
+    })
+  })
   it('is not on the page for an image with no patches', async () => {
     const { host } = await render([])
     expect(host.innerHTML).toBe('')
