@@ -43,6 +43,7 @@ import {
 } from '../core/musicTrim'
 import { readWav, writeWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
+import { createTakeEngine, type BoardAccess, type TakeEntry } from './takeEngine'
 import { readResource, refusalAnswer, refusalSentence, writeAtomic, writeOrRefuse } from './files'
 import { gpuQueue, holdGpu, GPU } from './gpu'
 import type { MusicGenerator } from './music'
@@ -164,15 +165,7 @@ interface Inputs {
 }
 
 /** A take being made or waiting, or one that failed, until it is made. */
-interface Entry {
-  n: number
-  state: 'waiting' | 'making' | 'failed'
-  startedAt: number
-  message: string
-  /** The hash of the inputs it is made for; Try again files it under the brief as it is then. */
-  hash: string
-  /** Ends the take while it is being made (Stop). */
-  stop?: AbortController
+interface Entry extends TakeEntry {
   /** The music model it is made with; a retry makes it again with the same. */
   model: MusicModelId
   /** The press of Make all that started it, which counts it if it is stopped; none if by hand. */
@@ -196,7 +189,7 @@ export function musicTakeHash(inputs: Inputs): string {
 const lineOf = (model: MusicModelId) => modelLine(musicModel(model).recipe)
 
 /** A failure as a sentence for the page. */
-function describeFailure(error: unknown): string {
+function describeMusicFailure(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
   const prefix = 'The music generator: '
   const sentence = text.startsWith(prefix)
@@ -332,16 +325,19 @@ export function createMusicTakes({
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
   const shared = globalThis as {
-    contentStudioMakingTakes?: Map<string, Map<number, Entry>>
     contentStudioMusicBatches?: Map<string, StoredBatch>
   }
-  const active = (shared.contentStudioMakingTakes ??= new Map())
   // The latest press of each list (`<project file>\0<list id>`), so every tab shows its summary.
   const batches = (shared.contentStudioMusicBatches ??= new Map())
   // The press while Make all starts its own takes, which are not hand starts.
   let pressing: StoredBatch | null = null
   // Changes to one track's board, one after another: a take finishing and a drop lose neither.
-  const boards = boardQueue()
+  const engine = createTakeEngine<Entry, MusicBoard>({
+    slot: 'contentStudioMakingTakes',
+    boards: boardQueue(),
+    now,
+    describe: describeMusicFailure,
+  })
   // What a stinger take has to cut, by its file's path, size and time, so a poll reads no WAV again.
   const scans = new Map<string, NonNullable<TakeView['trimmable']>>()
 
@@ -405,125 +401,106 @@ export function createMusicTakes({
     return board
   }
 
+  /** A track's board: read with its problems, written through the refusal. */
+  const accessOf = (found: Found): BoardAccess<MusicBoard> => ({
+    read: () => readBoard(found.root, found.board),
+    write: (text) => writeOrRefuse(found.root, found.board, text),
+  })
+
   /** Changes a track's board and saves it; what `change` returns is the answer. */
-  function changeBoard<T>(
+  const changeBoard = <T>(
     projectFile: string,
     found: Found,
     change: (board: MusicBoard) => T | Promise<T>,
     /** Called when the board cannot be written, to take back what `change` did elsewhere. */
     undo?: () => Promise<void>,
-  ): Promise<T | ProjectFailure> {
-    return boards.run(`${projectFile}\0${found.id}`, async () => {
-      const board = await readBoard(found.root, found.board)
-      if ('ok' in board) return board
-      const before = JSON.stringify(board, null, 2)
-      const answer = await change(board)
-      const after = JSON.stringify(board, null, 2)
-      // Nothing changed (a drop of a take that is not there): nothing is written.
-      if (after !== before) {
-        try {
-          await writeOrRefuse(found.root, found.board, `${after}\n`)
-        } catch (error) {
-          await undo?.()
-          throw error
-        }
-      }
-      return answer
-    })
-  }
+  ): Promise<T | ProjectFailure> =>
+    engine.changeBoard(projectFile, found.id, accessOf(found), change, undo)
 
   async function run(
     projectFile: string,
     found: Found,
     entry: Entry,
     inputs: Inputs,
-    waiting: Map<number, Entry>,
   ): Promise<void> {
-    // Stopped while it waited: it is no longer in the map.
-    if (waiting.get(entry.n) !== entry || entry.state !== 'waiting') return
-    entry.state = 'making'
-    entry.startedAt = now()
-    const stop = new AbortController()
-    entry.stop = stop
     // What the take costs, sent once ElevenLabs made it (billed, kept or not), or once it was
     // stopped while being made (the request was sent, so it may be billed).
     const price = takePrice(entry.model, inputs)
     let generated = false
-    try {
-      const seed = newSeed()
-      const take = await generator.generate(
-        {
-          brief: inputs.brief,
-          kind: inputs.kind,
-          seconds: generatedSeconds(inputs.kind, inputs.seconds),
-          bpm: inputs.bpm,
-          key: inputs.key,
-          seed,
-          model: entry.model,
-        },
-        stop.signal,
-      )
-      generated = true
-      // Stopped while it was made: it is discarded, and no longer in the map.
-      if (stop.signal.aborted) return
-      const shaped = shapeTake(take.wav, inputs.kind, inputs.seconds)
-      const wav = readWav(shaped)
-      const made: BoardTake = {
-        n: entry.n,
-        hash: entry.hash,
-        ...(take.seed !== undefined && { seed: take.seed }),
-        model: musicModel(entry.model).recipe,
-        seconds: wavSeconds(wav),
-        peaks: peaks(wav, WAVEFORM_BARS),
-        inputs,
-      }
-      // The file first: a take is on the board only once its WAV is there.
-      await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, shaped)
-      const saved = await changeBoard(projectFile, found, (board) => {
-        // Stopped while its file was written or it waited for the board: not put on it.
-        if (stop.signal.aborted) return
-        board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort((a, b) => a.n - b.n)
-      })
-      if (stop.signal.aborted) {
-        await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
-        return
-      }
-      if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
-      waiting.delete(entry.n)
-    } catch (error) {
-      if (stop.signal.aborted) return
-      entry.state = 'failed'
-      entry.message = describeFailure(error)
-    } finally {
-      const outcome = generated ? 'done' : stop.signal.aborted ? 'stopped' : null
-      if (price !== null && outcome) {
-        // Saving what was spent must never undo or crash the take it describes.
-        try {
-          await spent(projectFile, {
-            id: randomUUID(),
-            at: new Date(now()).toISOString(),
-            part: found.listId,
-            track: found.id,
-            title: found.title,
-            model: entry.model,
+    await engine.run(projectFile, found.id, entry, {
+      async job(stop) {
+        const seed = newSeed()
+        const take = await generator.generate(
+          {
+            brief: inputs.brief,
+            kind: inputs.kind,
             seconds: generatedSeconds(inputs.kind, inputs.seconds),
-            cost: price,
-            outcome,
-          })
-        } catch (error) {
-          console.error('Content Studio: could not save what a music take cost:', error)
+            bpm: inputs.bpm,
+            key: inputs.key,
+            seed,
+            model: entry.model,
+          },
+          stop,
+        )
+        generated = true
+        // Stopped while it was made: it is discarded, and no longer in the map.
+        if (stop.aborted) return
+        const shaped = shapeTake(take.wav, inputs.kind, inputs.seconds)
+        const wav = readWav(shaped)
+        const made: BoardTake = {
+          n: entry.n,
+          hash: entry.hash,
+          ...(take.seed !== undefined && { seed: take.seed }),
+          model: musicModel(entry.model).recipe,
+          seconds: wavSeconds(wav),
+          peaks: peaks(wav, WAVEFORM_BARS),
+          inputs,
         }
-      }
-    }
+        // The file first: a take is on the board only once its WAV is there.
+        await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, shaped)
+        const saved = await changeBoard(projectFile, found, (board) => {
+          // Stopped while its file was written or it waited for the board: not put on it.
+          if (stop.aborted) return
+          board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort(
+            (a, b) => a.n - b.n,
+          )
+        })
+        if (stop.aborted) {
+          await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
+          return
+        }
+        if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
+      },
+      async settled() {
+        const stopped = entry.stop?.signal.aborted ?? false
+        const outcome = generated ? 'done' : stopped ? 'stopped' : null
+        if (price !== null && outcome) {
+          // Saving what was spent must never undo or crash the take it describes.
+          try {
+            await spent(projectFile, {
+              id: randomUUID(),
+              at: new Date(now()).toISOString(),
+              part: found.listId,
+              track: found.id,
+              title: found.title,
+              model: entry.model,
+              seconds: generatedSeconds(inputs.kind, inputs.seconds),
+              cost: price,
+              outcome,
+            })
+          } catch (error) {
+            console.error('Content Studio: could not save what a music take cost:', error)
+          }
+        }
+      },
+    })
   }
 
   /** Whether any take of the press is still waiting or being made. */
   const pressRunning = (projectFile: string, press: StoredBatch) =>
     press.tracks.some((id) => entriesOf(projectFile, id).some((entry) => entry.state !== 'failed'))
 
-  /** A track's entries: waiting, being made, or failed. */
-  const entriesOf = (projectFile: string, id: string) =>
-    [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])].sort((a, b) => a.n - b.n)
+  const { entriesOf } = engine
 
   const api: MusicTakes = {
     async view(projectFile, id) {
@@ -559,25 +536,22 @@ export function createMusicTakes({
           ...(take.fades && { fades: take.fades }),
         })
       }
-      const making: MakingView[] = entries
-        .filter((entry) => entry.state !== 'failed' && !takes.some((take) => take.n === entry.n))
-        .map((entry) => ({
-          n: entry.n,
-          state: entry.state as 'waiting' | 'making',
-          elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
-          model: lineOf(entry.model),
-          expected: musicModel(entry.model).seconds,
-          paid: musicModel(entry.model).perMinute !== null,
-        }))
+      const split = engine.split(entries, takes)
+      const making: MakingView[] = split.pending.map((entry) => ({
+        n: entry.n,
+        state: entry.state as 'waiting' | 'making',
+        elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
+        model: lineOf(entry.model),
+        expected: musicModel(entry.model).seconds,
+        paid: musicModel(entry.model).perMinute !== null,
+      }))
       // Whatever brief they failed on: Try again makes them from the brief as it is now.
-      const failed: FailedView[] = entries
-        .filter((entry) => entry.state === 'failed')
-        .map((entry) => ({
-          n: entry.n,
-          message: entry.message,
-          model: lineOf(entry.model),
-          modelId: entry.model,
-        }))
+      const failed: FailedView[] = split.failed.map((entry) => ({
+        n: entry.n,
+        message: entry.message,
+        model: lineOf(entry.model),
+        modelId: entry.model,
+      }))
       const models = await Promise.all(
         MUSIC_MODELS.map(async ({ id }) => ({ id, installed: await generator.installed(id) })),
       )
@@ -606,8 +580,7 @@ export function createMusicTakes({
       if (!found || !('inputs' in found)) return found
       const { inputs, hash } = found
       // A retry is made with the model the take was first asked with.
-      const retried =
-        'retry' in request ? active.get(`${projectFile}\0${id}`)?.get(request.retry) : undefined
+      const retried = 'retry' in request ? engine.entry(projectFile, id, request.retry) : undefined
       const model =
         retried?.model ?? ('retry' in request ? found.model : (request.model ?? found.model))
       const tooLong = tooLongOnTrack(model, inputs.kind, inputs.seconds)
@@ -635,56 +608,43 @@ export function createMusicTakes({
                 !pressRunning(projectFile, press),
             )
             .map(([at]) => at)
-      const key = `${projectFile}\0${id}`
-      const entries = active.get(key) ?? new Map<number, Entry>()
-      active.set(key, entries)
-      const queued: Entry[] = []
+      let queued: Entry[]
       if ('retry' in request) {
-        const failed = entries.get(request.retry)
-        if (!failed || failed.state !== 'failed') {
+        // The brief may have changed since it failed: it is made from it, so it is filed under it.
+        const failed = engine.retry(projectFile, id, request.retry, hash)
+        if (!failed) {
           return {
             ok: false,
             message: `Take ${request.retry} did not fail, so it is not made again.`,
           }
         }
-        failed.state = 'waiting'
-        // The brief may have changed since it failed: it is made from it, so it is filed under it.
-        failed.hash = hash
-        queued.push(failed)
+        queued = [failed]
       } else {
-        // The numbers are reserved on the board at once, so none is used twice, even by a take
-        // that fails or is stopped.
-        const reserved = await changeBoard(projectFile, found, (board) => {
-          const first = Math.max(board.next, ...[...entries.values()].map((entry) => entry.n + 1))
-          board.next = first + request.count
-          return first
-        }).catch(
-          refusalAnswer(
-            'reserving the take numbers failed',
-            (reason) => `No takes were made: ${reason}.`,
-          ),
-        )
-        if (typeof reserved !== 'number') return reserved
-        for (let i = 0; i < request.count; i++) {
-          const entry: Entry = {
-            n: reserved + i,
+        const reserved = await engine
+          .reserve(projectFile, id, accessOf(found), request.count, (n) => ({
+            n,
             state: 'waiting',
             startedAt: 0,
             message: '',
             hash,
             model,
             ...(press && { press }),
-          }
-          entries.set(entry.n, entry)
-          queued.push(entry)
-        }
+          }))
+          .catch(
+            refusalAnswer(
+              'reserving the take numbers failed',
+              (reason) => `No takes were made: ${reason}.`,
+            ),
+          )
+        if (!Array.isArray(reserved)) return reserved
+        queued = reserved
       }
       for (const key of ended) batches.delete(key)
       for (const entry of queued) {
         // Takes made on this computer wait for its GPU; takes made in the cloud wait only for
         // each other.
         const turn = onThisComputer(entry.model) ? GPU : CLOUD
-        const make = () => run(projectFile, found, entry, inputs, entries)
+        const make = () => run(projectFile, found, entry, inputs)
         void queue.run(turn, turn === GPU ? () => holdGpu('music', make) : make)
       }
       return { ok: true }
@@ -796,17 +756,10 @@ export function createMusicTakes({
     async stop(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      let stopped = 0
-      const entries = active.get(`${projectFile}\0${id}`)
-      if (!entries) return { ok: true, stopped: 0 }
-      for (const [n, entry] of entries) {
-        if (entry.state === 'failed') continue
-        entry.stop?.abort()
-        entries.delete(n)
-        stopped++
-        // Its press counts it, wherever Stop was pressed, so a take stopped is never one made.
+      // Its press counts it, wherever Stop was pressed, so a take stopped is never one made.
+      const stopped = engine.stop(projectFile, id, (entry) => {
         if (entry.press) entry.press.stopped++
-      }
+      })
       return { ok: true, stopped }
     },
 
@@ -931,7 +884,7 @@ export function createMusicTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       // In the board's turn, so the take cannot be dropped between the check and the lock.
-      return boards.run(`${projectFile}\0${id}`, async (): Promise<CommitResult> => {
+      return engine.inTurn(projectFile, id, async (): Promise<CommitResult> => {
         const board = await readBoard(found.root, found.board)
         if ('ok' in board) return board
         const take = board.takes.find((t) => fileOf(t) === name)
@@ -1078,7 +1031,7 @@ export function createMusicTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       // In the board's turn, like Choose and Drop, so none slips between another's check and write.
-      return boards.run(`${projectFile}\0${id}`, () =>
+      return engine.inTurn(projectFile, id, () =>
         uncommitChoice({ root: found.root, projectFile, music: found.music, id }),
       )
     },
@@ -1086,7 +1039,7 @@ export function createMusicTakes({
     async accept(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      return boards.run(`${projectFile}\0${id}`, () =>
+      return engine.inTurn(projectFile, id, () =>
         acceptChange({ root: found.root, projectFile, id, now: found.inputs }),
       )
     },
@@ -1112,9 +1065,9 @@ export function createMusicTakes({
         if (busy) return { ok: false, message: `${track.title} is being refreshed from the game.` }
       }
       // Both boards' turns, in a fixed order, so two moves the other way round cannot wait on each other.
-      const [first, second] = [from.id, to.id].sort()
-      return boards.run(`${projectFile}\0${first}`, () =>
-        boards.run(`${projectFile}\0${second}`, async (): Promise<MoveResult> => {
+      const [first, second] = [from.id, to.id].sort() as [string, string]
+      return engine.inTurn(projectFile, first, () =>
+        engine.inTurn(projectFile, second, async (): Promise<MoveResult> => {
           const problems: Problem[] = []
           const chosenTracks = await readChosen(from.root, from.music, problems)
           if (!chosenTracks.read || problems.length) {
@@ -1164,14 +1117,11 @@ export function createMusicTakes({
     },
 
     async making(projectFile) {
-      const summary: Record<string, MusicMakingSummary> = {}
-      const prefix = `${projectFile}\0`
-      for (const [key, entries] of active) {
-        if (!key.startsWith(prefix)) continue
+      return engine.making(projectFile, (entries) => {
         let takes = 0
         let left = 0
         let failed = 0
-        for (const entry of entries.values()) {
+        for (const entry of entries) {
           if (entry.state === 'failed') {
             failed++
             continue
@@ -1183,9 +1133,8 @@ export function createMusicTakes({
               ? expected
               : Math.max(0, expected - (now() - entry.startedAt) / 1000)
         }
-        if (takes || failed) summary[key.slice(prefix.length)] = { takes, left, failed }
-      }
-      return summary
+        return takes || failed ? { takes, left, failed } : null
+      })
     },
 
     async takeFile(projectFile, id, name) {

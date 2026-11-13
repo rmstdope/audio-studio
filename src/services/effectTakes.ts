@@ -48,6 +48,7 @@ import { readEffects } from './effectsLists'
 import type { EffectGenerator } from './effects'
 import type { EffectHealthStore } from './effectHealth'
 import { gpuInUse, gpuQueue, GPU, holdGpu } from './gpu'
+import { createTakeEngine, type BoardAccess, type TakeEntry } from './takeEngine'
 import { WriteRefused, refusalAnswer, refusalSentence, writeAtomic, writeOrRefuse } from './files'
 import type { CommitResult } from './musicClips'
 import { createSerial, type Serial } from './serial'
@@ -120,17 +121,9 @@ interface Batch {
 }
 
 /** A take being made or waiting, or one that failed, until it is made. */
-interface Entry {
-  n: number
-  state: 'waiting' | 'making' | 'failed'
-  startedAt: number
-  message: string
-  /** The hash of the inputs it is made for; Try again files it under the words as they are then. */
-  hash: string
+interface Entry extends TakeEntry {
   /** The model it is made with. */
   model: EffectModelId
-  /** Ends the take while it is being made (Stop). */
-  stop?: AbortController
 }
 
 /** What Make all answered: the effects that got takes, or why nothing was started. */
@@ -217,12 +210,6 @@ function playedOf(take: EffectBoardTake, bytes: Uint8Array) {
 const modelName = (id: string) =>
   (EFFECT_MODEL_IDS as readonly string[]).includes(id) ? effectModel(id as EffectModelId).name : id
 
-/** A failure as a sentence for the page. */
-function describeFailure(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error)
-  return /[.!?]$/.test(text) ? text : `${text}.`
-}
-
 /**
  * The takes of the game's sound effects: made by `generator` one at a time (the CPU), each ending
  * where its sound ends, and kept on a board per effect in `content-studio/cache/effect-boards/<effect>.json`
@@ -256,18 +243,19 @@ export function createEffectTakes({
 }): EffectTakes {
   // On `globalThis`, so a `--dev` reload keeps what is being made and the one queue.
   const shared = globalThis as {
-    contentStudioEffectEntries?: Map<string, Map<number, Entry>>
     contentStudioEffectQueue?: Serial
     contentStudioEffectBoards?: Serial
     contentStudioEffectBatches?: Map<string, Batch>
   }
-  const active = (shared.contentStudioEffectEntries ??= new Map())
   const cpu = queue ?? (shared.contentStudioEffectQueue ??= createSerial())
   // Changes to one effect's board, one after another: a take finishing and a drop lose neither.
-  const boards = (shared.contentStudioEffectBoards ??= createSerial())
+  const engine = createTakeEngine<Entry, EffectBoard>({
+    slot: 'contentStudioEffectEntries',
+    boards: (shared.contentStudioEffectBoards ??= createSerial()),
+    now,
+  })
   // The latest Make all of each project, so its summary can be worked out from what is running.
   const batches = (shared.contentStudioEffectBatches ??= new Map())
-  const keyOf = (projectFile: string, id: string) => `${projectFile}\0${id}`
   // Set while Make all starts its own takes, which are not hand starts.
   let pressing = false
   // What a take has to cut, by its file's path, size and time, so a poll reads no WAV again.
@@ -318,108 +306,88 @@ export function createEffectTakes({
   }
   type Found = Exclude<Awaited<ReturnType<typeof resolve>>, ProjectFailure | null>
 
+  /** An effect's board: read with its problems, written through the refusal. */
+  const accessOf = (found: Found): BoardAccess<EffectBoard> => ({
+    read: () => readEffectBoard(found.root, found.id),
+    write: (text) => writeOrRefuse(found.root, boardFile(found.id), text),
+  })
+
   /** Changes an effect's board and saves it; what `change` returns is the answer. */
-  function changeBoard<T>(
+  const changeBoard = <T>(
     projectFile: string,
     found: Found,
     change: (board: EffectBoard) => T | Promise<T>,
     /** Called when the board cannot be written, to take back what `change` did elsewhere. */
     undo?: () => Promise<void>,
-  ): Promise<T | ProjectFailure> {
-    return boards.run(keyOf(projectFile, found.id), async () => {
-      const board = await readEffectBoard(found.root, found.id)
-      if ('ok' in board) return board
-      const before = JSON.stringify(board, null, 2)
-      const answer = await change(board)
-      const after = JSON.stringify(board, null, 2)
-      if (after !== before) {
-        try {
-          await writeOrRefuse(found.root, boardFile(found.id), `${after}\n`)
-        } catch (error) {
-          await undo?.()
-          throw error
-        }
-      }
-      return answer
-    })
-  }
+  ): Promise<T | ProjectFailure> =>
+    engine.changeBoard(projectFile, found.id, accessOf(found), change, undo)
 
-  async function run(
-    projectFile: string,
-    found: Found,
-    entry: Entry,
-    waiting: Map<number, Entry>,
-  ): Promise<void> {
-    // Stopped while it waited: it is no longer in the map.
-    if (waiting.get(entry.n) !== entry || entry.state !== 'waiting') return
-    entry.state = 'making'
-    entry.startedAt = now()
-    const stop = new AbortController()
-    entry.stop = stop
+  function run(projectFile: string, found: Found, entry: Entry): Promise<void> {
     const { inputs } = found
-    try {
-      const generate = () =>
-        generator.generate(
-          {
-            prompt: inputs.description,
-            seconds: inputs.loops ? loopRequestSeconds(inputs.seconds) : inputs.seconds,
-            seed: newSeed(),
-            model: entry.model,
-            ...(inputs.loops && { loops: true }),
-          },
-          stop.signal,
-        )
-      const take = await (entry.model === 'open-1' ? holdGpu('effect', generate) : generate())
-      // Stopped while it was made: it is discarded, and no longer in the map.
-      if (stop.signal.aborted) return
-      // A loop is made seamless at the length the game asks; a one-shot ends where its sound does.
-      const shaped = inputs.loops ? shapeEffectLoop(readWav(take.wav), inputs.seconds) : null
-      const wav = shaped ? shaped.wav : readWav(take.wav)
-      const bytes = shaped ? writeWav(wav) : take.wav
-      const made: EffectBoardTake = {
-        n: entry.n,
-        hash: entry.hash,
-        seed: take.seed,
-        model: entry.model,
-        seconds: wavSeconds(wav),
-        peaks: peaks(wav, WAVEFORM_BARS),
-        inputs,
-        ...(shaped?.quietAt != null && { quietAt: shaped.quietAt }),
-      }
-      // The file first: a take is on the board only once its WAV is there.
-      await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, bytes)
-      const saved = await changeBoard(projectFile, found, async (board) => {
-        // A stopped take is no news of the model: its last failure stays.
-        if (stop.signal.aborted) return
-        // The model worked: its failure is cleared before the take shows, so a page that sees the
-        // take made sees the model well too.
-        await health?.clear(projectFile, entry.model).catch(() => {})
-        if (stop.signal.aborted) return
-        board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort((a, b) => a.n - b.n)
-      })
-      if (stop.signal.aborted) {
-        await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
-        return
-      }
-      if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
-      waiting.delete(entry.n)
-    } catch (error) {
-      if (stop.signal.aborted) return
-      entry.state = 'failed'
-      entry.message = describeFailure(error)
-      // The model made the take; only its board could not be saved, which is no news of the model.
-      if (error instanceof WriteRefused) {
-        console.error('saving the take failed', error)
-        await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
-          force: true,
-        }).catch(() => {})
-        return
-      }
-      const last = entry.message.split('\n').filter(Boolean).pop() ?? entry.message
-      await health
-        ?.record(projectFile, entry.model, { error: last, effect: found.id })
-        .catch(() => {})
-    }
+    return engine.run(projectFile, found.id, entry, {
+      async job(stop) {
+        const generate = () =>
+          generator.generate(
+            {
+              prompt: inputs.description,
+              seconds: inputs.loops ? loopRequestSeconds(inputs.seconds) : inputs.seconds,
+              seed: newSeed(),
+              model: entry.model,
+              ...(inputs.loops && { loops: true }),
+            },
+            stop,
+          )
+        const take = await (entry.model === 'open-1' ? holdGpu('effect', generate) : generate())
+        // Stopped while it was made: it is discarded, and no longer in the map.
+        if (stop.aborted) return
+        // A loop is made seamless at the length the game asks; a one-shot ends where its sound does.
+        const shaped = inputs.loops ? shapeEffectLoop(readWav(take.wav), inputs.seconds) : null
+        const wav = shaped ? shaped.wav : readWav(take.wav)
+        const bytes = shaped ? writeWav(wav) : take.wav
+        const made: EffectBoardTake = {
+          n: entry.n,
+          hash: entry.hash,
+          seed: take.seed,
+          model: entry.model,
+          seconds: wavSeconds(wav),
+          peaks: peaks(wav, WAVEFORM_BARS),
+          inputs,
+          ...(shaped?.quietAt != null && { quietAt: shaped.quietAt }),
+        }
+        // The file first: a take is on the board only once its WAV is there.
+        await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, bytes)
+        const saved = await changeBoard(projectFile, found, async (board) => {
+          // A stopped take is no news of the model: its last failure stays.
+          if (stop.aborted) return
+          // The model worked: its failure is cleared before the take shows, so a page that sees the
+          // take made sees the model well too.
+          await health?.clear(projectFile, entry.model).catch(() => {})
+          if (stop.aborted) return
+          board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort(
+            (a, b) => a.n - b.n,
+          )
+        })
+        if (stop.aborted) {
+          await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
+          return
+        }
+        if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
+      },
+      async failed(error) {
+        // The model made the take; only its board could not be saved, which is no news of the model.
+        if (error instanceof WriteRefused) {
+          console.error('saving the take failed', error)
+          await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
+            force: true,
+          }).catch(() => {})
+          return
+        }
+        const last = entry.message.split('\n').filter(Boolean).pop() ?? entry.message
+        await health
+          ?.record(projectFile, entry.model, { error: last, effect: found.id })
+          .catch(() => {})
+      },
+    })
   }
 
   /** Each model: how much of it is on this computer, and whether its last effect failed. */
@@ -463,9 +431,7 @@ export function createEffectTakes({
     return false
   }
 
-  /** An effect's entries: waiting, being made, or failed. */
-  const entriesOf = (projectFile: string, id: string) =>
-    [...(active.get(keyOf(projectFile, id))?.values() ?? [])].sort((a, b) => a.n - b.n)
+  const { entriesOf } = engine
 
   const api: EffectTakes = {
     async models(projectFile) {
@@ -511,9 +477,8 @@ export function createEffectTakes({
           ...(trimmable && { trimmable }),
         })
       }
-      const pending = entries.filter(
-        (entry) => entry.state !== 'failed' && !takes.some((take) => take.n === entry.n),
-      )
+      const split = engine.split(entries, takes)
+      const { pending } = split
       // The first Open 1.0 take that waits for the chip says so and what is using it, unless one
       // of this effect's own takes is making: then the takes behind it say "waiting".
       const first = pending.some((entry) => entry.state === 'making')
@@ -528,9 +493,10 @@ export function createEffectTakes({
         ...(entry === first ? { chip: { using: gpuInUse() } } : {}),
       }))
       // Whatever words they failed on: Try again makes them from the words as they are now.
-      const failed: EffectFailedView[] = entries
-        .filter((entry) => entry.state === 'failed')
-        .map((entry) => ({ n: entry.n, message: entry.message }))
+      const failed: EffectFailedView[] = split.failed.map((entry) => ({
+        n: entry.n,
+        message: entry.message,
+      }))
       const modelsView = await modelsOf(projectFile, found.projectModel)
       return {
         ...modelsView,
@@ -545,11 +511,9 @@ export function createEffectTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       const { hash } = found
-      const key = keyOf(projectFile, id)
-      const entries0 = active.get(key)
       let model: EffectModelId
       if ('retry' in request) {
-        const failed = entries0?.get(request.retry)
+        const failed = engine.entry(projectFile, id, request.retry)
         if (!failed || failed.state !== 'failed') {
           return {
             ok: false,
@@ -569,45 +533,40 @@ export function createEffectTakes({
       // entries change. One still running goes on.
       const press = batches.get(projectFile)
       const ended = !pressing && press !== undefined && !pressRunning(projectFile, press)
-      const entries = active.get(key) ?? new Map<number, Entry>()
-      active.set(key, entries)
-      const queued: Entry[] = []
+      let queued: Entry[]
       if ('retry' in request) {
-        const failed = entries.get(request.retry)!
-        failed.state = 'waiting'
         // The words may have changed since it failed: it is made from them, so it is filed under them.
-        failed.hash = hash
-        queued.push(failed)
+        const failed = engine.retry(projectFile, id, request.retry, hash)
+        // Another press of Try again got there first.
+        if (!failed) {
+          return {
+            ok: false,
+            message: `Take ${request.retry} did not fail, so it is not made again.`,
+          }
+        }
+        queued = [failed]
       } else {
-        // The numbers are reserved on the board at once, so none is used twice, even by a take
-        // that fails or is stopped.
-        const reserved = await changeBoard(projectFile, found, (board) => {
-          const first = Math.max(board.next, ...[...entries.values()].map((entry) => entry.n + 1))
-          board.next = first + request.count
-          return first
-        }).catch(
-          refusalAnswer(
-            'reserving the take numbers failed',
-            (reason) => `No takes were made: ${reason}.`,
-          ),
-        )
-        if (typeof reserved !== 'number') return reserved
-        for (let i = 0; i < request.count; i++) {
-          const entry: Entry = {
-            n: reserved + i,
+        const reserved = await engine
+          .reserve(projectFile, id, accessOf(found), request.count, (n) => ({
+            n,
             state: 'waiting',
             startedAt: 0,
             message: '',
             hash,
             model,
-          }
-          entries.set(entry.n, entry)
-          queued.push(entry)
-        }
+          }))
+          .catch(
+            refusalAnswer(
+              'reserving the take numbers failed',
+              (reason) => `No takes were made: ${reason}.`,
+            ),
+          )
+        if (!Array.isArray(reserved)) return reserved
+        queued = reserved
       }
       if (ended) batches.delete(projectFile)
       for (const entry of queued) {
-        const make = () => run(projectFile, found, entry, entries)
+        const make = () => run(projectFile, found, entry)
         void (entry.model === 'open-1' ? gpu.run(GPU, make) : cpu.run(CPU, make))
       }
       return { ok: true }
@@ -616,16 +575,9 @@ export function createEffectTakes({
     async stop(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      let stopped = 0
-      const entries = active.get(keyOf(projectFile, id))
-      if (!entries) return { ok: true, stopped: 0 }
-      for (const [n, entry] of entries) {
-        if (entry.state === 'failed') continue
-        entry.stop?.abort()
-        entries.delete(n)
-        countStopped(projectFile, id, n)
-        stopped++
-      }
+      const stopped = engine.stop(projectFile, id, (entry) =>
+        countStopped(projectFile, id, entry.n),
+      )
       return { ok: true, stopped }
     },
 
@@ -668,7 +620,7 @@ export function createEffectTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       // In the board's turn, so the take cannot be dropped between the check and the lock.
-      return boards.run(keyOf(projectFile, id), async (): Promise<CommitResult> => {
+      return engine.inTurn(projectFile, id, async (): Promise<CommitResult> => {
         const board = await readEffectBoard(found.root, id)
         if ('ok' in board) return board
         const take = board.takes.find((t) => fileOf(t) === name)
@@ -930,7 +882,7 @@ export function createEffectTakes({
     async unchoose(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      return boards.run(keyOf(projectFile, id), () =>
+      return engine.inTurn(projectFile, id, () =>
         uncommitEffect({ root: found.root, projectFile, effects: found.effects, id }),
       )
     },
@@ -938,7 +890,7 @@ export function createEffectTakes({
     async accept(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      return boards.run(keyOf(projectFile, id), () =>
+      return engine.inTurn(projectFile, id, () =>
         acceptEffect({
           root: found.root,
           projectFile,
@@ -949,13 +901,10 @@ export function createEffectTakes({
     },
 
     async making(projectFile) {
-      const summary: Record<string, EffectMakingSummary> = {}
-      const prefix = `${projectFile}\0`
-      for (const [key, entries] of active) {
-        if (!key.startsWith(prefix)) continue
+      return engine.making(projectFile, (entries) => {
         let takes = 0
         let left = 0
-        for (const entry of entries.values()) {
+        for (const entry of entries) {
           if (entry.state === 'failed') continue
           takes++
           const { seconds } = effectModel(entry.model)
@@ -964,9 +913,8 @@ export function createEffectTakes({
               ? seconds
               : Math.max(0, seconds - (now() - entry.startedAt) / 1000)
         }
-        if (takes) summary[key.slice(prefix.length)] = { takes, left }
-      }
-      return summary
+        return takes ? { takes, left } : null
+      })
     },
 
     async makeAll(projectFile, ids) {
@@ -1028,18 +976,9 @@ export function createEffectTakes({
     async stopAll(projectFile) {
       const opened = await openProject(projectFile)
       if (!opened.ok) return opened
-      let stopped = 0
-      const prefix = `${projectFile}\0`
-      for (const [key, entries] of active) {
-        if (!key.startsWith(prefix)) continue
-        for (const [n, entry] of entries) {
-          if (entry.state === 'failed') continue
-          entry.stop?.abort()
-          entries.delete(n)
-          countStopped(projectFile, key.slice(prefix.length), n)
-          stopped++
-        }
-      }
+      const stopped = engine.stopIn(projectFile, (id, entry) =>
+        countStopped(projectFile, id, entry.n),
+      )
       return { ok: true, stopped }
     },
 
