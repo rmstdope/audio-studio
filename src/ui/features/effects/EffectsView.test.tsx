@@ -274,8 +274,9 @@ describe('the Sound effects list', () => {
     const rows = [row(long), row('coins', { status: 'not-chosen' })]
     const { container } = render(list, effects({ rows }))
     for (const tr of container.querySelectorAll('tbody tr')) {
-      const pill = tr.querySelectorAll('td')[4]!.querySelector('.chip')!
-      expect(valuesInEveryWindow(pill, 'white-space').join()).toContain(': nowrap')
+      // The cell keeps its pill on one line, as the Images table's Status cell does.
+      const cell = tr.querySelectorAll('td')[4]!
+      expect(valuesInEveryWindow(cell, 'white-space').join()).toContain(': nowrap')
     }
   })
 
