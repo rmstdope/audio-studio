@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Image take not known</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --line: rgb(255 255 255/7%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --panel: #10121a;
+        --inset: #0d0f14;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 20px 16px 40px;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .intro {
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        border-left: 3px solid var(--accent);
+        padding: 4px 10px;
+        margin: 4px 0 16px;
+        color: var(--muted);
+      }
+      .crumbs {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .crumbs a {
+        color: var(--muted);
+      }
+      h2.t {
+        font-size: 22px;
+        margin: 2px 0;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin: 14px 0 10px;
+        flex-wrap: wrap;
+      }
+      .jt {
+        padding: 7px 12px;
+        border-radius: 9px;
+        background: var(--chip);
+        display: flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .jt.on {
+        background: #23263a;
+        outline: 1px solid #3a3f5c;
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--muted);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .bench {
+        display: grid;
+        grid-template-columns: 1fr 1fr 300px;
+        gap: 12px;
+      }
+      @media (max-width: 900px) {
+        .bench {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .panel.warn {
+        border-color: #6b5420;
+        background: #16130b;
+      }
+      .lbl {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .frame {
+        aspect-ratio: 16/10;
+        border: 1px dashed #2c3040;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        text-align: center;
+        padding: 12px;
+        margin: 8px 0;
+        background: var(--inset);
+      }
+      .pic {
+        aspect-ratio: 16/10;
+        border-radius: 8px;
+        margin: 8px 0;
+        background: linear-gradient(135deg, #3a4a6a, #7a5a3a);
+      }
+      .faint {
+        color: var(--faint);
+        font-size: 12.5px;
+      }
+      .btn {
+        background: var(--chip);
+        border: 1px solid #2c3040;
+        color: var(--text);
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+      }
+      .banner {
+        border: 1px solid #6b5420;
+        background: #16130b;
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin: 10px 0;
+      }
+      .banner b {
+        color: var(--warn);
+      }
+      .cap {
+        margin: 26px 0 6px;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .cmp {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 900px) {
+        .cmp {
+          grid-template-columns: 1fr;
+        }
+      }
+      .strip {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .th {
+        width: 90px;
+        aspect-ratio: 16/10;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #334, #553);
+      }
+      .warnline {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>An image's page while the images lock cannot be read (agreed: A, C, E)</h1>
+        The image's own "In the game" side says the lock could not be read, as a track's and a sound
+        effect's page already do. The Make and Patches tabs say <i>not known</i> — the same words
+        the act's list of images already uses for this image.
+      </div>
+      <div class="cap">Option A</div>
+      <div class="panel">
+        <div class="crumbs"><a>Images</a> › <a>Act 2</a></div>
+        <h2 class="t">The old map</h2>
+        <span class="mono">old-map</span>
+        <div class="tabs">
+          <div class="jt on">Make <span class="chip warn">not known</span></div>
+          <div class="jt">Fine-tune</div>
+          <div class="jt">Patches <span class="chip warn">not known</span></div>
+          <div class="jt">Named areas <span class="chip ok">3 of 3</span></div>
+        </div>
+        <div class="bench">
+          <div class="panel warn">
+            <span class="lbl">In the game</span>
+            <div style="margin-top: 6px"><b>The images lock could not be read</b></div>
+            <div class="frame"></div>
+            <span class="faint"
+              >Which take the game shows is not known until the lock can be read; fix it, then
+              reload.</span
+            >
+          </div>
+          <div class="panel">
+            <span class="lbl">Take 2</span>
+            <div class="pic"></div>
+            <button
+              class="btn"
+              disabled
+              title="The images lock cannot be read, so choosing, dropping and un-choosing wait. Fix the lock file, then reload."
+            >
+              Choose C
+            </button>
+          </div>
+          <div class="panel">
+            <b>Make takes</b>
+            <p class="faint">Words, model, how many…</p>
+            <button class="btn">Make 2 takes</button>
+          </div>
+        </div>
+        <div class="panel" style="margin-top: 12px">
+          <b>Takes · 3</b>
+          <div class="faint" style="color: var(--warn)">
+            Choosing, dropping and un-choosing wait until the images lock can be read. You can still
+            look and make more takes.
+          </div>
+          <div class="strip">
+            <div class="th"></div>
+            <div class="th"></div>
+            <div class="th"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">Patches tab</div>
+      <div class="panel">
+        <div class="crumbs"><a>Images</a> › <a>Act 2</a></div>
+        <h2 class="t">The old map</h2>
+        <span class="mono">old-map</span>
+        <div class="tabs">
+          <div class="jt">Make <span class="chip warn">not known</span></div>
+          <div class="jt">Fine-tune</div>
+          <div class="jt on">Patches <span class="chip warn">not known</span></div>
+          <div class="jt">Named areas <span class="chip ok">3 of 3</span></div>
+        </div>
+        <div class="bench">
+          <div class="panel">
+            <span class="lbl">Patch · torn corner</span>
+            <div class="frame">
+              <span
+                >Which take the game shows is not known until the images lock can be read; fix it,
+                then reload.</span
+              >
+            </div>
+            <button class="btn" disabled>Paint</button>
+          </div>
+          <div class="panel">
+            <span class="lbl">Patch · ink stain</span>
+            <div class="frame">
+              <span
+                >Which take the game shows is not known until the images lock can be read; fix it,
+                then reload.</span
+              >
+            </div>
+          </div>
+          <div class="panel">
+            <b>Patches · 2</b>
+            <p class="faint">torn corner, ink stain</p>
+          </div>
+        </div>
+      </div>
+      <div class="cap">Named areas tab</div>
+      <div class="panel">
+        <div class="crumbs"><a>Images</a> › <a>Act 2</a></div>
+        <h2 class="t">The old map</h2>
+        <span class="mono">old-map</span>
+        <div class="tabs">
+          <div class="jt">Make <span class="chip warn">not known</span></div>
+          <div class="jt">Fine-tune</div>
+          <div class="jt">Patches <span class="chip warn">not known</span></div>
+          <div class="jt on">Named areas <span class="chip ok">3 of 3</span></div>
+        </div>
+        <div class="bench">
+          <div class="panel">
+            <span class="lbl">Areas</span>
+            <div class="frame">
+              <span
+                >Which take the game shows is not known until the images lock can be read; fix it,
+                then reload.</span
+              >
+            </div>
+          </div>
+          <div class="panel">
+            <p class="faint">harbour · tower · gate</p>
+            <p
+              class="faint"
+              title="Which take the game shows is not known until the images lock can be read; fix it, then reload."
+            >
+              (hover on an area row gives the same words)
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="cap">Today, with the images lock unreadable (for comparison)</div>
+      <div class="panel">
+        <div class="crumbs"><a>Images</a> › <a>Act 2</a></div>
+        <h2 class="t">The old map</h2>
+        <span class="mono">old-map</span>
+        <div class="tabs">
+          <div class="jt on">Make <span class="chip warn">No take chosen</span></div>
+          <div class="jt">Fine-tune</div>
+          <div class="jt">Patches <span class="chip warn">0 of 2</span></div>
+          <div class="jt">Named areas <span class="chip ok">3 of 3</span></div>
+        </div>
+        <div class="bench">
+          <div class="panel">
+            <span class="lbl">In the game</span>
+            <div class="frame">
+              <b>No picture yet</b><span>Choose a take and the game shows it.</span>
+            </div>
+          </div>
+          <div class="panel">
+            <span class="lbl">Take 2</span>
+            <div class="pic"></div>
+            <button
+              class="btn"
+              disabled
+              title="The images lock cannot be read, so choosing, dropping and un-choosing wait. Fix the lock file, then reload."
+            >
+              Choose C
+            </button>
+          </div>
+          <div class="panel">
+            <b>Make takes</b>
+            <p class="faint">Words, model, how many…</p>
+            <button class="btn">Make 2 takes</button>
+          </div>
+        </div>
+      </div>
+      <p class="faint">
+        Both chips and the left side claim nothing is chosen — which may be untrue: the lock is what
+        says.
+      </p>
+    </div>
+  </body>
+</html>
