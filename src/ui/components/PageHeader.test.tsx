@@ -49,4 +49,18 @@ describe('PageHeader', () => {
     const c = show({ title: createElement('h1', null, 'T'), pager: null })
     expect(c.querySelector('.header-end')).toBeNull()
   })
+
+  it('gives the title block the class a page asks for', () => {
+    const c = show({ title: createElement('h1', null, 'T'), titleClass: 'audition-who' })
+    expect(c.querySelector('header')!.firstElementChild!.className).toBe('audition-who')
+  })
+
+  it('passes keys through to the pager', () => {
+    const titles = (keys: boolean) =>
+      [...show({ title: 'T', pager: { ...pager, keys } }).querySelectorAll('button')].map(
+        (b) => b.title,
+      )
+    expect(titles(true)).toEqual(['Previous: A (←)', 'Next: C (→)'])
+    expect(titles(false)).toEqual(['Previous: A', 'Next: C'])
+  })
 })

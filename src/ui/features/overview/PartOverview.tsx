@@ -80,36 +80,38 @@ export function PartOverview({
           )
         }
         actions={
-          <>
-            {summary.canRefresh && (
-              <button
-                className="btn"
-                type="button"
-                {...off(refreshRunningWhy(refresh.pending))}
-                title={
-                  refresh.pending
-                    ? undefined
-                    : 'Runs the project’s refresh.part command to extract this dialog from the game'
-                }
-                onClick={refresh.start}
-              >
-                {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
-              </button>
-            )}
-            {showsLines && (
-              <a className="btn" href={routeHref({ view: 'lines', part: part.id, language })}>
-                <ListIcon /> All {lineCount} lines
-              </a>
-            )}
-            {toRecord > 0 && (
-              <a
-                className="btn btn-primary"
-                href={routeHref({ view: 'lines', part: part.id, language })}
-              >
-                Generate {plural(toRecord, 'line')}
-              </a>
-            )}
-          </>
+          (hasDialog || summary.canRefresh) && (
+            <>
+              {summary.canRefresh && (
+                <button
+                  className="btn"
+                  type="button"
+                  {...off(refreshRunningWhy(refresh.pending))}
+                  title={
+                    refresh.pending
+                      ? undefined
+                      : 'Runs the project’s refresh.part command to extract this dialog from the game'
+                  }
+                  onClick={refresh.start}
+                >
+                  {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
+                </button>
+              )}
+              {showsLines && (
+                <a className="btn" href={routeHref({ view: 'lines', part: part.id, language })}>
+                  <ListIcon /> All {lineCount} lines
+                </a>
+              )}
+              {toRecord > 0 && (
+                <a
+                  className="btn btn-primary"
+                  href={routeHref({ view: 'lines', part: part.id, language })}
+                >
+                  Generate {plural(toRecord, 'line')}
+                </a>
+              )}
+            </>
+          )
         }
         pager={pager}
       />
