@@ -103,6 +103,7 @@ export function imagesRoutes(c: RouteContext) {
     ...makeAllRoutes(c, {
       base: '/api/image-acts/:id',
       stop: 'stop',
+      stopRefuses: true,
       service: {
         makeAll: (file, request) => imageTakes.makeAll(file, request.params.id),
         batch: (file, request) => imageTakes.batch(file, request.params.id),

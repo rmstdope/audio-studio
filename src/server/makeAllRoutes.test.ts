@@ -4,7 +4,7 @@ import { makeAllRoutes, type MakeAllService } from './makeAllRoutes'
 import type { RouteRequest } from './shared'
 
 /** A service whose every action answers `answer` and records what it was asked. */
-function setup(answer: unknown, stop = 'stop') {
+function setup(answer: unknown, stop = 'stop', stopRefuses = false, withBody = true) {
   const calls: unknown[][] = []
   const record =
     (name: string) =>
@@ -20,7 +20,14 @@ function setup(answer: unknown, stop = 'stop') {
   } as unknown as MakeAllService<{ ids: string[] }>
   const routes = makeAllRoutes(
     { projectFile: 'p', guard: (h) => h, fromOwnPage: (h) => h },
-    { base: '/api/things/:id', stop, service, body: z.object({ ids: z.array(z.string()) }) },
+    {
+      base: '/api/things/:id',
+      stop,
+      stopRefuses,
+      service,
+      expected: '{ ids }',
+      ...(withBody && { body: z.object({ ids: z.array(z.string()) }) }),
+    },
   ) as unknown as Record<string, Record<string, (r: RouteRequest) => Promise<Response>>>
   return { routes, calls }
 }
@@ -61,5 +68,27 @@ describe('makeAllRoutes', () => {
     await routes['/api/things/:id/stop']!.POST!(request({ id: 'a' }))
     expect(calls.map((c) => c[0])).toEqual(['makeAll', 'batch', 'closeBatch', 'stopAll'])
     expect(calls[0]).toEqual(['makeAll', 'a', { ids: ['x'] }])
+  })
+
+  it('says what the body should have been', async () => {
+    const bad = await setup({ ok: true }).routes['/api/things/:id/make-all']!.POST!(
+      request({ id: 'a' }, {}),
+    )
+    expect(await bad.json()).toEqual({ error: 'expected { ids }' })
+  })
+
+  it('gives a medium with no body undefined', async () => {
+    const { routes, calls } = setup({ ok: true }, 'stop', false, false)
+    expect((await routes['/api/things/:id/make-all']!.POST!(request({ id: 'a' }))).status).toBe(200)
+    expect(calls[0]).toEqual(['makeAll', 'a', undefined])
+  })
+
+  it('answers Stop all 404 for nothing, and 409 for a refusal only where the medium refuses', async () => {
+    const stop = (answer: unknown, refuses: boolean) =>
+      setup(answer, 'stop', refuses).routes['/api/things/:id/stop']!.POST!(request({ id: 'a' }))
+    expect((await stop(null, false)).status).toBe(404)
+    expect((await stop({ ok: false }, false)).status).toBe(200)
+    expect((await stop({ ok: false }, true)).status).toBe(409)
+    expect((await stop({ ok: true }, true)).status).toBe(200)
   })
 })

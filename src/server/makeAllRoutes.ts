@@ -17,7 +17,7 @@ export type MakeAllService<Body = undefined> = {
 }
 
 /** One medium's Make all routes: where they live, its service and the body Make all accepts. */
-export type MakeAllMedium<Body> = {
+export type MakeAllRoutesMedium<Body> = {
   /** The address before `/make-all`, such as `/api/effects` or `/api/music/lists/:id`. */
   base: string
   /** The last part of Stop all's address: `stop` or `stop-all`. */
@@ -25,6 +25,8 @@ export type MakeAllMedium<Body> = {
   service: MakeAllService<Body>
   /** The body Make all needs, when it needs one (the effects' ids). */
   body?: ZodType<Body>
+  /** Whether a refused Stop all answers 409 (images); otherwise any result is a 200 (music, effects). */
+  stopRefuses?: boolean
   /** What the 400 says the body should have been, such as `{ ids }`. */
   expected?: string
 }
@@ -41,7 +43,7 @@ function answerOf(result: Answer): Response {
  */
 export function makeAllRoutes<Body = undefined>(
   c: Pick<RouteContext, 'fromOwnPage' | 'guard' | 'projectFile'>,
-  { base, stop, service, body, expected }: MakeAllMedium<Body>,
+  { base, stop, service, body, expected, stopRefuses = false }: MakeAllRoutesMedium<Body>,
 ) {
   const { fromOwnPage, guard, projectFile } = c
   return {
@@ -69,9 +71,10 @@ export function makeAllRoutes<Body = undefined>(
       ),
     },
     [`${base}/${stop}`]: {
-      POST: fromOwnPage(async (request: RouteRequest) =>
-        answerOf(await service.stopAll(projectFile, request)),
-      ),
+      POST: fromOwnPage(async (request: RouteRequest) => {
+        const result = await service.stopAll(projectFile, request)
+        return stopRefuses ? answerOf(result) : result ? Response.json(result) : notFound()
+      }),
     },
   }
 }

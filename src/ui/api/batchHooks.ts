@@ -6,7 +6,9 @@ import { sendTake, type TakeAction } from './takeHooks'
 export type MakeAllMedium = {
   /** The address before `/make-all`: `/api/effects`, or one list's or act's. */
   base: string
+  /** The query holding the latest press. */
   batchKey: readonly unknown[]
+  /** The query holding what is being made. */
   makingKey: readonly unknown[]
   /** The last part of Stop all's address, as `makeAllRoutes` declares it. */
   stop: 'stop' | 'stop-all'
@@ -18,7 +20,7 @@ export type MakeAllMedium = {
   runningMs?: number
 }
 
-/** The requests of Make all and Stop all, written once; they match `makeAllRoutes` on the server. */
+/** The requests of Make all and Stop all (which share `tolerated`), written once; they match `makeAllRoutes` on the server. */
 export function makeAllActions(stop: MakeAllMedium['stop'], tolerated: readonly number[]) {
   return {
     make: {
