@@ -4471,6 +4471,10 @@ textarea[aria-disabled='true'][data-why] {
 .effects-length {
   white-space: nowrap;
 }
+/* A long effect id squeezes the Status column; its pill keeps to one line (as-95qk). */
+.effects-status .chip {
+  white-space: nowrap;
+}
 .loops-tag {
   margin-left: 6px;
   padding: 0 7px;

@@ -190,7 +190,7 @@ export function EffectsList({
                         {effectSeconds(row.seconds)}
                         {row.loops && <span className="loops-tag">loops</span>}
                       </td>
-                      <td>
+                      <td className="effects-status">
                         {making[row.id] ? (
                           <span className="chip">{effectMakingStatus(making[row.id]!)}</span>
                         ) : (
