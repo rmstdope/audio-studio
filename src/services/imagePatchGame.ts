@@ -43,6 +43,9 @@ export async function readPatchBoard(
   return board
 }
 
+/** A patch board as it is written to its `board.json`. */
+export const boardText = (board: PatchBoard) => `${JSON.stringify(board, null, 2)}\n`
+
 /** Reads a patch's board in its turn, lets `change` alter it and writes it back if it differs. */
 export function changePatchBoard<T>(
   where: { projectFile: string; root: string; image: string; patch: string },
@@ -56,7 +59,7 @@ export function changePatchBoard<T>(
     const answer = await change(board)
     const after = JSON.stringify(board, null, 2)
     if (after !== before) {
-      await writeOrRefuse(root, `${patchFolder(image, patch)}/board.json`, `${after}\n`)
+      await writeOrRefuse(root, `${patchFolder(image, patch)}/board.json`, boardText(board))
     }
     return answer
   })

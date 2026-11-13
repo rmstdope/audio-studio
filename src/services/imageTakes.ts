@@ -58,6 +58,7 @@ import {
 } from './imagePatchGame'
 import { decodePng, encodePng, pngSize } from './png'
 import { choices, sorted } from './musicClips'
+import { takeOut } from './takeOut'
 import { gameFilePath } from './musicLists'
 import { boardQueue, isSafeId } from './musicTakes'
 import type { Serial } from './serial'
@@ -1035,20 +1036,18 @@ export function createImageTakes({
             if (!manifest) return { ok: false, message: 'The images manifest could not be read.' }
             if (!lock) return { ok: false, message: 'The images lock could not be read.' }
             if (!lock[id]) return { ok: false, message: 'No take is chosen for this image.' }
-            if (id in manifest) {
-              delete manifest[id]
-              await writeOrRefuse(
-                found.root,
-                found.config.manifest,
-                `${JSON.stringify(sorted(manifest), null, 2)}\n`,
-              )
-            }
-            await rm(resolveInRoot(found.root, join(found.config.clips, `${id}.png`)), {
-              force: true,
-            })
+            const had = id in manifest
+            delete manifest[id]
             delete lock[id]
-            await writeOrRefuse(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
-            return { ok: true }
+            return takeOut({
+              root: found.root,
+              clips: found.config.clips,
+              file: `${id}.png`,
+              manifest: had ? found.config.manifest : null,
+              manifestNow: `${JSON.stringify(sorted(manifest), null, 2)}\n`,
+              last: IMAGES_LOCK_FILE,
+              lastNow: formatImageLock(lock),
+            })
           },
         )
       })
