@@ -1472,7 +1472,8 @@ An image whose list carries patches gets a panel, the Patches tab of the image's
 `ui/imageJobs.ts`): beside a portrait image (taller than wide) the patches are a list on the left
 (about 220 px; title, id and a state chip: "Take 2 chosen", "3 takes", "no takes yet"), above a
 landscape or square image they are a row of chips (a dot green when chosen), both headed "Patches · 2 of 5
-chosen". One patch is open at a time (on arrival the first whose game words changed under the
+chosen" (while the images lock cannot be read, as-50ju, the heading is "Patches · 5" and the chips have no
+dot: `patchesHeading(row, lockUnread)`). One patch is open at a time (on arrival the first whose game words changed under the
 user's, else the first), shown as the patch's workbench (as-bo8.2, below): the stage, the tools and
 the takes strip below both. The patch's workbench has one field of words, reworded as the image's own
 words are. The rewording is `images.<id>.patches.<patchId>: { text, gameWas }` in the edits
@@ -2345,6 +2346,8 @@ Images' and scenes' routes are described with them:
   beside it, and the block's padding counted in the room the pictures are fitted to, so the hint is
   never clipped by the workbench), and the
   Patches and Named areas tabs say which take is not known instead of asking for one to be chosen.
+  The Patches heading then gives only the count the game asks for ("Patches · 2", in its usual
+  colour) and the chips over a wide picture have no dot (as-50ju).
 - An invalid project file or resource opens the UI on an error page that names the file, the path
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
