@@ -1156,8 +1156,9 @@ a.btn {
 }
 /* Only a table in a box that scrolls keeps its columns wide: one in a panel fits the panel at any
    width rather than scrolling the page. `:where` keeps this as weak as `.table`, so a table's own
-   minimum (`.music-table`, `.spending-table`) still wins. */
-:where(.table-box) .table {
+   minimum (`.music-table`, `.spending-table`) still wins. A table that stacks into cards keeps no
+   such minimum: between 701 px, where it stops stacking, and 760 px it would scroll its box (as-35pz). */
+:where(.table-box) .table:where(:not(.stack-table)) {
   min-width: 760px;
 }
 
