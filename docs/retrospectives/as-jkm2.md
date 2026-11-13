@@ -18,7 +18,7 @@
 
 ## Image services tests failed under a full run, a different one each time
 
-**What happened.** `bun run check` failed once on `imagePatches.test.ts` › *times a finished patch take under the model's own key…*, and on the next run on `imageTakes.test.ts` › *adds the next take with its picture…* (`board.takes[1]` undefined). Both pass alone, and a third full run was green. This change touches neither file.
+**What happened.** `bun run check` failed once on `imagePatches.test.ts` › _times a finished patch take under the model's own key…_, and on the next run on `imageTakes.test.ts` › _adds the next take with its picture…_ (`board.takes[1]` undefined). Both pass alone, and a third full run was green. This change touches neither file.
 
 **Why.** Not established. Shared `globalThis` state in the image services, or load, is a guess.
 
