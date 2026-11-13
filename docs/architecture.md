@@ -121,6 +121,10 @@ A native window (Electrobun) can wrap the same web UI later; nothing in the desi
 
 ---
 
+A page's problem banners share a `ProblemScope` (`src/ui/components/ProblemScope.tsx`): each banner
+asks `useBannerProblems(id, problems)` for its own problems less those of the banners before it, so a
+problem appears once on a page however many banners it has, and no banner knows the others.
+
 ## 4. Module layout
 
 ```

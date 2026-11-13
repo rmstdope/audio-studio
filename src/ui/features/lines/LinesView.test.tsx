@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { cpSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Problem } from '../../../core/project'
 import type { ProjectSummary } from '../../../core/summary'
 import { tempRepo } from '../../../../test/helpers'
 import { valuesInEveryWindow } from '../../../../test/stylesheet'
@@ -32,11 +33,21 @@ afterAll(() => server.stop(true))
 const { Request, Response, Headers } = globalThis
 GlobalRegistrator.register()
 Object.assign(globalThis, { Request, Response, Headers })
-const { act, createElement, Fragment } = await import('react')
+const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { Problems } = await import('../../components/Problems')
 const { LinesView } = await import('./LinesView')
+const { PartOverview } = await import('../overview/PartOverview')
+const { ProblemScope, useBannerProblems } = await import('../../components/ProblemScope')
+
+/** The top banner as App lays it out: the first on the page, so the others leave out its problems. */
+function TopBanner({ problems }: { problems: Problem[] }) {
+  const shown = useBannerProblems('project', problems)
+  return shown.length
+    ? createElement(Problems, { title: 'Some files could not be read', problems: shown })
+    : null
+}
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -50,47 +61,69 @@ async function until(ready: () => boolean) {
   expect(ready()).toBe(true)
 }
 
-describe('a part’s All lines page, with the cast file broken', () => {
-  it('reads each cast-file problem once', async () => {
-    globalThis.fetch = ((input: string, init?: RequestInit) =>
-      realFetch(new URL(input, server.url), init)) as typeof fetch
-    try {
-      const project = (await (await fetch('/api/project')).json()) as {
-        summary: ProjectSummary
-      }
-      const { summary } = project
-      const part = summary.parts.find((p) => p.id === 'act1')!
-      const message = 'speakers.narrator.voice must be text (it is a number)'
-      expect(summary.problems.map((p) => p.message)).toContain(message)
-
-      const container = document.createElement('div')
-      document.body.append(container)
-      const page = createRoot(container)
-      // The page as App lays it out: the top banner, then the part's lines.
-      await act(() =>
-        page.render(
+/** Renders `page` under the top banner and returns the page's text once `ready` holds in it. */
+async function pageText(
+  page: (
+    summary: ProjectSummary,
+    part: ProjectSummary['parts'][number],
+  ) => ReturnType<typeof createElement>,
+  ready: string,
+) {
+  globalThis.fetch = ((input: string, init?: RequestInit) =>
+    realFetch(new URL(input, server.url), init)) as typeof fetch
+  try {
+    const { summary } = (await (await fetch('/api/project')).json()) as { summary: ProjectSummary }
+    const part = summary.parts.find((p) => p.id === 'act1')!
+    const container = document.createElement('div')
+    document.body.append(container)
+    const rendered = createRoot(container)
+    await act(() =>
+      rendered.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
           createElement(
-            QueryClientProvider,
-            { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-            createElement(
-              Fragment,
-              null,
-              createElement(Problems, {
-                title: 'Some files could not be read',
-                problems: summary.problems,
-              }),
-              createElement(LinesView, { summary, part }),
-            ),
+            ProblemScope,
+            null,
+            createElement(TopBanner, { problems: summary.problems }),
+            page(summary, part),
           ),
         ),
-      )
-      await until(() => (container.textContent ?? '').includes('Generation cannot be planned'))
-      expect((container.textContent ?? '').split(message).length - 1).toBe(1)
-      await act(() => page.unmount())
-    } finally {
-      globalThis.fetch = realFetch
-      document.body.innerHTML = ''
-    }
+      ),
+    )
+    await until(() => (container.textContent ?? '').includes(ready))
+    const text = container.textContent ?? ''
+    await act(() => rendered.unmount())
+    return { text, summary }
+  } finally {
+    globalThis.fetch = realFetch
+    document.body.innerHTML = ''
+  }
+}
+
+/** How many times each problem the project reports appears in `text`. */
+function timesShown(text: string, problems: Problem[]) {
+  return problems.map((p) => text.split(p.message).length - 1)
+}
+
+describe('a part’s pages, with the cast file broken', () => {
+  const message = 'speakers.narrator.voice must be text (it is a number)'
+
+  it('read each problem once on the All lines page', async () => {
+    const { text, summary } = await pageText(
+      (summary, part) => createElement(LinesView, { summary, part }),
+      'Generation cannot be planned',
+    )
+    expect(summary.problems.map((p) => p.message)).toContain(message)
+    expect(timesShown(text, summary.problems).every((n) => n === 1)).toBe(true)
+  })
+
+  it('read each problem once on the part’s overview', async () => {
+    const { text, summary } = await pageText(
+      (summary, part) => createElement(PartOverview, { summary, part }),
+      'Lines up to date',
+    )
+    expect(timesShown(text, summary.problems).every((n) => n === 1)).toBe(true)
   })
 })
 
