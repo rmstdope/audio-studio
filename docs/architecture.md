@@ -141,7 +141,7 @@ content-studio/
 │   │                       imageTakes.ts; effects.ts and effectTakes.ts; scenes.ts and
 │   │                       sceneLoudness.ts; refresh.ts (the game's commands), git.ts, setup.ts
 │   ├── server/             Bun.serve (index.ts: composes the routes, the static UI); context.ts (what
-│   │                       the routes share: generators, queues, guards); shared.ts (request bodies);
+│   │                       the routes share: generators, queues, guards); shared.ts (request bodies and the small helpers the routes share);
 │   │                       routes/<medium>.ts (the JSON API of §9, one file per medium)
 │   └── ui/                 React app: index.html, main.tsx, App.tsx (routes by the address's hash,
 │       │                   route.ts), api.ts (re-exports api/<medium>.ts: every query and change), styles.css
