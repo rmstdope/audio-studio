@@ -31,7 +31,7 @@ describe('a panel changes layout by its own width', () => {
     }
   })
 
-  it('stacks the rows in a 650 px panel and not in an 800 px one (the panel's width is the only input; no window exists in this test)', () => {
+  it('stacks the rows in a 650 px panel and not in an 800 px one (the panel width is the only input; no window exists in this test)', () => {
     expect(selectorsAtPanelWidth(650)).toContain('.stack-table thead')
     expect(selectorsAtPanelWidth(800)).not.toContain('.stack-table thead')
   })
