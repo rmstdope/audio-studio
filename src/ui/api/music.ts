@@ -23,7 +23,8 @@ import type { RefreshSharedResult } from '../../services/refresh'
 import type { ModelsChange } from '../../services/models'
 import type { ProjectFailure } from '../../services/workspace'
 
-import { closeKept, getJson, useKeptBatch, useRefreshRun } from './core'
+import { useBatch, useMakeAllRequest, useStopAllRequest, type MakeAllMedium } from './batchHooks'
+import { getJson, useRefreshRun } from './core'
 import { useTakeAction, type TakeMedium } from './takeHooks'
 
 /**
@@ -278,8 +279,14 @@ export function useMusicModelState() {
  */
 export type MakeAllBatch = MusicBatch
 
-/** The cache key of a list's batch. */
-const batchKey = (listId: string) => ['music-batch', listId] as const
+/** Where Make all keeps its press and its requests for one list. */
+const makeAllMedium = (listId: string): MakeAllMedium => ({
+  base: `/api/music/lists/${encodeURIComponent(listId)}`,
+  batchKey: ['music-batch', listId],
+  makingKey: ['music-making'],
+  stop: 'stop',
+  tolerated: [],
+})
 
 /**
  * A list's latest press of Make takes, or null, and `dismiss` (Close), which clears it for every
@@ -292,21 +299,8 @@ export function useMakeAllBatch(
   batch: MakeAllBatch | null
   dismiss: () => void
 } {
-  const client = useQueryClient()
-  const batch = useKeptBatch<MakeAllBatch>(
-    batchKey(listId),
-    `/api/music/lists/${encodeURIComponent(listId)}/batch`,
-    busy,
-  )
-  return {
-    batch,
-    dismiss: () =>
-      closeKept(
-        client,
-        batchKey(listId),
-        `/api/music/lists/${encodeURIComponent(listId)}/batch/close`,
-      ),
-  }
+  const { batch, close } = useBatch<MakeAllBatch>(makeAllMedium(listId), busy)
+  return { batch, dismiss: close }
 }
 
 /**
@@ -314,42 +308,16 @@ export function useMakeAllBatch(
  * remembers the press; the page reads what is being made and the press afterwards.
  */
 export function useMakeAll(listId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/music/lists/${encodeURIComponent(listId)}/make-all`, {
-        method: 'POST',
-      })
-      const answer = (await response.json().catch(() => null)) as MakeAllResult | null
-      if (!answer || !answer.ok || answer.takes === 0) {
-        throw new Error(`asking for takes answered ${response.status}`)
-      }
-      await client.refetchQueries({ queryKey: ['music-making'] })
-      return answer
+  return useMakeAllRequest<void, MakeAllResult>(
+    makeAllMedium(listId),
+    () => undefined,
+    (answer) => {
+      if (!answer.ok || answer.takes === 0) throw new Error('asking for takes made nothing')
     },
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['music-making'] }),
-        client.invalidateQueries({ queryKey: batchKey(listId) }),
-      ]),
-  })
+  )
 }
 
 /** Stops every take of a list that waits or is being made; the studio counts them into the press. */
 export function useStopAll(listId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/music/lists/${encodeURIComponent(listId)}/stop`, {
-        method: 'POST',
-      })
-      if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
-      return (await response.json()) as { ok: true; byTrack: Record<string, number> }
-    },
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['music-making'] }),
-        client.invalidateQueries({ queryKey: batchKey(listId) }),
-      ]),
-  })
+  return useStopAllRequest<{ ok: true; byTrack: Record<string, number> }>(makeAllMedium(listId))
 }

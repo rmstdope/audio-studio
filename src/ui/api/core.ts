@@ -84,19 +84,20 @@ export function closeKept(client: QueryClient, key: readonly unknown[], path: st
 /**
  * Keeps a batch query fresh: polled while the press runs or anything is being made, again every
  * few seconds while a finished one shows (a Close in another tab arrives), and read once more
- * when the last take ends.
+ * when the last take ends. `runningMs` is how often it is read while the press runs.
  */
 export function useKeptBatch<T extends { running: boolean }>(
   key: readonly unknown[],
   path: string,
   busy: boolean,
+  runningMs = 3000,
 ): T | null {
   const client = useQueryClient()
   const { data } = useQuery({
     queryKey: key,
     queryFn: () => getJson<T | null>(path),
     refetchInterval: (query) =>
-      busy || query.state.data?.running ? 3000 : query.state.data ? 5000 : false,
+      busy || query.state.data?.running ? runningMs : query.state.data ? 5000 : false,
   })
   // The key is rebuilt on every render; its text is what identifies the query.
   const id = JSON.stringify(key)

@@ -605,13 +605,10 @@ export function narrationRoutes(c: RouteContext) {
       }),
     },
     '/api/parts/:part/lines/:key/takes/:file': {
-      GET: guard(async (request) => {
+      GET: fileRoute(guard, async (request) => {
         const { part, key, file } = request.params
         const id = /^([0-9a-f]{16})\.wav$/.exec(file)?.[1]
-        const found = id
-          ? await lineTakeFile(projectFile, part, key, id, languageOf(request))
-          : null
-        return found ? new Response(Bun.file(found)) : notFound()
+        return id ? lineTakeFile(projectFile, part, key, id, languageOf(request)) : null
       }),
       DELETE: fromOwnPage(async (request) => {
         const { part, key, file } = request.params

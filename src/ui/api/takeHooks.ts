@@ -5,7 +5,7 @@ import type { Fades } from '../../core/fades'
 type TakeRequest = { method: string; path: string; body?: unknown }
 
 /** What one take action sends, what its failure says, and the statuses that still carry an answer. */
-type TakeAction<V> = {
+export type TakeAction<V> = {
   what: string
   request: (value: V) => TakeRequest
   tolerated: readonly number[]

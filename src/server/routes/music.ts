@@ -12,6 +12,7 @@ import { setMusicModel } from '../../services/models'
 import { removeOrphan } from '../../services/musicOrphans'
 import { musicClipFile, musicCurrentFile } from '../../services/workspace'
 import type { RouteContext } from '../context'
+import { makeAllRoutes } from '../makeAllRoutes'
 import { takeRoutes } from '../takeRoutes'
 import { StageModelBody, fileRoute, notFound } from '../shared'
 
@@ -95,29 +96,16 @@ export function musicRoutes(c: RouteContext) {
         return state ? Response.json(state) : notFound()
       }),
     },
-    '/api/music/lists/:id/make-all': {
-      POST: fromOwnPage(async (request) => {
-        const result = await musicTakes.makeAll(projectFile, request.params.id)
-        if (!result) return notFound()
-        return Response.json(result, { status: result.ok ? 200 : 409 })
-      }),
-    },
-    '/api/music/lists/:id/batch': {
-      GET: guard(async (request) =>
-        Response.json(await musicTakes.batch(projectFile, request.params.id)),
-      ),
-    },
-    '/api/music/lists/:id/batch/close': {
-      POST: fromOwnPage(async (request) =>
-        Response.json(await musicTakes.closeBatch(projectFile, request.params.id)),
-      ),
-    },
-    '/api/music/lists/:id/stop': {
-      POST: fromOwnPage(async (request) => {
-        const result = await musicTakes.stopAll(projectFile, request.params.id)
-        return result ? Response.json(result) : notFound()
-      }),
-    },
+    ...makeAllRoutes(c, {
+      base: '/api/music/lists/:id',
+      stop: 'stop',
+      service: {
+        makeAll: (file, request) => musicTakes.makeAll(file, request.params.id),
+        batch: (file, request) => musicTakes.batch(file, request.params.id),
+        closeBatch: (file, request) => musicTakes.closeBatch(file, request.params.id),
+        stopAll: (file, request) => musicTakes.stopAll(file, request.params.id),
+      },
+    }),
     '/api/music/making': {
       GET: guard(async () => Response.json(await musicTakes.making(projectFile))),
     },
