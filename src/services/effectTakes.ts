@@ -210,6 +210,13 @@ function playedOf(take: EffectBoardTake, bytes: Uint8Array) {
 const modelName = (id: string) =>
   (EFFECT_MODEL_IDS as readonly string[]).includes(id) ? effectModel(id as EffectModelId).name : id
 
+/** A take's board that could not be read after its WAV was written: no news of the model. */
+class BoardUnusable extends Error {
+  constructor(file: string) {
+    super(`${file} cannot be used`)
+  }
+}
+
 /**
  * The takes of the game's sound effects: made by `generator` one at a time (the CPU), each ending
  * where its sound ends, and kept on a board per effect in `content-studio/cache/effect-boards/<effect>.json`
@@ -371,12 +378,12 @@ export function createEffectTakes({
           await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
           return
         }
-        if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
+        if (saved && 'ok' in saved) throw new BoardUnusable(saved.file)
       },
       async failed(error) {
         // The model made the take; only its file or its board could not be saved, which is no news of the model.
-        if (error instanceof WriteRefused) {
-          console.error('saving the take failed', error)
+        if (error instanceof WriteRefused || error instanceof BoardUnusable) {
+          if (error instanceof WriteRefused) console.error('saving the take failed', error)
           await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
             force: true,
           }).catch(() => {})
