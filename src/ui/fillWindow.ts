@@ -87,7 +87,8 @@ function asNode(element: HTMLElement): Node & { element: HTMLElement } {
 
 /**
  * A ref callback for a frame that fills the window below its own start: pass it as `ref` and give
- * the frame `height: var(--fill-height)`. It follows the window's size and every box before the
+ * the frame `height: var(--fill-height)`, or `min-height` when it may grow to what its rows hold
+ * (Patches, Fine-tune). It follows the window's size and every box before the
  * frame, so it grows back when something above it goes away.
  */
 export function useFillWindow(): (element: HTMLElement | null) => void {

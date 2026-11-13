@@ -5932,7 +5932,7 @@ textarea[aria-disabled='true'][data-why] {
   }
   .patch-bench,
   .fine-job {
-    height: max(480px, var(--fill-height, 480px));
+    min-height: var(--fill-height, 0px);
     grid-template-rows: minmax(auto, 1fr) auto;
     align-items: stretch;
   }
@@ -5945,6 +5945,7 @@ textarea[aria-disabled='true'][data-why] {
   }
   .patch-bench-right,
   .fine-tools {
+    contain: size;
     min-height: 0;
     overflow-y: auto;
   }
