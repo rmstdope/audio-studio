@@ -17,7 +17,8 @@ import type {
 import type { ModelsChange } from '../../services/models'
 import type { ProjectFailure } from '../../services/workspace'
 
-import { closeKept, getJson, useKeptBatch } from './core'
+import { useBatch, useMakeAllRequest, useStopAllRequest, type MakeAllMedium } from './batchHooks'
+import { getJson } from './core'
 
 /**
  * Saves the project's image model in the project file (`was` is the one the page showed), then
@@ -220,8 +221,14 @@ export function useImageModelState() {
  */
 export type ImagesBatch = ImageBatch
 
-/** The cache key of an act's batch. */
-const imagesBatchKey = (actId: string) => ['images-batch', actId] as const
+/** Where Make all keeps its press and its requests for one act. */
+const imagesMakeAllMedium = (actId: string): MakeAllMedium => ({
+  base: `/api/image-acts/${encodeURIComponent(actId)}`,
+  batchKey: ['images-batch', actId],
+  makingKey: ['image-making'],
+  stop: 'stop',
+  tolerated: [],
+})
 
 /**
  * An act's latest press of Make takes, or null, and `dismiss` (Close), which clears it for every
@@ -231,21 +238,8 @@ export function useImagesBatch(
   actId: string,
   busy = false,
 ): { batch: ImagesBatch | null; dismiss: () => void } {
-  const client = useQueryClient()
-  const batch = useKeptBatch<ImagesBatch>(
-    imagesBatchKey(actId),
-    `/api/image-acts/${encodeURIComponent(actId)}/batch`,
-    busy,
-  )
-  return {
-    batch,
-    dismiss: () =>
-      closeKept(
-        client,
-        imagesBatchKey(actId),
-        `/api/image-acts/${encodeURIComponent(actId)}/batch/close`,
-      ),
-  }
+  const { batch, close } = useBatch<ImagesBatch>(imagesMakeAllMedium(actId), busy)
+  return { batch, dismiss: close }
 }
 
 /**
@@ -254,41 +248,18 @@ export function useImagesBatch(
  * nothing was made.
  */
 export function useImagesMakeAll(actId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/image-acts/${encodeURIComponent(actId)}/make-all`, {
-        method: 'POST',
-      })
-      const answer = (await response.json().catch(() => null)) as { ok: boolean } | null
-      if (!response.ok || !answer?.ok)
-        throw new Error(`asking for takes answered ${response.status}`)
-      await client.refetchQueries({ queryKey: ['image-making'] })
+  return useMakeAllRequest<void, { ok: boolean }>(
+    imagesMakeAllMedium(actId),
+    () => undefined,
+    (answer) => {
+      if (!answer.ok) throw new Error('asking for takes was refused')
     },
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['image-making'] }),
-        client.invalidateQueries({ queryKey: imagesBatchKey(actId) }),
-      ]),
-  })
+  )
 }
 
 /** Stops every take of an act that waits or is being made. */
 export function useImagesStopAll(actId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/image-acts/${encodeURIComponent(actId)}/stop`, {
-        method: 'POST',
-      })
-      if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
-    },
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['image-making'] }),
-        client.invalidateQueries({ queryKey: imagesBatchKey(actId) }),
-      ]),
-  })
+  return useStopAllRequest<unknown>(imagesMakeAllMedium(actId))
 }
 
 /**

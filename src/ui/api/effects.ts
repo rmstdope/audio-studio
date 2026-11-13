@@ -16,7 +16,8 @@ import { useEffect, useRef } from 'react'
 import type { ModelsChange } from '../../services/models'
 import type { ProjectFailure } from '../../services/workspace'
 
-import { closeKept, getJson, useRefreshRun } from './core'
+import { useBatch, useMakeAllRequest, useStopAllRequest, type MakeAllMedium } from './batchHooks'
+import { getJson, useRefreshRun } from './core'
 import { useTakeAction, type TakeMedium } from './takeHooks'
 
 /**
@@ -204,6 +205,16 @@ export function useEffectModels() {
   })
 }
 
+const effectsMakeAll: MakeAllMedium = {
+  base: '/api/effects',
+  batchKey: ['effects-batch'],
+  makingKey: ['effects-making'],
+  stop: 'stop-all',
+  tolerated: [409],
+  alsoStale: [['project'], ['effect-takes']],
+  runningMs: 1000,
+}
+
 /**
  * What the latest Make all made, stopped and failed so far, kept by the studio so any tab sees it
  * (null: none, or it was closed). Polled while takes are made, and while a finished one shows so a
@@ -213,61 +224,17 @@ export function useEffectsBatch(running: boolean): {
   batch: EffectBatch | null
   close: () => void
 } {
-  const client = useQueryClient()
-  const { data } = useQuery({
-    queryKey: ['effects-batch'],
-    queryFn: () => getJson<EffectBatch | null>('/api/effects/batch'),
-    // Until the batch itself says it is done, so the answer that ends it is never missed.
-    refetchInterval: (query) =>
-      running || query.state.data?.running ? 1000 : query.state.data ? 5000 : false,
-  })
-  return {
-    batch: data ?? null,
-    close: () => closeKept(client, ['effects-batch'], '/api/effects/batch/close'),
-  }
-}
-
-/** One change that reaches every effect (Make all, Stop all), then everything it changes is read again. */
-function useEffectsAll<V, R>(path: string, what: string, bodyOf: (value: V) => unknown) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async (value: V) => {
-      const body = bodyOf(value)
-      const response = await fetch(path, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      })
-      if (!response.ok && response.status !== 409)
-        throw new Error(`${what} answered ${response.status}`)
-      return (await response.json()) as R
-    },
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['project'] }),
-        client.invalidateQueries({ queryKey: ['effects-making'] }),
-        client.invalidateQueries({ queryKey: ['effects-batch'] }),
-        client.invalidateQueries({ queryKey: ['effect-takes'] }),
-      ]),
-  })
+  return useBatch<EffectBatch>(effectsMakeAll, running)
 }
 
 /** Makes four takes for each of these sound effects. */
 export function useMakeAllEffects() {
-  return useEffectsAll<string[], EffectMakeAllResult>(
-    '/api/effects/make-all',
-    'making the takes',
-    (ids) => ({ ids }),
-  )
+  return useMakeAllRequest<string[], EffectMakeAllResult>(effectsMakeAll, (ids) => ({ ids }))
 }
 
 /** Stops every sound-effect take waiting or being made. */
 export function useStopAllEffects() {
-  return useEffectsAll<void, NonNullable<EffectStopResult>>(
-    '/api/effects/stop-all',
-    'stopping the takes',
-    () => undefined,
-  )
+  return useStopAllRequest<NonNullable<EffectStopResult>>(effectsMakeAll)
 }
 
 /** What is being made for each sound effect, for the list's status; polled meanwhile. */

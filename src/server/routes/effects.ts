@@ -9,6 +9,7 @@ import {
 import { MakeAllBody } from '../../core/effectsMakeAll'
 import { effectClipFile, effectCurrentFile } from '../../services/workspace'
 import type { RouteContext } from '../context'
+import { makeAllRoutes } from '../makeAllRoutes'
 import { takeRoutes } from '../takeRoutes'
 import { EffectDescriptionBody, effectAnswer, fileRoute, notFound } from '../shared'
 
@@ -31,23 +32,18 @@ export function effectsRoutes(c: RouteContext) {
         return view ? Response.json(view) : notFound()
       }),
     },
-    '/api/effects/batch': {
-      GET: guard(async () => Response.json(await effectTakes.batch(projectFile))),
-    },
-    '/api/effects/batch/close': {
-      POST: fromOwnPage(async () => Response.json(await effectTakes.closeBatch(projectFile))),
-    },
-    '/api/effects/make-all': {
-      POST: fromOwnPage(async (request) => {
-        const body = MakeAllBody.safeParse(await request.json().catch(() => null))
-        if (!body.success) return Response.json({ error: 'expected { ids }' }, { status: 400 })
-        const result = await effectTakes.makeAll(projectFile, body.data.ids)
-        return Response.json(result, { status: result.ok ? 200 : 409 })
-      }),
-    },
-    '/api/effects/stop-all': {
-      POST: fromOwnPage(async () => Response.json(await effectTakes.stopAll(projectFile))),
-    },
+    ...makeAllRoutes(c, {
+      base: '/api/effects',
+      stop: 'stop-all',
+      body: MakeAllBody,
+      expected: '{ ids }',
+      service: {
+        makeAll: (file, _request, body) => effectTakes.makeAll(file, body.ids),
+        batch: (file) => effectTakes.batch(file),
+        closeBatch: (file) => effectTakes.closeBatch(file),
+        stopAll: (file) => effectTakes.stopAll(file),
+      },
+    }),
     '/api/effects/clips/:file': {
       GET: fileRoute(guard, async (request) => {
         return effectClipFile(projectFile, request.params.file)

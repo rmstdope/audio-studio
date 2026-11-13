@@ -15,6 +15,7 @@ import { ActStyleBody, CompareBody, StyleFieldBody, WordsBody } from '../../core
 import { figuresOf } from '../../core/takeTimes'
 import { readTakeTimes } from '../../services/takeTimes'
 import type { RouteContext } from '../context'
+import { makeAllRoutes } from '../makeAllRoutes'
 import { AreaBoxBody, imageAnswer, fileRoute, notFound } from '../shared'
 
 /** The images routes. */
@@ -99,28 +100,16 @@ export function imagesRoutes(c: RouteContext) {
     '/api/images/model-state': {
       GET: guard(async () => Response.json(await imageTakes.modelState(projectFile))),
     },
-    '/api/image-acts/:id/make-all': {
-      POST: fromOwnPage(async (request) =>
-        imageAnswer(await imageTakes.makeAll(projectFile, request.params.id)),
-      ),
-    },
-    '/api/image-acts/:id/batch': {
-      GET: guard(async (request) =>
-        Response.json(await imageTakes.batch(projectFile, request.params.id)),
-      ),
-    },
-    '/api/image-acts/:id/batch/close': {
-      POST: fromOwnPage(async (request) =>
-        Response.json(await imageTakes.closeBatch(projectFile, request.params.id)),
-      ),
-    },
-    '/api/image-acts/:id/stop': {
-      POST: fromOwnPage(async (request) => {
-        const result = await imageTakes.stopAll(projectFile, request.params.id)
-        if (!result) return notFound()
-        return Response.json(result, { status: result.ok ? 200 : 409 })
-      }),
-    },
+    ...makeAllRoutes(c, {
+      base: '/api/image-acts/:id',
+      stop: 'stop',
+      service: {
+        makeAll: (file, request) => imageTakes.makeAll(file, request.params.id),
+        batch: (file, request) => imageTakes.batch(file, request.params.id),
+        closeBatch: (file, request) => imageTakes.closeBatch(file, request.params.id),
+        stopAll: (file, request) => imageTakes.stopAll(file, request.params.id),
+      },
+    }),
     '/api/images/bring-all': {
       GET: guard(async () => Response.json(imageTakes.lookRun(projectFile))),
       POST: fromOwnPage(async () => imageAnswer(await imageTakes.bringAll(projectFile))),
