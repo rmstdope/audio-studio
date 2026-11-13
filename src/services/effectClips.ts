@@ -17,9 +17,17 @@ import { LOCK_UNREAD, type LockRead } from '../core/lockRead'
 import { resolveInRoot } from '../core/paths'
 import { EFFECTS_LOCK_FILE, type EffectsConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
-import type { Encoder } from './audio'
-import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
-import { choices, sorted, type CommitResult } from './musicClips'
+import { FileNotWritten, type Encoder } from './audio'
+import {
+  WriteRefused,
+  formatEntriesPerLine,
+  listFiles,
+  readResource,
+  refuseWrite,
+  writeFailure,
+  writeOrRefuse,
+} from './files'
+import { choiceRefused, choices, commitFailure, sorted, type CommitResult } from './musicClips'
 
 /** How the game's sound effects are encoded: stereo, 160 kbps, at the level the model made them. */
 export const EFFECT_OUTPUT = { bitrate: '160k', channels: 2 } as const
@@ -116,7 +124,12 @@ export async function commitEffect({
     await encode(wav, temporary, EFFECT_OUTPUT)
   } catch (error) {
     await rm(temporary, { force: true }).catch(() => {})
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    // The encoder knows only the temporary file's folder: the refusal names the game's file.
+    return commitFailure(
+      error instanceof FileNotWritten
+        ? new WriteRefused(join(effects.clips, file), writeFailure(error), error)
+        : error,
+    )
   }
   try {
     return await choices().run(turn(projectFile), async (): Promise<CommitResult> => {
@@ -126,11 +139,10 @@ export async function commitEffect({
       const lock = await lockNow(root, found)
       if (!manifest || !lock) {
         const unread = !manifest ? 'manifest' : 'lock'
-        const message = `Take ${take.n} could not be chosen: the sound effects ${unread} could not be read.`
-        return { ok: false, message: `${message} Nothing was changed.` }
+        return choiceRefused(take.n, `the sound effects ${unread} could not be read`)
       }
       if (soundOnly) {
-        await rename(temporary, target)
+        await rename(temporary, target).catch(refuseWrite(join(effects.clips, file)))
         return { ok: true }
       }
       manifest[id] = { file, duration: pyRound(take.seconds) }
@@ -146,13 +158,13 @@ export async function commitEffect({
         },
         at: now().toISOString(),
       }
-      await rename(temporary, target)
-      await writeAtomic(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
-      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
+      await rename(temporary, target).catch(refuseWrite(join(effects.clips, file)))
+      await writeOrRefuse(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
+      await writeOrRefuse(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
       return { ok: true }
     })
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    return commitFailure(error)
   } finally {
     // Gone already once renamed; otherwise never left behind.
     await rm(temporary, { force: true }).catch(() => {})
@@ -183,7 +195,7 @@ export async function keepEffect({
   const lockWas = (await lockNow(root, []))?.[id]
   return () =>
     choices().run(turn(projectFile), async () => {
-      if (sound) await writeAtomic(root, clip, sound)
+      if (sound) await writeOrRefuse(root, clip, sound)
       else await rm(resolveInRoot(root, clip), { force: true })
       const found: Problem[] = []
       const manifest = await manifestNow(root, effects, found)
@@ -192,10 +204,10 @@ export async function keepEffect({
         throw new Error('The sound effects manifest or lock could not be read.')
       if (manifestWas) manifest[id] = manifestWas
       else delete manifest[id]
-      await writeAtomic(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
+      await writeOrRefuse(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
       if (lockWas) lock[id] = lockWas
       else delete lock[id]
-      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
+      await writeOrRefuse(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
     })
 }
 
@@ -226,15 +238,17 @@ export async function uncommitEffect({
       if (!(id in lock)) return { ok: false, message: 'No take is chosen for this effect.' }
       if (id in manifest) {
         delete manifest[id]
-        await writeAtomic(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
+        await writeOrRefuse(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
       }
-      await rm(resolveInRoot(root, join(effects.clips, `${id}.mp3`)), { force: true })
+      await rm(resolveInRoot(root, join(effects.clips, `${id}.mp3`)), {
+        force: true,
+      }).catch(refuseWrite(join(effects.clips, `${id}.mp3`)))
       delete lock[id]
-      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
+      await writeOrRefuse(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
       return { ok: true }
     })
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    return commitFailure(error)
   }
 }
 
@@ -274,10 +288,10 @@ export async function acceptEffect({
         }
       }
       lock[id] = { ...entry, inputs: { ...entry.inputs, description: now.description } }
-      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
+      await writeOrRefuse(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
       return { ok: true }
     })
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    return commitFailure(error)
   }
 }

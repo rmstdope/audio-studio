@@ -19,7 +19,15 @@ import { resolveInRoot } from '../core/paths'
 import { MUSIC_LOCK_FILE, type MusicConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import { FileNotWritten, type Encoder } from './audio'
-import { isWriteFailure, listFiles, readResource, writeAtomic } from './files'
+import {
+  WriteRefused,
+  listFiles,
+  readResource,
+  refuseWrite,
+  writeFailure,
+  refusalSentence,
+  writeOrRefuse,
+} from './files'
 import { createSerial, type Serial } from './serial'
 import type { ProjectFailure } from './workspace'
 
@@ -27,7 +35,34 @@ import type { ProjectFailure } from './workspace'
 export const MUSIC_OUTPUT = { bitrate: '160k', channels: 2, lufs: -20 } as const
 
 /** What choosing a take answered: written, refused with a reason, or a lock or manifest that cannot be used. */
-export type CommitResult = { ok: true } | { ok: false; message: string } | ProjectFailure
+export type CommitResult =
+  | { ok: true }
+  /** `reason` is the failure without the framing around it, when the framing is the module's. */
+  | { ok: false; message: string; reason?: string }
+  | ProjectFailure
+
+/** A choice refused because the lock or manifest could not be read: nothing was changed. */
+export function choiceRefused(n: number, reason: string): CommitResult {
+  return {
+    ok: false,
+    message: `Take ${n} could not be chosen: ${reason}. Nothing was changed.`,
+    reason,
+  }
+}
+
+/**
+ * What a choice, un-choice or accept that threw answers: a refused write names its file, anything
+ * else gives its own message.
+ */
+export function commitFailure(error: unknown): CommitResult {
+  const sentence = refusalSentence(error)
+  if (sentence !== null) {
+    // Kept in the server log: the person is told which file, the log says why.
+    console.error('writing the game’s files failed', error)
+    return { ok: false, message: `${sentence}.`, reason: sentence }
+  }
+  return { ok: false, message: error instanceof Error ? error.message : String(error) }
+}
 
 /** The music lock as it is now: empty if there is none; null (with the problems added) if broken. */
 export async function lockNow(root: string, problems: Problem[]): Promise<MusicLock | null> {
@@ -113,10 +148,12 @@ export async function commitChoice({
     await encode(wav, temporary, MUSIC_OUTPUT)
   } catch (error) {
     await rm(temporary, { force: true }).catch(() => {})
-    if (error instanceof FileNotWritten) {
-      return { ok: false, message: 'The game’s file could not be written.' }
-    }
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    // The encoder knows only the temporary file's folder: the refusal names the game's file.
+    return commitFailure(
+      error instanceof FileNotWritten
+        ? new WriteRefused(join(music.clips, file), writeFailure(error), error)
+        : error,
+    )
   }
   try {
     return await choices().run(`music-choice\0${projectFile}`, async (): Promise<CommitResult> => {
@@ -125,11 +162,10 @@ export async function commitChoice({
       const lock = await lockNow(root, found)
       if (!manifest || !lock) {
         const unread = !manifest ? 'manifest' : 'lock'
-        const message = `Take ${take.n} could not be chosen: the music ${unread} could not be read.`
-        return { ok: false, message: `${message} Nothing was changed.` }
+        return choiceRefused(take.n, `the music ${unread} could not be read`)
       }
       if (soundOnly) {
-        await rename(temporary, target)
+        await rename(temporary, target).catch(refuseWrite(join(music.clips, file)))
         return { ok: true }
       }
       manifest[id] = { file, duration: pyRound(take.seconds) }
@@ -143,13 +179,13 @@ export async function commitChoice({
         at: now().toISOString(),
       }
       lock[id] = entry
-      await rename(temporary, target)
-      await writeAtomic(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
-      await writeAtomic(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
+      await rename(temporary, target).catch(refuseWrite(join(music.clips, file)))
+      await writeOrRefuse(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
+      await writeOrRefuse(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
       return { ok: true }
     })
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    return commitFailure(error)
   } finally {
     // Gone already once renamed; otherwise never left behind.
     await rm(temporary, { force: true }).catch(() => {})
@@ -184,17 +220,17 @@ export async function uncommitChoice({
       if (!(id in lock)) return { ok: false, message: 'No take is chosen for this track.' }
       if (id in manifest) {
         delete manifest[id]
-        await writeAtomic(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
+        await writeOrRefuse(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
       }
-      await rm(resolveInRoot(root, join(music.clips, `${id}.mp3`)), { force: true })
+      await rm(resolveInRoot(root, join(music.clips, `${id}.mp3`)), { force: true }).catch(
+        refuseWrite(join(music.clips, `${id}.mp3`)),
+      )
       delete lock[id]
-      await writeAtomic(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
+      await writeOrRefuse(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
       return { ok: true }
     })
   } catch (error) {
-    if (isWriteFailure(error))
-      return { ok: false, message: 'The game’s file could not be written.' }
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    return commitFailure(error)
   }
 }
 
@@ -236,11 +272,11 @@ export async function acceptChange({
         ...entry,
         inputs: { ...entry.inputs, brief: now.brief, bpm: now.bpm, key: now.key },
       }
-      await writeAtomic(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
+      await writeOrRefuse(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
       return { ok: true }
     })
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    return commitFailure(error)
   }
 }
 

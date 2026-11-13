@@ -9,6 +9,9 @@ import {
   readJson,
   writeAtomic,
   writeFailure,
+  writeOrRefuse,
+  WriteRefused,
+  refusalSentence,
 } from './files'
 
 describe('formatEntriesPerLine', () => {
@@ -100,5 +103,26 @@ describe('isWriteFailure', () => {
     expect(isWriteFailure(failed('toString'))).toBe(false)
     expect(isWriteFailure(new Error('no code'))).toBe(false)
     expect(isWriteFailure(null)).toBe(false)
+  })
+})
+
+describe('writeOrRefuse', () => {
+  it('refuses a write that fails with the file named and the reason kept', async () => {
+    const root = tempRepo({ blocked: 'a file, not a folder' })
+    const error = await writeOrRefuse(root, 'blocked/board.json', '{}').catch((e) => e)
+    expect(error).toBeInstanceOf(WriteRefused)
+    expect(error.file).toBe('blocked/board.json')
+    expect(error.reason).toBeString()
+    expect(refusalSentence(error)).toBe('blocked/board.json could not be written')
+  })
+
+  it('writes like writeAtomic when nothing is wrong', async () => {
+    const root = tempRepo({})
+    await writeOrRefuse(root, 'a/b.json', '{}')
+    expect(readFileSync(join(root, 'a/b.json'), 'utf8')).toBe('{}')
+  })
+
+  it('has no sentence for an error that is not a refused write', () => {
+    expect(refusalSentence(new Error('boom'))).toBeNull()
   })
 })

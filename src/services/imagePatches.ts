@@ -28,7 +28,7 @@ import {
 import type { PatchRow } from '../core/images'
 import { resolveInRoot } from '../core/paths'
 import { IMAGES_LOCK_FILE } from '../core/project'
-import { readResource, writeAtomic } from './files'
+import { readResource, writeOrRefuse } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import {
@@ -245,7 +245,11 @@ export function createImagePatches({
   }
 
   const writeManifest = (found: Pick<Found, 'root' | 'config'>, manifest: ImageManifest) =>
-    writeAtomic(found.root, found.config.manifest, `${JSON.stringify(sorted(manifest), null, 2)}\n`)
+    writeOrRefuse(
+      found.root,
+      found.config.manifest,
+      `${JSON.stringify(sorted(manifest), null, 2)}\n`,
+    )
 
   /** The image take's picture and size, or null when it is not there or is no picture. */
   async function takePicture(image: Image, n: number) {
@@ -339,7 +343,7 @@ export function createImagePatches({
         model: entry.model,
       }
       // The picture first: a take is on the board only once its file is there.
-      await writeAtomic(found.root, `${found.folder}/${entry.n}.png`, png)
+      await writeOrRefuse(found.root, `${found.folder}/${entry.n}.png`, png)
       // Marked before it is on the board, so the page never sees it between made and brought.
       bringing.add(`${found.key}\0${entry.n}`)
       const failure = await changeBoard(found, (board) => {
@@ -835,7 +839,7 @@ export function createImagePatches({
               }
             }
             const file = patchClipName(id, patch)
-            await writeAtomic(found.root, join(found.config.clips, file), png)
+            await writeOrRefuse(found.root, join(found.config.clips, file), png)
             const listed = { ...(entry.patches as Record<string, unknown> | undefined) }
             listed[patch] = { file, width: found.row.width, height: found.row.height }
             manifest[id] = { ...entry, patches: sorted(listed) }

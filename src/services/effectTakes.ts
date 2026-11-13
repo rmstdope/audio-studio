@@ -48,7 +48,7 @@ import { readEffects } from './effectsLists'
 import type { EffectGenerator } from './effects'
 import type { EffectHealthStore } from './effectHealth'
 import { gpuInUse, gpuQueue, GPU, holdGpu } from './gpu'
-import { writeAtomic } from './files'
+import { WriteRefused, refusalAnswer, refusalSentence, writeAtomic, writeOrRefuse } from './files'
 import type { CommitResult } from './musicClips'
 import { createSerial, type Serial } from './serial'
 import { MAKE_ALL_TAKES, type EffectBatch } from '../core/effectsMakeAll'
@@ -213,37 +213,6 @@ function playedOf(take: EffectBoardTake, bytes: Uint8Array) {
   }
 }
 
-/** A take board that could not be saved, after anything the change wrote elsewhere was undone. */
-class BoardNotWritten extends Error {
-  constructor(
-    /** The board's path in the project. */
-    readonly file: string,
-    cause: unknown,
-  ) {
-    super(`${file} could not be written`, { cause })
-  }
-}
-
-/**
- * Turns a board that could not be saved into a refusal naming its file, kept with its stack in the
- * server log under `what`; any other error goes on.
- */
-function boardRefusal(what: string, say: (reason: string) => string) {
-  return (error: unknown): { ok: false; message: string } => {
-    if (!(error instanceof BoardNotWritten)) throw error
-    console.error(what, error)
-    return { ok: false, message: say(error.message) }
-  }
-}
-
-/** A refusal of a choice as a bare reason: "Take 1 could not be chosen: X. Nothing was changed." gives "X". */
-function plainReason(message: string): string {
-  return message
-    .replace(/^Take \d+ could not be chosen: /, '')
-    .replace(/\.? Nothing was changed\.$/, '')
-    .replace(/\.$/, '')
-}
-
 /** A model's full name; an id the studio does not know is shown as it is. */
 const modelName = (id: string) =>
   (EFFECT_MODEL_IDS as readonly string[]).includes(id) ? effectModel(id as EffectModelId).name : id
@@ -365,10 +334,10 @@ export function createEffectTakes({
       const after = JSON.stringify(board, null, 2)
       if (after !== before) {
         try {
-          await writeAtomic(found.root, boardFile(found.id), `${after}\n`)
+          await writeOrRefuse(found.root, boardFile(found.id), `${after}\n`)
         } catch (error) {
           await undo?.()
-          throw new BoardNotWritten(boardFile(found.id), error)
+          throw error
         }
       }
       return answer
@@ -439,7 +408,7 @@ export function createEffectTakes({
       entry.state = 'failed'
       entry.message = describeFailure(error)
       // The model made the take; only its board could not be saved, which is no news of the model.
-      if (error instanceof BoardNotWritten) {
+      if (error instanceof WriteRefused) {
         console.error('saving the take failed', error)
         await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
           force: true,
@@ -617,7 +586,7 @@ export function createEffectTakes({
           board.next = first + request.count
           return first
         }).catch(
-          boardRefusal(
+          refusalAnswer(
             'reserving the take numbers failed',
             (reason) => `No takes were made: ${reason}.`,
           ),
@@ -683,7 +652,7 @@ export function createEffectTakes({
           return { dropped: take }
         },
       ).catch(
-        boardRefusal(
+        refusalAnswer(
           'dropping the take failed',
           (reason) => `The take could not be dropped: ${reason}.`,
         ),
@@ -816,8 +785,8 @@ export function createEffectTakes({
       ).catch((error): EffectMakeResult => {
         // Kept in the server log: the person is told the plain reason, not the stack.
         console.error('saving the fades failed', error)
-        const board =
-          error instanceof BoardNotWritten ? error.message : 'The take board could not be written'
+        const board = refusalSentence(error)
+        if (board === null) throw error
         return stuck
           ? {
               ok: false,
@@ -913,7 +882,10 @@ export function createEffectTakes({
             })
             if (!committed.ok) {
               return 'message' in committed
-                ? { ok: false, message: plainReason(committed.message) }
+                ? {
+                    ok: false,
+                    message: committed.reason ?? committed.message,
+                  }
                 : { ok: false, message: `${committed.file} could not be read` }
             }
           }
@@ -926,16 +898,17 @@ export function createEffectTakes({
             console.error('putting the game’s files back failed', error)
           }),
       ).catch((error): EffectTrimResult => {
-        if (!(error instanceof BoardNotWritten)) throw error
+        const sentence = refusalSentence(error)
+        if (sentence === null) throw error
         // Kept in the server log: the person is told which file, not the stack.
         console.error('saving the trim failed', error)
         return stuck
           ? {
               ok: false,
-              message: `${error.message}, and the game’s files could not be put back`,
+              message: `${sentence}, and the game’s files could not be put back`,
               gameChanged: true,
             }
-          : { ok: false, message: error.message }
+          : { ok: false, message: sentence }
       })
     },
 

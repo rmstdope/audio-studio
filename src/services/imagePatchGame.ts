@@ -4,7 +4,7 @@ import { gamePatch, PatchBoardSchema, type PatchBoard } from '../core/imagePatch
 import type { ImageRow } from '../core/images'
 import { resolveInRoot } from '../core/paths'
 import { CACHE_DIR, type Problem } from '../core/project'
-import { readResource, writeAtomic } from './files'
+import { readResource, writeOrRefuse } from './files'
 import { IMAGE_TAKES_DIR } from './imageLists'
 import { boardQueue } from './musicTakes'
 import { decodePng, encodeTransparentPng } from './png'
@@ -56,7 +56,7 @@ export function changePatchBoard<T>(
     const answer = await change(board)
     const after = JSON.stringify(board, null, 2)
     if (after !== before) {
-      await writeAtomic(root, `${patchFolder(image, patch)}/board.json`, `${after}\n`)
+      await writeOrRefuse(root, `${patchFolder(image, patch)}/board.json`, `${after}\n`)
     }
     return answer
   })
@@ -83,7 +83,7 @@ export async function renderPatchGame(
   }
   try {
     const png = encodeTransparentPng(gamePatch(decodePng(take), decodePng(picture), look, size))
-    await writeAtomic(root, patchGameOf(image, patch, n), png)
+    await writeOrRefuse(root, patchGameOf(image, patch, n), png)
     return png
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) }
@@ -123,7 +123,7 @@ export async function patchesInGame(
       .catch(() => null)
     if (!png) continue
     const file = patchClipName(row.id, patch.id)
-    await writeAtomic(root, join(clips, file), png)
+    await writeOrRefuse(root, join(clips, file), png)
     entries[patch.id] = { file, width: row.width, height: row.height }
   }
   return entries

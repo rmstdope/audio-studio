@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { EffectLockSchema, type EffectBoardTake } from '../core/effectTakes'
 import { ProjectSchema } from '../core/project'
-import type { Encoder, EncodeOptions } from './audio'
+import { FileNotWritten, type Encoder, type EncodeOptions } from './audio'
 import {
   acceptEffect,
   commitEffect,
@@ -58,6 +58,23 @@ const choose = (root: string, id: string, n: number, encode: Encoder, hash?: str
   })
 
 describe('commitEffect', () => {
+  it('says which file could not be written when the encoder cannot write the clip', async () => {
+    const root = tempRepo({})
+    const encode: Encoder = async () => {
+      throw new FileNotWritten()
+    }
+    const quiet = console.error
+    console.error = () => {}
+    try {
+      expect(await choose(root, 'coins', 1, encode)).toMatchObject({
+        ok: false,
+        message: 'audio/effects/coins.mp3 could not be written.',
+      })
+    } finally {
+      console.error = quiet
+    }
+  })
+
   it('writes the clip, the manifest with its real length, and the lock', async () => {
     const root = tempRepo({})
     const { encode, calls } = fakeEncoder()
@@ -106,7 +123,7 @@ describe('commitEffect', () => {
   it('changes nothing when the lock or the manifest cannot be read', async () => {
     const lockBroken = tempRepo({ 'content-studio/effects/lock.json': '{ nope' })
     const one = await choose(lockBroken, 'door-creak', 1, fakeEncoder().encode)
-    expect(one).toEqual({
+    expect(one).toMatchObject({
       ok: false,
       message:
         'Take 1 could not be chosen: the sound effects lock could not be read. Nothing was changed.',
@@ -280,4 +297,23 @@ describe('formatEffectLock', () => {
     expect(formatEffectLock({ rain: rain!, coins: coins! })).toBe(text)
     expect(formatEffectLock({})).toBe('{}\n')
   })
+
+  it.skipIf(process.getuid?.() === 0)(
+    'says which file could not be written when the effects folder is read-only',
+    async () => {
+      const root = tempRepo({})
+      await choose(root, 'coins', 1, fakeEncoder().encode)
+      const clips = join(root, 'audio/effects')
+      chmodSync(clips, 0o555)
+      try {
+        expect(await uncommitEffect({ root, effects: config, id: 'coins' })).toMatchObject({
+          ok: false,
+          message: 'audio/effects/manifest.json could not be written.',
+        })
+      } finally {
+        chmodSync(clips, 0o755)
+      }
+      expect(existsSync(join(root, 'audio/effects/coins.mp3'))).toBe(true)
+    },
+  )
 })

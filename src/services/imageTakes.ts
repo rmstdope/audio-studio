@@ -42,7 +42,7 @@ import {
 } from '../core/images'
 import { resolveInRoot } from '../core/paths'
 import { IMAGES_LOCK_FILE, type Problem } from '../core/project'
-import { readResource, writeAtomic } from './files'
+import { readResource, writeOrRefuse } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import { adoptImageAreas } from './imageEdits'
@@ -338,7 +338,7 @@ export function createImageTakes({
       const before = JSON.stringify(board, null, 2)
       const answer = await change(board)
       const after = JSON.stringify(board, null, 2)
-      if (after !== before) await writeAtomic(found.root, found.board, `${after}\n`)
+      if (after !== before) await writeOrRefuse(found.root, found.board, `${after}\n`)
       return answer
     })
   }
@@ -429,14 +429,14 @@ export function createImageTakes({
       manifest[id] = listed
       if (next && png) {
         lock[id] = next
-        await writeAtomic(found.root, join(found.config.clips, file), png)
+        await writeOrRefuse(found.root, join(found.config.clips, file), png)
       }
-      await writeAtomic(
+      await writeOrRefuse(
         found.root,
         found.config.manifest,
         `${JSON.stringify(sorted(manifest), null, 2)}\n`,
       )
-      if (next && png) await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
+      if (next && png) await writeOrRefuse(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
       return { ok: true as const }
     })
   }
@@ -458,7 +458,7 @@ export function createImageTakes({
     }
     try {
       const png = encodePng(bringToLook(decodePng(source), found.look, found.row))
-      await writeAtomic(found.root, gameOf(found.id, n), png)
+      await writeOrRefuse(found.root, gameOf(found.id, n), png)
       return png
     } catch (error) {
       return { error: describeFailure(error) }
@@ -531,7 +531,7 @@ export function createImageTakes({
         seen: false,
       }
       // The picture first: a take is on the board only once its file is there.
-      await writeAtomic(found.root, pictureOf(found.id, take.n), made.png)
+      await writeOrRefuse(found.root, pictureOf(found.id, take.n), made.png)
       // Marked before it is on the board, so the page never sees it between made and brought.
       bringing.add(`${found.key}\0${take.n}`)
       const saved = await changeBoard(found, (board) => {
@@ -642,7 +642,7 @@ export function createImageTakes({
         take.look = key
         if (take.n === chosen?.take) chosenPng = made
       }
-      await writeAtomic(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
+      await writeOrRefuse(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
       if (failure) return failure
       const patchFailure = await bringPatches(found, key)
       if (chosen && chosen.look !== key) {
@@ -913,7 +913,7 @@ export function createImageTakes({
         const n = board.next
         const size = pngSize(made.png.subarray(0, 33))
         // The picture first: a take is on the board only once its file is there.
-        await writeAtomic(found.root, pictureOf(id, n), made.png)
+        await writeOrRefuse(found.root, pictureOf(id, n), made.png)
         board.next = n + 1
         board.takes = [
           ...board.takes,
@@ -979,7 +979,7 @@ export function createImageTakes({
         if (!take.seen || take.look !== key) {
           take.seen = true
           take.look = key
-          await writeAtomic(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
+          await writeOrRefuse(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
         }
         return { ok: true }
       })
@@ -1010,7 +1010,7 @@ export function createImageTakes({
             }
           }
           lock[id] = { ...chosen, words: now.words, style: now.style }
-          await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
+          await writeOrRefuse(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
           return { ok: true }
         }),
       )
@@ -1037,7 +1037,7 @@ export function createImageTakes({
             if (!lock[id]) return { ok: false, message: 'No take is chosen for this image.' }
             if (id in manifest) {
               delete manifest[id]
-              await writeAtomic(
+              await writeOrRefuse(
                 found.root,
                 found.config.manifest,
                 `${JSON.stringify(sorted(manifest), null, 2)}\n`,
@@ -1047,7 +1047,7 @@ export function createImageTakes({
               force: true,
             })
             delete lock[id]
-            await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
+            await writeOrRefuse(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
             return { ok: true }
           },
         )

@@ -94,6 +94,10 @@ retroquest/                      ← user runs `content-studio` here
    Models panel, and the retirement
    switch of `s1`. The Fish tier and the take fade are the person's own, not the project's: they are
    kept in the cache (`content-studio/cache/settings.json`), never in the project file.
+   A write that fails is one typed refusal, `WriteRefused` (`services/files.ts`): `writeOrRefuse`
+   raises it naming the file's path in the project and the reason, `refusalSentence` words it in one
+   place ("<file> could not be written"), and the take boards, the clip modules (`commitFailure`) and
+   the engines' `changeBoard` all go through it, so a failed write says which file, whichever operation met it.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 
