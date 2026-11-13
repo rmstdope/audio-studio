@@ -1,6 +1,8 @@
 import { fieldOwnsKeys, usePendingFocus } from './useWorkbenchKeys'
 import { useAfterSaved } from '../../useAfterSaved'
 import { useJobOpen } from './ImageJobTabs'
+import { FitPicture, pictureShape } from './FitPicture'
+import { useFillWindow } from '../../fillWindow'
 import {
   useEffect,
   useRef,
@@ -230,6 +232,7 @@ export function PatchWorkbench({
   // Focus goes to Make once a stopped press has left it free again.
   const [landOnMake, setLandOnMake] = useState(false)
   const start = useRef<{ x: number; y: number } | null>(null)
+  const fill = useFillWindow()
   const asked = useRef(new Set<number>())
   // A choice or drop asked for by a key and not yet settled: a second press waits for it.
   const changing = useRef(false)
@@ -455,62 +458,62 @@ export function PatchWorkbench({
             </span>
           )}
         </div>
-        {game && (lookError !== null || shown?.look === 'bringing' || shown?.look === 'missing') ? (
-          <div
-            className={`look-empty${lookError !== null ? ' look-empty-err' : ''}`}
-            style={{ aspectRatio: `${space.width} / ${space.height}` }}
-            role={lookError !== null ? 'alert' : 'status'}
-          >
-            {lookError !== null
-              ? lookError
-              : shown?.look === 'missing'
-                ? "Not brought to the game's look yet."
-                : "Bringing to the game's look…"}
-          </div>
-        ) : (
-          <div
-            className="patch-stage"
-            style={
-              {
-                aspectRatio: `${space.width} / ${space.height}`,
-                '--picture-ratio': space.width / space.height,
-                ...(game ? { imageRendering: 'pixelated' } : {}),
-              } as CSSProperties
-            }
-            onPointerDown={(event) => {
-              if (event.button !== 0 || event.ctrlKey) return
-              event.preventDefault()
-              event.currentTarget.setPointerCapture(event.pointerId)
-              start.current = { x: event.clientX, y: event.clientY }
-            }}
-            onPointerMove={dragTo}
-            onPointerUp={(event) => {
-              dragTo(event)
-              start.current = null
-            }}
-            onPointerCancel={() => {
-              start.current = null
-            }}
-          >
-            <img
-              className="patch-take"
-              src={sources.base}
-              alt="The chosen take of the image"
-              draggable={false}
-            />
-            {overlaid && sources.patch(overlaid.n, overlaid.look) && (
+        <FitPicture>
+          {game &&
+          (lookError !== null || shown?.look === 'bringing' || shown?.look === 'missing') ? (
+            <div
+              className={`look-empty fit-shape${lookError !== null ? ' look-empty-err' : ''}`}
+              style={pictureShape(space.width, space.height)}
+              role={lookError !== null ? 'alert' : 'status'}
+            >
+              {lookError !== null
+                ? lookError
+                : shown?.look === 'missing'
+                  ? "Not brought to the game's look yet."
+                  : "Bringing to the game's look…"}
+            </div>
+          ) : (
+            <div
+              className="patch-stage fit-shape"
+              style={{
+                ...pictureShape(space.width, space.height),
+                ...(game ? ({ imageRendering: 'pixelated' } as CSSProperties) : {}),
+              }}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || event.ctrlKey) return
+                event.preventDefault()
+                event.currentTarget.setPointerCapture(event.pointerId)
+                start.current = { x: event.clientX, y: event.clientY }
+              }}
+              onPointerMove={dragTo}
+              onPointerUp={(event) => {
+                dragTo(event)
+                start.current = null
+              }}
+              onPointerCancel={() => {
+                start.current = null
+              }}
+            >
               <img
-                className="patch-over"
-                src={sources.patch(overlaid.n, overlaid.look)!}
-                alt={`Take ${overlaid.n}`}
+                className="patch-take"
+                src={sources.base}
+                alt="The chosen take of the image"
                 draggable={false}
               />
-            )}
-            {showMark && marked && (
-              <div className="patch-mark" style={placed(space.place(marked), space)} />
-            )}
-          </div>
-        )}
+              {overlaid && sources.patch(overlaid.n, overlaid.look) && (
+                <img
+                  className="patch-over"
+                  src={sources.patch(overlaid.n, overlaid.look)!}
+                  alt={`Take ${overlaid.n}`}
+                  draggable={false}
+                />
+              )}
+              {showMark && marked && (
+                <div className="patch-mark" style={placed(space.place(marked), space)} />
+              )}
+            </div>
+          )}
+        </FitPicture>
         <span className="faint small">
           {game
             ? `${view.game.width} × ${view.game.height}`
@@ -568,7 +571,7 @@ export function PatchWorkbench({
   ].sort((a, b) => a.n - b.n)
 
   return (
-    <div className="patch-bench" onKeyDown={onKeyDown}>
+    <div className="patch-bench" ref={fill} onKeyDown={onKeyDown}>
       <div className="patch-bench-left">{left}</div>
       <div className="patch-bench-right">
         <h3 className="patch-title">{title}</h3>

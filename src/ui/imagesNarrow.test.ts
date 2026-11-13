@@ -34,7 +34,9 @@ describe('an image’s workbench', () => {
   it('is a frame: the stage, the tools column of about 300 px, and the strip along the bottom', () => {
     expect(rule('.image-workbench')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) 300px/)
     expect(rule('.image-workbench')).toMatch(/grid-template-rows:\s*minmax\(0, 1fr\) auto/)
-    expect(rule('.image-workbench')).toMatch(/height:\s*max\(520px, calc\(100vh - 230px\)\)/)
+    // The window's height reaches the frame as where it starts (--fill-height), never as a sum of
+    // what is above it.
+    expect(rule('.image-workbench')).toMatch(/height:\s*max\(520px, var\(--fill-height, 520px\)\)/)
     expect(rule(".image-workbench > [data-area='strip']")).toMatch(/grid-column:\s*1 \/ -1/)
     expect(rule('.image-thumbs')).toMatch(/overflow-x:\s*auto/)
   })
@@ -137,5 +139,38 @@ describe('the patch list beside a portrait image (as-sgou)', () => {
   it('makes each patch a box as wide as the list, whatever its name', () => {
     expect(rule('.patch-pick-row')).toMatch(/width:\s*100%/)
     expect(rule('.patch-pick-row')).toMatch(/box-sizing:\s*border-box/)
+  })
+})
+
+describe('fitting a picture to the window (as-5wln)', () => {
+  it('names no pixels of what else is on the page: no image rule subtracts a length from the window’s height', () => {
+    // Every rule but the Scenes list's, which is no picture.
+    const images = css.replace(/\.scene-list \{[^}]*\}/, '')
+    expect(images).not.toMatch(/100d?vh\s*-\s*\d+px/)
+  })
+
+  it('sizes every fitted picture by the room its track gives it, in a wide window', () => {
+    const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
+    const block = wide.slice(0, wide.indexOf('\n}\n'))
+    expect(rule('.fit-picture', block)).toMatch(/container-type:\s*size/)
+    expect(rule('.fit-shape', block)).toMatch(
+      /width:\s*min\(100cqw, calc\(100cqh \* var\(--picture-ratio, 1\)\)\)/,
+    )
+  })
+
+  it('gives the pages a frame as tall as the window below where it starts, the stage row taking what the rest leaves', () => {
+    const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
+    const block = wide.slice(0, wide.indexOf('\n}\n'))
+    expect(block).toMatch(/\.patch-bench,\s*\.fine-job\s*\{[^}]*var\(--fill-height, 480px\)/)
+    // `auto` as the least, not 0: a tall strip makes the page scroll instead of crushing the stage.
+    expect(block).toMatch(/grid-template-rows:\s*minmax\(auto, 1fr\) auto/)
+    expect(block).not.toMatch(/\.(patch-bench-left|fine-stage)\s*\{[^}]*min-height:\s*0/)
+    expect(block).toMatch(/\.named-areas-body\s*\{[^}]*var\(--fill-height, 360px\)/)
+  })
+
+  it('caps a picture by half the window when nothing is fitted', () => {
+    expect(rule('.fit-shape')).toMatch(
+      /width:\s*min\(100%, calc\(50vh \* var\(--picture-ratio, 1\)\)\)/,
+    )
   })
 })

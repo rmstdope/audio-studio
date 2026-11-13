@@ -3295,11 +3295,10 @@ button.cue-chip[aria-expanded='true'] {
 .patches p {
   margin: 0;
 }
-/* The picture as wide as its column, but no taller than leaves the controls under it and the takes
-   below in view in the window: a portrait picture is fitted to the height. */
+/* The picture as wide as its column, but no taller than its track: a portrait picture is fitted to
+   the height (`.fit-shape`). */
 .patch-stage {
   position: relative;
-  width: min(100%, calc(max(240px, 100vh - 460px) * var(--picture-ratio, 1)));
   max-width: 1024px;
   cursor: crosshair;
   touch-action: none;
@@ -4219,7 +4218,7 @@ textarea[aria-disabled='true'][data-why] {
   grid-template-columns: minmax(0, 1fr) 300px;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 12px;
-  height: max(520px, calc(100vh - 230px));
+  height: max(520px, var(--fill-height, 520px));
 }
 .image-workbench > [data-area='stage'] {
   grid-column: 1;
@@ -5244,12 +5243,6 @@ textarea[aria-disabled='true'][data-why] {
   user-select: none;
   background: var(--inset);
 }
-/* As large as fits: a tall picture keeps its caption, switches and S hint in the window, the
-   320 px being the page above the picture and the panel's rows below it (as-dab0). */
-.named-area-stage,
-.named-area-empty {
-  width: min(100%, calc((100vh - 320px) * var(--picture-ratio)));
-}
 .named-area-take {
   position: absolute;
   inset: 0;
@@ -5885,10 +5878,50 @@ textarea[aria-disabled='true'][data-why] {
 .fine-stage .patch-stage {
   max-width: none;
 }
-/* On Patches the stage has the takes strip under it as well as its controls, so it leaves more of the
-   window to them, down to a stage 160 px tall (as-jkm2). */
-.patch-bench-left .patch-stage {
-  width: min(100%, calc(max(160px, 100vh - 580px) * var(--picture-ratio, 1)));
+/* The room a picture is fitted to (as-5wln). A page that shows a picture is a grid whose stage row
+   takes what the rows around it leave, and `useFillWindow` makes the page end at the window's
+   bottom, so no rule names the pixels of what else is on the page. The picture sits in a
+   `.fit-picture` track, as wide as its column and as tall as the row gives it (a row never shorter
+   than what its column holds at the track's floor, so a tall strip makes the page scroll and never
+   draws over the controls), and a `.fit-shape`
+   picture is the largest of its shape inside it. The floors are the smallest a page is allowed to
+   shrink to, and below them it scrolls. In a narrow panel (under 821 px, as the other panel layouts
+   follow the panel's width) nothing is fitted: the picture is as wide as its column and no taller
+   than half the window. */
+.fit-picture {
+  min-width: 0;
+  min-height: 0;
+}
+.fit-shape {
+  width: min(100%, calc(50vh * var(--picture-ratio, 1)));
+}
+@container panel (min-width: 821px) {
+  .fit-picture {
+    container-type: size;
+    flex: 1 1 0;
+    min-height: 160px;
+  }
+  .fit-shape {
+    width: min(100cqw, calc(100cqh * var(--picture-ratio, 1)));
+  }
+  .patch-bench,
+  .fine-job {
+    height: max(480px, var(--fill-height, 480px));
+    grid-template-rows: minmax(auto, 1fr) auto;
+    align-items: stretch;
+  }
+  .named-areas-body {
+    height: max(360px, var(--fill-height, 360px));
+    grid-template-rows: minmax(auto, 1fr);
+  }
+  .named-areas-picture {
+    align-self: stretch;
+  }
+  .patch-bench-right,
+  .fine-tools {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 .fine-under {
   display: flex;

@@ -1,5 +1,7 @@
 import { fieldOwnsKeys, NOT_YET, useDocumentKeys, usePendingFocus } from './useWorkbenchKeys'
 import { useJobOpen } from './ImageJobTabs'
+import { FitPicture, pictureShape } from './FitPicture'
+import { useFillWindow } from '../../fillWindow'
 import {
   useEffect,
   useLayoutEffect,
@@ -158,6 +160,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     return !target && typeof want === 'object' ? NOT_YET : target
   }, query.data)
   const start = useRef<{ x: number; y: number } | null>(null)
+  const fill = useFillWindow()
   const asked = useRef(new Set<number>())
   const changing = useRef(false)
   const cameShown = useRef(false)
@@ -446,47 +449,44 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
           </button>
         </section>
       )}
-      <div className="fine-job">
+      <div className="fine-job" ref={fill}>
         <div className="fine-stage">
-          <div
-            className="patch-stage"
-            style={
-              {
-                aspectRatio: `${picture.width} / ${picture.height}`,
-                '--picture-ratio': picture.width / picture.height,
-              } as CSSProperties
-            }
-            onPointerDown={(event) => {
-              if (event.button !== 0 || event.ctrlKey) return
-              event.preventDefault()
-              event.currentTarget.setPointerCapture(event.pointerId)
-              start.current = { x: event.clientX, y: event.clientY }
-            }}
-            onPointerMove={dragTo}
-            onPointerUp={(event) => {
-              dragTo(event)
-              start.current = null
-            }}
-            onPointerCancel={() => {
-              start.current = null
-            }}
-          >
-            <img
-              className="patch-take"
-              src={baseSrc}
-              alt={pictureCaption(picture)}
-              draggable={false}
-            />
-            {overlaid && (
+          <FitPicture>
+            <div
+              className="patch-stage fit-shape"
+              style={pictureShape(picture.width, picture.height)}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || event.ctrlKey) return
+                event.preventDefault()
+                event.currentTarget.setPointerCapture(event.pointerId)
+                start.current = { x: event.clientX, y: event.clientY }
+              }}
+              onPointerMove={dragTo}
+              onPointerUp={(event) => {
+                dragTo(event)
+                start.current = null
+              }}
+              onPointerCancel={() => {
+                start.current = null
+              }}
+            >
               <img
-                className="patch-over"
-                src={tuneSrc(overlaid.n)}
-                alt={`Fine-tune ${overlaid.n}`}
+                className="patch-take"
+                src={baseSrc}
+                alt={pictureCaption(picture)}
                 draggable={false}
               />
-            )}
-            {showMark && mark && <div className="patch-mark" style={placed(mark, picture)} />}
-          </div>
+              {overlaid && (
+                <img
+                  className="patch-over"
+                  src={tuneSrc(overlaid.n)}
+                  alt={`Fine-tune ${overlaid.n}`}
+                  draggable={false}
+                />
+              )}
+              {showMark && mark && <div className="patch-mark" style={placed(mark, picture)} />}
+            </div>
+          </FitPicture>
           <div className="fine-under">
             <span className="fine-caption">
               {stageCaption(picture, overlaid?.n ?? null)}
