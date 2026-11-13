@@ -27,7 +27,14 @@ import {
   writeFailure,
   writeOrRefuse,
 } from './files'
-import { choiceRefused, choices, commitFailure, sorted, type CommitResult } from './musicClips'
+import {
+  choiceRefused,
+  choices,
+  commitFailure,
+  sorted,
+  takeOut,
+  type CommitResult,
+} from './musicClips'
 
 /** How the game's sound effects are encoded: stereo, 160 kbps, at the level the model made them. */
 export const EFFECT_OUTPUT = { bitrate: '160k', channels: 2 } as const
@@ -213,8 +220,8 @@ export async function keepEffect({
 
 /**
  * Takes the chosen take back: in the project's turn, once the manifest and lock could be read, the
- * effect's manifest entry, then its clip, then its lock entry last, so a failure part-way leaves it
- * chosen and the same click can be pressed again. An effect with no lock entry is refused; the
+ * effect's manifest entry, then its clip, then its lock entry last (`takeOut`), so a failure
+ * part-way puts back what was changed and the effect stays chosen. An effect with no lock entry is refused; the
  * caller has asked the user.
  */
 export async function uncommitEffect({
@@ -236,16 +243,19 @@ export async function uncommitEffect({
       if (!manifest) return { ok: false, message: 'The sound effects manifest could not be read.' }
       if (!lock) return { ok: false, message: 'The sound effects lock could not be read.' }
       if (!(id in lock)) return { ok: false, message: 'No take is chosen for this effect.' }
-      if (id in manifest) {
-        delete manifest[id]
-        await writeOrRefuse(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
-      }
-      await rm(resolveInRoot(root, join(effects.clips, `${id}.mp3`)), {
-        force: true,
-      }).catch(refuseWrite(join(effects.clips, `${id}.mp3`)))
       delete lock[id]
-      await writeOrRefuse(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
-      return { ok: true }
+      return takeOut({
+        root,
+        clips: effects.clips,
+        id,
+        manifest: id in manifest ? effects.manifest : null,
+        manifestNow: () => {
+          delete manifest[id]
+          return `${pythonJson(sorted(manifest))}\n`
+        },
+        lock: EFFECTS_LOCK_FILE,
+        lockNow: formatEffectLock(lock),
+      })
     })
   } catch (error) {
     return commitFailure(error)

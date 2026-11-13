@@ -219,6 +219,7 @@ export function InTheGame({
             : 'message' in failed
               ? failed.message
               : `${failed.file} could not be read`,
+          Boolean(failed && 'gameChanged' in failed),
         )
       : null
   const cls =

@@ -393,6 +393,35 @@ describe('uncommitChoice', () => {
       ])
     },
   )
+  it.skipIf(process.getuid?.() === 0)(
+    'leaves the clip, manifest and lock as they were when the lock cannot be written',
+    async () => {
+      const root = await chosen()
+      const clip = readFileSync(join(root, 'audio/music/hall.mp3'))
+      const manifest = readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')
+      const lock = readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')
+      const studio = join(root, 'content-studio/music')
+      chmodSync(studio, 0o555)
+      try {
+        const result = await uncommitChoice({ root, music: config, id: 'hall' })
+        expect(result).toEqual({
+          ok: false,
+          message: 'content-studio/music/lock.json could not be written.',
+          reason: 'content-studio/music/lock.json could not be written',
+        })
+      } finally {
+        chmodSync(studio, 0o755)
+      }
+      expect(readFileSync(join(root, 'audio/music/hall.mp3'))).toEqual(clip)
+      expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe(manifest)
+      expect(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')).toBe(lock)
+      expect(readdirSync(join(root, 'audio/music')).sort()).toEqual([
+        'cave.mp3',
+        'hall.mp3',
+        'manifest.json',
+      ])
+    },
+  )
 })
 
 describe('acceptChange', () => {

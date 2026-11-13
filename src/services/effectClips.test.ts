@@ -316,4 +316,32 @@ describe('formatEffectLock', () => {
       expect(existsSync(join(root, 'audio/effects/coins.mp3'))).toBe(true)
     },
   )
+  it.skipIf(process.getuid?.() === 0)(
+    'leaves the clip, manifest and lock as they were when the lock cannot be written',
+    async () => {
+      const root = tempRepo({})
+      await choose(root, 'coins', 1, fakeEncoder().encode)
+      const clip = readFileSync(join(root, 'audio/effects/coins.mp3'))
+      const manifest = readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8')
+      const lock = readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8')
+      const studio = join(root, 'content-studio/effects')
+      chmodSync(studio, 0o555)
+      try {
+        expect(await uncommitEffect({ root, effects: config, id: 'coins' })).toEqual({
+          ok: false,
+          message: 'content-studio/effects/lock.json could not be written.',
+          reason: 'content-studio/effects/lock.json could not be written',
+        })
+      } finally {
+        chmodSync(studio, 0o755)
+      }
+      expect(readFileSync(join(root, 'audio/effects/coins.mp3'))).toEqual(clip)
+      expect(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8')).toBe(manifest)
+      expect(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8')).toBe(lock)
+      expect(readdirSync(join(root, 'audio/effects')).sort()).toEqual([
+        'coins.mp3',
+        'manifest.json',
+      ])
+    },
+  )
 })
