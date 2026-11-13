@@ -1,13 +1,8 @@
 import { useJobOpen } from './ImageJobTabs'
+import { FitPicture, pictureShape } from './FitPicture'
+import { useFillWindow } from '../../fillWindow'
 import { off } from '../../off'
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-  type PointerEvent,
-} from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { AreaBox, AreaRow, ImageRow } from '../../../core/images'
 import { useImagePatches, useSetImageAreaBox } from '../../api'
 import {
@@ -150,6 +145,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
   const [unreadable, setUnreadable] = useState<number | null>(null)
   const [shown, setShown] = useState<Set<string>>(new Set())
   const stage = useRef<HTMLDivElement>(null)
+  const fill = useFillWindow()
   const rowButtons = useRef<Record<string, HTMLButtonElement | null>>({})
   const size = { width: row.width, height: row.height }
 
@@ -426,11 +422,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
         ...boxes.filter((b) => b.area.id !== selected),
         ...boxes.filter((b) => b.area.id === selected),
       ]
-  // The ratio as a number too: the stylesheet caps the picture's height by the window through it.
-  const pictureShape = {
-    aspectRatio: `${row.width} / ${row.height}`,
-    '--picture-ratio': row.width / row.height,
-  } as CSSProperties
+  const shape = pictureShape(row.width, row.height)
 
   return (
     <section className="panel named-areas" aria-label="Named areas">
@@ -439,7 +431,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
           {failure}
         </p>
       )}
-      <div className="named-areas-body">
+      <div className="named-areas-body" ref={fill}>
         {/* The list comes first so Tab reaches the switches after it; the grid puts the picture left. */}
         <div className="named-areas-side">
           <div className="named-areas-head">
@@ -514,88 +506,92 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
         <div className="named-areas-picture">
           {ready && view?.take ? (
             <>
-              <div
-                ref={stage}
-                className="named-area-stage"
-                style={pictureShape}
-                onPointerDown={down}
-                onPointerMove={move}
-                onPointerUp={up}
-                onPointerCancel={() => setGesture(null)}
-              >
-                <img
-                  className="named-area-take"
-                  src={`/api/images/${encodeURIComponent(row.id)}/takes/${view.take.n}`}
-                  alt="The chosen take"
-                  draggable={false}
-                  onError={() => setUnreadable(view.take?.n ?? null)}
-                />
-                {patches
-                  .filter(
-                    (patch): patch is ListedPatch & { src: string } =>
-                      !!patch.src && shown.has(patch.id),
-                  )
-                  .map((patch) => (
-                    <img
-                      key={patch.id}
-                      className="named-area-take named-area-patch"
-                      src={patch.src}
-                      alt={patch.title}
-                      draggable={false}
-                    />
-                  ))}
-                {ordered.map(({ area, box }) => {
-                  const isSelected = area.id === selected
-                  const edge = [
-                    box.y / row.height < 0.08 ? ' low' : '',
-                    box.x / row.width > 0.5 ? ' right' : '',
-                  ].join('')
-                  return (
-                    <div
-                      key={area.id}
-                      className={`named-area-box${isSelected ? ' selected' : ''}${edge}`}
-                      style={placedStyle(box, row)}
-                      data-area={area.id}
-                    >
-                      <span title={area.title} data-tag-of={area.id}>
-                        {areaTagText(area.title)}
-                      </span>
-                      {isSelected &&
-                        HANDLES.map((handle) => (
-                          <i
-                            key={handle}
-                            className={`handle handle-${handle}`}
-                            data-handle={handle}
-                          />
-                        ))}
-                      {/* After the handles, so a point on a corner or a side is pressed, not the handle. */}
-                      <i
-                        className={`area-point${isSelected && !small(box) ? '' : ' small'}${isSelected && tiny(box) ? ' tiny' : ''}`}
-                        style={pointStyle(box)}
-                        data-point-of={area.id}
-                        {...(isSelected
-                          ? { role: 'img', 'aria-label': `Point of ${area.title}` }
-                          : { 'aria-hidden': true })}
+              <FitPicture>
+                <div
+                  ref={stage}
+                  className="named-area-stage fit-shape"
+                  style={shape}
+                  onPointerDown={down}
+                  onPointerMove={move}
+                  onPointerUp={up}
+                  onPointerCancel={() => setGesture(null)}
+                >
+                  <img
+                    className="named-area-take"
+                    src={`/api/images/${encodeURIComponent(row.id)}/takes/${view.take.n}`}
+                    alt="The chosen take"
+                    draggable={false}
+                    onError={() => setUnreadable(view.take?.n ?? null)}
+                  />
+                  {patches
+                    .filter(
+                      (patch): patch is ListedPatch & { src: string } =>
+                        !!patch.src && shown.has(patch.id),
+                    )
+                    .map((patch) => (
+                      <img
+                        key={patch.id}
+                        className="named-area-take named-area-patch"
+                        src={patch.src}
+                        alt={patch.title}
+                        draggable={false}
                       />
-                    </div>
-                  )
-                })}
-                {drawing && !clean && (
-                  <div className="named-area-box drawing" style={placedStyle(drawing, row)} />
-                )}
-              </div>
+                    ))}
+                  {ordered.map(({ area, box }) => {
+                    const isSelected = area.id === selected
+                    const edge = [
+                      box.y / row.height < 0.08 ? ' low' : '',
+                      box.x / row.width > 0.5 ? ' right' : '',
+                    ].join('')
+                    return (
+                      <div
+                        key={area.id}
+                        className={`named-area-box${isSelected ? ' selected' : ''}${edge}`}
+                        style={placedStyle(box, row)}
+                        data-area={area.id}
+                      >
+                        <span title={area.title} data-tag-of={area.id}>
+                          {areaTagText(area.title)}
+                        </span>
+                        {isSelected &&
+                          HANDLES.map((handle) => (
+                            <i
+                              key={handle}
+                              className={`handle handle-${handle}`}
+                              data-handle={handle}
+                            />
+                          ))}
+                        {/* After the handles, so a point on a corner or a side is pressed, not the handle. */}
+                        <i
+                          className={`area-point${isSelected && !small(box) ? '' : ' small'}${isSelected && tiny(box) ? ' tiny' : ''}`}
+                          style={pointStyle(box)}
+                          data-point-of={area.id}
+                          {...(isSelected
+                            ? { role: 'img', 'aria-label': `Point of ${area.title}` }
+                            : { 'aria-hidden': true })}
+                        />
+                      </div>
+                    )
+                  })}
+                  {drawing && !clean && (
+                    <div className="named-area-box drawing" style={placedStyle(drawing, row)} />
+                  )}
+                </div>
+              </FitPicture>
               <p className="muted named-area-line">{areaCaptionText(view.take.n, current)}</p>
             </>
           ) : (
-            <div
-              className={`named-area-empty${state === 'loading' ? '' : ' named-area-empty-text'}`}
-              style={pictureShape}
-              role={state === 'loading' ? undefined : 'status'}
-            >
-              {state === 'none' && 'Choose a take to mark the areas on it.'}
-              {state === 'gone' &&
-                "The chosen take's picture is missing or cannot be read, so the areas cannot be marked on it."}
-            </div>
+            <FitPicture>
+              <div
+                className={`named-area-empty fit-shape${state === 'loading' ? '' : ' named-area-empty-text'}`}
+                style={shape}
+                role={state === 'loading' ? undefined : 'status'}
+              >
+                {state === 'none' && 'Choose a take to mark the areas on it.'}
+                {state === 'gone' &&
+                  "The chosen take's picture is missing or cannot be read, so the areas cannot be marked on it."}
+              </div>
+            </FitPicture>
           )}
           {ready && (
             <div className="named-area-switches">

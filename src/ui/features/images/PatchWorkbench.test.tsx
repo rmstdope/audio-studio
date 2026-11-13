@@ -2,7 +2,6 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagePatchesView, PatchWorkView } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
-import { cssLength, valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -1014,8 +1013,7 @@ describe('what the game gets', () => {
       view([work('a', over), work('b')], more)
   const box = (host: Element, at = 0) =>
     [...host.querySelectorAll<HTMLInputElement>('.patch-takes input[type=checkbox]')][at]!
-  const caption = (host: Element) =>
-    text(host.querySelector('.patch-stage + .faint, .look-empty + .faint'))
+  const caption = (host: Element) => text(host.querySelector('.fit-picture + .faint'))
 
   it('has a box in the Takes heading, ticked, also before any takes exist', async () => {
     const { host } = await render([patchRow('a')], one())
@@ -1488,79 +1486,57 @@ describe('the model of new takes', () => {
 describe('the three parts of an open patch', () => {
   const made = () => view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })])
 
-  it('fits a portrait picture to the window’s height, so Choose and the takes stay in view', async () => {
-    const { host } = await render([patchRow('a')], () =>
-      view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
-        take: { n: 3, width: 160, height: 200, cropped: false },
-        game: { width: 160, height: 200 },
-      }),
-    )
-    const stage = host.querySelector<HTMLElement>('.patch-stage')!
-    expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(160 / 200))
-    const widths = valuesInEveryWindow(stage, 'width')
-    expect(widths[0]).toMatch(/^\.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
-    expect(widths.at(-1)).toMatch(
-      /^\.patch-bench-left \.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/,
-    )
-  })
-
-  // On the 160 × 200 cellar door, a thin mark whose frame widens to a square inside the picture and
-  // a tall one whose frame stops at the picture's edges and is the whole picture; and on a 9 : 16
-  // picture, a mark whose frame is the whole of that much taller picture.
-  for (const [what, size, mark] of [
-    ['a small mark', { width: 160, height: 200 }, { x: 70, y: 80, width: 20, height: 60 }],
-    [
-      'a mark taller than the picture is wide',
-      { width: 160, height: 200 },
-      { x: 70, y: 20, width: 20, height: 160 },
-    ],
-    [
-      'a 9 : 16 picture marked top to bottom',
-      { width: 90, height: 160 },
-      { x: 35, y: 10, width: 20, height: 140 },
-    ],
+  // The shapes a picture comes in: portrait, landscape, and the game's whole frame (the picture
+  // the game uses, shown at its own size) as well as a model's take.
+  for (const [what, size] of [
+    ['a portrait picture', { width: 160, height: 200 }],
+    ['a landscape picture', { width: 320, height: 200 }],
   ] as const) {
-    it(`ends a portrait picture’s take thumbnails in a 1400 × 757 window, with ${what} (as-jkm2)`, async () => {
+    it(`fits ${what} to the room its track has, so Choose and the takes stay in view (as-5wln)`, async () => {
       const { host } = await render([patchRow('a')], () =>
-        view(
-          [
-            work('a', {
-              takes: [takeOf(1, { area: mark }), takeOf(2, { area: mark, chosen: true })],
-            }),
-          ],
-          {
-            take: { n: 3, ...size, cropped: false },
-            game: size,
-          },
-        ),
-      )
-      // A block with no width rule is as wide as its column.
-      const last = (element: Element) =>
-        (valuesInEveryWindow(element, 'width').at(-1) ?? 'all: 100%').replace(/^[^:]+: /, '')
-      const stage = host.querySelector<HTMLElement>('.patch-stage')!
-      const closeUps = [...host.querySelectorAll<HTMLElement>('.patch-thumb .patch-closeup')]
-      expect(closeUps.length).toBe(2)
-      // Measured in Chrome 1400 px wide on the cellar door: the bench starts 243 px down the window;
-      // its left column is 28 px above the stage, the stage and 74 px of controls under it, its right
-      // column (the tools) 286 px; the strip starts 16 px under the taller of the two, and its
-      // thumbnails 27 px into it. A thumbnail is 100 px wide inside: 6 px above its close-up, then
-      // 4, a label of 21 (with a chip), 4, the model line of 18 and 6 below.
-      const closeUp = Math.max(
-        ...closeUps.map((c) => {
-          const [w, h] = c.style.aspectRatio.split('/').map(Number)
-          // The box's width from the ratio the element itself gives the stylesheet (1 when it gives
-          // none, as the rule's fallback), its height from its shape.
-          const given = Number(c.style.getPropertyValue('--closeup-ratio') || 1)
-          return cssLength(last(c), { percent: 100, vh: 757, ratio: given }) / (w! / h!)
+        view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
+          take: { n: 3, ...size, cropped: false },
+          game: size,
         }),
       )
-      const ratio = size.width / size.height
-      const height = cssLength(last(stage), { percent: 516, vh: 757, ratio }) / ratio
-      const thumbnailsEnd =
-        243 + Math.max(28 + height + 74, 286) + 16 + 27 + 6 + closeUp + 4 + 21 + 4 + 18 + 6
-      expect(thumbnailsEnd).toBeLessThanOrEqual(757)
+      const stage = host.querySelector<HTMLElement>('.patch-stage')!
+      expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(size.width / size.height))
+      expect(stage.classList.contains('fit-shape')).toBe(true)
+      expect(stage.parentElement!.className).toBe('fit-picture')
+      expect(stage.parentElement!.parentElement!.className).toBe('patch-bench-left')
     })
   }
+
+  it('fits the game’s whole frame, once ticked, the same way as a take (as-5wln)', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a', { takes: [takeOf(1)] })], {
+        take: { n: 3, width: 160, height: 200, cropped: false },
+        game: { width: 512, height: 288 },
+      }),
+    )
+    await open(host)
+    const ratio = () =>
+      host
+        .querySelector<HTMLElement>('.fit-picture > .patch-stage')!
+        .style.getPropertyValue('--picture-ratio')
+    expect(ratio()).toBe(String(512 / 288))
+    await act(async () =>
+      host.querySelector<HTMLInputElement>('.patch-takes input[type=checkbox]')!.click(),
+    )
+    expect(ratio()).toBe(String(160 / 200))
+  })
+
+  it('lays the stage and the takes strip out as the two rows of one frame, so the stage takes what the strip leaves (as-jkm2, as-5wln)', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
+        take: { n: 3, width: 90, height: 160, cropped: false },
+        game: { width: 90, height: 160 },
+      }),
+    )
+    const bench = host.querySelector('.patch-bench')!
+    expect(bench.querySelector(':scope > .patch-bench-left .fit-picture')).not.toBeNull()
+    expect(bench.querySelector(':scope > .patch-takes')).not.toBeNull()
+  })
 
   it('puts the stage on the left, the tools on the right headed by the patch’s title, and the takes below both', async () => {
     const { host } = await render([patchRow('a')], made)

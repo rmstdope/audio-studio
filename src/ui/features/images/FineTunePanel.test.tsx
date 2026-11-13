@@ -2,7 +2,6 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { FineTunesView } from '../../../core/imageFineTunes'
 import type { ImageRow } from '../../../core/images'
-import { valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -165,15 +164,24 @@ describe('the states of the panel', () => {
     expect(host.querySelectorAll('select.takes-count option')).toHaveLength(10)
   })
 
-  it('fits a portrait picture to the window’s height, so its buttons and the strip stay in view', async () => {
-    const { host } = await render(() =>
-      view({ picture: { kind: 'take', n: 3, width: 160, height: 200 } }),
-    )
-    const stage = host.querySelector<HTMLElement>('.patch-stage')!
-    expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(160 / 200))
-    const widths = valuesInEveryWindow(stage, 'width')
-    expect(widths.at(-1)).toMatch(/^\.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
-  })
+  for (const [what, picture] of [
+    ['a portrait picture', { kind: 'take', n: 3, width: 160, height: 200 }],
+    ['a landscape picture', { kind: 'take', n: 3, width: 320, height: 200 }],
+    ['the game’s whole image', { kind: 'game', width: 1024, height: 576 }],
+  ] as const) {
+    it(`fits ${what} to the room its track has, so its buttons and the strip stay in view (as-5wln)`, async () => {
+      const { host } = await render(() => view({ picture }))
+      const stage = host.querySelector<HTMLElement>('.patch-stage')!
+      expect(stage.style.getPropertyValue('--picture-ratio')).toBe(
+        String(picture.width / picture.height),
+      )
+      expect(stage.classList.contains('fit-shape')).toBe(true)
+      expect(stage.parentElement!.className).toBe('fit-picture')
+      // The strip is a row of the same frame as the stage, so the stage leaves it its room.
+      expect(host.querySelector('.fine-job > .fine-strip')).not.toBeNull()
+      expect(host.querySelector('.fine-job > .fine-stage > .fit-picture')).not.toBeNull()
+    })
+  }
 
   it('names the game’s own image when no take is chosen', async () => {
     const { host } = await render(() =>

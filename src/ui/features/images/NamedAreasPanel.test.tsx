@@ -3,7 +3,6 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { AreaBox, AreaRow, ImageRow } from '../../../core/images'
 import type { ImagePatchesView } from '../../../core/imagePatches'
 import { valuesInEveryWindow } from '../../../../test/stylesheet'
-
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register({ url: 'http://localhost/' })
 const isOff = (element: Element) => element.getAttribute('aria-disabled') === 'true'
@@ -85,6 +84,8 @@ interface Options {
   chosenTake?: number | null
   /** Whether the panel's tab is the open one (default true). */
   open?: boolean
+  /** The image's size (default 320 x 200). */
+  size?: { width: number; height: number }
 }
 
 /** Renders the panel for an image of 320 x 200 with these areas; gives what was saved. */
@@ -109,8 +110,8 @@ async function render(areas: AreaRow[], options: Options = {}) {
   const draw = async (now: AreaRow[], chosenTake: number | null) => {
     const row = {
       id: 'inn',
-      width: 320,
-      height: 200,
+      width: options.size?.width ?? 320,
+      height: options.size?.height ?? 200,
       areas: now,
       chosenTake,
       patches: (options.patches ?? []).map((p) => ({ id: p.id, title: p.title })),
@@ -254,18 +255,29 @@ describe('the named areas panel', () => {
       expect(stage!.style.getPropertyValue('--picture-ratio')).toBe('1.6')
     })
 
-    it('fits a portrait picture to the window’s height, so the caption, switches and S hint stay in view (as-dab0)', async () => {
-      const { stage } = await render([area('a')])
-      const fitted = /: min\(100%, calc\(\(100vh - 320px\) \* var\(--picture-ratio\)\)\)$/
-      expect(valuesInEveryWindow(stage!, 'width').at(-1)).toMatch(
-        new RegExp(`^\\.named-area-stage${fitted.source}`),
-      )
-      const empty = (
-        await render([area('a')], { answer: () => new Promise<Response>(() => {}) })
-      ).host.querySelector<HTMLElement>('.named-area-empty')!
-      expect(valuesInEveryWindow(empty, 'width').at(-1)).toMatch(
-        new RegExp(`^\\.named-area-empty${fitted.source}`),
-      )
+    for (const [what, size] of [
+      ['a portrait picture', { width: 160, height: 200 }],
+      ['a landscape picture', { width: 320, height: 200 }],
+    ] as const) {
+      it(`fits ${what} to the room its track has, so the caption, switches and S hint stay in view (as-5wln)`, async () => {
+        const { stage } = await render([area('a')], { size })
+        expect(stage!.style.getPropertyValue('--picture-ratio')).toBe(
+          String(size.width / size.height),
+        )
+        expect(stage!.classList.contains('fit-shape')).toBe(true)
+        expect(stage!.parentElement!.className).toBe('fit-picture')
+      })
+    }
+
+    it('fits the picture’s place before its take has arrived the same way', async () => {
+      const { host } = await render([area('a')], {
+        size: { width: 160, height: 200 },
+        answer: () => new Promise<Response>(() => {}),
+      })
+      const empty = host.querySelector<HTMLElement>('.named-area-empty')!
+      expect(empty.classList.contains('fit-shape')).toBe(true)
+      expect(empty.parentElement!.className).toBe('fit-picture')
+      expect(empty.style.getPropertyValue('--picture-ratio')).toBe('0.8')
     })
   })
 

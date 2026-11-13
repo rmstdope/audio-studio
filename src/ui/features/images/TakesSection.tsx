@@ -64,15 +64,14 @@ import { imageTimeLeftText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 import { scrollWithin } from '../../scrollWithin'
+import { useFillWindow } from '../../fillWindow'
+import { stageChrome } from './stageRoom'
 
 /** How many takes the count menu starts on. */
 const STARTING_COUNT = 4
 
-/** What a side takes besides its picture: caption, size line, buttons and the gaps between them. */
-const SIDE_CHROME = 100
-
-/** The space between the two sides, in pixels (the stylesheet's `.image-stage` gap). */
-const STAGE_GAP = 14
+/** What a side of the stage shows its picture in. */
+const PICTURE = '.image-take-picture, .look-empty, .image-take-empty'
 
 /**
  * A take's picture; `shown` is its width on the page, when set, and a picture shown smaller than
@@ -206,7 +205,9 @@ export function TakesSection({
   const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   const [showing, setShowing] = useState<Showing>('game')
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
-  const [available, setAvailable] = useState({ width: 0, height: 0 })
+  const fill = useFillWindow()
+  const measureStage = useRef<(() => void) | null>(null)
+  const [available, setAvailable] = useState({ width: 0, height: 0, gap: 0 })
   const asked = useRef(new Set<number>())
   const chooseButton = useRef<HTMLButtonElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
@@ -249,21 +250,46 @@ export function TakesSection({
   }, [onRight])
   useEffect(() => {
     if (!stage || typeof ResizeObserver === 'undefined') return
-    // A narrow panel stacks the frame (the stylesheet's `@container panel` rule, which has no grid
-    // rows then) and the stage grows with its pictures: only the width counts.
+    // The picture's room is the stage less what a side holds besides its picture, and the gap
+    // between the sides: both read from the laid-out page.
     const measure = () => {
+      // A narrow panel stacks the frame (the stylesheet's `@container panel` rule, which has no grid
+      // rows then): only the width counts.
       const frame = stage.closest('.image-workbench')
       const stacked = frame !== null && getComputedStyle(frame).gridTemplateRows === 'none'
-      setAvailable({
-        width: stage.clientWidth,
-        height: stacked ? 0 : Math.max(0, stage.clientHeight - SIDE_CHROME),
+      const sides = Array.from(stage.querySelectorAll<HTMLElement>('.image-side')).map((side) => ({
+        side,
+        picture: side.querySelector<HTMLElement>(PICTURE),
+      }))
+      const chrome = stageChrome(sides, (box) => parseFloat(getComputedStyle(box).rowGap) || 0)
+      setAvailable((now) => {
+        const next = {
+          width: stage.clientWidth,
+          // Not stacked, and the room not known (no picture on either side yet): none, as stacked.
+          height: stacked || chrome === null ? 0 : Math.max(0, stage.clientHeight - chrome),
+          gap: parseFloat(getComputedStyle(stage).columnGap) || 0,
+        }
+        // The same room again is no change, or the sides, which a change reflows, would ask again.
+        return next.width === now.width && next.height === now.height && next.gap === now.gap
+          ? now
+          : next
       })
     }
     measure()
+    measureStage.current = measure
     const observer = new ResizeObserver(measure)
     observer.observe(stage)
-    return () => observer.disconnect()
+    // A side takes a picture, or loses one, without the stage changing size.
+    for (const side of stage.querySelectorAll('.image-side')) observer.observe(side)
+    return () => {
+      measureStage.current = null
+      observer.disconnect()
+    }
   }, [stage])
+  // A side's content (a question closing, a row going) changes what the pictures leave room for
+  // without changing the size of the stage or its sides, which a grid stretches: ask after each
+  // render. The same room is no change.
+  useEffect(() => measureStage.current?.())
 
   // While the takes load, no key does anything: the last render's handler must not outlive its takes.
   keys.current = () => {}
@@ -274,7 +300,7 @@ export function TakesSection({
       <>
         {null}
         {[]}
-        <div className="image-workbench">
+        <div className="image-workbench" ref={fill}>
           <section className="panel image-stage-panel" data-area="stage">
             {!view
               ? query.isError
@@ -320,7 +346,7 @@ export function TakesSection({
   const { zoom, stacked } = fitZoom(
     available.width,
     available.height,
-    STAGE_GAP,
+    available.gap,
     row.width,
     row.height,
   )
@@ -543,7 +569,7 @@ export function TakesSection({
           </button>
         </div>
       ))}
-      <div className="image-workbench">
+      <div className="image-workbench" ref={fill}>
         <section
           className="panel image-stage-panel"
           data-area="stage"
