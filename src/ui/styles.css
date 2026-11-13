@@ -5921,7 +5921,7 @@ textarea[aria-disabled='true'][data-why] {
   }
   .patch-bench,
   .fine-job {
-    height: max(480px, var(--fill-height, 480px));
+    height: max(320px, var(--fill-height, 320px));
     grid-template-rows: minmax(auto, 1fr) auto;
     align-items: stretch;
   }
