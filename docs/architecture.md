@@ -1752,7 +1752,7 @@ effect. When none of the models can run the row says sound effects can't be made
 model is kept in `content-studio/cache/effect-model-health.json` with the effect it was made on
 (`createEffectHealth`: `record` when an effect fails, `clear` when one made with the model works,
 nothing when one is stopped, and no `record` when only the take's WAV or its board could not be written,
-which is no news of the model); the row links the effect's page, and names no effect once the game no
+or its board could not be read once the WAV was, which is no news of the model); the row links the effect's page, and names no effect once the game no
 longer lists it.
 
 ### 8.9 Sound effects: the list and the studio’s descriptions
