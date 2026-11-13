@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
-import { takeRoutes, type TakeService } from './takeRoutes'
+import { takeListRoutes, takeRoutes, type TakeService } from './takeRoutes'
 import type { RouteRequest } from './shared'
 
 /** Calls the server's pass-through guards record, and what the fake service was asked. */
@@ -50,14 +50,35 @@ describe('takeRoutes', () => {
   it('declares each take action once, at the medium’s base', () => {
     expect(Object.keys(setup({ ok: true }).routes)).toEqual([
       '/api/things/:id/takes',
+      '/api/things/:id/unchoose',
+      '/api/things/:id/accept',
+      '/api/things/:id/stop',
       '/api/things/:id/takes/:file',
       '/api/things/:id/takes/:file/fades',
       '/api/things/:id/choose',
       '/api/things/:id/trim',
+    ])
+  })
+
+  it('declares, for a medium with numbered takes, only the routes that go by id alone', async () => {
+    const calls: unknown[][] = []
+    const answer = async (...args: unknown[]) => (calls.push(args.slice(1)), { ok: true })
+    const routes = takeListRoutes(
+      { projectFile: 'p', guard: (h) => h, fromOwnPage: (h) => h },
+      {
+        base: '/api/things',
+        service: { view: answer, make: answer, unchoose: answer, accept: answer, stop: answer },
+        bodies: { make: z.object({ count: z.number() }) },
+      },
+    ) as unknown as Record<string, Record<string, (r: RouteRequest) => Promise<Response>>>
+    expect(Object.keys(routes)).toEqual([
+      '/api/things/:id/takes',
       '/api/things/:id/unchoose',
       '/api/things/:id/accept',
       '/api/things/:id/stop',
     ])
+    await routes['/api/things/:id/takes']!.POST!(request({ id: 'a' }, { count: 2 }))
+    expect(calls).toEqual([['a', { count: 2 }]])
   })
 
   it('answers 400 to a body that does not fit, 404 to nothing, 409 to a refusal, 200 otherwise', async () => {
