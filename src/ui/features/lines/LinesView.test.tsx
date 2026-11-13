@@ -93,8 +93,9 @@ async function pageText(
     )
     await until(() => (container.textContent ?? '').includes(ready))
     const text = container.textContent ?? ''
+    const items = [...container.querySelectorAll('.problems li')].map((li) => li.textContent ?? '')
     await act(() => rendered.unmount())
-    return { text, summary }
+    return { text, items, summary }
   } finally {
     globalThis.fetch = realFetch
     document.body.innerHTML = ''
@@ -110,20 +111,22 @@ describe('a part’s pages, with the cast file broken', () => {
   const message = 'speakers.narrator.voice must be text (it is a number)'
 
   it('read each problem once on the All lines page', async () => {
-    const { text, summary } = await pageText(
+    const { text, items, summary } = await pageText(
       (summary, part) => createElement(LinesView, { summary, part }),
       'Generation cannot be planned',
     )
     expect(summary.problems.map((p) => p.message)).toContain(message)
     expect(timesShown(text, summary.problems).every((n) => n === 1)).toBe(true)
+    expect(items).toEqual([...new Set(items)])
   })
 
   it('read each problem once on the part’s overview', async () => {
-    const { text, summary } = await pageText(
+    const { text, items, summary } = await pageText(
       (summary, part) => createElement(PartOverview, { summary, part }),
       'Lines up to date',
     )
     expect(timesShown(text, summary.problems).every((n) => n === 1)).toBe(true)
+    expect(items).toEqual([...new Set(items)])
   })
 })
 

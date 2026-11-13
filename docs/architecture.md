@@ -121,10 +121,6 @@ A native window (Electrobun) can wrap the same web UI later; nothing in the desi
 
 ---
 
-A page's problem banners share a `ProblemScope` (`src/ui/components/ProblemScope.tsx`): each banner
-asks `useBannerProblems(id, problems)` for its own problems less those of the banners before it, so a
-problem appears once on a page however many banners it has, and no banner knows the others.
-
 ## 4. Module layout
 
 ```
@@ -179,6 +175,10 @@ part's overview and Lines page and an act's Scenes page, the pages whose header 
 language switch, the control sits inside the header's action group (`.header-end`), held to the
 right end, so a narrower window wraps it with the buttons and never alone at the left (as-ped,
 as-85z).
+
+A page's problem banners share a `ProblemScope` (`src/ui/components/ProblemScope.tsx`): each banner
+asks `useBannerProblems(id, problems)` for its own problems less those of the banners before it, so a
+problem appears once on a page however many banners it has, and no banner knows the others.
 
 Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows. `core/` has no
 imports from the others, so the rules for status, staleness and alignment are tested without

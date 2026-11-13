@@ -1,9 +1,21 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import type { Problem } from '../../core/project'
 import { notShown } from '../problems'
 
 /** What a page's banners have claimed, in the order they first claimed it, and a counter that bumps when one leaves. */
-type Scope = { claims: Map<string, Problem[]>; leave: () => void; version: number }
+type Scope = {
+  claims: Map<string, { owner: string; problems: Problem[] }>
+  leave: () => void
+  version: number
+}
 
 const ScopeContext = createContext<Scope | null>(null)
 
@@ -13,7 +25,7 @@ const ScopeContext = createContext<Scope | null>(null)
  * the page has, and no banner needs to know the others.
  */
 export function ProblemScope({ children }: { children: ReactNode }) {
-  const claims = useRef(new Map<string, Problem[]>())
+  const claims = useRef(new Map<string, { owner: string; problems: Problem[] }>())
   const [version, setVersion] = useState(0)
   const leave = useRef(() => setVersion((v) => v + 1))
   return (
@@ -30,21 +42,23 @@ export function ProblemScope({ children }: { children: ReactNode }) {
  */
 export function useBannerProblems(id: string, problems: Problem[]): Problem[] {
   const scope = useContext(ScopeContext)
+  const owner = useId()
   const leave = scope?.leave
   const claims = scope?.claims
   useEffect(() => {
     return () => {
-      if (claims?.delete(id)) leave?.()
+      // A page that replaces this one has already claimed the id: its claim stays.
+      if (claims?.get(id)?.owner === owner && claims.delete(id)) leave?.()
     }
-  }, [claims, leave, id])
+  }, [claims, leave, id, owner])
   if (!scope) return problems
   const before: Problem[] = []
   for (const [other, claimed] of scope.claims) {
     if (other === id) break
-    before.push(...claimed)
+    before.push(...claimed.problems)
   }
   // Set after reading, so a banner's own claim never hides its own problems; re-claiming under
   // the same id keeps its place in the order.
-  scope.claims.set(id, problems)
+  scope.claims.set(id, { owner, problems })
   return notShown(problems, before)
 }

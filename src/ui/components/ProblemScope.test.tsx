@@ -61,6 +61,25 @@ describe('the banners of a page', () => {
     await act(() => page.unmount())
   })
 
+  it('keep their order when one page is swapped for another that uses the same banners', async () => {
+    const overview = createElement(Banner, { id: 'part', problems: [cast] })
+    const lines = [
+      createElement(Banner, { key: 'p', id: 'part', problems: [cast] }),
+      createElement(Banner, { key: 'g', id: 'generation', problems: [cast] }),
+    ]
+    const { container, page } = await render(
+      createElement(ProblemScope, null, createElement('div', { key: 'overview' }, overview)),
+    )
+    await act(() =>
+      page.render(
+        createElement(ProblemScope, null, createElement('section', { key: 'lines' }, lines)),
+      ),
+    )
+    expect(container.querySelector('#part')!.textContent).toBe('is wrong')
+    expect(container.querySelector('#generation')!.textContent).toBe('')
+    await act(() => page.unmount())
+  })
+
   it('show everything outside a scope', async () => {
     const { container, page } = await render(
       createElement(Banner, { id: 'part', problems: [cast] }),
