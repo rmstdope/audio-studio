@@ -1548,8 +1548,10 @@ describe('the three parts of an open patch', () => {
       const closeUp = Math.max(
         ...closeUps.map((c) => {
           const [w, h] = c.style.aspectRatio.split('/').map(Number)
-          const ratio = w! / h!
-          return cssLength(last(c), { percent: 100, vh: 757, ratio }) / ratio
+          // The box's width from the ratio the element itself gives the stylesheet (1 when it gives
+          // none, as the rule's fallback), its height from its shape.
+          const given = Number(c.style.getPropertyValue('--closeup-ratio') || 1)
+          return cssLength(last(c), { percent: 100, vh: 757, ratio: given }) / (w! / h!)
         }),
       )
       const ratio = size.width / size.height
