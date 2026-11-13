@@ -116,11 +116,14 @@ describe('GamePatchesPanel', () => {
       const { host } = await render(two(), undefined, { lockUnread: true }, { chosenTake: 1 })
       expect(heading(host)).toBe('Patches · 2')
       expect(host.querySelectorAll('.patch-pick .dot').length).toBe(0)
+      expect(pickButtons(host).map((b) => text(b))).toEqual(['Title a', 'Title b'])
     })
     it('heads a tall picture’s list the same way', async () => {
       const shape = { chosenTake: 1, width: 600, height: 800 }
       const { host } = await render(two(), undefined, { lockUnread: true }, shape)
       expect(heading(host)).toBe('Patches · 2')
+      expect(pickButtons(host).length).toBe(2)
+      expect(host.querySelectorAll('.patch-pick-row .mono').length).toBe(2)
     })
     it('keeps the count of chosen and the dots when the lock is readable', async () => {
       const { host } = await render(two(), undefined, {}, { chosenTake: 1 })
