@@ -1,3 +1,4 @@
+import { useAfterSaved } from '../../useAfterSaved'
 import {
   EFFECTS_LOCK_UNREAD,
   EFFECTS_PENDING,
@@ -99,7 +100,7 @@ export function EffectTakesPanel({
   const [count, setCount] = useState(4)
   // The model the next press uses: Setup's, until a pick, which lasts while the page stays open.
   const [picked, setPicked] = useState<EffectModelId | null>(null)
-  const [waitingForWords, setWaitingForWords] = useState(false)
+  const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   const view = takes.data
   if (!view) {
     return (
@@ -132,16 +133,6 @@ export function EffectTakesPanel({
   const none = !others.length && !view.making.length
   const busy = view.making.length > 0
   const canMake = view.canMake
-  /** Takes are made from the saved words, so `ask` waits until they are the words in the field. */
-  const afterWordsSaved = (ask: () => void) => {
-    const saving = saveWords?.() ?? null
-    if (saving === null) return ask()
-    setWaitingForWords(true)
-    void saving.then((wordsSaved) => {
-      setWaitingForWords(false)
-      if (wordsSaved) ask()
-    })
-  }
   const makeState = { canMake, busy, waitingForWords, pending: make.isPending }
   const makeWhy = effectsMakeWhy(makeState)
   const countWhy = effectsMakeWhy({ ...makeState, pending: false })

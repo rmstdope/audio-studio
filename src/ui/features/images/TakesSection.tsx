@@ -1,3 +1,4 @@
+import { useAfterSaved } from '../../useAfterSaved'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
@@ -201,7 +202,7 @@ export function TakesSection({
   })
   const [saved, setSaved] = useState(0)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
-  const [waitingForWords, setWaitingForWords] = useState(false)
+  const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   const [showing, setShowing] = useState<Showing>('game')
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState({ width: 0, height: 0 })
@@ -479,17 +480,6 @@ export function TakesSection({
       event.preventDefault()
       request({ kind: 'drop', n: rightTake.n })
     }
-  }
-
-  /** Takes are made from the saved words, so `ask` waits until they are the words in the field. */
-  const afterWordsSaved = (ask: () => void) => {
-    const saving = saveWords?.() ?? null
-    if (saving === null) return ask()
-    setWaitingForWords(true)
-    void saving.then((wordsSaved) => {
-      setWaitingForWords(false)
-      if (wordsSaved) ask()
-    })
   }
 
   const controls = (

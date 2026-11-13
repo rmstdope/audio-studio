@@ -1,3 +1,4 @@
+import { useAfterSaved } from '../../useAfterSaved'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { acceptable, changedLine } from '../../../core/musicChoose'
 import { fadesLine, heardAs } from '../../../core/fades'
@@ -137,7 +138,7 @@ export function TakesPanel({
   // Whether the model menu's list is probably open: then every entry reads in full.
   const [listOpen, setListOpen] = useState(false)
   const [countOpen, setCountOpen] = useState(false)
-  const [waitingForBrief, setWaitingForBrief] = useState(false)
+  const { waiting: waitingForBrief, afterSaved } = useAfterSaved(saveBrief)
   if (!view)
     return (
       <section className="panel">
@@ -231,13 +232,7 @@ export function TakesPanel({
   const afterBriefSaved = (ask: () => void) => {
     actions.press('make')
     make.reset() // a press that ends up asking for nothing leaves no earlier failure behind
-    const saving = saveBrief?.() ?? null
-    if (saving === null) return ask()
-    setWaitingForBrief(true)
-    void saving.then((briefSaved) => {
-      setWaitingForBrief(false)
-      if (briefSaved) ask()
-    })
+    afterSaved(ask)
   }
   /** Starts the batch the menus say; the count stays as picked. */
   const makeBatch = () => afterBriefSaved(() => make.mutate({ count, model }))

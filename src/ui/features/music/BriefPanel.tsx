@@ -1,3 +1,4 @@
+import { useLatestSave } from '../../useAfterSaved'
 import { useId, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import { fieldSource, type BriefChange, type BriefField, type TrackRow } from '../../../core/music'
 import type { MusicListSummary } from '../../../core/music'
@@ -170,7 +171,7 @@ function FieldRow({
     setProblem(null)
   }
   // Set the moment the field is left: a press that left it comes before any render.
-  const saving = useRef<Promise<boolean> | null>(null)
+  const saving = useLatestSave()
   const send = (change: BriefChange) => {
     const sent = save
       .mutateAsync(change, {
@@ -184,11 +185,7 @@ function FieldRow({
         (result) => result.ok,
         () => false,
       )
-    saving.current = sent
-    void sent.then(() => {
-      if (saving.current === sent) saving.current = null
-    })
-    return sent
+    return saving.track(sent)
   }
   const leave = () => {
     if (draft === null) return null
@@ -204,7 +201,7 @@ function FieldRow({
     setProblem(null)
     return send(parsed.change)
   }
-  useImperativeHandle(saveNow, () => () => saving.current ?? leave())
+  useImperativeHandle(saveNow, () => () => saving.current() ?? leave())
   const change = (value: string) => {
     onEdit()
     setProblem(null)

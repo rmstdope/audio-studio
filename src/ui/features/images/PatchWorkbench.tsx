@@ -1,3 +1,4 @@
+import { useAfterSaved } from '../../useAfterSaved'
 import { useJobOpen } from './ImageJobTabs'
 import {
   useEffect,
@@ -222,7 +223,7 @@ export function PatchWorkbench({
   const [count, setCount] = useState(2)
   const [asking, setAsking] = useState(false)
   const [pendingFocus, setPendingFocus] = useState<number | 'heading' | null>(null)
-  const [waitingForWords, setWaitingForWords] = useState(false)
+  const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   // Focus goes to Make once a stopped press has left it free again.
   const [landOnMake, setLandOnMake] = useState(false)
   const start = useRef<{ x: number; y: number } | null>(null)
@@ -640,14 +641,7 @@ export function PatchWorkbench({
               // goes to the take looked at in the grid, so ← and → keep stepping it.
               focusQuietly.current = true
               setPendingFocus(lookingAt ?? 'heading')
-              const saving = saveWords()
-              if (saving === null) return make.mutate({ count, area: marked, model })
-              // The takes are made from the saved words, so they must be the words in the field.
-              setWaitingForWords(true)
-              void saving.then((saved) => {
-                setWaitingForWords(false)
-                if (saved) make.mutate({ count, area: marked, model })
-              })
+              afterWordsSaved(() => make.mutate({ count, area: marked, model }))
             }}
           >
             {makeTakesText(count, hasTakes)}
