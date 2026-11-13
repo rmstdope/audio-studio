@@ -2341,7 +2341,9 @@ Images' and scenes' routes are described with them:
   "none yet" or "not chosen" about a file it could not read; an unreadable images lock reads
   "not known" on the act's list (amber, as music's and effects' are), the act's heading gives no count, and Make all offers nothing and says so (`ImagesMakeAllPlan` `lock-unread`).
   An image's own page does the same (as-su3y): the Make and Patches tab chips read "not known", the
-  "In the game" side is an amber block with an empty frame and no claim about a take, and the
+  "In the game" side is an amber block with an empty frame and no claim about a take (the frame as wide as the take
+  beside it, and the block's padding counted in the room the pictures are fitted to, so the hint is
+  never clipped by the workbench), and the
   Patches and Named areas tabs say which take is not known instead of asking for one to be chosen.
 - An invalid project file or resource opens the UI on an error page that names the file, the path
   in the JSON, and what is wrong (from zod), instead of failing on the command line.

@@ -16,6 +16,14 @@ describe('what a side of the stage holds besides its picture', () => {
     expect(heightBesides(picture, side, gap)).toBe(80)
   })
 
+  it('adds the padding and border of each box the picture sits inside', () => {
+    const picture = box(300)
+    const warn = box(0, box(18), picture)
+    const side = box(500, warn)
+    // 18 + 4 (sibling), and the 26 the box around them takes up besides its content
+    expect(heightBesides(picture, side, gap, (b) => (b === warn ? 26 : 0))).toBe(48)
+  })
+
   it('is the larger of the two sides’ when both show a picture', () => {
     const leftPic = box(100)
     const l = box(400, box(20), leftPic)
