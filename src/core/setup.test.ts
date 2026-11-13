@@ -1,6 +1,14 @@
 import { imageModel } from './imageModels'
 import { describe, expect, it } from 'bun:test'
-import { setupChecks, type ElevenAccount, type SetupFacts } from './setup'
+import {
+  effectModelsRow,
+  stableAudioRow,
+  setupChecks,
+  type EffectFamily,
+  type EffectFamilyModel,
+  type ElevenAccount,
+  type SetupFacts,
+} from './setup'
 
 const ready: SetupFacts = {
   ffmpeg: true,
@@ -1125,5 +1133,144 @@ describe('the Sound-effect models row', () => {
       `${opening} The project's sound-effects model, Stable Audio 3 Small SFX, is not on this computer. Stable Audio Open 1.0 is in place: an effect's takes can use it meanwhile.`,
     )
     expect(none({}).state).toBe('ok')
+  })
+})
+
+describe('the sound-effect models row for any number of models', () => {
+  const model = (id: string, name: string, repo: string, gigabytes: number): EffectFamilyModel => ({
+    id,
+    name,
+    short: name,
+    repo,
+    gigabytes,
+    source: { kind: 'hub' },
+  })
+  const family: EffectFamily = {
+    models: [
+      model('a', 'Alpha', 'org/alpha', 1),
+      model('b', 'Beta', 'org/beta', 2),
+      model('c', 'Gamma', 'org/gamma', 3),
+    ],
+  }
+  const whole = { download: 'whole' as const, failure: null }
+  const facts = (
+    main: string,
+    models: Record<string, SetupFacts['effects']['models']['open-1']>,
+  ) => ({
+    uv: true,
+    listed: true,
+    model: main,
+    models,
+  })
+
+  it('is ready with all three whole, naming each', () => {
+    const check = effectModelsRow(facts('a', { a: whole, b: whole, c: whole }), family)
+    expect(check).toMatchObject({
+      state: 'ok',
+      detail:
+        'Alpha, Beta and Gamma are fully downloaded on this computer; a model loads on its first effect.',
+    })
+  })
+
+  it('closes a sentence about one missing model with the two in place', () => {
+    const check = effectModelsRow(
+      facts('a', { a: { download: 'absent', failure: null }, b: whole, c: whole }),
+      family,
+    )
+    expect(check.detail).toBe(
+      "The project's sound-effects model, Alpha, is not on this computer. Beta and Gamma are in place: an effect's takes can use them meanwhile.",
+    )
+  })
+
+  it('says one sentence each when two are missing, and a step for each', () => {
+    const absent = { download: 'absent' as const, failure: null }
+    const check = effectModelsRow(facts('a', { a: whole, b: absent, c: absent }), family)
+    expect(check.detail).toBe('Beta is not on this computer. Gamma is not on this computer.')
+    expect(check.steps?.list[0]!.parts).toEqual([
+      "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+      { link: 'org/beta', href: 'https://huggingface.co/org/beta' },
+      ' and ',
+      { link: 'org/gamma', href: 'https://huggingface.co/org/gamma' },
+      '.',
+    ])
+    expect(check.steps?.list.map((s) => s.parts[0])).toEqual([
+      "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+      'Make a read token at ',
+      'Download Beta, once (about 2 GB):',
+      'Download Gamma, once (about 3 GB):',
+    ])
+  })
+
+  it('lists three models when none can run', () => {
+    const absent = { download: 'absent' as const, failure: null }
+    const check = effectModelsRow(facts('a', { a: absent, b: absent, c: absent }), family)
+    expect(check.detail).toBe(
+      "Sound effects can't be made: Alpha, Beta and Gamma are not on this computer.",
+    )
+  })
+})
+
+describe('the Stable Audio row for any number of models', () => {
+  const models = [
+    { id: 'a', name: 'Alpha', folders: ['alpha'] },
+    { id: 'b', name: 'Beta', folders: ['beta'] },
+    { id: 'c', name: 'Gamma', folders: ['gamma'] },
+  ]
+  const row = (missing: string[], model = 'a') =>
+    stableAudioRow({ model, stableAudioMissing: missing }, models)
+
+  it('names all three when they are in place', () => {
+    expect(row([])).toMatchObject({
+      state: 'ok',
+      detail: 'Alpha, Beta and Gamma are in place; they load on the first take.',
+    })
+  })
+
+  it('says which of three are in place and which are missing', () => {
+    expect(row(['b', 'c']).detail).toBe(
+      'Alpha is in place; Beta and Gamma are missing from ~/.cache/stable-audio.',
+    )
+    expect(row(['c']).detail).toBe(
+      'Alpha and Beta are in place; Gamma is missing from ~/.cache/stable-audio.',
+    )
+  })
+
+  it('downloads all three from one licence step and one token step', () => {
+    const steps = row(['a', 'b', 'c'], 'c').steps!.list
+    expect(steps).toHaveLength(3)
+    expect(steps[0]!.parts.filter((p) => typeof p === 'object')).toHaveLength(3)
+    expect(steps[2]!.parts[0]).toBe(
+      'Download all of them into ~/.cache/stable-audio, where the studio looks for them:',
+    )
+    expect(steps[2]!.commands).toHaveLength(3)
+  })
+})
+
+describe('the sound-effect models row for one model', () => {
+  it('says nothing is in place when its only model failed', () => {
+    const only: EffectFamily = {
+      models: [
+        {
+          id: 'a',
+          name: 'Alpha',
+          short: 'Alpha',
+          repo: 'o/a',
+          gigabytes: 1,
+          source: { kind: 'hub' },
+        },
+      ],
+    }
+    const check = effectModelsRow(
+      {
+        uv: true,
+        listed: true,
+        model: 'a',
+        models: { a: { download: 'whole', failure: { error: 'x', effect: null } } },
+      },
+      only,
+    )
+    expect(check.failures![0]!.sentence).toBe(
+      "The last effect with Alpha, the project's sound-effects model, failed.",
+    )
   })
 })
