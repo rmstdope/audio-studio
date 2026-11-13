@@ -368,6 +368,28 @@ describe('createEffectTakes', () => {
     expect(held.calls).toEqual(['clear small-sfx'])
   })
 
+  it('names the take’s file, not the model, when its WAV cannot be written, and leaves the model’s health as it was', async () => {
+    const { root, file, takes, calls, settled } = setup()
+    const folder = join(root, 'content-studio/cache/effect-takes/coins')
+    mkdirSync(folder, { recursive: true })
+    chmodSync(folder, 0o555)
+    const quietLog = console.error
+    console.error = () => {}
+    try {
+      await takes.make(file, 'coins', { count: 1 })
+      const view = await settled('coins')
+      expect(view.failed).toHaveLength(1)
+      expect(view.failed[0]!.message).toMatch(
+        /^content-studio\/cache\/effect-takes\/coins\/[^/]+\.1\.wav could not be written\.$/,
+      )
+    } finally {
+      console.error = quietLog
+      chmodSync(folder, 0o755)
+    }
+    await new Promise((r) => setTimeout(r, 40))
+    expect(calls).toEqual([])
+  })
+
   it('names the board file when the take numbers cannot be reserved, and makes nothing', async () => {
     const { root, file, takes, requests, settled } = setup()
     await takes.make(file, 'coins', { count: 1 })
