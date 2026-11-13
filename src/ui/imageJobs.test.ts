@@ -25,7 +25,13 @@ function row(over: {
   } as unknown as ImageRow
 }
 
-const quiet = { makingTakes: false, newFineTunes: 0, makingFineTunes: false, makingPatches: false }
+const quiet = {
+  makingTakes: false,
+  newFineTunes: 0,
+  makingFineTunes: false,
+  makingPatches: false,
+  lockUnread: false,
+}
 
 describe('imageJobTabs', () => {
   it('lists only Make and Fine-tune when the game asks for no patches or areas', () => {
@@ -119,6 +125,7 @@ describe('imageJobTabs', () => {
       newFineTunes: 0,
       makingFineTunes: true,
       makingPatches: true,
+      lockUnread: false,
     })
     expect(tabs.map((t) => t.making)).toEqual([true, true, true])
   })

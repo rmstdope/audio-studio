@@ -402,6 +402,29 @@ describe('an image’s page', () => {
     )
   })
 
+  it('says not known on Make and Patches when only the patches view finds the lock unread', () => {
+    const lamp = { id: 'lamp-lit', title: 'Lamp lit', description: 'Light the lamp' }
+    const made = summary().images!.acts[0]!.rows[0]!.madeFrom
+    const shown = summary({ chosen: { inn: made }, gameTake: 1, patches: [lamp] })
+    const page = render(route, shown, {}, null, false, { lockUnread: false }, (client) =>
+      client.setQueryData(['image-patches', 'inn'], {
+        ok: true,
+        take: null,
+        game: { width: 320, height: 200 },
+        lookError: null,
+        lookKey: null,
+        lockUnread: true,
+        pictureGone: false,
+        maker: { ok: true },
+        models: { 'qwen-edit': 'whole', klein: 'whole' },
+        patches: [],
+        remake: { earlier: {}, press: null, failedModels: [] },
+      }),
+    )
+    expect(page.querySelector('#job-tab-make .chip')?.textContent).toBe('not known')
+    expect(page.querySelector('#job-tab-patches .chip')?.textContent).toBe('not known')
+  })
+
   it('steps to the other image of the act by its buttons only, and the arrow keys leave it alone', () => {
     window.location.hash = '#/start'
     const page = render(route)
