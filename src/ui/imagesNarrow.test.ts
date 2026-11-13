@@ -161,26 +161,25 @@ describe('fitting a picture to the window (as-5wln)', () => {
   it('gives the pages a frame as tall as the window below where it starts, the stage row taking what the rest leaves', () => {
     const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
     const block = wide.slice(0, wide.indexOf('\n}\n'))
-    expect(block).toMatch(/\.patch-bench,\s*\.fine-job\s*\{[^}]*var\(--fill-height, 320px\)/)
+    expect(block).toMatch(/\.patch-bench,\s*\.fine-job\s*\{[^}]*var\(--fill-height, 0px\)/)
     // `auto` as the least, not 0: a tall strip makes the page scroll instead of crushing the stage.
     expect(block).toMatch(/grid-template-rows:\s*minmax\(auto, 1fr\) auto/)
     expect(block).not.toMatch(/\.(patch-bench-left|fine-stage)\s*\{[^}]*min-height:\s*0/)
     expect(block).toMatch(/\.named-areas-body\s*\{[^}]*var\(--fill-height, 360px\)/)
   })
 
-  it('lets the Patches and Fine-tune frames shrink to the room an ordinary desktop window leaves (as-3xtn)', () => {
+  it('lets the Patches and Fine-tune frames shrink to the window, and grow only to what their rows hold (as-3xtn)', () => {
     const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
     const block = wide.slice(0, wide.indexOf('\n}\n'))
-    const frame = block.match(
-      /\.patch-bench,\s*\.fine-job\s*\{[^}]*height:\s*max\((\d+)px, var\(--fill-height, (\d+)px\)\)/,
-    )
-    expect(frame).not.toBeNull()
-    // A 1280 × 763 window leaves the Patches frame 413 px below where it starts (lantern-hall, no
-    // patch takes); a floor above that makes the page scroll past the window while the picture
-    // could still shrink. The stage row's own minimum (the picture's 160 px track, its two lines
-    // and the empty takes strip) keeps the page from crushing below about 320 px.
-    expect(Number(frame![1])).toBeLessThanOrEqual(413)
-    expect(frame![2]).toBe(frame![1])
+    const frame = rule('.patch-bench,\n  .fine-job', block)
+    // The window's room is the least the frame is, never a fixed height with a pixel floor: a
+    // 480 px floor kept the frame past a 763 px window's 413 px with the picture still able to
+    // shrink, and a fixed height lets a tall takes strip draw past the panel.
+    expect(frame).toMatch(/min-height:\s*var\(--fill-height, 0px\);/)
+    expect(frame).not.toMatch(/(^|[\s;])height:/)
+    // The tools take no room of their own, so the row is what the picture's track and the strip
+    // leave, and they scroll inside it.
+    expect(rule('.patch-bench-right,\n  .fine-tools', block)).toMatch(/contain:\s*size/)
   })
 
   it('caps a picture by half the window when nothing is fitted', () => {
