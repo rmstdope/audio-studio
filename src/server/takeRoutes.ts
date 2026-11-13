@@ -37,7 +37,7 @@ export type TakeRoutesMedium<Make, Fades> = {
 }
 
 /** The answer for a result that may refuse: 404 for nothing, 409 for a refusal, else 200. */
-export function resultResponse(result: Answer): Response {
+function resultResponse(result: Answer): Response {
   if (!result) return notFound()
   return Response.json(result, {
     status: result.ok === false || result.ok === undefined ? 409 : 200,

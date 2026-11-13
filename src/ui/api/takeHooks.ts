@@ -77,6 +77,27 @@ export type TakeMedium = {
   makingKey: string
 }
 
+/** Sends one take action to the track or effect at `base`; a status not tolerated is an error. */
+export async function sendTake<V, R>(base: string, action: TakeAction<V>, value: V): Promise<R> {
+  const { method, path, body } = action.request(value)
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok && !action.tolerated.includes(response.status)) {
+    throw new Error(`${action.what} answered ${response.status}`)
+  }
+  return (await response.json()) as R
+}
+
+/** The queries a take action makes stale: the project, the track or effect's takes, what is being made. */
+export const takeQueryKeys = (medium: TakeMedium, id: string): unknown[][] => [
+  ['project'],
+  [medium.takesKey, id],
+  [medium.makingKey],
+]
+
 /**
  * One change to a track or effect's takes, then its takes, the project (whose pages show the
  * status) and what is being made are read again, so a block never shows the old state.
@@ -87,26 +108,12 @@ export function useTakeAction<V, R>(
   action: (actions: ReturnType<typeof takeActions>) => TakeAction<V>,
 ) {
   const client = useQueryClient()
-  const base = medium.base(id)
-  const { what, request, tolerated } = action(takeActions())
+  const chosen = action(takeActions())
   return useMutation({
-    mutationFn: async (value: V) => {
-      const { method, path, body } = request(value)
-      const response = await fetch(`${base}${path}`, {
-        method,
-        headers: { 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      })
-      if (!response.ok && !tolerated.includes(response.status)) {
-        throw new Error(`${what} answered ${response.status}`)
-      }
-      return (await response.json()) as R
-    },
+    mutationFn: (value: V) => sendTake<V, R>(medium.base(id), chosen, value),
     onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['project'] }),
-        client.invalidateQueries({ queryKey: [medium.takesKey, id] }),
-        client.invalidateQueries({ queryKey: [medium.makingKey] }),
-      ]),
+      Promise.all(
+        takeQueryKeys(medium, id).map((queryKey) => client.invalidateQueries({ queryKey })),
+      ),
   })
 }

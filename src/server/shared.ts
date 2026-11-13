@@ -287,9 +287,20 @@ export const languageOf = (request: Request) =>
 /** The answer for a path or thing that is not there. */
 export const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
 
-/** A file served as it is, or the answer for one that is not there. */
-export const fileResponse = (file: string | null) =>
-  file ? new Response(Bun.file(file)) : notFound()
+/**
+ * A GET route that serves the file its own `find` names, as it is, or answers 404 for none. Each
+ * route passes its finder, so no two routes share a line.
+ */
+export const fileRoute = (
+  guard: (
+    handler: (request: RouteRequest) => Response | Promise<Response>,
+  ) => (request: RouteRequest) => Response | Promise<Response>,
+  find: (request: RouteRequest) => Promise<string | null>,
+) =>
+  guard(async (request) => {
+    const file = await find(request)
+    return file ? new Response(Bun.file(file)) : notFound()
+  })
 
 /** The answer for a request the studio refuses to serve. */
 export const forbidden = (error: string) => Response.json({ error }, { status: 403 })

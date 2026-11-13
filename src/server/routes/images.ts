@@ -15,7 +15,7 @@ import { ActStyleBody, CompareBody, StyleFieldBody, WordsBody } from '../../core
 import { figuresOf } from '../../core/takeTimes'
 import { readTakeTimes } from '../../services/takeTimes'
 import type { RouteContext } from '../context'
-import { AreaBoxBody, imageAnswer, fileResponse, notFound } from '../shared'
+import { AreaBoxBody, imageAnswer, fileRoute, notFound } from '../shared'
 
 /** The images routes. */
 export function imagesRoutes(c: RouteContext) {
@@ -169,10 +169,9 @@ export function imagesRoutes(c: RouteContext) {
       }),
     },
     '/api/images/:id/patches/:patch/takes/:n': {
-      GET: guard(async (request) => {
+      GET: fileRoute(guard, async (request) => {
         const { id, patch, n } = request.params
-        const file = await imagePatches.takeFile(projectFile, id, patch, n)
-        return fileResponse(file)
+        return imagePatches.takeFile(projectFile, id, patch, n)
       }),
       DELETE: fromOwnPage(async (request) => {
         const { id, patch, n } = request.params
@@ -180,10 +179,9 @@ export function imagesRoutes(c: RouteContext) {
       }),
     },
     '/api/images/:id/patches/:patch/takes/:n/game': {
-      GET: guard(async (request) => {
+      GET: fileRoute(guard, async (request) => {
         const { id, patch, n } = request.params
-        const file = await imagePatches.gameFile(projectFile, id, patch, n)
-        return fileResponse(file)
+        return imagePatches.gameFile(projectFile, id, patch, n)
       }),
     },
     '/api/images/:id/patches/:patch/takes/:n/seen': {
@@ -253,10 +251,9 @@ export function imagesRoutes(c: RouteContext) {
       }),
     },
     '/api/images/:id/fine-tunes/:n': {
-      GET: guard(async (request) => {
+      GET: fileRoute(guard, async (request) => {
         const { id, n } = request.params
-        const file = await imageFineTunes.file(projectFile, id, n)
-        return fileResponse(file)
+        return imageFineTunes.file(projectFile, id, n)
       }),
       DELETE: fromOwnPage(async (request) => {
         const { id, n } = request.params
@@ -283,9 +280,8 @@ export function imagesRoutes(c: RouteContext) {
       }),
     },
     '/api/images/:id/takes/:n': {
-      GET: guard(async (request) => {
-        const file = await imageTakes.takeFile(projectFile, request.params.id, request.params.n)
-        return fileResponse(file)
+      GET: fileRoute(guard, async (request) => {
+        return imageTakes.takeFile(projectFile, request.params.id, request.params.n)
       }),
       DELETE: fromOwnPage(async (request) =>
         imageAnswer(
@@ -294,9 +290,8 @@ export function imagesRoutes(c: RouteContext) {
       ),
     },
     '/api/images/:id/takes/:n/game': {
-      GET: guard(async (request) => {
-        const file = await imageTakes.gameFile(projectFile, request.params.id, request.params.n)
-        return fileResponse(file)
+      GET: fileRoute(guard, async (request) => {
+        return imageTakes.gameFile(projectFile, request.params.id, request.params.n)
       }),
     },
     '/api/images/:id/takes/:n/seen': {
@@ -330,9 +325,8 @@ export function imagesRoutes(c: RouteContext) {
       }),
     },
     '/api/images/:id/current': {
-      GET: guard(async (request) => {
-        const file = await imageTakes.currentFile(projectFile, request.params.id)
-        return fileResponse(file)
+      GET: fileRoute(guard, async (request) => {
+        return imageTakes.currentFile(projectFile, request.params.id)
       }),
     },
     '/api/image-style': {

@@ -13,7 +13,7 @@ import { removeOrphan } from '../../services/musicOrphans'
 import { musicClipFile, musicCurrentFile } from '../../services/workspace'
 import type { RouteContext } from '../context'
 import { takeRoutes } from '../takeRoutes'
-import { StageModelBody, fileResponse, notFound } from '../shared'
+import { StageModelBody, fileRoute, notFound } from '../shared'
 
 /** The music routes. */
 export function musicRoutes(c: RouteContext) {
@@ -80,15 +80,13 @@ export function musicRoutes(c: RouteContext) {
       }),
     },
     '/api/music/clips/:file': {
-      GET: guard(async (request) => {
-        const file = await musicClipFile(projectFile, request.params.file)
-        return fileResponse(file)
+      GET: fileRoute(guard, async (request) => {
+        return musicClipFile(projectFile, request.params.file)
       }),
     },
     '/api/music/tracks/:id/current': {
-      GET: guard(async (request) => {
-        const file = await musicCurrentFile(projectFile, request.params.id)
-        return fileResponse(file)
+      GET: fileRoute(guard, async (request) => {
+        return musicCurrentFile(projectFile, request.params.id)
       }),
     },
     '/api/music/model-state': {

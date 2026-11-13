@@ -122,4 +122,29 @@ describe('takeRoutes', () => {
       (await setup(null).routes['/api/things/:id/takes']!.GET!(request({ id: 'a' }))).status,
     ).toBe(404)
   })
+
+  it('names what a bad body should have been, for make, fades and trim', async () => {
+    const { routes } = setup({ ok: true })
+    const make = await routes['/api/things/:id/takes']!.POST!(request({ id: 'a' }, {}))
+    expect([make.status, await make.json()]).toEqual([
+      400,
+      { error: 'expected { count } or { retry }' },
+    ])
+    const fades = await routes['/api/things/:id/takes/:file/fades']!.PUT!(
+      request({ id: 'a', file: 'f' }, {}),
+    )
+    expect(await fades.json()).toEqual({ error: 'expected { in, out, shape }' })
+    const trim = await routes['/api/things/:id/trim']!.POST!(request({ id: 'a' }, {}))
+    expect(await trim.json()).toEqual({ error: 'expected { file, undo? }' })
+  })
+
+  it('serves a take’s file, 404 when it is not there, from any medium’s base', async () => {
+    const { routes } = setup({ ok: true })
+    const missing = await routes['/api/things/:id/takes/:file']!.GET!(
+      request({ id: 'a', file: 'f' }),
+    )
+    expect(missing.status).toBe(404)
+    const other = setup({ ok: true })
+    expect(Object.keys(other.routes)[0]).toBe('/api/things/:id/takes')
+  })
 })

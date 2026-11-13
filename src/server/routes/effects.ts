@@ -10,7 +10,7 @@ import { MakeAllBody } from '../../core/effectsMakeAll'
 import { effectClipFile, effectCurrentFile } from '../../services/workspace'
 import type { RouteContext } from '../context'
 import { takeRoutes } from '../takeRoutes'
-import { EffectDescriptionBody, effectAnswer, fileResponse, notFound } from '../shared'
+import { EffectDescriptionBody, effectAnswer, fileRoute, notFound } from '../shared'
 
 /** The effects routes. */
 export function effectsRoutes(c: RouteContext) {
@@ -49,15 +49,13 @@ export function effectsRoutes(c: RouteContext) {
       POST: fromOwnPage(async () => Response.json(await effectTakes.stopAll(projectFile))),
     },
     '/api/effects/clips/:file': {
-      GET: guard(async (request) => {
-        const file = await effectClipFile(projectFile, request.params.file)
-        return fileResponse(file)
+      GET: fileRoute(guard, async (request) => {
+        return effectClipFile(projectFile, request.params.file)
       }),
     },
     '/api/effects/:id/current': {
-      GET: guard(async (request) => {
-        const file = await effectCurrentFile(projectFile, request.params.id)
-        return fileResponse(file)
+      GET: fileRoute(guard, async (request) => {
+        return effectCurrentFile(projectFile, request.params.id)
       }),
     },
     ...takeRoutes(c, {
