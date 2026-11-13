@@ -16,6 +16,7 @@ import { figuresOf } from '../../core/takeTimes'
 import { readTakeTimes } from '../../services/takeTimes'
 import type { RouteContext } from '../context'
 import { makeAllRoutes } from '../makeAllRoutes'
+import { takeListRoutes } from '../takeRoutes'
 import { AreaBoxBody, imageAnswer, fileRoute, notFound } from '../shared'
 
 /** The images routes. */
@@ -256,19 +257,11 @@ export function imagesRoutes(c: RouteContext) {
         return imageAnswer(await imageFineTunes.markSeen(projectFile, id, Number(n)))
       }),
     },
-    '/api/images/:id/takes': {
-      GET: guard(async (request) => {
-        const view = await imageTakes.view(projectFile, request.params.id)
-        return view ? Response.json(view) : notFound()
-      }),
-      POST: fromOwnPage(async (request) => {
-        const body = MakeImageTakesBody.safeParse(await request.json().catch(() => null))
-        if (!body.success) {
-          return Response.json({ error: 'expected { count } or { retry }' }, { status: 400 })
-        }
-        return imageAnswer(await imageTakes.make(projectFile, request.params.id, body.data))
-      }),
-    },
+    ...takeListRoutes(c, {
+      base: '/api/images',
+      service: imageTakes,
+      bodies: { make: MakeImageTakesBody },
+    }),
     '/api/images/:id/takes/:n': {
       GET: fileRoute(guard, async (request) => {
         return imageTakes.takeFile(projectFile, request.params.id, request.params.n)
@@ -296,22 +289,6 @@ export function imagesRoutes(c: RouteContext) {
         const body = ChooseImageTakeBody.safeParse(await request.json().catch(() => null))
         if (!body.success) return Response.json({ error: 'expected { n }' }, { status: 400 })
         return imageAnswer(await imageTakes.choose(projectFile, request.params.id, body.data.n))
-      }),
-    },
-    '/api/images/:id/accept': {
-      POST: fromOwnPage(async (request) =>
-        imageAnswer(await imageTakes.accept(projectFile, request.params.id)),
-      ),
-    },
-    '/api/images/:id/unchoose': {
-      POST: fromOwnPage(async (request) =>
-        imageAnswer(await imageTakes.unchoose(projectFile, request.params.id)),
-      ),
-    },
-    '/api/images/:id/stop': {
-      POST: fromOwnPage(async (request) => {
-        const result = await imageTakes.stop(projectFile, request.params.id)
-        return result ? Response.json(result) : notFound()
       }),
     },
     '/api/images/:id/current': {
