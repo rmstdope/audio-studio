@@ -45,6 +45,7 @@ import {
   BRINGING_WHY,
   fitZoom,
   IMAGES_LOCK_WHY,
+  IMAGE_TAKE_UNKNOWN,
   imageMakeWhy,
   imageMenuWhy,
   makeTakesText,
@@ -118,7 +119,7 @@ function EmptyFrame({
 }) {
   return (
     <div className="image-take-empty" style={{ aspectRatio: `${width} / ${height}` }}>
-      <b>{title}</b>
+      {title && <b>{title}</b>}
       {hint && <span className="faint small">{hint}</span>}
     </div>
   )
@@ -926,6 +927,17 @@ function LeftSide({
       In the game
     </span>
   )
+  // The lock cannot be read: nothing is claimed about which take the game shows.
+  if (lockUnread) {
+    return (
+      <div className="image-side-unknown" data-unknown="true">
+        <div className="take-row">{label}</div>
+        <b>The images lock could not be read</b>
+        <EmptyFrame title="" {...size} />
+        <span className="faint small">{IMAGE_TAKE_UNKNOWN}</span>
+      </div>
+    )
+  }
   if (chosen) {
     return (
       <>

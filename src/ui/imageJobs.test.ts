@@ -15,8 +15,10 @@ function row(over: {
   chosenTake?: number | null
   patches?: { id: string; chosenOn: number[] }[]
   areas?: { id: string; placed: boolean }[]
+  status?: string
 }): ImageRow {
   return {
+    status: over.status ?? 'none yet',
     chosenTake: over.chosenTake ?? null,
     patches: over.patches ?? [],
     areas: over.areas ?? [],
@@ -48,6 +50,22 @@ describe('imageJobTabs', () => {
       tone: 'ok',
     })
     expect(imageJobTabs({ row: row({}), ...quiet })[0]!.chip?.text).toBe('No take chosen')
+  })
+
+  it('says not known on Make and Patches, and leaves the others, while the lock cannot be read', () => {
+    const tabs = imageJobTabs({
+      row: row({
+        status: 'unknown',
+        patches: [{ id: 'p', chosenOn: [] }],
+        areas: [{ id: 'a', placed: true }],
+      }),
+      ...quiet,
+    })
+    const warn = { text: 'not known', tone: 'warn' as const }
+    expect(tabs[0]!.chip).toEqual(warn)
+    expect(tabs[1]!.chip).toBeNull()
+    expect(tabs[2]!.chip).toEqual(warn)
+    expect(tabs[3]!.chip).toEqual({ text: '1 of 1', tone: 'ok' })
   })
 
   it('counts the unseen fine-tunes, and has no chip without any', () => {

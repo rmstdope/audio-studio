@@ -540,6 +540,12 @@ describe('imageMenuWhy and imageMakeWhy', () => {
 })
 
 describe('areaRowWhy', () => {
+  it('says which take is not known while the lock cannot be read', () => {
+    expect(areaRowWhy('unknown')).toBe(
+      'Which take the game shows is not known until the images lock can be read; fix it, then reload.',
+    )
+  })
+
   it('says what keeps a named area from being picked, nothing when the picture is ready', () => {
     expect(areaRowWhy('ready')).toBeNull()
     expect(areaRowWhy('loading')).toBe('The picture is still loading. Pick an area when it has.')

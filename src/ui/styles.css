@@ -4370,6 +4370,20 @@ textarea[aria-disabled='true'][data-why] {
   image-rendering: pixelated;
   object-fit: contain;
 }
+/* The In the game side while the images lock cannot be read: the warning tone, as music's */
+.image-side-unknown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+}
+.image-side-unknown .lbl {
+  color: var(--warn);
+}
 .image-take-empty {
   width: 100%;
   display: flex;

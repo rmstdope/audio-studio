@@ -293,6 +293,18 @@ describe('the named areas panel', () => {
       expect(host.querySelector('.named-areas-head')!.textContent).toContain('0 of 1 placed')
     })
 
+    it('says which take is not known while the lock cannot be read, on the panel and the rows', async () => {
+      const line =
+        'Which take the game shows is not known until the images lock can be read; fix it, then reload.'
+      const { host } = await render([area('a')], {
+        answer: view({ take: null, lockUnread: true }),
+      })
+      expect(host.querySelector('.named-area-empty')!.textContent).toBe(line)
+      expect(mainOf(host, 0).getAttribute('data-why')).toBe(line)
+      expect(isOff(mainOf(host, 0))).toBe(true)
+      expect(host.querySelector('.named-area-switches')).toBeNull()
+    })
+
     it('says the picture is missing, and keeps the boxes already placed in the list', async () => {
       const box = { x: 10, y: 10, width: 20, height: 20 }
       const { host } = await render([placedAt('a', box)], {

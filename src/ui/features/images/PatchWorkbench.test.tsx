@@ -225,6 +225,17 @@ describe('an open patch with nothing to patch on', () => {
     expect(button(host, 'Make 2 takes')).toBeUndefined()
   })
 
+  it('says which take is not known, not to choose one, while the lock cannot be read', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a')], { take: null, lockUnread: true }),
+    )
+    await open(host)
+    expect(text(host)).toContain(
+      'Which take the game shows is not known until the images lock can be read; fix it, then reload.',
+    )
+    expect(text(host)).not.toContain('Choose a take of the image first')
+  })
+
   it('says the picture is missing', async () => {
     const { host } = await render([patchRow('a')], () =>
       view([work('a')], { take: null, pictureGone: true }),

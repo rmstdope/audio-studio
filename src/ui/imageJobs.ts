@@ -1,4 +1,5 @@
 import type { ImageRow, PatchRow } from '../core/images'
+import { IMAGE_STATUS_LABEL } from './imagesText'
 
 /** The jobs of an image's page, one tab each. */
 export type ImageJob = 'make' | 'fine-tune' | 'patches' | 'areas'
@@ -23,12 +24,16 @@ export interface JobTabsInput {
 /** The tabs an image's page shows, in order; a job the game does not ask for has none. */
 export function imageJobTabs(input: JobTabsInput): JobTab[] {
   const { row } = input
+  // The lock cannot be read: which take the game shows is not known, so Make and Patches say so.
+  const unknown = row.status === 'unknown'
+  const notKnown = { text: IMAGE_STATUS_LABEL.unknown, tone: 'warn' } as const
   const tabs: JobTab[] = [
     {
       job: 'make',
       title: 'Make',
-      chip:
-        row.chosenTake === null
+      chip: unknown
+        ? notKnown
+        : row.chosenTake === null
           ? { text: 'No take chosen', tone: 'warn' }
           : { text: `Take ${row.chosenTake} chosen`, tone: 'ok' },
       making: input.makingTakes,
@@ -45,10 +50,12 @@ export function imageJobTabs(input: JobTabsInput): JobTab[] {
     tabs.push({
       job: 'patches',
       title: 'Patches',
-      chip: {
-        text: `${chosen} of ${row.patches.length}`,
-        tone: chosen === row.patches.length ? 'ok' : 'warn',
-      },
+      chip: unknown
+        ? notKnown
+        : {
+            text: `${chosen} of ${row.patches.length}`,
+            tone: chosen === row.patches.length ? 'ok' : 'warn',
+          },
       making: input.makingPatches,
     })
   }
