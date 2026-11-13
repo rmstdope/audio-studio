@@ -612,7 +612,11 @@ export function useDropImageTake(imageId: string) {
 
 /** Stops the image's takes (the one being made and those waiting). */
 export function useStopImageTakes(imageId: string) {
-  return useTakeAction<void, NonNullable<ImageTakesAnswer>>(imageTakeMedium, imageId, (a) => a.stop)
+  return useTakeAction<void, { ok: true; stopped: number } | ProjectFailure>(
+    imageTakeMedium,
+    imageId,
+    (a) => a.stop,
+  )
 }
 
 /** Records that a take has been shown on the right once. */

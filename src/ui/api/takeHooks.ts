@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Fades } from '../../core/fades'
 
-/** One request to a medium's take routes: its path is relative to the track or effect's address. */
+/** One request to a medium's take routes: its path is relative to the address of the track, effect or image. */
 type TakeRequest = { method: string; path: string; body?: unknown }
 
 /** What one take action sends, what its failure says, and the statuses that still carry an answer. */
@@ -13,7 +13,7 @@ export type TakeAction<V> = {
 
 /**
  * The requests of the take actions every medium with takes has, written once. Paths are relative
- * to the address of one track or effect (`/api/effects/<id>`) and match `takeRoutes` on the server.
+ * to the address of one track, effect or image (`/api/effects/<id>`) and match `takeRoutes` and `takeListRoutes` on the server.
  */
 export function takeActions() {
   const post = (path: string, body?: unknown): TakeRequest => ({
@@ -69,9 +69,9 @@ export function takeActions() {
   } satisfies Record<string, TakeAction<never>>
 }
 
-/** Where a medium keeps its takes' queries: the takes of one track or effect, and what is being made. */
+/** Where a medium keeps its takes' queries: the takes of one track, effect or image, and what is being made. */
 export type TakeMedium = {
-  /** The address of one track or effect, given its id. */
+  /** The address of one track, effect or image, given its id. */
   base: (id: string) => string
   takesKey: string
   makingKey: string
@@ -79,7 +79,7 @@ export type TakeMedium = {
   alsoStale?: (id: string) => unknown[][]
 }
 
-/** Sends one take action to the track or effect at `base`; a status not tolerated is an error. */
+/** Sends one take action to the track, effect or image at `base`; a status not tolerated is an error. */
 export async function sendTake<V, R>(base: string, action: TakeAction<V>, value: V): Promise<R> {
   const { method, path, body } = action.request(value)
   const response = await fetch(`${base}${path}`, {
@@ -93,7 +93,7 @@ export async function sendTake<V, R>(base: string, action: TakeAction<V>, value:
   return (await response.json()) as R
 }
 
-/** The queries a take action makes stale: the project, the track or effect's takes, what is being made. */
+/** The queries a take action makes stale: the project, the track, effect or image's takes, what is being made. */
 export const takeQueryKeys = (medium: TakeMedium, id: string): unknown[][] => [
   ['project'],
   [medium.takesKey, id],
@@ -102,7 +102,7 @@ export const takeQueryKeys = (medium: TakeMedium, id: string): unknown[][] => [
 ]
 
 /**
- * One change to a track or effect's takes, then its takes, the project (whose pages show the
+ * One change to a track, effect or image's takes, then its takes, the project (whose pages show the
  * status) and what is being made are read again, so a block never shows the old state.
  */
 export function useTakeAction<V, R>(
