@@ -1498,7 +1498,10 @@ describe('the three parts of an open patch', () => {
     const stage = host.querySelector<HTMLElement>('.patch-stage')!
     expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(160 / 200))
     const widths = valuesInEveryWindow(stage, 'width')
-    expect(widths.at(-1)).toMatch(/: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
+    expect(widths[0]).toMatch(/^\.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
+    expect(widths.at(-1)).toMatch(
+      /^\.patch-bench-left \.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/,
+    )
   })
 
   it('ends a portrait picture’s take thumbnails in a 1400 × 757 window (as-jkm2)', async () => {
