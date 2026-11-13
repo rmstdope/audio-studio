@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagePatchesView, PatchWorkView } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
-import { valuesInEveryWindow } from '../../../../test/stylesheet'
+import { cssLength, valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -1498,7 +1498,27 @@ describe('the three parts of an open patch', () => {
     const stage = host.querySelector<HTMLElement>('.patch-stage')!
     expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(160 / 200))
     const widths = valuesInEveryWindow(stage, 'width')
-    expect(widths.at(-1)).toMatch(/^\.patch-stage: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
+    expect(widths.at(-1)).toMatch(/: min\(100%, .*vh.*var\(--picture-ratio, 1\)\)\)$/)
+  })
+
+  it('ends a portrait picture’s take thumbnails in a 1400 × 757 window (as-jkm2)', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
+        take: { n: 3, width: 160, height: 200, cropped: false },
+        game: { width: 160, height: 200 },
+      }),
+    )
+    const stage = host.querySelector<HTMLElement>('.patch-stage')!
+    const width = valuesInEveryWindow(stage, 'width')
+      .at(-1)!
+      .replace(/^[^:]+: /, '')
+    // Measured in Chrome 1400 px wide on the cellar door: the bench starts 243 px down the window;
+    // its left column is 28 px above the stage, the stage and 74 px of controls under it, its right
+    // column (the tools) 286 px; the strip starts 16 px under the taller of the two, and its
+    // thumbnails end 206 px into it.
+    const height = cssLength(width, { percent: 516, vh: 757, ratio: 160 / 200 }) / (160 / 200)
+    const thumbnailsEnd = 243 + Math.max(28 + height + 74, 286) + 16 + 206
+    expect(thumbnailsEnd).toBeLessThanOrEqual(757)
   })
 
   it('puts the stage on the left, the tools on the right headed by the patch’s title, and the takes below both', async () => {

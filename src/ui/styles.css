@@ -5914,6 +5914,11 @@ textarea[aria-disabled='true'][data-why] {
 .fine-stage .patch-stage {
   max-width: none;
 }
+/* On Patches the stage has the takes strip under it as well as its controls, so it leaves more of the
+   window to them, down to a stage 160 px tall (as-jkm2). */
+.patch-bench-left .patch-stage {
+  width: min(100%, calc(max(160px, 100vh - 580px) * var(--picture-ratio, 1)));
+}
 .fine-under {
   display: flex;
   flex-wrap: wrap;
