@@ -5,7 +5,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 GlobalRegistrator.register()
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { fieldOwnsKeys, typingIn, useDocumentKeys, usePendingFocus } =
+const { NOT_YET, fieldOwnsKeys, typingIn, useDocumentKeys, usePendingFocus } =
   await import('./useWorkbenchKeys')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -113,5 +113,24 @@ describe('usePendingFocus', () => {
     const page = await mount({ one: null, two: null })
     await act(async () => page.focusOn('one'))
     expect(document.activeElement).toBe(document.body)
+  })
+
+  it('gives up on a missing Map entry, and waits only for NOT_YET', async () => {
+    document.body.innerHTML = ''
+    const cards = new Map<number, HTMLButtonElement>()
+    const later = made('button') as HTMLButtonElement
+    const seen: { focusOn: ((want: number) => void) | null } = { focusOn: null }
+    const Page = ({ n }: { n: number }) => {
+      seen.focusOn = usePendingFocus<number>((want) => cards.get(want), n)
+      return null
+    }
+    const root = createRoot(document.createElement('div'))
+    await act(async () => root.render(createElement(Page, { n: 0 })))
+    await act(async () => seen.focusOn!(7))
+    cards.set(7, later)
+    await act(async () => root.render(createElement(Page, { n: 1 })))
+    expect(document.activeElement).toBe(document.body)
+    const waits = { current: NOT_YET as unknown }
+    expect(typeof waits.current).toBe('symbol')
   })
 })

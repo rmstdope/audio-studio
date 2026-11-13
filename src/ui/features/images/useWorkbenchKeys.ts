@@ -42,14 +42,17 @@ export function useDocumentKeys(active = true): MutableRefObject<(event: Keyboar
   return handler
 }
 
+/** What a resolver of {@link usePendingFocus} answers when the element is not drawn yet but may come. */
+export const NOT_YET = Symbol('not yet')
+
 /**
  * Focus asked for now and given once the change has settled: `focusOn(want)` names where, and after
- * the render `resolve` finds the element. It is tried once and given up on when the element is null;
- * an `undefined` answer waits for the page to show it (checked again after each render that changes
+ * the render `resolve` finds the element. It is tried once and given up on when the element is missing
+ * (null or undefined); a {@link NOT_YET} answer waits for the page to show it (checked again after each render that changes
  * `rerunOn`). A `quietly` focus does not scroll: a mouse press stays where it was.
  */
 export function usePendingFocus<Want>(
-  resolve: (want: Want) => HTMLElement | null | undefined,
+  resolve: (want: Want) => HTMLElement | null | undefined | typeof NOT_YET,
   rerunOn?: unknown,
 ): (want: Want, quietly?: boolean) => void {
   const [pending, setPending] = useState<{ want: Want } | null>(null)
@@ -57,7 +60,7 @@ export function usePendingFocus<Want>(
   useEffect(() => {
     if (pending === null) return
     const target = resolve(pending.want)
-    if (target === undefined) return
+    if (target === NOT_YET) return
     target?.focus(quietly.current ? { preventScroll: true } : undefined)
     quietly.current = false
     setPending(null)

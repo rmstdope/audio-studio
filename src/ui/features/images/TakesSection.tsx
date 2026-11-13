@@ -65,8 +65,6 @@ import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 import { scrollWithin } from '../../scrollWithin'
 
-/** The inputs that are pressed rather than typed into, which leave the page's keys to it. */
-
 /** How many takes the count menu starts on. */
 const STARTING_COUNT = 4
 
@@ -266,6 +264,8 @@ export function TakesSection({
     return () => observer.disconnect()
   }, [stage])
 
+  // While the takes load, no key does anything: the last render's handler must not outlive its takes.
+  keys.current = () => {}
   if (!view || !ready) {
     // The same shape as the workbench below, so the prompt is not made again (losing words being
     // written) when the takes come and go.

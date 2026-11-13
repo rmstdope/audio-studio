@@ -1,4 +1,4 @@
-import { fieldOwnsKeys, useDocumentKeys, usePendingFocus } from './useWorkbenchKeys'
+import { fieldOwnsKeys, NOT_YET, useDocumentKeys, usePendingFocus } from './useWorkbenchKeys'
 import { useJobOpen } from './ImageJobTabs'
 import {
   useEffect,
@@ -155,7 +155,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
           ? cards.current.get(want)
           : stops.current.get(want.stop)
     // A Stop that is not there yet waits for the page to show the next fine-tune being made.
-    return !target && typeof want === 'object' ? undefined : target
+    return !target && typeof want === 'object' ? NOT_YET : target
   }, query.data)
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
