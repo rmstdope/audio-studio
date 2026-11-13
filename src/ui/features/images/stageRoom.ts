@@ -42,3 +42,24 @@ export function stageChrome<B extends Box>(
   )
   return found.length === 0 ? null : Math.max(...found)
 }
+
+/**
+ * What the sides of the stage hold across besides their pictures: the padding and border across
+ * (`inset`) of each box a picture sits inside, the side itself included, the larger of the sides',
+ * or nothing when no side shows a picture. A side's picture is fitted to its column less this.
+ */
+export function stageAcross<B extends Box>(
+  sides: { side: B; picture: B | null }[],
+  inset: (box: B) => number,
+): number {
+  let most = 0
+  for (const { side, picture } of sides) {
+    if (!picture) continue
+    let total = 0
+    for (let at = picture; at !== side && at.parentElement; at = at.parentElement as B) {
+      total += inset(at.parentElement as B)
+    }
+    most = Math.max(most, total)
+  }
+  return most
+}

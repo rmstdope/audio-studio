@@ -66,7 +66,7 @@ import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 import { scrollWithin } from '../../scrollWithin'
 import { useFillWindow } from '../../fillWindow'
-import { stageChrome } from './stageRoom'
+import { stageAcross, stageChrome } from './stageRoom'
 
 /** How many takes the count menu starts on. */
 const STARTING_COUNT = 4
@@ -281,18 +281,15 @@ export function TakesSection({
       )
       // A side may hold its picture in a box of its own (the images-lock warning): its padding and
       // border across are room the picture does not have.
-      const across = Math.max(
-        0,
-        ...Array.from(stage.querySelectorAll<HTMLElement>('.image-side-unknown')).map((box) => {
-          const style = getComputedStyle(box)
-          return (
-            px(style.paddingLeft) +
-            px(style.paddingRight) +
-            px(style.borderLeftWidth) +
-            px(style.borderRightWidth)
-          )
-        }),
-      )
+      const across = stageAcross(sides, (box) => {
+        const style = getComputedStyle(box)
+        return (
+          px(style.paddingLeft) +
+          px(style.paddingRight) +
+          px(style.borderLeftWidth) +
+          px(style.borderRightWidth)
+        )
+      })
       setAvailable((now) => {
         const next = {
           width: stage.clientWidth,
