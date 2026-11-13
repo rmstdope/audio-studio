@@ -43,7 +43,7 @@ import {
 } from '../core/musicTrim'
 import { readWav, writeWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
-import { readResource, writeAtomic } from './files'
+import { readResource, refusalAnswer, refusalSentence, writeAtomic, writeOrRefuse } from './files'
 import { gpuQueue, holdGpu, GPU } from './gpu'
 import type { MusicGenerator } from './music'
 import {
@@ -420,7 +420,7 @@ export function createMusicTakes({
       // Nothing changed (a drop of a take that is not there): nothing is written.
       if (after !== before) {
         try {
-          await writeAtomic(found.root, found.board, `${after}\n`)
+          await writeOrRefuse(found.root, found.board, `${after}\n`)
         } catch (error) {
           await undo?.()
           throw error
@@ -656,7 +656,12 @@ export function createMusicTakes({
           const first = Math.max(board.next, ...[...entries.values()].map((entry) => entry.n + 1))
           board.next = first + request.count
           return first
-        })
+        }).catch(
+          refusalAnswer(
+            'reserving the take numbers failed',
+            (reason) => `No takes were made: ${reason}.`,
+          ),
+        )
         if (typeof reserved !== 'number') return reserved
         for (let i = 0; i < request.count; i++) {
           const entry: Entry = {
@@ -825,6 +830,11 @@ export function createMusicTakes({
           board.takes = board.takes.filter((t) => t !== take)
           return { dropped: take }
         },
+      ).catch(
+        refusalAnswer(
+          'dropping the take failed',
+          (reason) => `The take could not be dropped: ${reason}.`,
+        ),
       )
       if (!outcome || !('dropped' in outcome)) return outcome
       await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(outcome.dropped)}`), {
@@ -901,16 +911,17 @@ export function createMusicTakes({
             console.error('putting the game’s file back failed', error)
           }),
       ).catch((error): DropResult => {
-        // Kept in the server log: the person is told the plain reason, not the stack.
+        const sentence = refusalSentence(error)
+        if (sentence === null) throw error
+        // Kept in the server log: the person is told which file, not the stack.
         console.error('saving the fades failed', error)
         return stuck
           ? {
               ok: false,
-              message:
-                'The take board could not be written, and the game’s file could not be put back.',
+              message: `${sentence}, and the game’s file could not be put back.`,
               gameChanged: true,
             }
-          : { ok: false, message: 'The take board could not be written.' }
+          : { ok: false, message: `${sentence}.` }
       })
     },
 
@@ -1007,7 +1018,7 @@ export function createMusicTakes({
         }
         board.takes = board.takes.map((t) => (t === take ? next : t))
         return { ok: true }
-      })
+      }).catch(refusalAnswer('saving the trim failed', (sentence) => `${sentence}.`))
     },
 
     async trimmedSound(projectFile, id, name) {

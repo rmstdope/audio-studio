@@ -1587,13 +1587,31 @@ describe('fading a stinger take', () => {
     try {
       expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({
         ok: false,
-        message: 'The take board could not be written.',
+        message: expect.stringMatching(
+          /^content-studio\/cache\/music\/\S+\.json could not be written\.$/,
+        ),
       })
     } finally {
       console.error = quiet
       chmodSync(folder, 0o755)
     }
     expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
+  it('names the board when dropping a take cannot save it', async () => {
+    const made = await stinger()
+    const folder = join(made.root, 'content-studio/cache/music')
+    const board = /^The take could not be dropped: content-studio\/cache\/music\/\S+\.json could not be written\.$/
+    const quiet = console.error
+    console.error = () => {}
+    chmodSync(folder, 0o555)
+    try {
+      const dropped = await made.takes.drop(made.file, 'victory', made.name).catch((e) => e)
+      expect(dropped).toMatchObject({ ok: false, message: expect.stringMatching(board) })
+    } finally {
+      console.error = quiet
+      chmodSync(folder, 0o755)
+    }
   })
 
   it('says why when the board cannot be written for the chosen take, the lock untouched', async () => {
@@ -1607,7 +1625,9 @@ describe('fading a stinger take', () => {
     try {
       expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({
         ok: false,
-        message: 'The take board could not be written.',
+        message: expect.stringMatching(
+          /^content-studio\/cache\/music\/\S+\.json could not be written\.$/,
+        ),
       })
     } finally {
       console.error = quiet

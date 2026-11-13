@@ -111,6 +111,54 @@ export async function writeAtomic(
 }
 
 /**
+ * A file the studio could not write, with its path in the project and the reason a user can act
+ * on. The one refusal for a failed write: raised by `writeOrRefuse`, worded by `refusalSentence`.
+ */
+export class WriteRefused extends Error {
+  constructor(
+    /** The file's path in the project. */
+    readonly file: string,
+    /** Why, as `writeFailure` words it ("permission denied"). */
+    readonly reason: string,
+    cause: unknown,
+  ) {
+    super(`${file} could not be written`, { cause })
+  }
+}
+
+/** `writeAtomic`, but a failed write is a `WriteRefused` naming `path`. */
+export async function writeOrRefuse(
+  root: string,
+  path: string,
+  text: string | Uint8Array,
+): Promise<void> {
+  try {
+    await writeAtomic(root, path, text)
+  } catch (error) {
+    throw new WriteRefused(path, writeFailure(error), error)
+  }
+}
+
+/**
+ * A `.catch` handler turning a refused write into a failed answer worded by `say` (given the one
+ * sentence, "<file> could not be written"), the error kept with its stack in the server log under
+ * `what`; any other error goes on.
+ */
+export function refusalAnswer(what: string, say: (sentence: string) => string) {
+  return (error: unknown): { ok: false; message: string } => {
+    const sentence = refusalSentence(error)
+    if (sentence === null) throw error
+    console.error(what, error)
+    return { ok: false, message: say(sentence) }
+  }
+}
+
+/** The one sentence for a refused write ("<file> could not be written"); null for any other error. */
+export function refusalSentence(error: unknown): string | null {
+  return error instanceof WriteRefused ? error.message : null
+}
+
+/**
  * A JSON object written one entry per line, keys sorted: `{\n "a": {...},\n "b": {...}\n}\n`.
  * Small diffs when entries change, and still valid JSON.
  */
