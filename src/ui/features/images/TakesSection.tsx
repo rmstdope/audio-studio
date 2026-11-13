@@ -211,7 +211,7 @@ export function TakesSection({
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
   const fill = useFillWindow()
   const measureStage = useRef<(() => void) | null>(null)
-  const [available, setAvailable] = useState({ width: 0, height: 0, gap: 0 })
+  const [available, setAvailable] = useState({ width: 0, height: 0, gap: 0, across: 0 })
   const asked = useRef(new Set<number>())
   const chooseButton = useRef<HTMLButtonElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
@@ -279,15 +279,33 @@ export function TakesSection({
           )
         },
       )
+      // A side may hold its picture in a box of its own (the images-lock warning): its padding and
+      // border across are room the picture does not have.
+      const across = Math.max(
+        0,
+        ...Array.from(stage.querySelectorAll<HTMLElement>('.image-side-unknown')).map((box) => {
+          const style = getComputedStyle(box)
+          return (
+            px(style.paddingLeft) +
+            px(style.paddingRight) +
+            px(style.borderLeftWidth) +
+            px(style.borderRightWidth)
+          )
+        }),
+      )
       setAvailable((now) => {
         const next = {
           width: stage.clientWidth,
+          across,
           // Not stacked, and the room not known (no picture on either side yet): none, as stacked.
           height: stacked || chrome === null ? 0 : Math.max(0, stage.clientHeight - chrome),
           gap: parseFloat(getComputedStyle(stage).columnGap) || 0,
         }
         // The same room again is no change, or the sides, which a change reflows, would ask again.
-        return next.width === now.width && next.height === now.height && next.gap === now.gap
+        return next.width === now.width &&
+          next.height === now.height &&
+          next.gap === now.gap &&
+          next.across === now.across
           ? now
           : next
       })
@@ -366,6 +384,7 @@ export function TakesSection({
     available.gap,
     row.width,
     row.height,
+    available.across,
   )
   const set = (update: (v: ImageTakesView) => ImageTakesView) =>
     client.setQueryData<ImageTakesView>(['image-takes', id], (v) =>

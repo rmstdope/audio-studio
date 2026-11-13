@@ -4371,23 +4371,16 @@ textarea[aria-disabled='true'][data-why] {
   image-rendering: pixelated;
   object-fit: contain;
 }
-/* The In the game side while the images lock cannot be read: the warning tone, as music's. The tone
-   is painted outside the column (::before) so the frame keeps the picture's width and the two sides
-   stay level; only its vertical padding takes room, which the stage's fit counts. */
+/* The In the game side while the images lock cannot be read: the warning tone, as music's, painted
+   inside its column so it keeps the stage's gap from the take beside it and the panel's padding from
+   the panel's border. Its padding and border take room, which the stage's fit counts across and
+   down, so the frame keeps the picture's size and the two sides stay level. */
 .image-side-unknown {
-  position: relative;
-  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  padding: 12px 0;
-}
-.image-side-unknown::before {
-  content: '';
-  position: absolute;
-  inset: 0 -12px;
-  z-index: -1;
+  padding: 12px;
   border-radius: 12px;
   background: var(--warn-bg);
   border: 1px solid var(--warn);

@@ -2343,8 +2343,9 @@ Images' and scenes' routes are described with them:
   "not known" on the act's list (amber, as music's and effects' are), the act's heading gives no count, and Make all offers nothing and says so (`ImagesMakeAllPlan` `lock-unread`).
   An image's own page does the same (as-su3y): the Make and Patches tab chips read "not known", the
   "In the game" side is an amber block with an empty frame and no claim about a take (the frame as wide as the take
-  beside it, and the block's padding counted in the room the pictures are fitted to, so the hint is
-  never clipped by the workbench), and the
+  beside it, and the block's padding counted in the room the pictures are fitted to, down and
+  across, so the hint is never clipped by the workbench and the block, painted inside its column,
+  keeps the stage's gap from the take beside it and the panel's padding from its border, as-t5h6), and the
   Patches and Named areas tabs say which take is not known instead of asking for one to be chosen.
   The Patches heading then gives only the count the game asks for ("Patches · 2", in its usual
   colour) and the chips over a wide picture have no dot (as-50ju).
