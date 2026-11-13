@@ -381,7 +381,8 @@ export function createEffectTakes({
         if (saved && 'ok' in saved) throw new BoardUnusable(saved.file)
       },
       async failed(error) {
-        // The model made the take; only its file or its board could not be saved, which is no news of the model.
+        // The model made the take; only its file or its board could not be saved, or its board could not be read
+        // once the WAV was, which is no news of the model.
         if (error instanceof WriteRefused || error instanceof BoardUnusable) {
           if (error instanceof WriteRefused) console.error('saving the take failed', error)
           await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
