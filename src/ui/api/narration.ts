@@ -1,0 +1,1837 @@
+import type { AuditionSession } from '../../core/audition'
+import type { FreedResult } from '../../services/elevenVoices'
+import {
+  keepPreviousData,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
+import { agreedBody, agreedOf, type Agreed } from '../agreed'
+import { DESIGN_PRICE } from '../../core/design'
+import type { Pronunciation } from '../../core/pronounce'
+import type { CueChange } from '../../services/cues'
+import type { ChangesResult } from '../../services/git'
+import type { CreditResult } from '../../services/fish'
+import { figuresOf, TIME_KEYS, type Figures } from '../../core/takeTimes'
+import type { RefreshResult } from '../../services/refresh'
+import { useCallback, useState } from 'react'
+import type { CharacterChange, CharacterVoiceResult } from '../../services/auditions'
+import type { GenerationPlan } from '../../core/generation'
+import type { ElevenTts, Problem } from '../../core/project'
+import type { SpendingAnswer } from '../../core/spending'
+import type { JobState } from '../../services/jobs'
+import type { HeardResult } from '../../services/heard'
+import type { AcceptResult, MeasureResult, RecordResult } from '../../services/narration'
+import type { RuledOutResult } from '../../services/ruledOut'
+import type { Take } from '../../core/retirement'
+import type { ElevenAnswer, FishTier } from '../../core/setup'
+import type { ModelsChange } from '../../services/models'
+import type { ModelsView } from '../../services/modelsView'
+import type { Busy, Stage } from '../../core/models'
+import type { SoundAlikeChange } from '../../services/soundAlike'
+import type { FishTierChange } from '../../services/fishTier'
+import type { TakeFadeChange } from '../../services/takeFade'
+import type { SetupResult } from '../../services/setup'
+import type { NoteChange } from '../../services/notes'
+import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../../services/lineTakes'
+import type { CastResult, SessionView } from '../../services/sessions'
+import type { CloneResult } from '../../services/cloneVoice'
+import type { DesignResult } from '../../services/designs'
+import type { TakeResult, TryResult } from '../../services/takes'
+import type { AuditionText } from '../../core/takes'
+import type { SittingView } from '../../core/sitting'
+import { takeCaches, waitingAfter } from '../sitting'
+import { providerOf, type VoiceProvider } from '../../core/voices'
+import { voiceTitleOf } from '../castLanguages'
+import {
+  isAbout,
+  takeAnswerState,
+  withAuditionTakes,
+  withBoardTake,
+  withTake,
+  withVoiceTake,
+} from '../takes'
+import type {
+  AdoptResult,
+  LoadResult,
+  PartProgress,
+  PartResult,
+  ProjectFailure,
+} from '../../services/workspace'
+
+import { getJson, postJson, useRefreshRun, useRemakeChange, useTakeTimes } from './core'
+
+/** A successful answer about a character's cast voice. */
+export type Voiced = Extract<NonNullable<CharacterVoiceResult>, { ok: true }>
+
+/** A session view with a phrase to record takes of. */
+type Viewed = Extract<SessionView, { ok: true }> & { audition: AuditionText }
+
+/** The project summary, or the problems with the project file. Refetched when the window regains focus. */
+export function useProject() {
+  return useQuery({ queryKey: ['project'], queryFn: () => getJson<LoadResult>('/api/project') })
+}
+
+/** How far each act's narration is in a language, as the server answers it. */
+export type NarrationProgress = { ok: true; parts: Record<string, PartProgress> } | ProjectFailure
+
+/**
+ * How far each act's narration is in `language` (the source language when left out), for the
+ * sidebar while it lists the acts: read again every few seconds, since recording and checking
+ * change it from the act's page.
+ */
+export function useNarrationProgress(language: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['narration-progress', language],
+    queryFn: () => getJson<NarrationProgress>(inLanguage('/api/narration/progress', language)),
+    refetchInterval: 5000,
+    enabled,
+  })
+}
+
+/**
+ * What git sees of the project's files, for the Changes page and its count in the sidebar: read
+ * again every few seconds, since recording, editing or a commit outside the studio changes it.
+ */
+export function useChanges() {
+  return useQuery({
+    queryKey: ['changes'],
+    queryFn: () => getJson<ChangesResult>('/api/changes'),
+    refetchInterval: 5000,
+  })
+}
+
+/**
+ * What paid recordings cost: read again every couple of seconds while one runs (its cost and
+ * lines are live), else every so often, since recordings end from other pages.
+ */
+export function useSpending() {
+  return useQuery({
+    queryKey: ['spending'],
+    queryFn: () => getJson<SpendingAnswer>('/api/spending'),
+    refetchInterval: (query) =>
+      query.state.data?.ok && query.state.data.rows.some((r) => r.state === 'running')
+        ? 2000
+        : 15_000,
+  })
+}
+
+/**
+ * The Fish account's remaining credit. It changes only when money is spent or added, so it is read
+ * again after recording and every five minutes, not on every return to the window.
+ */
+export function useCredit() {
+  return useQuery({
+    queryKey: ['credit'],
+    queryFn: () => getJson<CreditResult>('/api/credit'),
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+/** A part with the state of every line's clip. */
+export function usePart(partId: string, enabled = true, language?: string) {
+  return useQuery({ ...partQuery(partId, language), enabled })
+}
+
+/**
+ * What Whisper heard of a line's kept take, for comparing with its text. Asked again whenever it is
+ * shown, and after the part's lines are recorded, since a retake replaces it.
+ */
+export function useHeard(partId: string, key: string, language?: string) {
+  return useQuery({
+    queryKey: ['heard', partId, key, language],
+    queryFn: () =>
+      getJson<NonNullable<HeardResult>>(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/heard`,
+          language,
+        ),
+      ),
+  })
+}
+
+/** How a part is asked for and cached, the same for one part as for several. */
+function partQuery(partId: string, language?: string) {
+  return {
+    queryKey: language ? ['part', partId, language] : ['part', partId],
+    queryFn: () =>
+      getJson<NonNullable<PartResult>>(
+        `/api/parts/${encodeURIComponent(partId)}${language ? `?language=${encodeURIComponent(language)}` : ''}`,
+      ),
+  }
+}
+
+/** Several parts, as `usePart` loads each (sharing its cache), in the order given. */
+export function useParts(partIds: string[], language?: string) {
+  return useQueries({
+    queries: partIds.map((id) => partQuery(id, language)),
+  })
+}
+
+/** Saves the project's own words that sound the same, then reloads the project. */
+export function useSetSoundAlike(language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'sound-alike' },
+    mutationFn: async (change: { groups: string[][]; was: string[][] }) => {
+      const response = await fetch(inLanguage('/api/sound-alike', language), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(change),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the words that sound the same answered ${response.status}`)
+      }
+      return (await response.json()) as SoundAlikeChange
+    },
+    // Refused or not, the page shows the file's groups again: a refusal may mean they changed.
+    onSuccess: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/** Switches the takes' models from s1 to s2.1-pro in the project file, then reloads what shows them. */
+export function useSwitchModels() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async (takes: Take[]) => {
+      const response = await fetch('/api/models', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ takes }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`switching the models answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    // Refused or not, the page shows the file's models again; the parts and plans carry them too.
+    onSuccess: () => client.invalidateQueries(),
+  })
+}
+
+/** What the Models panel shows, and what is going on that stops the menus (null if nothing). */
+export type ModelsAnswer =
+  (Extract<ModelsView, { ok: true }> & { busy: Busy | null }) | ProjectFailure
+
+/**
+ * The models, the whole dialog and what the clips were made with, read afresh whenever the Setup
+ * page opens (a hand edit shows then), and every few seconds while something is recording.
+ */
+export function useModelsView() {
+  return useQuery({
+    queryKey: ['models'],
+    queryFn: () => getJson<ModelsAnswer>('/api/models'),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (query.state.data?.ok && query.state.data.busy ? 3000 : false),
+  })
+}
+
+/**
+ * Saves the model of a stage in the project file (`was` is the one the page showed), then reloads
+ * everything that shows models: the plans, the setup checks and the retirement banner.
+ */
+export function useSetStageModel() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async ({ stage, model, was }: { stage: Stage; model: string; was: string }) => {
+      const response = await fetch(`/api/models/${stage}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model, was }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the model answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    onSettled: () => client.invalidateQueries(),
+  })
+}
+
+/**
+ * Saves one stage's ElevenLabs model in the project file (`was` is the one the page showed), then
+ * reloads everything, as a Fish stage's save does.
+ */
+export function useSetElevenModel() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async ({ stage, model, was }: { stage: Stage; model: string; was: string }) => {
+      const response = await fetch(`/api/models/elevenlabs/${stage}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model, was }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the model answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    onSettled: () => client.invalidateQueries(),
+  })
+}
+
+/**
+ * Saves ElevenLabs' voice settings in the project file (`was` is what the page showed), then
+ * reloads everything, as a model's save does: every ElevenLabs line's state depends on them.
+ */
+export function useSetElevenTts() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async ({ tts, was }: { tts: ElevenTts; was: ElevenTts }) => {
+      const response = await fetch('/api/elevenlabs/tts', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tts, was }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the voice settings answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    onSettled: () => client.invalidateQueries(),
+  })
+}
+
+/**
+ * Has Whisper check a line's clip again with today's rules (no new audio), then reloads the part,
+ * its plan and what was heard.
+ */
+export function useCheckAgain(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) =>
+      postJson<MeasureResult>(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/check`,
+          language,
+        ),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['heard', partId] })
+      return client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Accepts a weak line's clip as it is, then reloads the part (the line is no longer weak). */
+export function useAccept(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) =>
+      postJson<AcceptResult>(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/accept`,
+          language,
+        ),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      return client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Adopts a part's untracked clips, then reloads the part. */
+export function useAdopt(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      postJson<NonNullable<AdoptResult>>(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/adopt`, language),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      return client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** `path` asking for `language` (the source language when none is named). */
+function inLanguage(path: string, language: string | undefined): string {
+  if (!language) return path
+  return `${path}${path.includes('?') ? '&' : '?'}language=${encodeURIComponent(language)}`
+}
+
+/**
+ * A character's cast voice as Fish knows it, its take and the audition phrase, for its page.
+ * Cached for a while: it asks Fish each time.
+ */
+export function useCharacterVoice(
+  characterId: string,
+  voiceId: string | null,
+  enabled = true,
+  language?: string,
+) {
+  return useQuery({
+    enabled,
+    // Keyed by the voice too: a voice cast since (in the file, or by an audition) is asked anew.
+    queryKey: ['voice', characterId, language ?? '', voiceId],
+    queryFn: () =>
+      getJson<NonNullable<CharacterVoiceResult>>(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/voice`, language),
+      ),
+    // An answer about another voice (the file changed between) is asked again at once.
+    staleTime: (query) => {
+      const data = query.state.data
+      return data?.ok && !isAbout(data, voiceId) ? 0 : 10 * 60 * 1000
+    },
+    refetchOnWindowFocus: false,
+  })
+}
+
+/**
+ * The names on Fish of the voices a character is cast with in other languages, by voice id. Each
+ * voice is asked for once, in the first language it is cast in, through the same cached answer
+ * as that language's own page; a voice Fish has not named yet is missing.
+ */
+export function useOtherVoiceTitles(
+  characterId: string,
+  voices: { id: string; language: string }[],
+  enabled = true,
+): Record<string, string | undefined> {
+  return useQueries({
+    queries: voices.map(({ id, language }) => ({
+      enabled,
+      queryKey: ['voice', characterId, language, id],
+      queryFn: () =>
+        getJson<NonNullable<CharacterVoiceResult>>(
+          inLanguage(`/api/characters/${encodeURIComponent(characterId)}/voice`, language),
+        ),
+      staleTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    })),
+    combine: (results) =>
+      Object.fromEntries(voices.map((v, i) => [v.id, voiceTitleOf(results[i]?.data, v.id)])),
+  })
+}
+
+/**
+ * Saves a character's audition keywords (the next audition searches with them). Saves for one
+ * character run one after another, so a quick second edit is never overtaken by the first.
+ */
+export function useSetKeywords(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `keywords-${characterId}` },
+    mutationFn: async (keywords: string[]) => {
+      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ keywords }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the keywords answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    // Stay pending until the project (which holds the saved keywords) is reloaded, so the chips
+    // never fall back to the old list.
+    onSuccess: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/** Saves a character's own audition phrase (null for the standard one), then reloads its takes. */
+export function useSetPhrase(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `phrase-${characterId}-${language ?? ''}` },
+    mutationFn: async (phrase: string | null) => {
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}`, language),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ phrase }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the phrase answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    // Refresh the phrase and takes shown, without searching Fish's library again.
+    onSuccess: (saved) => (saved.ok ? refreshAudition(client, characterId) : undefined),
+  })
+}
+
+/**
+ * Reloads what shows a character's audition phrase after it or the style changed: the board and
+ * the cast voice, with their takes. Neither searches Fish's library.
+ */
+async function refreshAudition(client: QueryClient, characterId: string) {
+  await Promise.all([
+    client.invalidateQueries({ queryKey: ['session', characterId] }),
+    client.invalidateQueries({ queryKey: ['voice', characterId] }),
+  ])
+}
+
+/** Saves a character's style cue (empty to remove it); its lines and audition takes follow it. */
+export function useSetStyle(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `style-${characterId}` },
+    mutationFn: async (style: string) => {
+      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ style }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the style answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      // Lines without their own cue are said in the style: their statuses change everywhere. The
+      // editor closes once the style shown is the new one.
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['plan'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        refreshAudition(client, characterId),
+      ])
+    },
+  })
+}
+
+/** Saves a character's own speed (null: the project's), then reloads what it changes. */
+export function useSetSpeed(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `speed-${characterId}-${language ?? ''}` },
+    mutationFn: async (speed: number | null) => {
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}`, language),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ speed }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the speed answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      // Every line of the character is spoken at the speed: statuses change everywhere, and the
+      // audition takes are recorded anew.
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['plan'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        refreshAudition(client, characterId),
+      ])
+    },
+  })
+}
+
+/**
+ * Saves the whole pronunciation table; `was` is the table shown, so a page that is out of date is
+ * refused instead of overwriting someone's change. Every part's lines follow it.
+ */
+export function useSetPronunciations(language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'pronounce' },
+    mutationFn: async (change: { table: Pronunciation[]; was: Pronunciation[] }) => {
+      const response = await fetch(inLanguage('/api/pronounce', language), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(change),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the pronunciations answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    onSuccess: async (saved) => {
+      // Refused or not, the page shows the file's table again: a refusal may mean it changed.
+      if (saved.ok) {
+        void client.invalidateQueries({ queryKey: ['part'] })
+        void client.invalidateQueries({ queryKey: ['plan'] })
+        // The phrase as said changes, and so do the takes of it.
+        void client.invalidateQueries({ queryKey: ['session'] })
+        void client.invalidateQueries({ queryKey: ['voice'] })
+      }
+      // The panel shows the saved table once the project has it.
+      await client.invalidateQueries({ queryKey: ['project'] })
+    },
+  })
+}
+
+/**
+ * Refreshing a part's dialog (and its loops): see `useRefreshRun`. Afterwards everything read from
+ * the dialog is loaded again.
+ */
+export function useRefreshDialog(partId: string) {
+  return useRefreshRun<NonNullable<RefreshResult>>(
+    ['refresh', partId],
+    `/api/parts/${encodeURIComponent(partId)}/refresh`,
+    async (client) => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['changes'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['part', partId] }),
+      ])
+    },
+  )
+}
+
+/** The image time figures to draw with now: the saved ones, or guesses while they load or cannot be had. */
+export function useFigures(): Figures {
+  const { data } = useTakeTimes()
+  return data && TIME_KEYS.every((key) => data[key]) ? data : figuresOf({})
+}
+
+/** Stops the takes of the latest press that wait or are being made. */
+export function useStopRemake(imageId: string) {
+  return useRemakeChange(imageId, 'stop')
+}
+
+/** Forgets the latest press's summary. */
+export function useCloseRemake(imageId: string) {
+  return useRemakeChange(imageId, 'close')
+}
+
+/** Gives an orphaned cue to a line (`to`), or removes it (null), then reloads the part. */
+export function useMoveCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ key, to }: { key: string; to: string | null }) => {
+      const response = await fetch(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}/move`,
+          language,
+        ),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ to }),
+        },
+      )
+      if (response.status === 404) {
+        throw new Error(
+          'That cue or line is no longer in this part; the page shows it as it is now.',
+        )
+      }
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`moving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    // Moved or not (a 404 means the part changed), the page shows the part as it is now.
+    onSettled: async () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['changes'] })
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Gives an orphaned scene cue to the scene `to`, or removes it (null), then reloads the part. */
+export function useMoveSceneCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ from, to }: { from: string; to: string | null }) => {
+      const response = await fetch(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/scene-cues/move`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ from, to }),
+        },
+      )
+      if (response.status === 404) {
+        throw new Error(
+          'That cue or scene is no longer in this part; the page shows it as it is now.',
+        )
+      }
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`moving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    // Moved or not (a 404 means the part changed), the page shows the part as it is now.
+    onSettled: async () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['changes'] })
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Saves a scene's cue (empty to remove it), then reloads the part. */
+export function useSetSceneCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ scene, cue }: { scene: string; cue: string }) => {
+      const response = await fetch(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/scene-cues`, language),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ scene, cue }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the scene cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      // The editor closes once the cue shown is the new one.
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Saves the user's note on a line (empty to remove it), then reloads the part. */
+export function useSetNote(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ key, note }: { key: string; note: string }) => {
+      const response = await fetch(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/note`,
+          language,
+        ),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ note }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the note answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<NoteChange>
+    },
+    onSuccess: async (saved) => {
+      if (saved.ok) await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Saves a line's own cue (empty to go back to the character's style), then reloads the part. */
+export function useSetCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ key, cue }: { key: string; cue: string }) => {
+      const response = await fetch(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}`,
+          language,
+        ),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ cue }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      // The cell closes once the cue shown is the new one.
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/**
+ * Records audition takes: `record(voice, adding)` asks the server for the take and adds it to the
+ * board and the cast voice in the cache, without asking Fish for anything else. `board` says the
+ * takes are the audition board's (on the audition model, paid from the sitting); the cast voice's
+ * on its page are on the free model (ElevenLabs' audition model for an ElevenLabs voice, whose
+ * credits the Spending page then reads again); each goes only to its own cached answer
+ * (`takeCaches`). `recording` holds the voices in progress, `errors` what went wrong per voice,
+ * `waiting` the voices whose take waits for more money (`retryWaiting` asks for a provider's
+ * again, once its money was added). `adding` says a take would add a library voice to the user's
+ * voices: `mayHaveAdded` holds when each such take answered, as it may have used a voice slot.
+ */
+export function useTakes(characterId: string, board = false, language?: string) {
+  const client = useQueryClient()
+  const [recording, setRecording] = useState<Set<string>>(new Set())
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [waiting, setWaiting] = useState<Set<string>>(new Set())
+  // When a board take of a library voice not yet added answered: it may have used a voice slot.
+  const [mayHaveAdded, setMayHaveAdded] = useState<Map<string, number>>(new Map())
+
+  const record = useCallback(
+    async (voice: string, adding = false) => {
+      setRecording((now) => new Set(now).add(voice))
+      setErrors(({ [voice]: _gone, ...rest }) => rest)
+      try {
+        const response = await fetch(
+          inLanguage(`/api/characters/${encodeURIComponent(characterId)}/takes`, language),
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ voice, board }),
+          },
+        )
+        if (!response.ok && response.status !== 409) {
+          throw new Error(`recording answered ${response.status}`)
+        }
+        const result = (await response.json()) as NonNullable<TakeResult>
+        if (adding && !('reason' in result && result.reason === 'waits')) {
+          // Counted as a slot used until the account is read again, which it now is.
+          setMayHaveAdded((now) => new Map(now).set(voice, Date.now()))
+          void client.invalidateQueries({ queryKey: ['eleven-account'] })
+          void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+        }
+        if (result.ok) {
+          setWaiting((now) => waitingAfter(now, voice, 'recorded'))
+          const caches = takeCaches(board)
+          if (caches.voice) {
+            client.setQueriesData<NonNullable<CharacterVoiceResult>>(
+              { queryKey: ['voice', characterId, language ?? ''] },
+              (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
+            )
+          }
+          if (caches.session) {
+            client.setQueryData<SessionView>(['session', characterId, language ?? ''], (old) =>
+              old?.ok && old.audition
+                ? old.session
+                  ? withBoardTake(old as Viewed & { session: AuditionSession }, voice, result)
+                  : withTake<Viewed>(old as Viewed, voice, result)
+                : old,
+            )
+          }
+        } else if ('reason' in result && result.reason === 'waits') {
+          setWaiting((now) => waitingAfter(now, voice, 'waits'))
+        } else {
+          setWaiting((now) => waitingAfter(now, voice, 'failed'))
+          // A library voice may have been added before ElevenLabs failed: the board reads it again.
+          if (board) {
+            void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
+          }
+          const message = 'message' in result ? result.message : 'the project’s files need fixing'
+          setErrors((now) => ({ ...now, [voice]: message }))
+        }
+        // A paid take spent money: the meter reads it again.
+        if (board) void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+        // An ElevenLabs take spent credits: the Spending page and the sidebar read them again.
+        if (result.ok && result.credits !== undefined) {
+          void client.invalidateQueries({ queryKey: ['spending'] })
+          // It may have added a library voice, using a voice slot.
+          void client.invalidateQueries({ queryKey: ['eleven-account'] })
+          void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+        }
+      } catch (error) {
+        setErrors((now) => ({
+          ...now,
+          [voice]: error instanceof Error ? error.message : String(error),
+        }))
+      } finally {
+        setRecording((now) => {
+          const next = new Set(now)
+          next.delete(voice)
+          return next
+        })
+      }
+    },
+    [board, characterId, client, language],
+  )
+
+  const retryWaiting = useCallback(
+    (provider: VoiceProvider, adding: (voice: string) => boolean = () => false) => {
+      for (const voice of waiting) {
+        if (providerOf(voice) === provider) void record(voice, adding(voice))
+      }
+    },
+    [record, waiting],
+  )
+
+  return { record, recording, errors, waiting, retryWaiting, mayHaveAdded }
+}
+
+/** A character's audition in progress, with the phrase and the takes of the voices in it. */
+export function useSession(characterId: string, enabled = true, language?: string) {
+  return useQuery({
+    enabled,
+    queryKey: ['session', characterId, language ?? ''],
+    queryFn: () =>
+      getJson<SessionView>(
+        inLanguage(`/api/auditions/${encodeURIComponent(characterId)}`, language),
+      ),
+  })
+}
+
+/**
+ * Whether an audition is going on in each of `languages`, by language: null until known. The
+ * switch on a character's page shows it.
+ */
+export function useAuditionsGoingOn(
+  characterId: string,
+  languages: string[],
+  enabled = true,
+): Record<string, boolean | null> {
+  const answers = useQueries({
+    queries: languages.map((language) => ({
+      enabled,
+      queryKey: ['session', characterId, language],
+      queryFn: () =>
+        getJson<SessionView>(
+          inLanguage(`/api/auditions/${encodeURIComponent(characterId)}`, language),
+        ),
+    })),
+  })
+  return Object.fromEntries(
+    languages.map((language, i) => {
+      const data = answers[i]?.data
+      return [language, data?.ok ? data.session !== null : null]
+    }),
+  )
+}
+
+/** What a session action sends: the path after the session's (`start`, `move`, …), and a body. */
+export interface SessionAction {
+  action: 'start' | 'move' | 'undo' | 'more' | 'add' | 'discard'
+  body?: unknown
+}
+
+/**
+ * Changes a character's audition (start, shortlist, unlist or drop a voice, undo the last drop,
+ * more voices, add by id, stop) and shows the answer. Actions run one after another, in the order
+ * asked.
+ */
+export function useSessionAction(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `session-${characterId}-${language ?? ''}` },
+    mutationFn: async ({ action, body }: SessionAction) => {
+      const base = `/api/auditions/${encodeURIComponent(characterId)}`
+      const response = await fetch(
+        inLanguage(action === 'discard' ? base : `${base}/${action}`, language),
+        {
+          method: action === 'discard' ? 'DELETE' : 'POST',
+          headers: body === undefined ? {} : { 'content-type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the audition answered ${response.status}`)
+      }
+      return (await response.json()) as SessionView
+    },
+    onSuccess: (view, { action, body }) => {
+      if (!view.ok) return
+      // A drop rules a voice out, undoing it or adding a voice by id allows it again. A drop
+      // shows at once, before the list is read again.
+      const dropped = action === 'move' ? droppedBy(body) : null
+      if (dropped && view.session && dropped !== view.session.current) {
+        const title = view.session.voices[dropped]?.title ?? dropped
+        client.setQueryData<NonNullable<RuledOutResult>>(
+          ['ruled-out', characterId, language ?? ''],
+          (old) =>
+            old?.ok && !old.voices.some((v) => v.id === dropped)
+              ? {
+                  ...old,
+                  voices: [{ id: dropped, title, at: new Date().toISOString() }, ...old.voices],
+                }
+              : old,
+        )
+      }
+      void client.invalidateQueries({ queryKey: ['ruled-out', characterId, language ?? ''] })
+      // A voice dropped, brought back or cast may change which voices' slots can be freed.
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+      // Starting opens a sitting, stopping ends it.
+      if (action === 'start' || action === 'discard') {
+        void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+      }
+      // An answer without the recorded lines (after a move on the board) keeps the ones shown;
+      // takes recorded while the answer was on its way are kept too.
+      client.setQueryData<SessionView>(['session', characterId, language ?? ''], (old) => {
+        if (!old?.ok) return view
+        const recorded = view.recorded ?? old.recorded
+        if (!view.audition || !old.audition) return { ...view, recorded }
+        const { takes } = withAuditionTakes<Viewed>(old as Viewed, view.audition, view.takes)
+        return { ...view, takes, recorded }
+      })
+    },
+  })
+}
+
+/**
+ * Fetches the voices on the user's own Fish account into the character's audition (`fetch`, once
+ * per board and again for Try again). It has no scope of its own, so the board's buttons work
+ * while Fish answers. `fetched` is true once an answer came, `error` Fish's reason when it failed.
+ */
+export function useOwnVoices(characterId: string, language?: string) {
+  const client = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(
+        inLanguage(`/api/auditions/${encodeURIComponent(characterId)}/own`, language),
+        { method: 'POST' },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the audition answered ${response.status}`)
+      }
+      return (await response.json()) as SessionView
+    },
+    // Not the answer itself: moves made meanwhile may have been answered after it, so the
+    // board is read again, in the server's order.
+    onSuccess: (view) => {
+      if (view.ok)
+        void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
+    },
+  })
+  const failure = mutation.data && !mutation.data.ok ? mutation.data : null
+  const noKey = failure !== null && 'reason' in failure && failure.reason === 'no-key'
+  const error =
+    mutation.error?.message ??
+    (failure && !noKey
+      ? 'message' in failure
+        ? failure.message
+        : 'the project’s files need fixing'
+      : null)
+  return {
+    fetch: () => mutation.mutate(),
+    pending: mutation.isPending,
+    fetched: mutation.isSuccess && !failure,
+    /** True when there is no Fish key, which Try again cannot mend. */
+    noKey,
+    error,
+  }
+}
+
+/** The voice a move drops, if it is a drop. */
+function droppedBy(body: unknown): string | null {
+  const move = body as { voice?: unknown; move?: unknown } | undefined
+  return move?.move === 'drop' && typeof move.voice === 'string' ? move.voice : null
+}
+
+/**
+ * Casts a shortlisted voice, ending the audition. Afterwards the project, its parts (whose lines
+ * are now stale) and the character's cast voice are loaded again.
+ */
+export function useCast(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `session-${characterId}-${language ?? ''}` },
+    mutationFn: async (voice: string) => {
+      const response = await fetch(
+        inLanguage(`/api/auditions/${encodeURIComponent(characterId)}/cast`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ voice }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`casting answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CastResult>
+    },
+    onSuccess: (result) => {
+      if (!result.ok) return
+      const ended: SessionView = {
+        ok: true,
+        session: null,
+        audition: null,
+        takes: {},
+        recorded: [],
+      }
+      client.setQueryData<SessionView>(['session', characterId, language ?? ''], () => ended)
+      void client.invalidateQueries({ queryKey: ['project'] })
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['voice', characterId] })
+      void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+      // Casting may add a library voice (a slot used) and ends the audition (voices freed).
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+    },
+  })
+}
+
+/**
+ * Makes a private voice on the user's Fish account from the recordings and the name (the page has
+ * judged the files; the server checks again). The answer says what was made, or why not.
+ */
+export function useCloneVoice(characterId: string) {
+  return useMutation({
+    mutationFn: async ({ title, files }: { title: string; files: File[] }) => {
+      const form = new FormData()
+      form.set('title', title)
+      for (const file of files) form.append('voices', file, file.name)
+      const response = await fetch(
+        `/api/characters/${encodeURIComponent(characterId)}/clone-voice`,
+        {
+          method: 'POST',
+          body: form,
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`cloning answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CloneResult>
+    },
+  })
+}
+
+/** The description the character's design box starts with: the last one sent, null before any. */
+export function useDesigns(characterId: string, language?: string) {
+  return useQuery({
+    queryKey: ['designs', characterId, language ?? ''],
+    queryFn: () =>
+      getJson<
+        | {
+            ok: true
+            description: string | null
+            /** What a design with ElevenLabs would say (null: a text it writes) and cost. */
+            eleven: { text: string | null; credits: number } | null
+          }
+        | ProjectFailure
+      >(inLanguage(`/api/characters/${encodeURIComponent(characterId)}/designs`, language)),
+  })
+}
+
+/** A design to ask for: the description, and with ElevenLabs the credits the user confirmed. */
+export type DesignAsked =
+  | { description: string; provider: 'fish' }
+  | { description: string; provider: 'elevenlabs'; credits: number }
+
+/**
+ * Has Fish or ElevenLabs design voices from the description, once the user has confirmed the
+ * cost. The answer says what was made, or why not; the audition (the designs join it), the last
+ * description, Fish's credit and the ElevenLabs plan are read again after one that was made.
+ */
+export function useDesignVoices(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (asked: DesignAsked) => {
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/design`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(
+            asked.provider === 'fish'
+              ? { description: asked.description, spendUpTo: DESIGN_PRICE }
+              : {
+                  description: asked.description,
+                  provider: 'elevenlabs',
+                  creditsUpTo: asked.credits,
+                },
+          ),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`designing answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<DesignResult> | { ok: false; message: string }
+    },
+    onSettled: (result) => {
+      void client.invalidateQueries({ queryKey: ['designs', characterId, language ?? ''] })
+      if (!result?.ok) return
+      void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
+      void client.invalidateQueries({ queryKey: ['credit'] })
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['spending'] })
+    },
+  })
+}
+
+/** Has the voice say the character's audition phrase; the take's key, or why there is none. */
+export async function recordVoiceTake(
+  characterId: string,
+  voice: string,
+  language?: string,
+): Promise<NonNullable<TakeResult>> {
+  const response = await fetch(
+    inLanguage(`/api/characters/${encodeURIComponent(characterId)}/takes`, language),
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ voice }),
+    },
+  )
+  if (!response.ok && response.status !== 409)
+    throw new Error(`recording answered ${response.status}`)
+  return (await response.json()) as NonNullable<TakeResult>
+}
+
+/**
+ * Casts a voice no audition holds (one just made from recordings) for the character, ending an
+ * audition going on. Afterwards the project, its parts and the cast voice are loaded again.
+ */
+export function useCastOwnVoice(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `session-${characterId}-${language ?? ''}` },
+    mutationFn: async (voice: { id: string; name: string }) => {
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/cast-voice`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ voice: voice.id, name: voice.name }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`casting answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CastResult>
+    },
+    onSuccess: (result) => {
+      if (!result.ok) return
+      void client.invalidateQueries({ queryKey: ['session', characterId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['voice', characterId] })
+    },
+  })
+}
+
+/** The voices ruled out for a character (dropped in auditions), the latest first. */
+export function useRuledOut(characterId: string, language?: string) {
+  return useQuery({
+    queryKey: ['ruled-out', characterId, language ?? ''],
+    queryFn: async () => {
+      const path = inLanguage(
+        `/api/characters/${encodeURIComponent(characterId)}/ruled-out`,
+        language,
+      )
+      const response = await fetch(path)
+      if (!response.ok && response.status !== 409)
+        throw new Error(`${path} answered ${response.status}`)
+      return okRuledOut((await response.json()) as NonNullable<RuledOutResult>)
+    },
+  })
+}
+
+/** Ruled-out voices, or an error naming what is wrong with the project. */
+function okRuledOut(result: NonNullable<RuledOutResult>) {
+  if (!result.ok) throw new Error(result.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
+  return result
+}
+
+/**
+ * Allows ruled-out voices again: one by its id, or every one (null), forgetting them all. Later
+ * searches for the character may show them again.
+ */
+export function useAllowVoices(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `ruled-out-${characterId}-${language ?? ''}` },
+    mutationFn: async (voice: string | null) => {
+      const base = `/api/characters/${encodeURIComponent(characterId)}/ruled-out`
+      const path = inLanguage(
+        voice === null ? base : `${base}/${encodeURIComponent(voice)}`,
+        language,
+      )
+      const response = await fetch(path, { method: 'DELETE' })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`allowing voices again answered ${response.status}`)
+      }
+      return okRuledOut((await response.json()) as NonNullable<RuledOutResult>)
+    },
+    onSuccess: (result) => {
+      client.setQueryData(['ruled-out', characterId, language ?? ''], result)
+    },
+  })
+}
+
+/**
+ * Saves the cue at one gap inside a line (empty removes it), with the words the page showed so a
+ * line changed in the game is refused; then reloads the part.
+ */
+export function useSetInsideCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      key,
+      ...body
+    }: {
+      key: string
+      at: number
+      cue: string
+      text: string
+    }) => {
+      const response = await fetch(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}/inside`,
+          language,
+        ),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/**
+ * Hears a line with a cue before saving it: the server records the line as a take with the cue
+ * (empty: the character's style) and answers with the take to play, or why there is none.
+ */
+export function useTryCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ key, cue, at }: { key: string; cue: string; at?: number }) => {
+      const response = await fetch(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/try`,
+          language,
+        ),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(at === undefined ? { cue } : { cue, at }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`trying the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<TryResult>
+    },
+    // A try with an ElevenLabs voice spent credits: the Spending page and the sidebar read them again.
+    onSuccess: (result) => {
+      if (result.ok && result.credits !== undefined) {
+        void client.invalidateQueries({ queryKey: ['spending'] })
+      }
+    },
+  })
+}
+
+/**
+ * The setup checks: what the studio needs on this machine and in the project, each with a fix.
+ * Asked for once in a while (the sidebar shows the count on every page, and the check asks Fish),
+ * or afresh each time the Setup page opens (`fresh`): the user installs things meanwhile.
+ */
+export function useSetup(fresh = false) {
+  return useQuery({
+    queryKey: ['setup'],
+    queryFn: () => getJson<SetupResult>('/api/setup'),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: fresh ? 'always' : true,
+  })
+}
+
+/** Saves what the user has paid Fish in total (or clears it), then checks the setup again. */
+export function useSetFishTier() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'fish-tier' },
+    mutationFn: async (tier: FishTier | null) => {
+      const response = await fetch('/api/fish-tier', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the tier answered ${response.status}`)
+      }
+      const change = (await response.json()) as FishTierChange
+      if (!change.ok) throw new Error(change.problems.map((p) => p.message).join('; '))
+    },
+    // Saved or not, the row checks again, so it shows what the file holds.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['setup'] }),
+        client.invalidateQueries({ queryKey: ['project'] }),
+      ]),
+  })
+}
+
+/**
+ * Saves how long takes fade when played in the studio (seconds, 0 for none), then reads the
+ * project again, saved or not, so the page shows what the file holds.
+ */
+export function useSetTakeFade() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'take-fade' },
+    mutationFn: async (seconds: number) => {
+      const response = await fetch('/api/take-fade', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ seconds }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the fade answered ${response.status}`)
+      }
+      const change = (await response.json()) as TakeFadeChange
+      if (!change.ok) throw new Error(change.problems.map((p) => p.message).join('; '))
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/** A line's extra takes, newest first, each marked current or stale. */
+export function useLineTakes(partId: string, key: string, language?: string) {
+  return useQuery({
+    queryKey: ['line-takes', partId, key, language],
+    queryFn: () =>
+      getJson<NonNullable<LineTakesResult>>(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`,
+          language,
+        ),
+      ),
+  })
+}
+
+/** The URL of one of a line's extra takes (a WAV). */
+export function lineTakeUrl(partId: string, key: string, id: string, language?: string): string {
+  return inLanguage(
+    `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes/${id}.wav`,
+    language,
+  )
+}
+
+/**
+ * A line's extra takes: `take` records one more, `use` makes one the line's clip, `drop` removes
+ * one from the cache. Each reloads the list; using one reloads the part too. On a paid draft model
+ * `take` first answers with the most it can cost: `toConfirm` holds it until the user pays (`take`
+ * again with that amount) or `cancel`s; nothing about the ask outlives the list.
+ */
+export function useLineTakeActions(partId: string, key: string, language?: string) {
+  const client = useQueryClient()
+  const base = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`
+  const reloadTakes = () => client.invalidateQueries({ queryKey: ['line-takes', partId, key] })
+  // The last refusal, of either action, shown until the next action.
+  const [refused, setRefused] = useState<{
+    what: string
+    answer: NonNullable<TakeLineResult> | NonNullable<UseTakeResult>
+  } | null>(null)
+  const [toConfirm, setToConfirm] = useState<Agreed | null>(null)
+  const [refusal, setRefusal] = useState<string | null>(null)
+  const take = useMutation({
+    mutationFn: async (agreed?: Agreed) => {
+      const response = await fetch(inLanguage(base, language), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(agreed ? agreedBody(agreed) : {}),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`${base} answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<TakeLineResult>
+    },
+    onMutate: () => {
+      setRefused(null)
+      setRefusal(null)
+      setToConfirm(null)
+    },
+    onSuccess: (result) => {
+      const state = takeAnswerState(result)
+      setToConfirm(state.toConfirm)
+      setRefusal(state.refusal)
+      if (!result.ok && !state.toConfirm && !state.refusal) {
+        setRefused({ what: 'The take could not be made', answer: result })
+      }
+      void client.invalidateQueries({ queryKey: ['credit'] })
+      void client.invalidateQueries({ queryKey: ['spending'] })
+      return reloadTakes()
+    },
+  })
+  const use = useMutation({
+    mutationFn: (id: string) =>
+      postJson<NonNullable<UseTakeResult>>(inLanguage(`${base}/${id}/use`, language)),
+    onMutate: () => setRefused(null),
+    onSuccess: async (result) => {
+      if (!result.ok) setRefused({ what: 'The take could not be used', answer: result })
+      await reloadTakes()
+      if (result.ok) {
+        void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['changes'] })
+        await client.invalidateQueries({ queryKey: ['part', partId] })
+      }
+    },
+  })
+  const drop = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(inLanguage(`${base}/${id}`, language), { method: 'DELETE' })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`dropping the take answered ${response.status}`)
+      }
+      return (await response.json()) as { ok: boolean }
+    },
+    onSuccess: reloadTakes,
+  })
+  return { take, use, drop, refused, toConfirm, refusal, cancel: () => setToConfirm(null) }
+}
+
+/** The ElevenLabs plan's account, and the credits running recordings and auditions hold of it. */
+export interface ElevenAccountAnswer {
+  account: ElevenAnswer
+  held: number
+}
+
+/**
+ * The ElevenLabs plan and what is held of it, for the board's bar that asks for credits and its
+ * voice slots; asked only while `enabled`.
+ */
+export function useElevenAccount(enabled = true) {
+  return useQuery({
+    queryKey: ['eleven-account'],
+    queryFn: () => getJson<ElevenAccountAnswer>('/api/elevenlabs/account'),
+    enabled,
+  })
+}
+
+/** A voice the studio added from ElevenLabs' library that nothing uses, whose slot can be freed. */
+export interface FreeableVoice {
+  voice: string
+  name: string
+  /** The character whose audition added it. */
+  character: string
+}
+
+/** The voices whose slots can be freed, or why none is offered (what is in use cannot be read). */
+export type FreeableAnswer =
+  { ok: true; voices: FreeableVoice[] } | { ok: false; reason: 'unknown-use'; message: string }
+
+/** The voices the studio added that nothing uses, or why none is offered. */
+export function useFreeableVoices() {
+  return useQuery({
+    queryKey: ['eleven-freeable'],
+    queryFn: async () => {
+      const response = await fetch('/api/elevenlabs/voices/freeable')
+      // A 409 is an answer: what is in use cannot be read.
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the voices to free answered ${response.status}`)
+      }
+      return (await response.json()) as FreeableAnswer
+    },
+  })
+}
+
+/** What freeing voice slots did, or why the server removed nothing: what is in use cannot be read. */
+export type FreeAnswer = FreedResult | { ok: false; reason: 'unknown-use'; message: string }
+
+/**
+ * Removes voices the studio added from the user's ElevenLabs voices, freeing their slots; the
+ * account and the voices that can be freed are read again after.
+ */
+export function useFreeVoices() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (voices: string[]) => {
+      const response = await fetch('/api/elevenlabs/voices/free', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ voices }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`freeing voice slots answered ${response.status}`)
+      }
+      return (await response.json()) as FreeAnswer
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+    },
+  })
+}
+
+/** The money of a character's audition, or why it cannot be shown. */
+export type SittingAnswer =
+  ({ ok: true } & SittingView) | { ok: false; message?: string; problems?: Problem[] }
+
+/**
+ * The audition model, what a take costs and the sitting's money for a character. Read from the
+ * server alone (no Fish call), and again after every paid take and every change to the sitting.
+ */
+export function useSitting(characterId: string, enabled = true, language?: string) {
+  return useQuery({
+    queryKey: ['sitting', characterId, language ?? ''],
+    queryFn: () =>
+      getJson<SittingAnswer>(
+        inLanguage(`/api/auditions/${encodeURIComponent(characterId)}/sitting`, language),
+      ),
+    enabled,
+  })
+}
+
+/** What is given to a sitting: Fish's dollars or ElevenLabs' credits. */
+export type SittingGiven = { amount: number } | { credits: number }
+
+/**
+ * Changes a character's sitting: `resume` opens a fresh one with an amount, `add` tops the one
+ * going on up with dollars or credits (the first credits give it its ElevenLabs half), `end` ends
+ * it (Pause). Each answers with the sitting's money, or why it was refused.
+ */
+export function useSittingActions(characterId: string, language?: string) {
+  const client = useQueryClient()
+  const base = `/api/auditions/${encodeURIComponent(characterId)}/sitting`
+  const send = async (method: string, path: string, body?: SittingGiven) => {
+    const response = await fetch(path, {
+      method,
+      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    if (!response.ok && response.status !== 409) {
+      throw new Error(`the sitting answered ${response.status}`)
+    }
+    return (await response.json()) as SittingAnswer
+  }
+  const options = {
+    scope: { id: `sitting-${characterId}` },
+    onSuccess: (answer: SittingAnswer) => {
+      if (answer.ok)
+        client.setQueryData<SittingAnswer>(['sitting', characterId, language ?? ''], answer)
+    },
+  }
+  const resume = useMutation({
+    ...options,
+    mutationFn: (amount: number) => send('POST', inLanguage(base, language), { amount }),
+  })
+  const add = useMutation({
+    ...options,
+    mutationFn: (given: SittingGiven) => send('POST', inLanguage(`${base}/add`, language), given),
+  })
+  const end = useMutation({
+    ...options,
+    mutationFn: () => send('DELETE', inLanguage(base, language)),
+  })
+  return { resume, add, end }
+}
+
+/** The URL of a recorded audition take. */
+export function takeUrl(key: string): string {
+  return `/api/takes/${key}.mp3`
+}
+
+/**
+ * Records lines one by one from their rows. On a paid model the server first answers with the
+ * most the line can cost: `toConfirm` holds it per line until the user confirms (`record` again
+ * with that amount) or `cancel`s. `recording` holds the lines in progress, `errors` what went
+ * wrong per line.
+ */
+export function useRecordLines(partId: string, language?: string) {
+  const client = useQueryClient()
+  const [recording, setRecording] = useState<Set<string>>(new Set())
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [toConfirm, setToConfirm] = useState<Record<string, Agreed>>({})
+  const forget = (key: string) => setToConfirm(({ [key]: _gone, ...rest }) => rest)
+
+  const record = useCallback(
+    async (key: string, agreed?: Agreed, stage: 'draft' | 'final' = 'draft') => {
+      setRecording((now) => new Set(now).add(key))
+      setErrors(({ [key]: _gone, ...rest }) => rest)
+      forget(key)
+      try {
+        const path = inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/record`,
+          language,
+        )
+        const response = await fetch(path, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ stage, ...(agreed ? agreedBody(agreed) : {}) }),
+        })
+        if (!response.ok && response.status !== 409) {
+          throw new Error(`recording answered ${response.status}`)
+        }
+        const result = (await response.json()) as NonNullable<RecordResult> | SpendAnswer
+        const asked = !result.ok && 'reason' in result ? agreedOf(result) : null
+        if (asked) {
+          // Shown and sent rounded up (to the cent, or the credit), so the amount agreed covers it.
+          setToConfirm((now) => ({ ...now, [key]: asked }))
+        } else if (!result.ok) {
+          const message = 'message' in result ? result.message : 'the part’s files need fixing'
+          setErrors((now) => ({ ...now, [key]: message }))
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setErrors((now) => ({ ...now, [key]: message }))
+      } finally {
+        // The line stays "recording" until its new status is shown, so it is never offered twice.
+        void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['credit'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+        void client.invalidateQueries({ queryKey: ['heard', partId] })
+        await client.invalidateQueries({ queryKey: ['part', partId] })
+        setRecording((now) => {
+          const next = new Set(now)
+          next.delete(key)
+          return next
+        })
+      }
+    },
+    [partId, language, client],
+  )
+
+  return { record, recording, errors, toConfirm, cancel: forget }
+}
+
+/** The server asking to confirm a paid recording: the most it can cost, in dollars or credits. */
+export interface SpendAnswer {
+  ok: false
+  reason: 'confirm' | 'confirm-credits'
+  ceiling: number
+  message: string
+}
+
+/** What generating a part (or one speaker in it) would do, or why it cannot be planned. */
+export type PlanAnswer =
+  | {
+      ok: true
+      plan: GenerationPlan
+      parallel: number
+      /** The ElevenLabs account, when the plan has lines with ElevenLabs voices. */
+      elevenAccount?: ElevenAnswer
+      /** The credits running recordings and auditions hold, beside the account. */
+      elevenHeld?: number
+    }
+  | { ok: false; problems: Problem[] }
+  | ProjectFailure
+
+/** The generation plan for a part, or one speaker in it (null for all); weak lines retaken if asked. */
+export function usePlan(
+  partId: string,
+  speaker: string | null,
+  weak = false,
+  stage: 'draft' | 'final' = 'draft',
+  language?: string,
+) {
+  return useQuery({
+    queryKey: ['plan', partId, speaker, weak, stage, language],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (speaker) params.set('speaker', speaker)
+      if (weak) params.set('weak', '1')
+      if (stage === 'final') params.set('stage', 'final')
+      if (language) params.set('language', language)
+      const query = params.size ? `?${params}` : ''
+      return getJson<PlanAnswer>(`/api/parts/${encodeURIComponent(partId)}/plan${query}`)
+    },
+    // Ticking the retake box asks for another plan: keep showing the last one for the same scope
+    // meanwhile (its buttons wait), but never another speaker's or stage's.
+    placeholderData: (previous, query) =>
+      query?.queryKey[2] === speaker &&
+      query?.queryKey[4] === stage &&
+      query?.queryKey[5] === language
+        ? keepPreviousData(previous)
+        : undefined,
+  })
+}
+
+/**
+ * The part's latest generation job, polled every second while it runs. When it finishes, the
+ * part and its plans are loaded again.
+ */
+export function useJob(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useQuery({
+    queryKey: ['job', partId, language],
+    queryFn: async () => {
+      const job = await getJson<JobState | null>(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/jobs/latest`, language),
+      )
+      const before = client.getQueryData<JobState | null>(['job', partId, language])
+      // Keep the lines' statuses current while the job runs, and once more when it ends.
+      const running = job && (job.status === 'running' || job.status === 'cancelling')
+      if (job && (running || before?.status !== job.status)) {
+        void client.invalidateQueries({ queryKey: ['part', partId] })
+        void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['heard', partId] })
+      }
+      // A finished job may have spent credit.
+      if (job && !running && before?.status !== job.status) {
+        void client.invalidateQueries({ queryKey: ['credit'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+      }
+      return job
+    },
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === 'running' || status === 'cancelling' ? 1000 : false
+    },
+  })
+}
+
+/** Starts generating a part, or cancels the running job. */
+export function useJobActions(partId: string, language?: string) {
+  const client = useQueryClient()
+  const start = useMutation({
+    mutationFn: async (options: {
+      kind: JobState['kind']
+      stage?: 'draft' | 'final'
+      retakeWeak?: boolean
+      /** The most the user agreed to spend, for a paid model. */
+      confirmedCost?: number
+      /** The most ElevenLabs credits the user agreed to, for lines with ElevenLabs voices. */
+      confirmedCredits?: number
+      speaker: string | null
+      keys: string[]
+      orphans: string[]
+    }) => {
+      const response = await fetch(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/jobs`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(options),
+        },
+      )
+      const body = (await response.json()) as JobState | { error: string }
+      if ('error' in body) throw new Error(body.error)
+      if (!response.ok) throw new Error(`generating answered ${response.status}`)
+      return body
+    },
+    onSuccess: (job) => {
+      client.setQueryData(['job', partId, language], job)
+      // A paid job is on the Spending page from its first moment.
+      void client.invalidateQueries({ queryKey: ['spending'] })
+    },
+    // Refused (the cost changed, a promotion ended): the plan shows what to confirm now.
+    onError: () => client.invalidateQueries({ queryKey: ['plan', partId] }),
+  })
+  const cancel = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error(`cancelling answered ${response.status}`)
+      return (await response.json()) as JobState
+    },
+    onSuccess: (job) => client.setQueryData(['job', partId, language], job),
+  })
+  return { start, cancel }
+}
+
+/** The URL of a clip in a part. */
+export function clipUrl(partId: string, file: string, language?: string): string {
+  const query = language ? `?language=${encodeURIComponent(language)}` : ''
+  return `/api/parts/${encodeURIComponent(partId)}/clips/${encodeURIComponent(file)}${query}`
+}
