@@ -14,7 +14,7 @@ import {
 } from '../../../core/fades'
 import type { TakeView } from '../../../core/musicTake'
 import { cutShares, playedSeconds, takeSoundUrl } from './trimSilence'
-import { useTrackActions, type TrackActions } from './trackActions'
+import { useTrackActions, type TrackActions } from '../../trackActions'
 import { useSetFades } from '../../api'
 import { off } from '../../off'
 import type { useClipPlayer } from '../../components/useClipPlayer'

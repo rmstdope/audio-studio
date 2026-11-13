@@ -218,6 +218,24 @@ describe('takes made, none chosen', () => {
     expect(text()).toContain('nope')
   })
 
+  it('shows only the failure of the action pressed last', async () => {
+    let first = true
+    const refuseOnce = () => {
+      if (!first) return Response.json({ ok: true })
+      first = false
+      return Response.json({ ok: false, message: 'nope' }, { status: 409 })
+    }
+    const { text, click, buttons } = render(
+      row({ status: 'not-chosen' }),
+      view({ takes: [take(1), take(2, { trimmable: 'cut' })] }),
+      refuseOnce,
+    )
+    await click(buttons('Choose')[0]!)
+    expect(text()).toContain('The take could not be chosen.')
+    await click(buttons('Trim silence')[0]!)
+    expect(text()).not.toContain('The take could not be chosen.')
+  })
+
   it('names the file when dropping a take could not save its board', async () => {
     const message =
       'The take could not be dropped: content-studio/cache/effect-boards/chest-open.json could not be written.'

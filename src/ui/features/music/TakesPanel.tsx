@@ -69,7 +69,7 @@ import {
 } from './trimSilence'
 import type { SaveWordsNow } from '../images/WordsField'
 import { MoveTakeDialog } from './MoveTakeDialog'
-import { TrackActionsContext, useTrackActions, useTrackActionsState } from './trackActions'
+import { TrackActionsContext, useTrackActions, useTrackActionsState } from '../../trackActions'
 
 /**
  * A track's Takes panel: the takes made, played from the start and, for a loop, around their

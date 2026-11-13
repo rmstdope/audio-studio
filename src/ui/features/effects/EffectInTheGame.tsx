@@ -24,6 +24,7 @@ import { takePlayId, takeUrl } from '../../effectsPlay'
 import { Wave } from '../music/InTheGame'
 import { cutShares, wavePosition } from '../music/trimSilence'
 import { EffectFadesEditor } from './EffectFadesEditor'
+import { useTrackActions } from '../../trackActions'
 import { EffectTrimmedTag, useEffectTrimControl } from './effectTrim'
 
 /** One clip at a time, shared with the takes below. */
@@ -56,6 +57,7 @@ export function EffectInTheGame({
   const take = view.takes.find((t) => t.chosen)
   const unchoose = useUnchooseEffect(row.id)
   const choose = useChooseEffectTake(row.id)
+  const actions = useTrackActions()
   const trimControl = useEffectTrimControl({
     effect: row.id,
     take,
@@ -128,6 +130,7 @@ export function EffectInTheGame({
   const failed = unchoose.data && !unchoose.data.ok ? unchoose.data : null
   const failedLine =
     asked !== null &&
+    actions.shows('unchoose') &&
     (state.kind === 'take' || state.kind === 'unknown') &&
     (failed || unchoose.isError)
       ? unchooseFailure(
@@ -193,7 +196,9 @@ export function EffectInTheGame({
           chosen
           player={player}
           onClose={() => onFadesClosed(take.n)}
-          onSaved={trimControl.clear}
+          onSaved={() => {
+            if (!trimControl.pending) actions.press(`fades:${take?.n}`)
+          }}
         />
       ) : (
         take && (
@@ -240,6 +245,7 @@ export function EffectInTheGame({
             {...off(unchoose.isPending && EFFECTS_PENDING)}
             onClick={() => {
               unchoose.reset()
+              actions.press('unchoose')
               setAsked(state.take)
               setAsking(true)
             }}
@@ -251,13 +257,10 @@ export function EffectInTheGame({
               type="button"
               className="btn btn-primary btn-small"
               {...off(choose.isPending && EFFECTS_PENDING)}
-              onClick={() =>
-                choose.mutate(take.file, {
-                  onSuccess: (result) => {
-                    if (result.ok) trimControl.clear()
-                  },
-                })
-              }
+              onClick={() => {
+                actions.press(`choose:${take.n}`)
+                choose.mutate(take.file)
+              }}
             >
               {choose.isPending ? 'Choosing…' : 'Choose again'}
             </button>
@@ -267,10 +270,11 @@ export function EffectInTheGame({
       {!editing && trimControl.failure}
       {!editing && hint}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
-      {choose.data && !choose.data.ok && (
-        <span className="adopt-error">The take could not be chosen.</span>
-      )}
-      {choose.isError && <span className="adopt-error">The take could not be chosen.</span>}
+      {take &&
+        actions.shows(`choose:${take.n}`) &&
+        (choose.isError || (choose.data && !choose.data.ok)) && (
+          <span className="adopt-error">The take could not be chosen.</span>
+        )}
     </section>
   )
 }

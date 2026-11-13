@@ -47,6 +47,7 @@ import { failureLine, progressOf } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { compareClips, takePlayId } from '../../effectsPlay'
 import type { SaveWordsNow } from '../images/WordsField'
+import { TrackActionsContext, useTrackActions, useTrackActionsState } from '../../trackActions'
 import { EffectFadesEditor } from './EffectFadesEditor'
 import { EffectTrimmedTag, useEffectTrimControl } from './effectTrim'
 import { EffectInTheGame, HearTheSeam, KindChip, Playback, type Player } from './EffectInTheGame'
@@ -97,6 +98,7 @@ export function EffectTakesPanel({
     else fadeOpeners.current.delete(n)
   }
   // How many takes the next press makes: 4 at first, then the pick, while the page stays open.
+  const actions = useTrackActionsState()
   const [count, setCount] = useState(4)
   // The model the next press uses: Setup's, until a pick, which lasts while the page stays open.
   const [picked, setPicked] = useState<EffectModelId | null>(null)
@@ -183,7 +185,7 @@ export function EffectTakesPanel({
   }
   const changed = row.changed
   return (
-    <>
+    <TrackActionsContext.Provider value={actions}>
       {!canMake && (
         <div className="errbox" role="alert">
           <div className="errbox-text">
@@ -329,7 +331,7 @@ export function EffectTakesPanel({
         {stop.isError && <span className="adopt-error">{stop.error.message}</span>}
         {make.isError && <span className="adopt-error">{make.error.message}</span>}
       </section>
-    </>
+    </TrackActionsContext.Provider>
   )
 }
 
@@ -372,6 +374,7 @@ function TakeCard({
   const seamPlaying = player.playing === `${id}-seam`
   const drop = useDropEffectTake(effect)
   const choose = useChooseEffectTake(effect)
+  const actions = useTrackActions()
   const trim = useEffectTrimControl({
     effect,
     take,
@@ -381,8 +384,10 @@ function TakeCard({
       if (playing || seamPlaying) player.stop()
     },
   })
-  const failedChoose = choose.isError || (choose.data && !choose.data.ok)
-  const failedDrop = drop.isError || (drop.data && !drop.data.ok)
+  const failedChoose =
+    actions.shows(`choose:${take.n}`) && (choose.isError || (choose.data && !choose.data.ok))
+  const failedDrop =
+    actions.shows(`drop:${take.n}`) && (drop.isError || (drop.data && !drop.data.ok))
   const editing = fading === take.n
   const otherOpen = fading !== null && !editing
   const fades = effectFadesOf(take, effectLoops)
@@ -402,7 +407,9 @@ function TakeCard({
           chosen={false}
           player={player}
           onClose={() => onFadesClosed(take.n)}
-          onSaved={trim.clear}
+          onSaved={() => {
+            if (!trim.pending) actions.press(`fades:${take.n}`)
+          }}
         />
       ) : (
         <>
@@ -450,6 +457,7 @@ function TakeCard({
               )}
               onClick={() => {
                 if (playing || comparing || seamPlaying) player.stop()
+                actions.press(`drop:${take.n}`)
                 drop.mutate(take.file)
               }}
             >
@@ -463,7 +471,10 @@ function TakeCard({
                   locked && EFFECTS_LOCK_UNREAD,
                   (choose.isPending || drop.isPending) && EFFECTS_PENDING,
                 )}
-                onClick={() => choose.mutate(take.file)}
+                onClick={() => {
+                  actions.press(`choose:${take.n}`)
+                  choose.mutate(take.file)
+                }}
               >
                 {choose.isPending ? 'Choosing…' : 'Choose'}
               </button>

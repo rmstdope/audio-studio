@@ -12,7 +12,7 @@ import type { MakingSummary, TakeView } from '../../../core/musicTake'
 import type { MoveResult } from '../../../services/musicTakes'
 import { useMoveTake } from '../../api'
 import { off } from '../../off'
-import { useTrackActions } from './trackActions'
+import { useTrackActions } from '../../trackActions'
 
 /** Why the dialog's controls wait: the move is on its way. */
 const MOVING_WHY = 'Wait for the move to finish.'

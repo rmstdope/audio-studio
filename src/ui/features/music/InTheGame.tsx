@@ -20,7 +20,7 @@ import {
 } from './trimSilence'
 import { movedFromLine } from '../../../core/musicMove'
 import { FadesEditor } from './FadesEditor'
-import { useTrackActions } from './trackActions'
+import { useTrackActions } from '../../trackActions'
 
 /** One clip at a time, shared with the takes below. */
 type Player = ReturnType<typeof useClipPlayer>
