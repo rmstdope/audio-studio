@@ -11,9 +11,9 @@ import { readEffects } from './effectsLists'
 import { createEffectHealth, type EffectHealthStore } from './effectHealth'
 import { createImageHealth, type ImageHealthStore } from './imageHealth'
 import { readImages } from './imageLists'
+import { HUB_DIR } from './hubCache'
 import {
   downloadOf,
-  HUB_DIR,
   imageModelDownload,
   imageModelInstalled,
   mfluxReady,

@@ -1,3 +1,4 @@
+import { WEIGHTS_ONLY_NEEDS, type HubNeeds } from './hubDownload'
 import type { ImageDownload } from './imageModels'
 
 /** The ids of the sound-effect models the studio makes takes with. */
@@ -20,6 +21,8 @@ export interface EffectModel {
   short: string
   /** The gated Hugging Face repository the weights are downloaded from. */
   repo: string
+  /** What the model fetches from the repository besides its weights. */
+  needs: HubNeeds
   /** About how many GB the weights take on disk. */
   gigabytes: number
   /** About how long one take takes, in seconds (§12, decision 9). */
@@ -35,6 +38,7 @@ export const EFFECT_MODELS: Record<EffectModelId, EffectModel> = {
     name: 'Stable Audio 3 Small SFX',
     short: 'Small SFX',
     repo: 'stabilityai/stable-audio-3-small-sfx',
+    needs: WEIGHTS_ONLY_NEEDS,
     gigabytes: 6.5,
     seconds: 2,
     source: { kind: 'hub' },
@@ -44,6 +48,7 @@ export const EFFECT_MODELS: Record<EffectModelId, EffectModel> = {
     name: 'Stable Audio Open 1.0',
     short: 'Open 1.0',
     repo: 'stabilityai/stable-audio-open-1.0',
+    needs: WEIGHTS_ONLY_NEEDS,
     gigabytes: 5,
     seconds: 100,
     source: { kind: 'folder', folder: 'stable-audio-open-1.0' },

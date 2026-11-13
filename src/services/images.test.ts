@@ -2,13 +2,12 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { WEIGHTS_ONLY_NEEDS } from '../core/hubDownload'
 import { imageModel } from '../core/imageModels'
 import { createGpuWorkers, gpuInUse, GPU } from './gpu'
 import {
   createMfluxGenerator,
-  hubDirOf,
   ImageToolError,
-  hubDownload,
   imageModelDownload,
   imageModelInstalled,
   makeImageTake,
@@ -18,6 +17,7 @@ import {
   type ImageGenerator,
   type ImageRequest,
 } from './images'
+import { hubDirOf, hubDownload } from './hubCache'
 import { createSerial } from './serial'
 
 const request: ImageRequest = {
@@ -515,9 +515,13 @@ describe('imageModelDownload', () => {
 
   it('checks any repository the same way (the sound-effect model)', () => {
     const dir = hub()
-    expect(hubDownload(dir, 'stabilityai/stable-audio-3-small-sfx')).toBe('absent')
+    expect(hubDownload(dir, 'stabilityai/stable-audio-3-small-sfx', WEIGHTS_ONLY_NEEDS)).toBe(
+      'absent',
+    )
     whole(dir, 'models--stabilityai--stable-audio-3-small-sfx')
-    expect(hubDownload(dir, 'stabilityai/stable-audio-3-small-sfx')).toBe('whole')
+    expect(hubDownload(dir, 'stabilityai/stable-audio-3-small-sfx', WEIGHTS_ONLY_NEEDS)).toBe(
+      'whole',
+    )
   })
 
   it('is partial for a folder with no weights, or with an unfinished blob', () => {
@@ -538,7 +542,7 @@ describe('imageModelDownload', () => {
       const { blobs } = whole(dir, SFX)
       writeFileSync(join(blobs, 'h1.6fc64d0e.incomplete'), 'half')
       writeFileSync(join(blobs, 'h1.incomplete'), 'half')
-      expect(hubDownload(dir, SFX_REPO)).toBe('whole')
+      expect(hubDownload(dir, SFX_REPO, WEIGHTS_ONLY_NEEDS)).toBe('whole')
     })
 
     it('stays partial while a blob with no finished file is still coming, beside a leftover', () => {
@@ -546,7 +550,7 @@ describe('imageModelDownload', () => {
       const { blobs } = whole(dir, SFX)
       writeFileSync(join(blobs, 'h1.6fc64d0e.incomplete'), 'half')
       writeFileSync(join(blobs, 'h2.a829cf6b.incomplete'), 'half')
-      expect(hubDownload(dir, SFX_REPO)).toBe('partial')
+      expect(hubDownload(dir, SFX_REPO, WEIGHTS_ONLY_NEEDS)).toBe('partial')
     })
   })
 

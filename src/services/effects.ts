@@ -7,7 +7,7 @@ import type { ImageDownload } from '../core/imageModels'
 import { effectModel, type EffectModelId } from '../core/effectModels'
 import { readWav, trimTrailingSilence, writeWav } from '../core/wav'
 import { createLineWorker } from './lineWorker'
-import { HUB_DIR, hubDownload } from './images'
+import { HUB_DIR, hubDownload } from './hubCache'
 import type { MusicGenerator } from './music'
 import { STABLE_AUDIO_DIR } from './stableAudio'
 
@@ -150,13 +150,18 @@ export function createEffectsWorker({
       'The effects generator was stopped by the computer, most likely because it ran out of memory. Try again.',
   })
   return {
-    download: () => hubDownload(hubDir, effectModel('small-sfx').repo),
+    download: () =>
+      hubDownload(hubDir, effectModel('small-sfx').repo, effectModel('small-sfx').needs),
     ready() {
       const { name } = effectModel('small-sfx')
       if (!Bun.which('uv')) {
         return { ok: false, message: `uv, which runs ${name}, is not on the PATH.` }
       }
-      const download = hubDownload(hubDir, effectModel('small-sfx').repo)
+      const download = hubDownload(
+        hubDir,
+        effectModel('small-sfx').repo,
+        effectModel('small-sfx').needs,
+      )
       if (download === 'absent') return { ok: false, message: `${name} is not on this computer.` }
       if (download === 'partial') {
         return { ok: false, message: `${name}'s download is incomplete, so it can't run.` }
@@ -192,7 +197,7 @@ export function effectDownload(
   hubDir: string = HUB_DIR,
   stableAudioDir: string = STABLE_AUDIO_DIR,
 ): ImageDownload {
-  const { source, repo } = effectModel(model)
-  if (source.kind === 'hub') return hubDownload(hubDir, repo)
+  const { source, repo, needs } = effectModel(model)
+  if (source.kind === 'hub') return hubDownload(hubDir, repo, needs)
   return existsSync(join(stableAudioDir, source.folder)) ? 'whole' : 'absent'
 }
