@@ -33,6 +33,7 @@ import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import {
   changePatchBoard,
+  boardText,
   patchBoardKey,
   patchClipName,
   patchFolder,
@@ -887,8 +888,8 @@ export function createImagePatches({
               file: patchClipName(id, patch),
               manifest: had ? found.config.manifest : null,
               manifestNow: `${JSON.stringify(sorted(manifest), null, 2)}\n`,
-              last: `${found.folder}/board.json`,
-              lastNow: `${JSON.stringify({ ...board, chosen, inGame }, null, 2)}\n`,
+              last: found.board,
+              lastNow: boardText({ ...board, chosen, inGame }),
             })
           },
         )

@@ -457,12 +457,17 @@ describe('choosing', () => {
     async () => {
       const { takes, file, root, read } = await made()
       await takes.choose(file, 'inn', 1)
+      // The game's manifest has no entry, so the picture is the first thing taken out.
+      writeFileSync(join(root, 'web/images/manifest.json'), '{}')
       const manifest = read('web/images/manifest.json')
       const lock = read(LOCK)
       const clips = join(root, 'web/images')
       chmodSync(clips, 0o555)
       try {
-        expect(await takes.unchoose(file, 'inn')).toMatchObject({ ok: false })
+        expect(await takes.unchoose(file, 'inn')).toMatchObject({
+          ok: false,
+          message: 'web/images/inn.png could not be written.',
+        })
       } finally {
         chmodSync(clips, 0o755)
       }

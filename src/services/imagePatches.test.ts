@@ -1072,12 +1072,17 @@ describe('a chosen take of a patch reaches the game', () => {
       await patches.make(file, 'inn', 'door', { count: 1, area })
       await work()
       await patches.choose(file, 'inn', 'door', 1)
+      // The game's manifest has no patch entry, so the picture is the first thing taken out.
+      writeFileSync(join(root, MANIFEST), JSON.stringify(gameManifest))
       const manifest = readFileSync(join(root, MANIFEST), 'utf8')
       const board = readFileSync(join(root, BOARD), 'utf8')
       const clips = dirname(join(root, GAME_PATCH))
       chmodSync(clips, 0o555)
       try {
-        expect(await patches.unchoose(file, 'inn', 'door')).toMatchObject({ ok: false })
+        expect(await patches.unchoose(file, 'inn', 'door')).toMatchObject({
+          ok: false,
+          message: `${GAME_PATCH} could not be written.`,
+        })
       } finally {
         chmodSync(clips, 0o755)
       }
