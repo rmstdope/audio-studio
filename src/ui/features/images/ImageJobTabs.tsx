@@ -1,3 +1,4 @@
+import { typingIn } from './useWorkbenchKeys'
 import { createContext, useContext, useEffect, type ReactNode } from 'react'
 import { jobAtKey, type ImageJob, type JobTab } from '../../imageJobs'
 
@@ -40,20 +41,6 @@ const ICONS: Record<ImageJob, ReactNode> = {
     </>
   ),
 }
-
-/** Whether a key pressed on `target` is typing in a field or choosing in a menu. */
-function typingIn(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false
-  if (target instanceof HTMLInputElement && PRESSED_INPUTS.has(target.type)) return false
-  return (
-    target.closest(
-      'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="listbox"]',
-    ) !== null
-  )
-}
-
-/** The inputs that are pressed rather than typed into (a take's box): the tab keys still work there. */
-const PRESSED_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset'])
 
 /**
  * The row of an image page's job tabs: each with its icon, name, state chip and key. The open tab

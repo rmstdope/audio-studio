@@ -1,3 +1,4 @@
+import { fieldOwnsKeys, useDocumentKeys, usePendingFocus } from './useWorkbenchKeys'
 import { useJobOpen } from './ImageJobTabs'
 import {
   useEffect,
@@ -146,7 +147,16 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     answer: Extract<UseFineTuneAnswer, { ok: true }>
     from: string
   } | null>(null)
-  const [pendingFocus, setPendingFocus] = useState<number | 'words' | { stop: number } | null>(null)
+  const focusOn = usePendingFocus<number | 'words' | { stop: number }>((want) => {
+    const target =
+      want === 'words'
+        ? wordsBox.current
+        : typeof want === 'number'
+          ? cards.current.get(want)
+          : stops.current.get(want.stop)
+    // A Stop that is not there yet waits for the page to show the next fine-tune being made.
+    return !target && typeof want === 'object' ? undefined : target
+  }, query.data)
   const start = useRef<{ x: number; y: number } | null>(null)
   const asked = useRef(new Set<number>())
   const changing = useRef(false)
@@ -154,7 +164,8 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
   const wordsBox = useRef<HTMLTextAreaElement>(null)
   const cards = useRef(new Map<number, HTMLButtonElement>())
   const stops = useRef(new Map<number, HTMLButtonElement>())
-  const keyHandler = useRef<((event: KeyboardEvent) => void) | null>(null)
+  // The keys are heard anywhere on the page, but only while this tab is the open one.
+  const keys = useDocumentKeys(jobOpen)
 
   const view = query.data && 'picture' in query.data ? query.data : null
   const tunes = view?.tunes ?? []
@@ -201,13 +212,6 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       seen.mutate(shown.n)
     }
   })
-  // The keys are heard anywhere on the page, but only while this tab is the open one.
-  useEffect(() => {
-    if (!jobOpen) return
-    const listen = (event: KeyboardEvent) => keyHandler.current?.(event)
-    document.addEventListener('keydown', listen)
-    return () => document.removeEventListener('keydown', listen)
-  }, [jobOpen])
   useEffect(() => {
     const card = lookingAt === null ? undefined : cards.current.get(lookingAt)
     scrollWithin(card, card?.closest<HTMLElement>('.patch-thumbs'))
@@ -223,19 +227,6 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     if (box.scrollHeight > box.clientHeight)
       box.style.height = `${box.scrollHeight + (box.offsetHeight - box.clientHeight)}px`
   }, [words, view?.picture.kind])
-  useEffect(() => {
-    if (pendingFocus === null) return
-    const target =
-      pendingFocus === 'words'
-        ? wordsBox.current
-        : typeof pendingFocus === 'number'
-          ? cards.current.get(pendingFocus)
-          : stops.current.get(pendingFocus.stop)
-    // A Stop that is not there yet waits for the page to show the next fine-tune being made.
-    if (!target && typeof pendingFocus === 'object') return
-    target?.focus()
-    setPendingFocus(null)
-  }, [pendingFocus, query.data])
 
   // Another take chosen in Takes ends the line about the last use (not the new take it made).
   const shownKey = !view
@@ -256,7 +247,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       ? came.answer
       : null
   if (came && !cameHere) setCame(null)
-  keyHandler.current = null
+  keys.current = () => {}
   if (!view)
     return (
       <section className="panel fine-tune" aria-label="Fine-tune the picture">
@@ -342,7 +333,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     drop.mutate(n, {
       onSettled: () => {
         changing.current = false
-        setPendingFocus(
+        focusOn(
           view.making.some((m) => m.n === n) && nextMaking
             ? { stop: nextMaking.n }
             : (next ?? 'words'),
@@ -396,18 +387,13 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       },
     })
   }
-  keyHandler.current = (event) => {
+  keys.current = (event) => {
     const target = event.target
     if (event.metaKey || event.ctrlKey || event.altKey) return
     const key = event.key.toLowerCase()
     if (!KEYS.has(event.key) && !KEYS.has(key)) return
     // Keys typed into a field or menu are its own.
-    if (
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement ||
-      (target instanceof HTMLInputElement && target.type !== 'checkbox')
-    )
-      return
+    if (fieldOwnsKeys(target)) return
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       event.preventDefault()
       const next = stepRight(strip, lookingAt, event.key === 'ArrowLeft' ? -1 : 1)
@@ -641,7 +627,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
               onClick={() => {
                 make.reset()
                 // The button goes off while they are made: focus goes to the fine-tune looked at, so ← and → keep stepping.
-                setPendingFocus(lookingAt ?? 'words')
+                focusOn(lookingAt ?? 'words')
                 make.mutate({ count, words: words1, area: mark, model })
               }}
             >
