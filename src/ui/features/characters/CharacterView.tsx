@@ -61,7 +61,7 @@ import { DesignVoice } from '../audition/DesignVoice'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
-import { Pager } from '../../components/Pager'
+import { PageHeader } from '../../components/PageHeader'
 import { off } from '../../off'
 import { pagerFor } from '../../pager'
 import { CHANGING } from '../../voiceOffText'
@@ -172,99 +172,113 @@ export function CharacterView({
   }))
   return (
     <>
-      <header className="page-header">
-        <div className="audition-who">
-          <div className="avatar" style={tintFor(character.id)} aria-hidden="true">
-            {character.name.charAt(0)}
-          </div>
-          <div>
-            <span className="crumbs">
-              <a
-                href={routeHref({ view: 'characters', ...(queried ? { language: queried } : {}) })}
-              >
-                Characters
-              </a>{' '}
-              / {character.name}
-            </span>
-            <h1>{character.name}</h1>
-            <span className="muted">
-              {appearances.length
-                ? `${plural(casting?.totalLines ?? 0, 'line')} in ${plural(appearances.length, summary.partLabel.toLowerCase())}`
-                : 'No lines yet'}{' '}
-              · {several ? 'one voice per language in every' : 'one voice in every'}{' '}
-              {summary.partLabel.toLowerCase()}
-            </span>
-          </div>
-        </div>
-        {several && (
-          <LanguageSwitch
-            tabs={summary.languages.map((l) => {
-              const tab = castTab(character, l, going[l.id] ?? false)
-              return {
-                id: l.id,
-                name: l.name,
-                count: going[l.id] === null ? null : tab.count,
-                title: tab.title,
-                dimmed: tab.dimmed,
-              }
-            })}
-            active={language}
-            onChoose={(id) => {
-              window.location.hash = routeHref({
-                view: 'character',
-                character: character.id,
-                language: id,
-              })
-            }}
-          />
-        )}
-        <div className="header-actions header-end">
-          <button
-            ref={designButton}
-            className="btn"
-            type="button"
-            // Only once it is known whether an audition is going on: paying starts one if not.
-            {...off(
-              blocked,
-              designing && 'The voice design box is open. Close it to start another.',
-              !view && 'Wait for the audition to be read.',
-            )}
-            onClick={() => setDesigning(true)}
-          >
-            <SparkIcon /> Design a voice…
-          </button>
-          {inProgress ? (
-            // On a paid model, with no money left in this sitting, Resume asks for more first.
-            needsResumeBox(money) ? (
-              <button className="btn btn-primary" type="button" onClick={() => setAsking('resume')}>
-                <HeadphonesIcon /> Resume…
-              </button>
+      <PageHeader
+        titleClass="audition-who"
+        title={
+          <>
+            <div className="avatar" style={tintFor(character.id)} aria-hidden="true">
+              {character.name.charAt(0)}
+            </div>
+            <div>
+              <span className="crumbs">
+                <a
+                  href={routeHref({
+                    view: 'characters',
+                    ...(queried ? { language: queried } : {}),
+                  })}
+                >
+                  Characters
+                </a>{' '}
+                / {character.name}
+              </span>
+              <h1>{character.name}</h1>
+              <span className="muted">
+                {appearances.length
+                  ? `${plural(casting?.totalLines ?? 0, 'line')} in ${plural(appearances.length, summary.partLabel.toLowerCase())}`
+                  : 'No lines yet'}{' '}
+                · {several ? 'one voice per language in every' : 'one voice in every'}{' '}
+                {summary.partLabel.toLowerCase()}
+              </span>
+            </div>
+          </>
+        }
+        tabs={
+          several && (
+            <LanguageSwitch
+              tabs={summary.languages.map((l) => {
+                const tab = castTab(character, l, going[l.id] ?? false)
+                return {
+                  id: l.id,
+                  name: l.name,
+                  count: going[l.id] === null ? null : tab.count,
+                  title: tab.title,
+                  dimmed: tab.dimmed,
+                }
+              })}
+              active={language}
+              onChoose={(id) => {
+                window.location.hash = routeHref({
+                  view: 'character',
+                  character: character.id,
+                  language: id,
+                })
+              }}
+            />
+          )
+        }
+        actions={
+          <>
+            <button
+              ref={designButton}
+              className="btn"
+              type="button"
+              // Only once it is known whether an audition is going on: paying starts one if not.
+              {...off(
+                blocked,
+                designing && 'The voice design box is open. Close it to start another.',
+                !view && 'Wait for the audition to be read.',
+              )}
+              onClick={() => setDesigning(true)}
+            >
+              <SparkIcon /> Design a voice…
+            </button>
+            {inProgress ? (
+              // On a paid model, with no money left in this sitting, Resume asks for more first.
+              needsResumeBox(money) ? (
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => setAsking('resume')}
+                >
+                  <HeadphonesIcon /> Resume…
+                </button>
+              ) : (
+                <a className="btn btn-primary" href={audition}>
+                  <HeadphonesIcon /> Resume audition
+                </a>
+              )
             ) : (
-              <a className="btn btn-primary" href={audition}>
-                <HeadphonesIcon /> Resume audition
-              </a>
-            )
-          ) : (
-            // Only once it is known that no audition is going on: starting would replace one.
-            view && (
-              <button
-                className="btn btn-primary"
-                type="button"
-                // While the audition is read again, one may have been started elsewhere.
-                {...off(
-                  blocked,
-                  (start.isPending || session.isFetching || sittingQuery.isPending) &&
-                    'Wait for the audition to be read.',
-                )}
-                onClick={beginAudition}
-              >
-                <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
-              </button>
-            )
-          )}
-          {pager && <Pager {...pager} />}
-        </div>
-      </header>
+              // Only once it is known that no audition is going on: starting would replace one.
+              view && (
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  // While the audition is read again, one may have been started elsewhere.
+                  {...off(
+                    blocked,
+                    (start.isPending || session.isFetching || sittingQuery.isPending) &&
+                      'Wait for the audition to be read.',
+                  )}
+                  onClick={beginAudition}
+                >
+                  <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
+                </button>
+              )
+            )}
+          </>
+        }
+        pager={pager}
+      />
       {designing && (
         <DesignVoice
           characterId={character.id}

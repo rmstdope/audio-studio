@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import type { MusicListSummary, TrackRow } from '../../../core/music'
-import { Pager } from '../../components/Pager'
+import { PageHeader } from '../../components/PageHeader'
 import { shortTitle } from '../../format'
 import { pagerFor } from '../../pager'
 import { routeHref } from '../../route'
@@ -31,16 +31,18 @@ export function TrackView({
   }))
   return (
     <>
-      <header className="page-header">
-        <div>
-          <span className="crumbs">
-            <a href={routeHref(listRoute)}>Music</a> › {name}
-          </span>
-          <h1>{track.title}</h1>
-          {track.plays && <span className="muted">Plays in: {track.plays}</span>}
-        </div>
-        {pager && <Pager {...pager} />}
-      </header>
+      <PageHeader
+        title={
+          <>
+            <span className="crumbs">
+              <a href={routeHref(listRoute)}>Music</a> › {name}
+            </span>
+            <h1>{track.title}</h1>
+            {track.plays && <span className="muted">Plays in: {track.plays}</span>}
+          </>
+        }
+        pager={pager}
+      />
       <BriefPanel key={track.id} track={track} kind={list.kind} saveNow={saveBrief} />
       <TakesPanel
         key={`takes-${track.id}`}

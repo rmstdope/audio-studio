@@ -2250,7 +2250,7 @@ button.cue-chip[aria-expanded='true'] {
   align-self: auto;
 }
 
-/* A header's buttons and ‹ › keep to its right end, on its first row or wrapped (as-ped, as-85z). */
+/* PageHeader keeps a header's buttons and ‹ › at its right end, on its first row or wrapped (as-ped, as-85z). */
 .header-end {
   margin-left: auto;
   justify-content: flex-end;
