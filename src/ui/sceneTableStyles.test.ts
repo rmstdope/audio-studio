@@ -23,7 +23,7 @@ describe('the Scenes sound effects table', () => {
     expect(rule('.scene-effect-name')).toMatch(/display:\s*inline-block/)
     expect(rule('.scene-effect-name')).not.toMatch(/margin/)
     expect(rule('\n.scene-effect-name:has(+ .chip)')).toMatch(/margin-right:\s*8px/)
-    const wide = css.slice(0, css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
+    const wide = css.slice(0, css.indexOf('@container panel (max-width: 700px) {\n  .scenes-body'))
     const cellRules = [...wide.matchAll(/([^{}]*\.scene-effect-cell[^{}]*)\{([^}]*)\}/g)].filter(
       ([, selector]) => !/\.chip/.test(selector ?? ''),
     )
@@ -56,7 +56,7 @@ describe('the Scenes sound effects table', () => {
   })
 
   it('sizes the effect column to its content, so a short name beside a chip is never cut', () => {
-    const wide = css.slice(0, css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
+    const wide = css.slice(0, css.indexOf('@container panel (max-width: 700px) {\n  .scenes-body'))
     const fixed = [...wide.matchAll(/([^{}]*\.scene-effect)\s*\{([^}]*)\}/g)].filter(([, , body]) =>
       /(^|[\s;])(min-|max-)?width:/.test(body ?? ''),
     )
@@ -69,18 +69,18 @@ describe('the Scenes sound effects table', () => {
 
   it('shows each effect as a card whenever the panel is too narrow for the table, not only in a narrow window', () => {
     expect(rule('.scene-effects')).toMatch(/container-type:\s*inline-size/)
-    expect(rule('.scene-effects')).toMatch(/container-name:\s*scene-effects/)
-    const at = css.indexOf('@container scene-effects (max-width: 700px) {')
+    expect(rule('.scene-effects')).toMatch(/container-name:\s*panel/)
+    const at = css.indexOf('@container panel (max-width: 700px) {\n  .scene-effects .table tr')
     expect(at).toBeGreaterThan(-1)
     const cards = css.slice(at, css.indexOf('\n}\n', at))
     expect(rule('.scene-effects .table tr', cards)).toMatch(/display:\s*grid/)
-    expect(rule('.scene-effects .table thead', cards)).toMatch(/display:\s*none/)
-    const narrow = css.slice(css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
+    expect(css).toMatch(/\.stack-table thead \{\n\s*display: none;/)
+    const narrow = css.slice(css.indexOf('@container panel (max-width: 700px) {\n  .scenes-body'))
     expect(narrow.slice(0, narrow.indexOf('\n}\n'))).not.toContain('.scene-effects .table')
   })
 
   it('lets the card use its grid column and cut the name only when it does not fit', () => {
-    const at = css.indexOf('@container scene-effects (max-width: 700px) {')
+    const at = css.indexOf('@container panel (max-width: 700px) {\n  .scene-effects .table tr')
     const cards = css.slice(at, css.indexOf('\n}\n', at))
     expect(rule('.scene-effects .table td', cards)).toMatch(/padding:\s*0/)
     const name = rule('.scene-effects .table .scene-effect-name', cards)
@@ -93,7 +93,7 @@ describe('the Scenes sound effects table', () => {
   })
 
   it('puts the chip on its own line under the card, so in a 252 px panel (800 px of window) the name keeps its column and the chip never runs over M/S', () => {
-    const at = css.indexOf('@container scene-effects (max-width: 700px) {')
+    const at = css.indexOf('@container panel (max-width: 700px) {\n  .scene-effects .table tr')
     const cards = css.slice(at, css.indexOf('\n}\n', at))
     const cell = rule(
       '.scene-effects .table td.scene-effect,\n  .scene-effects .table .scene-effect-cell',
@@ -122,7 +122,7 @@ describe('the Scenes sound effects table', () => {
 
 describe('the Scenes Music row', () => {
   it('wraps in every window, so its slider, M and S stay in a panel as narrow as 252 px (800 px of window)', () => {
-    const wide = css.slice(0, css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
+    const wide = css.slice(0, css.indexOf('@container panel (max-width: 700px) {\n  .scenes-body'))
     expect(rule('\n.scene-music', wide)).toMatch(/flex-wrap:\s*wrap/)
   })
 })

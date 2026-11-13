@@ -152,6 +152,8 @@ a {
 
 /* The page: small margins, so a laptop's window leaves the content as much room as it can */
 .content {
+  container-type: inline-size;
+  container-name: panel;
   flex: 999 1 560px;
   min-width: 0;
   padding: 20px 24px 32px;
@@ -1342,7 +1344,7 @@ button.cue-chip[aria-expanded='true'] {
 .line-stale-cues {
   display: block;
 }
-@media (max-width: 700px) {
+@container panel (max-width: 700px) {
   .cue-box {
     max-width: none;
   }
@@ -2371,7 +2373,7 @@ button.cue-chip[aria-expanded='true'] {
   align-items: center;
   gap: 8px;
 }
-@media (max-width: 640px) {
+@container panel (max-width: 640px) {
   .pronounce-rows li {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
@@ -2730,7 +2732,7 @@ button.cue-chip[aria-expanded='true'] {
   background: var(--accent);
 }
 
-@media (max-width: 640px) {
+@container panel (max-width: 640px) {
   .sitting-bar {
     flex-basis: 100%;
   }
@@ -2846,7 +2848,7 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--danger-ink);
 }
 
-@media (max-width: 720px) {
+@container panel (max-width: 720px) {
   .notice {
     flex-direction: column;
     align-items: stretch;
@@ -2957,7 +2959,7 @@ button.cue-chip[aria-expanded='true'] {
   display: block;
 }
 
-@media (max-width: 600px) {
+@container panel (max-width: 600px) {
   .clone-card-buttons {
     flex-direction: column;
   }
@@ -3123,7 +3125,7 @@ button.cue-chip[aria-expanded='true'] {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 600px) {
+@container panel (max-width: 600px) {
   .design-actions .btn,
   .header-actions .btn {
     flex: 1 1 auto;
@@ -3219,7 +3221,7 @@ button.cue-chip[aria-expanded='true'] {
 .voice-settings input[type='range'][aria-disabled='true'] {
   opacity: 0.55;
 }
-@media (max-width: 700px) {
+@container panel (max-width: 700px) {
   .mrow {
     grid-template-columns: 1fr;
     gap: 4px;
@@ -3364,7 +3366,7 @@ button.cue-chip[aria-expanded='true'] {
   gap: 16px;
   align-items: start;
 }
-@media (max-width: 700px) {
+@container panel (max-width: 700px) {
   .music-brief-grid {
     grid-template-columns: 1fr;
   }
@@ -3372,7 +3374,7 @@ button.cue-chip[aria-expanded='true'] {
 /* Side by side, the fields share three rows (head, input, messages), so a tag that wraps makes
    every head row taller and the labels and inputs stay level. A field must keep to three children
    (label row, input, one message), or the fourth lands on the message row. */
-@media (min-width: 701px) {
+@container panel (min-width: 701px) {
   .music-brief-grid > .brief-field {
     display: grid;
     grid-row: span 3;
@@ -3538,7 +3540,7 @@ button.cue-chip[aria-expanded='true'] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-@media (max-width: 700px) {
+@container panel (max-width: 700px) {
   .takes {
     grid-template-columns: 1fr;
   }
@@ -3852,8 +3854,8 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--danger-ink);
 }
 
-/* Narrow window: the Brief column goes first. */
-@media (max-width: 800px) {
+/* Narrow panel: the Brief column goes first. */
+@container panel (max-width: 800px) {
   .music-table .music-brief-cell {
     display: none;
   }
@@ -4155,31 +4157,53 @@ textarea[aria-disabled='true'][data-why] {
 .images-nothing {
   color: var(--faint);
 }
-@media (max-width: 700px) {
-  .images-cmp {
-    grid-template-columns: 1fr;
-  }
-  .images-table thead {
+/* Rows stack into cards (as-4rfy): a table with .stack-table becomes one card per row when its panel
+   (the page's column, or the Scenes effects panel) is 700 px wide or less, whatever the window is.
+   A table adds only where its cells go, after this block. */
+@container panel (max-width: 700px) {
+  .stack-table thead {
     display: none;
   }
-  .images-table,
-  .images-table tbody {
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr,
+  .stack-table td {
     display: block;
-  }
-  .images-table {
     min-width: 0;
+  }
+  .stack-table tr {
+    border-bottom: 1px solid var(--line);
+  }
+  .stack-table td {
+    border: 0;
+  }
+  /* An effect's or a dropped track's empty cell takes no line. */
+  .effects-table td:empty,
+  .music-orphans-table td:empty {
+    display: none;
+  }
+  .effects-table td,
+  .music-orphans-table td {
+    padding: 2px 12px;
+  }
+  .effects-table tr,
+  .music-orphans-table tr {
+    padding: 8px 0;
+  }
+}
+
+@container panel (max-width: 700px) {
+  .images-cmp {
+    grid-template-columns: 1fr;
   }
   .images-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px 12px;
     padding: 12px;
-    border-bottom: 1px solid var(--line);
   }
   .images-table td {
-    display: block;
     padding: 0;
-    border: 0;
   }
   .images-name {
     grid-column: 1;
@@ -4274,7 +4298,7 @@ textarea[aria-disabled='true'][data-why] {
   min-height: 0;
   overflow: auto;
 }
-@media (max-width: 1000px) {
+@container panel (max-width: 1000px) {
   .image-workbench {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
@@ -4453,40 +4477,6 @@ textarea[aria-disabled='true'][data-why] {
   margin-top: 12px;
 }
 
-/* Narrow window: each row stacks its cells (an effect's name, description, length and status; a
-   dropped track's music, title, date and Remove), so nothing sits off the right edge. */
-@media (max-width: 700px) {
-  .effects-table thead,
-  .music-orphans-table thead {
-    display: none;
-  }
-  .effects-table,
-  .effects-table tbody,
-  .effects-table tr,
-  .effects-table td,
-  .music-orphans-table,
-  .music-orphans-table tbody,
-  .music-orphans-table tr,
-  .music-orphans-table td {
-    display: block;
-    min-width: 0;
-  }
-  .effects-table td:empty,
-  .music-orphans-table td:empty {
-    display: none;
-  }
-  .effects-table td,
-  .music-orphans-table td {
-    border: 0;
-    padding: 2px 12px;
-  }
-  .effects-table tr,
-  .music-orphans-table tr {
-    padding: 8px 0;
-    border-bottom: 1px solid var(--line);
-  }
-}
-
 /* The Scenes pages */
 
 .scenes-body {
@@ -4613,7 +4603,7 @@ textarea[aria-disabled='true'][data-why] {
 .scene-suggest-note {
   margin: 10px 0 0;
 }
-@media (max-width: 640px) {
+@container panel (max-width: 640px) {
   .scene-suggest {
     flex-direction: column;
     align-items: stretch;
@@ -4656,7 +4646,7 @@ textarea[aria-disabled='true'][data-why] {
    each effect is a card (the rules after the narrow-window block). */
 .scene-effects {
   container-type: inline-size;
-  container-name: scene-effects;
+  container-name: panel;
 }
 /* The chip goes beside the name when there is room and whole on its own line under it when not, so
    the column is only as wide as the longer of the two, the name keeping its gap. */
@@ -5072,7 +5062,7 @@ textarea[aria-disabled='true'][data-why] {
   margin-left: 4px;
 }
 
-@media (max-width: 700px) {
+@container panel (max-width: 700px) {
   .scenes-body {
     flex-direction: column;
     align-items: stretch;
@@ -5101,26 +5091,16 @@ textarea[aria-disabled='true'][data-why] {
 }
 
 /* Each effect as a card, whenever the panel is narrower than the table needs while a scene plays
-   (about 1285 px of window and below, as-iix), not only in a narrow window. */
-@container scene-effects (max-width: 700px) {
-  .scene-effects .table thead {
-    display: none;
-  }
-  .scene-effects .table,
-  .scene-effects .table tbody {
-    display: block;
-  }
+   (as-iix), whatever the window is. */
+@container panel (max-width: 700px) {
   .scene-effects .table tr {
     display: grid;
     grid-template-columns: 40px 1fr auto auto;
     gap: 2px 8px;
     padding: 10px 0;
-    border-bottom: 1px solid var(--line);
   }
   .scene-effects .table td {
-    display: block;
     padding: 0;
-    border: 0;
   }
   .scene-effects .table td.scene-play {
     grid-row: 1;
@@ -5496,7 +5476,7 @@ textarea[aria-disabled='true'][data-why] {
 .named-area > .chip {
   margin-right: 10px;
 }
-@media (max-width: 760px) {
+@container panel (max-width: 760px) {
   .named-areas-body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -5741,7 +5721,7 @@ textarea[aria-disabled='true'][data-why] {
 .patch-closeup-empty {
   min-height: 44px;
 }
-@media (max-width: 700px) {
+@container panel (max-width: 700px) {
   .patch-bench,
   .game-patches .patch-bench,
   .patches-lefty {
@@ -6010,7 +5990,7 @@ textarea[aria-disabled='true'][data-why] {
   color: var(--accent-soft-ink);
   text-decoration: underline;
 }
-@media (max-width: 820px) {
+@container panel (max-width: 820px) {
   .fine-job {
     grid-template-columns: minmax(0, 1fr);
   }

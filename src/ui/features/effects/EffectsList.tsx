@@ -121,7 +121,7 @@ export function EffectsList({
             )}
           </section>
           <div className="table-box">
-            <table className="table effects-table">
+            <table className="table stack-table effects-table">
               <thead>
                 <tr>
                   <th aria-label="Play" />
@@ -227,7 +227,7 @@ function DroppedPanel({ dropped }: { dropped: DroppedEffect[] }) {
           You changed the description of these, and the game no longer asks for them. Your words are
           kept in case the game lists them again.
         </span>
-        <table className="table effects-table">
+        <table className="table stack-table effects-table">
           <tbody>
             {dropped.map((row) => (
               <tr key={row.id}>

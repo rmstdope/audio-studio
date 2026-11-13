@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { off } from '../../off'
+import { Overlay } from '../../components/Overlay'
 
 /**
  * The question asked when something would leave a scene with unsaved changes. Focus starts on
@@ -26,42 +27,44 @@ export function LeaveDialog({
     return () => before?.focus()
   }, [])
   return (
-    <div className="scene-leave-backdrop">
-      <div
-        className="panel scene-leave"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="scene-leave-title"
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.stopPropagation()
-            onCancel()
-          }
-        }}
-      >
-        <h2 id="scene-leave-title">Save the changes to {name}?</h2>
-        <p className="muted">If you don&apos;t, they are lost.</p>
-        <div className="confirm-actions">
-          <button className="btn btn-ghost" type="button" onClick={onDiscard}>
-            Don&apos;t save
-          </button>
-          <button className="btn" type="button" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            ref={save}
-            className="btn btn-primary"
-            type="button"
-            {...off(
-              !canSave &&
-                'Something in this scene needs fixing first. Go back and fix the rows marked red, then save.',
-            )}
-            onClick={onSave}
-          >
-            Save
-          </button>
+    <Overlay>
+      <div className="scene-leave-backdrop">
+        <div
+          className="panel scene-leave"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="scene-leave-title"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.stopPropagation()
+              onCancel()
+            }
+          }}
+        >
+          <h2 id="scene-leave-title">Save the changes to {name}?</h2>
+          <p className="muted">If you don&apos;t, they are lost.</p>
+          <div className="confirm-actions">
+            <button className="btn btn-ghost" type="button" onClick={onDiscard}>
+              Don&apos;t save
+            </button>
+            <button className="btn" type="button" onClick={onCancel}>
+              Cancel
+            </button>
+            <button
+              ref={save}
+              className="btn btn-primary"
+              type="button"
+              {...off(
+                !canSave &&
+                  'Something in this scene needs fixing first. Go back and fix the rows marked red, then save.',
+              )}
+              onClick={onSave}
+            >
+              Save
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Overlay>
   )
 }

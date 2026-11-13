@@ -518,7 +518,7 @@ export function SceneDetail({
         {draft.effects.length === 0 ? (
           <p className="muted">No sound effects in this scene.</p>
         ) : (
-          <table className="table">
+          <table className="table stack-table">
             <thead>
               <tr>
                 {play.phase !== 'stopped' && <th className="scene-now-head">Now</th>}

@@ -13,6 +13,7 @@ import type { MoveResult } from '../../../services/musicTakes'
 import { useMoveTake } from '../../api'
 import { off } from '../../off'
 import { useTrackActions } from '../../trackActions'
+import { Overlay } from '../../components/Overlay'
 
 /** Why the dialog's controls wait: the move is on its way. */
 const MOVING_WHY = 'Wait for the move to finish.'
@@ -179,81 +180,83 @@ export function MoveTakeDialog({
   }
 
   return (
-    <div className="modal-back" onKeyDown={onKeyDown}>
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="move-take-title"
-        ref={root}
-      >
-        <h3 id="move-take-title">{moveTitle(take.n, kind)}</h3>
-        <span className="muted small">{moveLine(trackTitle, kind)}</span>
-        {loops && (
-          <input
-            ref={search}
-            className="filter"
-            placeholder="Find a loop"
-            aria-label="Find a loop"
-            value={query}
-            {...off(pending && MOVING_WHY)}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        )}
-        <div className="modal-list" role="listbox" aria-label="Where to move it">
-          {groups.length === 0 && <div className="faint small modal-note">{NO_MATCH}</div>}
-          {groups.map((group, index) => (
-            <div className="group" key={group.heading ?? `group-${index}`}>
-              {group.heading && <div className="label">{group.heading}</div>}
-              {group.notListed && <div className="faint small modal-note">{group.notListed}</div>}
-              {group.tracks.map((target) => (
-                <button
-                  key={target.id}
-                  type="button"
-                  role="option"
-                  data-track={target.id}
-                  aria-selected={selected === target.id}
-                  {...off(
-                    target.here && 'The take is on this track already. Pick another one.',
-                    pending && MOVING_WHY,
-                  )}
-                  className={`dest${selected === target.id ? ' sel' : ''}${target.here ? ' off' : ''}`}
-                  onClick={() => setSelected(target.id)}
-                >
-                  <span className="grow">
-                    <span className="dest-title">{target.title}</span>
-                    <span className="faint small dest-line">{target.line}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-        {failure && (
-          <span className="adopt-error" role="alert">
-            {failure}
-          </span>
-        )}
-        <div className="modal-actions">
-          <span className="grow" />
-          <button
-            type="button"
-            className="btn btn-ghost"
-            {...off(pending && MOVING_WHY)}
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            {...off(!selected && 'Pick where to move it first.', pending && MOVING_WHY)}
-            onClick={() => void submit()}
-          >
-            {pending ? 'Moving…' : `Move take ${take.n}`}
-          </button>
+    <Overlay>
+      <div className="modal-back" onKeyDown={onKeyDown}>
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="move-take-title"
+          ref={root}
+        >
+          <h3 id="move-take-title">{moveTitle(take.n, kind)}</h3>
+          <span className="muted small">{moveLine(trackTitle, kind)}</span>
+          {loops && (
+            <input
+              ref={search}
+              className="filter"
+              placeholder="Find a loop"
+              aria-label="Find a loop"
+              value={query}
+              {...off(pending && MOVING_WHY)}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          )}
+          <div className="modal-list" role="listbox" aria-label="Where to move it">
+            {groups.length === 0 && <div className="faint small modal-note">{NO_MATCH}</div>}
+            {groups.map((group, index) => (
+              <div className="group" key={group.heading ?? `group-${index}`}>
+                {group.heading && <div className="label">{group.heading}</div>}
+                {group.notListed && <div className="faint small modal-note">{group.notListed}</div>}
+                {group.tracks.map((target) => (
+                  <button
+                    key={target.id}
+                    type="button"
+                    role="option"
+                    data-track={target.id}
+                    aria-selected={selected === target.id}
+                    {...off(
+                      target.here && 'The take is on this track already. Pick another one.',
+                      pending && MOVING_WHY,
+                    )}
+                    className={`dest${selected === target.id ? ' sel' : ''}${target.here ? ' off' : ''}`}
+                    onClick={() => setSelected(target.id)}
+                  >
+                    <span className="grow">
+                      <span className="dest-title">{target.title}</span>
+                      <span className="faint small dest-line">{target.line}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+          {failure && (
+            <span className="adopt-error" role="alert">
+              {failure}
+            </span>
+          )}
+          <div className="modal-actions">
+            <span className="grow" />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              {...off(pending && MOVING_WHY)}
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              {...off(!selected && 'Pick where to move it first.', pending && MOVING_WHY)}
+              onClick={() => void submit()}
+            >
+              {pending ? 'Moving…' : `Move take ${take.n}`}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Overlay>
   )
 }

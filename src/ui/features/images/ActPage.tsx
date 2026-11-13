@@ -141,7 +141,7 @@ export function ActPage({
         </section>
       ) : (
         <div className="table-box">
-          <table className="table images-table">
+          <table className="table stack-table images-table">
             <thead>
               <tr>
                 <th>Image</th>

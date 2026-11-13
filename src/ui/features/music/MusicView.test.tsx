@@ -231,8 +231,8 @@ describe('the music the game no longer asks for', () => {
 
   it('stacks in a narrow window, as the dropped effects do, so Remove is never off the edge', () => {
     const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
-    // Every rule that applies in a 600 px window: those in media blocks of 600 px wide or more.
-    const narrow = [...css.matchAll(/@media \(max-width: (\d+)px\) \{([\s\S]*?)\n\}\n/g)]
+    // Every rule that applies in a 600 px panel: those in container blocks of 600 px wide or more.
+    const narrow = [...css.matchAll(/@container panel \(max-width: (\d+)px\) \{([\s\S]*?)\n\}\n/g)]
       .filter((m) => Number(m[1]) >= 600)
       .map((m) => m[2])
       .join('\n')

@@ -1160,7 +1160,7 @@ describe('leaving a scene with unsaved changes', () => {
         .querySelector('button')!
         .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     })
-    act(() => button(page, 'Cancel').click())
+    act(() => button(document.body, 'Cancel').click())
     await flush()
     expect(dialog()).toBeNull()
     expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-store')
@@ -1191,7 +1191,7 @@ describe('leaving a scene with unsaved changes', () => {
   it('refreshes after Don’t save, with the changes gone', async () => {
     const page = render(open)
     await ask(page)
-    act(() => button(page, "Don't save").click())
+    act(() => button(document.body, "Don't save").click())
     await flush()
     expect(asked).toContainEqual({ method: 'POST', path: '/api/parts/act1/refresh' })
     expect(status(page)).toBeUndefined()
@@ -1271,7 +1271,7 @@ describe('leaving a scene with unsaved changes', () => {
       const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 5)))
       await settle()
       expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-store')
-      act(() => button(container, "Don't save").click())
+      act(() => button(document.body, "Don't save").click())
       await settle()
       expect(window.location.hash).toBe(target)
       expect(history.hashes()).toEqual(['#/scenes/parts/act1?scene=act1-store', target])

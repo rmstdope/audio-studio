@@ -5,6 +5,7 @@ import type { CharacterSummary } from '../../../core/summary'
 import { providerOf, type VoiceProvider } from '../../../core/voices'
 import type { SessionView } from '../../../services/sessions'
 import { castInLanguage, shortlistNote, type Language } from '../../castLanguages'
+import { Overlay } from '../../components/Overlay'
 import {
   useCast,
   useElevenAccount,
@@ -749,22 +750,24 @@ export function ShortlistBoard({
       </div>
 
       {undoable && (
-        <div className="toast" role="status">
-          <span>
-            Dropped <strong>{title(undoable)}</strong>.
-            {isRuledOut(undoable, ruledIds, session.current)
-              ? ` It won’t come back for ${name}.`
-              : ''}
-          </span>
-          <button
-            className="btn btn-small"
-            type="button"
-            {...off(act.isPending && CHANGING)}
-            onClick={() => run({ action: 'undo' }, () => setDroppedHere(null))}
-          >
-            Undo
-          </button>
-        </div>
+        <Overlay>
+          <div className="toast" role="status">
+            <span>
+              Dropped <strong>{title(undoable)}</strong>.
+              {isRuledOut(undoable, ruledIds, session.current)
+                ? ` It won’t come back for ${name}.`
+                : ''}
+            </span>
+            <button
+              className="btn btn-small"
+              type="button"
+              {...off(act.isPending && CHANGING)}
+              onClick={() => run({ action: 'undo' }, () => setDroppedHere(null))}
+            >
+              Undo
+            </button>
+          </div>
+        </Overlay>
       )}
     </div>
   )

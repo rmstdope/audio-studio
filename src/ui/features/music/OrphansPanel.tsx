@@ -42,7 +42,7 @@ export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
         <span className="muted">
           The game dropped these tracks, but their music files are still there.
         </span>
-        <table className="table music-orphans-table">
+        <table className="table stack-table music-orphans-table">
           <tbody>
             {orphans.map((row) => {
               const playing = player.playing === row.id
