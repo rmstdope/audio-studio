@@ -439,9 +439,9 @@ describe('the dropped effects', () => {
     const table = panel.querySelector('table')!
     expect(table.closest('.table-box')).toBeNull()
     expect(minWidthsInEveryWindow(table)).toEqual([])
-    // The effects table above, in its box that scrolls, keeps its columns wide.
+    // The effects table above stacks too, so its box holds no minimum either (as-35pz).
     const boxed = container.querySelector('.table-box table')!
-    expect(minWidthsInEveryWindow(boxed)).toEqual([':where(.table-box) .table: 760px'])
+    expect(minWidthsInEveryWindow(boxed)).toEqual([])
   })
 
   it('asks first; Cancel puts focus back on Forget', async () => {

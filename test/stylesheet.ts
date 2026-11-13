@@ -116,3 +116,32 @@ export function selectorsAtPanelWidth(width: number): string[] {
   }
   return selectors
 }
+
+/**
+ * The non-zero `min-width`s the stylesheet gives an element in a panel `width` px wide: the rules
+ * for every width and those of the `@container panel` blocks that apply at that width, each with
+ * the selector that gives it. Like `minWidthsInEveryWindow`, the cascade is not looked at.
+ */
+export function minWidthsAtPanelWidth(element: Element, width: number): string[] {
+  const found = minWidthsInEveryWindow(element)
+  for (const block of atBlocks()) {
+    const query = /^@container panel \((max|min)-width: (\d+)px\)$/.exec(block.prelude)
+    if (!query) continue
+    const limit = Number(query[2])
+    if (query[1] === 'max' ? width > limit : width < limit) continue
+    for (const m of block.body.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const value = /(?:^|[;\s])min-width:\s*([^;]+);/.exec(m[2]!)?.[1]?.trim()
+      if (!value || /^0(px)?$/.test(value)) continue
+      for (const selector of m[1]!.split(',').map((s) => s.trim())) {
+        let matches = false
+        try {
+          matches = element.matches(selector)
+        } catch {
+          // A selector the DOM cannot test (a pseudo-element) applies to no element.
+        }
+        if (matches) found.push(`${selector}: ${value}`)
+      }
+    }
+  }
+  return found
+}
