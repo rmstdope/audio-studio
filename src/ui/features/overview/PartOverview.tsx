@@ -5,7 +5,7 @@ import type { PartDetail } from '../../../services/workspace'
 import { useAdopt, useMoveCue, useMoveSceneCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
 import { DialogGonePanel } from '../lines/DialogGonePanel'
-import { Pager } from '../../components/Pager'
+import { PageHeader } from '../../components/PageHeader'
 import { pagerFor } from '../../pager'
 import { PartLanguageSwitch } from '../lines/PartLanguageSwitch'
 import { noDialogPanel } from '../../languages'
@@ -56,59 +56,65 @@ export function PartOverview({
   }))
   return (
     <>
-      <header className="page-header">
-        <div>
-          <span className="crumbs">Narration / {shortTitle(part.title)}</span>
-          <h1>{longTitle(part.title)}</h1>
-          <span className="mono muted" style={{ fontSize: 12 }}>
-            {loaded?.dialogPath ?? part.dialogPath}
-          </span>
-        </div>
-        {several && (
-          <PartLanguageSwitch
-            summary={summary}
-            part={part}
-            active={active.id}
-            progress={loaded?.languages ?? null}
-            onChoose={(id) => {
-              window.location.hash = routeHref({ view: 'part', part: part.id, language: id })
-            }}
-          />
-        )}
-        {(hasDialog || summary.canRefresh || pager) && (
-          <div className="header-actions header-end">
-            {summary.canRefresh && (
-              <button
-                className="btn"
-                type="button"
-                {...off(refreshRunningWhy(refresh.pending))}
-                title={
-                  refresh.pending
-                    ? undefined
-                    : 'Runs the project’s refresh.part command to extract this dialog from the game'
-                }
-                onClick={refresh.start}
-              >
-                {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
-              </button>
-            )}
-            {showsLines && (
-              <a className="btn" href={routeHref({ view: 'lines', part: part.id, language })}>
-                <ListIcon /> All {lineCount} lines
-              </a>
-            )}
-            {toRecord > 0 && (
-              <a
-                className="btn btn-primary"
-                href={routeHref({ view: 'lines', part: part.id, language })}
-              >
-                Generate {plural(toRecord, 'line')}
-              </a>
-            )}
-            {pager && <Pager {...pager} />}
-          </div>
-        )}
-      </header>
+      <PageHeader
+        title={
+          <>
+            <span className="crumbs">Narration / {shortTitle(part.title)}</span>
+            <h1>{longTitle(part.title)}</h1>
+            <span className="mono muted" style={{ fontSize: 12 }}>
+              {loaded?.dialogPath ?? part.dialogPath}
+            </span>
+          </>
+        }
+        tabs={
+          several && (
+            <PartLanguageSwitch
+              summary={summary}
+              part={part}
+              active={active.id}
+              progress={loaded?.languages ?? null}
+              onChoose={(id) => {
+                window.location.hash = routeHref({ view: 'part', part: part.id, language: id })
+              }}
+            />
+          )
+        }
+        actions={
+          (hasDialog || summary.canRefresh) && (
+            <>
+              {summary.canRefresh && (
+                <button
+                  className="btn"
+                  type="button"
+                  {...off(refreshRunningWhy(refresh.pending))}
+                  title={
+                    refresh.pending
+                      ? undefined
+                      : 'Runs the project’s refresh.part command to extract this dialog from the game'
+                  }
+                  onClick={refresh.start}
+                >
+                  {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
+                </button>
+              )}
+              {showsLines && (
+                <a className="btn" href={routeHref({ view: 'lines', part: part.id, language })}>
+                  <ListIcon /> All {lineCount} lines
+                </a>
+              )}
+              {toRecord > 0 && (
+                <a
+                  className="btn btn-primary"
+                  href={routeHref({ view: 'lines', part: part.id, language })}
+                >
+                  Generate {plural(toRecord, 'line')}
+                </a>
+              )}
+            </>
+          )
+        }
+        pager={pager}
+      />
       {refresh.outcome && (
         <RefreshOutcome
           result={refresh.outcome.result}

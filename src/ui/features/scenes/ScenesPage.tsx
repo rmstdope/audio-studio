@@ -3,7 +3,7 @@ import { draftOf, fixHeading, toMix, type SceneDraft } from '../../../core/scene
 import { expectedFigures, shiftStates, type SceneMeasure } from '../../../core/sceneLoudness'
 import type { SceneAct, SceneRow, ScenesSummary } from '../../../core/scenes'
 import { useRefreshDialog, useSceneLoudness } from '../../api'
-import { Pager } from '../../components/Pager'
+import { PageHeader } from '../../components/PageHeader'
 import { pagerFor } from '../../pager'
 import { Problems } from '../../components/Problems'
 import { shortTitle } from '../../format'
@@ -171,42 +171,46 @@ export function ScenesPage({
   }
   return (
     <>
-      <header className="page-header">
-        <div>
-          <span className="crumbs">Scenes · {name}</span>
-          <h1 tabIndex={-1}>{scene.name}</h1>
-          <span className="muted">{statesLine(scene)}</span>
-        </div>
-        <div className="header-actions header-end">
-          {word && (
-            <span className={word.className} role="status">
-              {word.text}
-            </span>
-          )}
-          <button
-            className="btn"
-            type="button"
-            {...off(
-              !editor.dirty &&
-                'There are no changes to discard. Change something in the scene first.',
+      <PageHeader
+        title={
+          <>
+            <span className="crumbs">Scenes · {name}</span>
+            <h1 tabIndex={-1}>{scene.name}</h1>
+            <span className="muted">{statesLine(scene)}</span>
+          </>
+        }
+        actions={
+          <>
+            {word && (
+              <span className={word.className} role="status">
+                {word.text}
+              </span>
             )}
-            onClick={editor.discard}
-          >
-            Discard
-          </button>
-          <button
-            ref={saveButton}
-            className="btn btn-primary"
-            type="button"
-            {...off(saveWhy({ dirty: editor.dirty, red, saving }))}
-            onClick={save}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          {refresh(false)}
-          {pager && <Pager {...pager} />}
-        </div>
-      </header>
+            <button
+              className="btn"
+              type="button"
+              {...off(
+                !editor.dirty &&
+                  'There are no changes to discard. Change something in the scene first.',
+              )}
+              onClick={editor.discard}
+            >
+              Discard
+            </button>
+            <button
+              ref={saveButton}
+              className="btn btn-primary"
+              type="button"
+              {...off(saveWhy({ dirty: editor.dirty, red, saving }))}
+              onClick={save}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            {refresh(false)}
+          </>
+        }
+        pager={pager}
+      />
       {status.kind === 'failed' && (
         <section className="panel scene-problem" aria-label="Save failed">
           <strong>Couldn&apos;t save {scene.name}.</strong>

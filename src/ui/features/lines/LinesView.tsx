@@ -31,7 +31,7 @@ import { RefreshOutcome } from '../overview/PartOverview'
 import { GeneratePanel } from './GeneratePanel'
 import { CuedText, LineWords } from './CueGaps'
 import { DialogGonePanel } from './DialogGonePanel'
-import { Pager } from '../../components/Pager'
+import { PageHeader } from '../../components/PageHeader'
 import { pagerFor } from '../../pager'
 import { PartLanguageSwitch } from './PartLanguageSwitch'
 import { HeardComparison } from './HeardComparison'
@@ -227,35 +227,35 @@ export function LinesView({
     href: routeHref({ view: 'lines', part: p.id, ...(language ? { language } : {}) }),
   }))
   const header = (
-    <header className="page-header">
-      <div>
-        <span className="crumbs">
-          <a href={routeHref({ view: 'part', part: part.id })}>
-            Narration / {shortTitle(part.title)}
-          </a>
-        </span>
-        <h1>Lines</h1>
-        <span className="muted">
-          {longTitle(part.title)} · {plural(part.lineCount, 'line')}
-        </span>
-      </div>
-      {several && (
-        <PartLanguageSwitch
-          summary={summary}
-          part={part}
-          active={active.id}
-          progress={loaded?.languages ?? null}
-          onChoose={(id) => {
-            window.location.hash = routeHref({ view: 'lines', part: part.id, language: id })
-          }}
-        />
-      )}
-      {pager && (
-        <div className="header-actions header-end">
-          <Pager {...pager} />
-        </div>
-      )}
-    </header>
+    <PageHeader
+      title={
+        <>
+          <span className="crumbs">
+            <a href={routeHref({ view: 'part', part: part.id })}>
+              Narration / {shortTitle(part.title)}
+            </a>
+          </span>
+          <h1>Lines</h1>
+          <span className="muted">
+            {longTitle(part.title)} · {plural(part.lineCount, 'line')}
+          </span>
+        </>
+      }
+      tabs={
+        several && (
+          <PartLanguageSwitch
+            summary={summary}
+            part={part}
+            active={active.id}
+            progress={loaded?.languages ?? null}
+            onChoose={(id) => {
+              window.location.hash = routeHref({ view: 'lines', part: part.id, language: id })
+            }}
+          />
+        )
+      }
+      pager={pager}
+    />
   )
 
   const dialog = loaded ? loaded.dialog : several ? 'ok' : part.dialog

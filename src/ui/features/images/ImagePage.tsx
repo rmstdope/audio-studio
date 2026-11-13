@@ -5,7 +5,7 @@ import {
   type ImagesAct,
   type ImagesSummary,
 } from '../../../core/images'
-import { Pager } from '../../components/Pager'
+import { PageHeader } from '../../components/PageHeader'
 import { Problems } from '../../components/Problems'
 import {
   useAcceptImageChange,
@@ -102,28 +102,30 @@ export function ImagePage({
   }))
   return (
     <>
-      <header className="page-header">
-        <div>
-          <span className="crumbs">
-            <a href={routeHref({ view: 'images', page: null })}>Images</a> ›{' '}
-            <a href={routeHref({ view: 'images', page: 'act', part: act.id })}>
-              {shortTitle(act.title)}
-            </a>
-          </span>
-          <h1 tabIndex={-1}>{row.title}</h1>
-          <span className="mono muted">{row.id}</span>
-          {row.sharedWith.length > 0 && (
-            <span className="muted images-shared">
-              Shared with <ActLinks acts={row.sharedWith} />: a change here changes it there too.
+      <PageHeader
+        title={
+          <>
+            <span className="crumbs">
+              <a href={routeHref({ view: 'images', page: null })}>Images</a> ›{' '}
+              <a href={routeHref({ view: 'images', page: 'act', part: act.id })}>
+                {shortTitle(act.title)}
+              </a>
             </span>
-          )}
-          <span className="muted images-look-line">
-            {row.look.line}
-            {row.looksOld && <span className="chip chip-warn">Old look</span>}
-          </span>
-        </div>
-        {pager && <Pager {...pager} keys={false} />}
-      </header>
+            <h1 tabIndex={-1}>{row.title}</h1>
+            <span className="mono muted">{row.id}</span>
+            {row.sharedWith.length > 0 && (
+              <span className="muted images-shared">
+                Shared with <ActLinks acts={row.sharedWith} />: a change here changes it there too.
+              </span>
+            )}
+            <span className="muted images-look-line">
+              {row.look.line}
+              {row.looksOld && <span className="chip chip-warn">Old look</span>}
+            </span>
+          </>
+        }
+        pager={pager && { ...pager, keys: false }}
+      />
       {row.status === 'out of date' && (
         <section className="notice notice-warn">
           <div className="notice-text">

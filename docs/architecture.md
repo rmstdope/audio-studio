@@ -170,11 +170,9 @@ unless the press is in a field or inside a control that uses the arrows (`ARROW_
 page-wide. The language chosen stays in the address of the neighbour. Every step lands at the top
 of the page, so the same arrow stays under the pointer (as-pbby): the control scrolls the window to
 the top once the stepped-to item shows, and a strip or grid that keeps its take in view
-(`ui/scrollWithin.ts`) scrolls only itself, never the page. On a character's page, a
-part's overview and Lines page and an act's Scenes page, the pages whose header has buttons or a
-language switch, the control sits inside the header's action group (`.header-end`), held to the
-right end, so a narrower window wraps it with the buttons and never alone at the left (as-ped,
-as-85z).
+(`ui/scrollWithin.ts`) scrolls only itself, never the page. On every page with the control, the header is a `PageHeader` (`ui/components/PageHeader.tsx`), which
+puts the control inside the header's action group (`.header-end`), held to the right end, so a
+narrower window wraps it with the buttons and never alone at the left (as-ped, as-85z, as-21ub).
 
 Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows. `core/` has no
 imports from the others, so the rules for status, staleness and alignment are tested without

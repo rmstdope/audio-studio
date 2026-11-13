@@ -2,7 +2,8 @@ import { useRef, useState } from 'react'
 import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import { useKeepMineEffect, useSetEffectDescription } from '../../api'
 import { Failure } from '../../components/Failure'
-import { Pager, type PagerProps } from '../../components/Pager'
+import type { PagerProps } from '../../components/Pager'
+import { PageHeader } from '../../components/PageHeader'
 import { pagerFor } from '../../pager'
 import { WordsField, type SaveWordsNow } from '../images/WordsField'
 import { EFFECTS_PENDING, effectLengthLine } from '../../effectsText'
@@ -51,16 +52,18 @@ function Found({ row, pager }: { row: EffectRow; pager: PagerProps | null }) {
   const saveNow = useRef<SaveWordsNow>(null)
   return (
     <>
-      <header className="page-header">
-        <div>
-          <span className="crumbs">
-            <a href={BACK}>Sound effects</a> ›
-          </span>
-          <h1 tabIndex={-1}>{row.name}</h1>
-          <span className="mono muted">{row.id}</span>
-        </div>
-        {pager && <Pager {...pager} />}
-      </header>
+      <PageHeader
+        title={
+          <>
+            <span className="crumbs">
+              <a href={BACK}>Sound effects</a> ›
+            </span>
+            <h1 tabIndex={-1}>{row.name}</h1>
+            <span className="mono muted">{row.id}</span>
+          </>
+        }
+        pager={pager}
+      />
       {row.gameChanged && (
         <section className="notice notice-warn" aria-label="The game's description changed">
           <div className="notice-text">
