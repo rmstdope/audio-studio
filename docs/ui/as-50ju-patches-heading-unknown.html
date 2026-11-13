@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Patches heading not known</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --line: rgb(255 255 255/7%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --panel: #10121a;
+        --inset: #0d0f14;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 20px 16px 40px;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .intro {
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        border-left: 3px solid var(--accent);
+        padding: 4px 10px;
+        margin: 4px 0 16px;
+        color: var(--muted);
+      }
+      .crumbs {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .crumbs a {
+        color: var(--muted);
+      }
+      h2.t {
+        font-size: 22px;
+        margin: 2px 0;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin: 14px 0 10px;
+        flex-wrap: wrap;
+      }
+      .jt {
+        padding: 7px 12px;
+        border-radius: 9px;
+        background: var(--chip);
+        display: flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .jt.on {
+        background: #23263a;
+        outline: 1px solid #3a3f5c;
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--muted);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .bench {
+        display: grid;
+        grid-template-columns: 1fr 1fr 300px;
+        gap: 12px;
+      }
+      @media (max-width: 900px) {
+        .bench {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .panel.warn {
+        border-color: #6b5420;
+        background: #16130b;
+      }
+      .lbl {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .frame {
+        aspect-ratio: 16/10;
+        border: 1px dashed #2c3040;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        text-align: center;
+        padding: 12px;
+        margin: 8px 0;
+        background: var(--inset);
+      }
+      .pic {
+        aspect-ratio: 16/10;
+        border-radius: 8px;
+        margin: 8px 0;
+        background: linear-gradient(135deg, #3a4a6a, #7a5a3a);
+      }
+      .faint {
+        color: var(--faint);
+        font-size: 12.5px;
+      }
+      .btn {
+        background: var(--chip);
+        border: 1px solid #2c3040;
+        color: var(--text);
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+      }
+      .banner {
+        border: 1px solid #6b5420;
+        background: #16130b;
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin: 10px 0;
+      }
+      .banner b {
+        color: var(--warn);
+      }
+      .cap {
+        margin: 26px 0 6px;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .cmp {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 900px) {
+        .cmp {
+          grid-template-columns: 1fr;
+        }
+      }
+      .strip {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .th {
+        width: 90px;
+        aspect-ratio: 16/10;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #334, #553);
+      }
+      .warnline {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+
+      .lbl {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .lbl.warnt {
+        color: var(--warn);
+      }
+      .faint {
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .cap {
+        margin: 26px 0 8px;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .pchips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 6px 0 12px;
+        padding: 0;
+        list-style: none;
+      }
+      .pchip {
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--chip);
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .pchip.cur {
+        outline: 1px solid #3a3f5c;
+        background: #23263a;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #3a3f4c;
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .frame {
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        min-height: 220px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        color: var(--faint);
+        text-align: center;
+        background: var(--inset);
+      }
+      .lefty {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 12px;
+      }
+      @media (max-width: 700px) {
+        .lefty {
+          grid-template-columns: 1fr;
+        }
+      }
+      .rows {
+        list-style: none;
+        padding: 0;
+        margin: 8px 0 0;
+        display: grid;
+        gap: 6px;
+      }
+      .rows li {
+        background: var(--chip);
+        border-radius: 9px;
+        padding: 8px 10px;
+      }
+      .rows li.cur {
+        outline: 1px solid #3a3f5c;
+        background: #23263a;
+      }
+      .rows .mono {
+        display: block;
+      }
+      h3 {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+      }
+      h3.warnt {
+        color: var(--warn);
+      }
+      .compare {
+        opacity: 0.75;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>Option A — the heading drops the count of chosen</h1>
+        <p>
+          The patch chips above a wide picture lose their grey dot while the images lock cannot be
+          read, so no chip looks “not chosen”. The heading over the patches says only how many
+          patches the game asks for: <b>Patches · 2</b>. It keeps its usual quiet colour; the tab
+          chip already says <i>not known</i> in the warning tone, and the panel says why.
+        </p>
+      </div>
+      <div class="cap">A wide picture: the patches as chips above it</div>
+      <div class="panel">
+        <div class="crumbs"><a>Images</a> › <a>Act 2</a></div>
+        <h2 class="t">The old map</h2>
+        <span class="mono">old-map</span>
+        <div class="tabs">
+          <div class="jt">Make <span class="chip warn">not known</span></div>
+          <div class="jt">Fine-tune</div>
+          <div class="jt on">Patches <span class="chip warn">not known</span></div>
+        </div>
+        <div class="panel">
+          <span class="lbl">Patches · 2</span>
+          <ul class="pchips">
+            <li class="pchip cur">Torn corner</li>
+            <li class="pchip">Ink stain</li>
+          </ul>
+          <div class="frame">
+            Which take the game shows is not known until the images lock can be read; fix it, then
+            reload.
+          </div>
+        </div>
+      </div>
+      <div class="cap">A tall picture: the patches as a list beside it</div>
+      <div class="panel">
+        <div class="crumbs"><a>Images</a> › <a>Act 1</a></div>
+        <h2 class="t">Lantern hall</h2>
+        <span class="mono">lantern-hall</span>
+        <div class="tabs">
+          <div class="jt">Make <span class="chip warn">not known</span></div>
+          <div class="jt">Fine-tune</div>
+          <div class="jt on">Patches <span class="chip warn">not known</span></div>
+        </div>
+        <div class="panel lefty">
+          <div>
+            <h3 class="">Patches · 2</h3>
+            <ul class="rows">
+              <li class="cur">
+                <b>Lit lantern</b><span class="mono">lit-lantern</span
+                ><span class="chip">2 takes</span>
+              </li>
+              <li>
+                <b>Open door</b><span class="mono">open-door</span
+                ><span class="chip">no takes yet</span>
+              </li>
+            </ul>
+          </div>
+          <div class="frame" style="min-height: 360px">
+            Which take the game shows is not known until the images lock can be read; fix it, then
+            reload.
+          </div>
+        </div>
+      </div>
+      <div class="cap">Today, for comparison</div>
+      <div class="compare">
+        <div class="intro compare">
+          <h1>Today — for comparison</h1>
+          <p>
+            What the Patches tab shows today while the images lock cannot be read: the chip and
+            panel say <i>not known</i>, but the heading still claims <b>0 of 2 chosen</b>.
+          </p>
+        </div>
+        <div class="cap">A wide picture: the patches as chips above it</div>
+        <div class="panel">
+          <div class="crumbs"><a>Images</a> › <a>Act 2</a></div>
+          <h2 class="t">The old map</h2>
+          <span class="mono">old-map</span>
+          <div class="tabs">
+            <div class="jt">Make <span class="chip warn">not known</span></div>
+            <div class="jt">Fine-tune</div>
+            <div class="jt on">Patches <span class="chip warn">not known</span></div>
+          </div>
+          <div class="panel">
+            <span class="lbl">Patches · 0 of 2 chosen</span>
+            <ul class="pchips">
+              <li class="pchip cur"><span class="dot"></span>Torn corner</li>
+              <li class="pchip"><span class="dot"></span>Ink stain</li>
+            </ul>
+            <div class="frame">
+              Which take the game shows is not known until the images lock can be read; fix it, then
+              reload.
+            </div>
+          </div>
+        </div>
+        <div class="cap">A tall picture: the patches as a list beside it</div>
+        <div class="panel">
+          <div class="crumbs"><a>Images</a> › <a>Act 1</a></div>
+          <h2 class="t">Lantern hall</h2>
+          <span class="mono">lantern-hall</span>
+          <div class="tabs">
+            <div class="jt">Make <span class="chip warn">not known</span></div>
+            <div class="jt">Fine-tune</div>
+            <div class="jt on">Patches <span class="chip warn">not known</span></div>
+          </div>
+          <div class="panel lefty">
+            <div>
+              <h3 class="">Patches · 0 of 2 chosen</h3>
+              <ul class="rows">
+                <li class="cur">
+                  <b>Lit lantern</b><span class="mono">lit-lantern</span
+                  ><span class="chip">2 takes</span>
+                </li>
+                <li>
+                  <b>Open door</b><span class="mono">open-door</span
+                  ><span class="chip">no takes yet</span>
+                </li>
+              </ul>
+            </div>
+            <div class="frame" style="min-height: 360px">
+              Which take the game shows is not known until the images lock can be read; fix it, then
+              reload.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
