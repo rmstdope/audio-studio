@@ -18,7 +18,7 @@ test('the environment switches carry Content Studio’s name, and no old name is
     .flatMap((d) => files(join(root, d)))
     .filter((f) => readFileSync(f, 'utf8').includes(oldPrefix))
   expect(old).toEqual([])
-  const server = readFileSync(join(root, 'src/server/index.ts'), 'utf8')
+  const server = readFileSync(join(root, 'src/server/context.ts'), 'utf8')
   expect(server).toContain("process.env.CONTENT_STUDIO_FAKE_IMAGES === '1'")
   expect(server).toContain("process.env.CONTENT_STUDIO_FAKE_MUSIC === '1'")
 })
