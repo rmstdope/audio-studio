@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { WriteRefused } from './files'
 import { setImageAreaBox, setImageWords } from './imageEdits'
 import { readImages } from './imageLists'
 import { createImageTakes } from './imageTakes'
@@ -102,6 +111,26 @@ function setup(
   }
   return { root, file, takes, requests, settled, read, row, clock }
 }
+
+describe.skipIf(process.getuid?.() === 0)('a board that cannot be written', () => {
+  it('raises one typed refusal naming the board, and changes nothing', async () => {
+    const { takes, file, root, settled } = setup()
+    await takes.make(file, 'inn', { count: 1 })
+    await settled('inn')
+    const folder = join(root, 'content-studio/cache/images')
+    chmodSync(folder, 0o555)
+    try {
+      const error = await takes.drop(file, 'inn', 1).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(WriteRefused)
+      expect((error as WriteRefused).message).toBe(
+        'content-studio/cache/images/inn.json could not be written',
+      )
+    } finally {
+      chmodSync(folder, 0o755)
+    }
+    expect(JSON.parse(readFileSync(join(folder, 'inn.json'), 'utf8')).takes).toHaveLength(1)
+  })
+})
 
 describe('making takes', () => {
   it('makes takes one after another from the whole prompt, at the take size, and lists them', async () => {

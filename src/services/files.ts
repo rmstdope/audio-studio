@@ -126,17 +126,20 @@ export class WriteRefused extends Error {
   }
 }
 
+/** A `.catch` handler for any file operation on `path` (a rename, a removal): its failure is a `WriteRefused`. */
+export function refuseWrite(path: string): (error: unknown) => never {
+  return (error) => {
+    throw new WriteRefused(path, writeFailure(error), error)
+  }
+}
+
 /** `writeAtomic`, but a failed write is a `WriteRefused` naming `path`. */
 export async function writeOrRefuse(
   root: string,
   path: string,
   text: string | Uint8Array,
 ): Promise<void> {
-  try {
-    await writeAtomic(root, path, text)
-  } catch (error) {
-    throw new WriteRefused(path, writeFailure(error), error)
-  }
+  await writeAtomic(root, path, text).catch(refuseWrite(path))
 }
 
 /**

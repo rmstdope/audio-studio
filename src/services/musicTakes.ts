@@ -276,14 +276,6 @@ interface StoredBatch extends Omit<MusicBatch, 'running'> {
 /** A take's file name on the board. */
 const fileOf = (take: Pick<BoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.wav`
 
-/** A refusal of a choice as a bare reason: "Take 1 could not be chosen: X. Nothing was changed." gives "X". */
-function plainReason(message: string): string {
-  return message
-    .replace(/^Take \d+ could not be chosen: /, '')
-    .replace(/\.? Nothing was changed\.$/, '')
-    .replace(/\.$/, '')
-}
-
 /**
  * What the game plays of a take: its WAV between the cuts if it was trimmed, then with its fades if
  * it has some, and the take as the board should hand it to the encoder, with the length that is left.
@@ -1012,7 +1004,10 @@ export function createMusicTakes({
           })
           if (!committed.ok) {
             return 'message' in committed
-              ? { ok: false, message: plainReason(committed.message) }
+              ? {
+                  ok: false,
+                  message: committed.reason ?? committed.message,
+                }
               : { ok: false, message: `${committed.file} could not be read` }
           }
         }

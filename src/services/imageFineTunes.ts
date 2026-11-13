@@ -20,7 +20,7 @@ import { takeSize } from '../core/imageTakes'
 import { resolveInRoot } from '../core/paths'
 import { CACHE_DIR, type Problem } from '../core/project'
 import { figuresOf, timeKeyOfEdit } from '../core/takeTimes'
-import { readResource, writeAtomic } from './files'
+import { readResource, writeOrRefuse } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_TAKES_DIR, readImages } from './imageLists'
 import { carryImageAreas } from './imageEdits'
@@ -165,7 +165,7 @@ export function createImageFineTunes({
       const before = JSON.stringify(board, null, 2)
       const answer = await change(board)
       const after = JSON.stringify(board, null, 2)
-      if (after !== before) await writeAtomic(image.root, image.board, `${after}\n`)
+      if (after !== before) await writeOrRefuse(image.root, image.board, `${after}\n`)
       return answer
     })
   }
@@ -272,7 +272,7 @@ export function createImageFineTunes({
         model: entry.model,
       }
       // The picture first: a fine-tune is on the board only once its file is there.
-      await writeAtomic(image.root, `${image.folder}/${entry.n}.png`, made.png)
+      await writeOrRefuse(image.root, `${image.folder}/${entry.n}.png`, made.png)
       const failure = await changeBoard(image, (board) => {
         if (stop.signal.aborted) return
         board.tunes = [...board.tunes.filter((t) => t.n !== saved.n), saved].sort(
@@ -543,7 +543,7 @@ export function createImageFineTunes({
         const bytes = await Bun.file(resolveInRoot(image.root, source))
           .bytes()
           .catch(() => null)
-        if (bytes) await writeAtomic(image.root, copy, bytes)
+        if (bytes) await writeOrRefuse(image.root, copy, bytes)
       }
       b.next = n + 1
       b.takes = [...b.takes, { ...old, n, base: to }]

@@ -159,7 +159,7 @@ describe('commitChoice', () => {
       encode,
       now: () => at,
     })
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'Take 3 could not be chosen: the music lock could not be read. Nothing was changed.',
     })
@@ -180,7 +180,7 @@ describe('commitChoice', () => {
       encode,
       now: () => at,
     })
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message:
         'Take 1 could not be chosen: the music manifest could not be read. Nothing was changed.',
@@ -213,9 +213,9 @@ describe.skipIf(Bun.which('ffmpeg') === null || process.getuid?.() === 0)(
           encode: ffmpegEncoder,
           now: () => at,
         })
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           ok: false,
-          message: 'The game’s file could not be written.',
+          message: 'audio/music/hall.mp3 could not be written.',
         })
       } finally {
         chmodSync(clips, 0o755)
@@ -241,7 +241,7 @@ describe('commitChoice with both files broken', () => {
       encode,
       now: () => at,
     })
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message:
         'Take 2 could not be chosen: the music manifest could not be read. Nothing was changed.',
@@ -377,7 +377,11 @@ describe('uncommitChoice', () => {
       chmodSync(clips, 0o555)
       try {
         const result = await uncommitChoice({ root, music: config, id: 'hall' })
-        expect(result).toEqual({ ok: false, message: 'The game’s file could not be written.' })
+        expect(result).toEqual({
+          ok: false,
+          message: 'audio/music/manifest.json could not be written.',
+          reason: 'audio/music/manifest.json could not be written',
+        })
       } finally {
         chmodSync(clips, 0o755)
       }

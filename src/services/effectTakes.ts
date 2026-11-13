@@ -213,14 +213,6 @@ function playedOf(take: EffectBoardTake, bytes: Uint8Array) {
   }
 }
 
-/** A refusal of a choice as a bare reason: "Take 1 could not be chosen: X. Nothing was changed." gives "X". */
-function plainReason(message: string): string {
-  return message
-    .replace(/^Take \d+ could not be chosen: /, '')
-    .replace(/\.? Nothing was changed\.$/, '')
-    .replace(/\.$/, '')
-}
-
 /** A model's full name; an id the studio does not know is shown as it is. */
 const modelName = (id: string) =>
   (EFFECT_MODEL_IDS as readonly string[]).includes(id) ? effectModel(id as EffectModelId).name : id
@@ -890,7 +882,10 @@ export function createEffectTakes({
             })
             if (!committed.ok) {
               return 'message' in committed
-                ? { ok: false, message: plainReason(committed.message) }
+                ? {
+                    ok: false,
+                    message: committed.reason ?? committed.message,
+                  }
                 : { ok: false, message: `${committed.file} could not be read` }
             }
           }

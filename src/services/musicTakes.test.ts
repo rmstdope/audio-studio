@@ -1601,7 +1601,8 @@ describe('fading a stinger take', () => {
   it('names the board when dropping a take cannot save it', async () => {
     const made = await stinger()
     const folder = join(made.root, 'content-studio/cache/music')
-    const board = /^The take could not be dropped: content-studio\/cache\/music\/\S+\.json could not be written\.$/
+    const board =
+      /^The take could not be dropped: content-studio\/cache\/music\/\S+\.json could not be written\.$/
     const quiet = console.error
     console.error = () => {}
     chmodSync(folder, 0o555)
@@ -1914,7 +1915,7 @@ describe('trimming a stinger take', () => {
     await m.takes.choose(m.file, 'victory', one!.file)
     expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
     m.fail(new FileNotWritten())
-    const reason = { ok: false, message: 'The game’s file could not be written' } as const
+    const reason = { ok: false, message: 'audio/music/victory.mp3 could not be written' } as const
     expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual(reason)
     m.fail(false)
     expect(await m.takes.trim(m.file, 'victory', one!.file, true)).toEqual({ ok: true })
