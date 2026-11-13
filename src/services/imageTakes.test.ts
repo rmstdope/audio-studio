@@ -428,6 +428,50 @@ describe('choosing', () => {
     expect(await takes.currentFile(file, 'inn')).toBeNull()
   })
 
+  it.skipIf(process.getuid?.() === 0)(
+    'leaves the picture, manifest and lock as they were when the lock cannot be written',
+    async () => {
+      const { takes, file, root, read } = await made()
+      await takes.choose(file, 'inn', 1)
+      const picture = readFileSync(join(root, 'web/images/inn.png'))
+      const manifest = read('web/images/manifest.json')
+      const lock = read(LOCK)
+      const studio = join(root, 'content-studio/images')
+      chmodSync(studio, 0o555)
+      try {
+        expect(await takes.unchoose(file, 'inn')).toMatchObject({
+          ok: false,
+          message: 'content-studio/images/lock.json could not be written.',
+        })
+      } finally {
+        chmodSync(studio, 0o755)
+      }
+      expect(readFileSync(join(root, 'web/images/inn.png'))).toEqual(picture)
+      expect(read('web/images/manifest.json')).toBe(manifest)
+      expect(read(LOCK)).toBe(lock)
+    },
+  )
+
+  it.skipIf(process.getuid?.() === 0)(
+    'refuses, changing nothing, when the picture cannot be taken out of the clips folder',
+    async () => {
+      const { takes, file, root, read } = await made()
+      await takes.choose(file, 'inn', 1)
+      const manifest = read('web/images/manifest.json')
+      const lock = read(LOCK)
+      const clips = join(root, 'web/images')
+      chmodSync(clips, 0o555)
+      try {
+        expect(await takes.unchoose(file, 'inn')).toMatchObject({ ok: false })
+      } finally {
+        chmodSync(clips, 0o755)
+      }
+      expect(existsSync(join(root, 'web/images/inn.png'))).toBe(true)
+      expect(read('web/images/manifest.json')).toBe(manifest)
+      expect(read(LOCK)).toBe(lock)
+    },
+  )
+
   it('keeps the placed areas on the manifest entry, points as marks: choosing writes them, un-choosing takes them with it', async () => {
     const box = { x: 80, y: 50, width: 160, height: 100, point: { x: 96, y: 60 } }
     const { takes, file, read } = await made({

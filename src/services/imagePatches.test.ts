@@ -1043,6 +1043,50 @@ describe('a chosen take of a patch reaches the game', () => {
     expect((await work()).takes).toHaveLength(1)
   })
 
+  it.skipIf(process.getuid?.() === 0)(
+    'leaves the patch, manifest and board as they were when the board cannot be written',
+    async () => {
+      const { root, file, patches, work } = setup()
+      await patches.make(file, 'inn', 'door', { count: 1, area })
+      await work()
+      await patches.choose(file, 'inn', 'door', 1)
+      const manifest = readFileSync(join(root, MANIFEST), 'utf8')
+      const board = readFileSync(join(root, BOARD), 'utf8')
+      const folder = dirname(join(root, BOARD))
+      chmodSync(folder, 0o555)
+      try {
+        expect(await patches.unchoose(file, 'inn', 'door')).toMatchObject({ ok: false })
+      } finally {
+        chmodSync(folder, 0o755)
+      }
+      expect(existsSync(join(root, GAME_PATCH))).toBe(true)
+      expect(readFileSync(join(root, MANIFEST), 'utf8')).toBe(manifest)
+      expect(readFileSync(join(root, BOARD), 'utf8')).toBe(board)
+    },
+  )
+
+  it.skipIf(process.getuid?.() === 0)(
+    'refuses, changing nothing, when the patch picture cannot be taken out of the clips folder',
+    async () => {
+      const { root, file, patches, work } = setup()
+      await patches.make(file, 'inn', 'door', { count: 1, area })
+      await work()
+      await patches.choose(file, 'inn', 'door', 1)
+      const manifest = readFileSync(join(root, MANIFEST), 'utf8')
+      const board = readFileSync(join(root, BOARD), 'utf8')
+      const clips = dirname(join(root, GAME_PATCH))
+      chmodSync(clips, 0o555)
+      try {
+        expect(await patches.unchoose(file, 'inn', 'door')).toMatchObject({ ok: false })
+      } finally {
+        chmodSync(clips, 0o755)
+      }
+      expect(existsSync(join(root, GAME_PATCH))).toBe(true)
+      expect(readFileSync(join(root, MANIFEST), 'utf8')).toBe(manifest)
+      expect(readFileSync(join(root, BOARD), 'utf8')).toBe(board)
+    },
+  )
+
   it('finishes un-choosing when pressed again after the board could not be saved', async () => {
     const { root, file, patches, work } = setup()
     await patches.make(file, 'inn', 'door', { count: 1, area })
