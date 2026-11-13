@@ -174,6 +174,10 @@ the top once the stepped-to item shows, and a strip or grid that keeps its take 
 puts the control inside the header's action group (`.header-end`), held to the right end, so a
 narrower window wraps it with the buttons and never alone at the left (as-ped, as-85z, as-21ub).
 
+A page's problem banners share a `ProblemScope` (`src/ui/components/ProblemScope.tsx`): each banner
+asks `useBannerProblems(id, problems)` for its own problems less those of the banners before it, so a
+problem appears once on a page however many banners it has, and no banner knows the others.
+
 Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows. `core/` has no
 imports from the others, so the rules for status, staleness and alignment are tested without
 audio, network or disk.

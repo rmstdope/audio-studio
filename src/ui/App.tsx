@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { retiringTakes } from '../core/retirement'
 import { useProject } from './api'
 import { WhyTip } from './components/WhyTip'
+import type { Problem } from '../core/project'
 import { Problems } from './components/Problems'
+import { ProblemScope, useBannerProblems } from './components/ProblemScope'
 import { RetirementNotice } from './components/RetirementNotice'
 import { Sidebar } from './components/Sidebar'
 import { AuditionView } from './features/audition/AuditionView'
@@ -87,50 +89,58 @@ export function App() {
             onNotNow={() => setNotNow(true)}
           />
         )}
-        {summary.problems.length > 0 && (
-          <Problems title="Some files could not be read" problems={summary.problems} />
-        )}
-        {route.view === 'changes' ? (
-          <ChangesView summary={summary} />
-        ) : route.view === 'spending' ? (
-          <SpendingView summary={summary} />
-        ) : route.view === 'music' ? (
-          <MusicView summary={summary} route={route} />
-        ) : route.view === 'effects' ? (
-          <EffectsView summary={summary} route={route} />
-        ) : route.view === 'scenes' ? (
-          <ScenesView summary={summary} route={route} />
-        ) : route.view === 'images' ? (
-          <ImagesView summary={summary} route={route} />
-        ) : route.view === 'setup' ? (
-          <SetupView />
-        ) : route.view === 'characters' ? (
-          <CharactersView summary={summary} asked={route.language} />
-        ) : route.view === 'character' ? (
-          <CharacterView
-            key={route.character}
-            summary={summary}
-            characterId={route.character}
-            asked={route.language}
-          />
-        ) : route.view === 'audition' ? (
-          <AuditionView
-            key={route.character}
-            summary={summary}
-            characterId={route.character}
-            asked={route.language}
-          />
-        ) : route.view === 'lines' ? (
-          <LinesView key={part.id} summary={summary} part={part} language={route.language} />
-        ) : (
-          <PartOverview
-            key={part.id}
-            summary={summary}
-            part={part}
-            language={route.view === 'part' ? route.language : undefined}
-          />
-        )}
+        <ProblemScope>
+          <ProjectProblems problems={summary.problems} />
+          {route.view === 'changes' ? (
+            <ChangesView summary={summary} />
+          ) : route.view === 'spending' ? (
+            <SpendingView summary={summary} />
+          ) : route.view === 'music' ? (
+            <MusicView summary={summary} route={route} />
+          ) : route.view === 'effects' ? (
+            <EffectsView summary={summary} route={route} />
+          ) : route.view === 'scenes' ? (
+            <ScenesView summary={summary} route={route} />
+          ) : route.view === 'images' ? (
+            <ImagesView summary={summary} route={route} />
+          ) : route.view === 'setup' ? (
+            <SetupView />
+          ) : route.view === 'characters' ? (
+            <CharactersView summary={summary} asked={route.language} />
+          ) : route.view === 'character' ? (
+            <CharacterView
+              key={route.character}
+              summary={summary}
+              characterId={route.character}
+              asked={route.language}
+            />
+          ) : route.view === 'audition' ? (
+            <AuditionView
+              key={route.character}
+              summary={summary}
+              characterId={route.character}
+              asked={route.language}
+            />
+          ) : route.view === 'lines' ? (
+            <LinesView key={part.id} summary={summary} part={part} language={route.language} />
+          ) : (
+            <PartOverview
+              key={part.id}
+              summary={summary}
+              part={part}
+              language={route.view === 'part' ? route.language : undefined}
+            />
+          )}
+        </ProblemScope>
       </main>
     </div>
   )
+}
+
+/** The project summary's banner: the first on every page, so the others leave out what it lists. */
+function ProjectProblems({ problems }: { problems: Problem[] }) {
+  const shown = useBannerProblems('project', problems)
+  return shown.length > 0 ? (
+    <Problems title="Some files could not be read" problems={shown} />
+  ) : null
 }

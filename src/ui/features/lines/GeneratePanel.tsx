@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { StaleReason } from '../../../core/fingerprint'
-import type { Problem } from '../../../core/project'
 import { displayName } from '../../../core/summary'
 import type { JobKind } from '../../../services/jobs'
 import { useJob, useJobActions, usePlan } from '../../api'
@@ -11,7 +10,7 @@ import { castNote, generateLabel, planHeadline, translatedNote } from '../../lan
 import { REASON } from '../../status'
 import { off } from '../../off'
 import { cancelRunWhy, generateWhy } from '../../linesText'
-import { notShown } from '../../problems'
+import { useBannerProblems } from '../../components/ProblemScope'
 
 /** How a job of each kind is told: while it runs, a line in it, and a line done. */
 const WORDS: Record<JobKind, { running: string; doing: string; done: string }> = {
@@ -31,7 +30,6 @@ export function GeneratePanel({
   language,
   speaker,
   models,
-  shown,
 }: {
   partId: string
   /** The language to record, in a project with several; null in a project with one. */
@@ -42,13 +40,16 @@ export function GeneratePanel({
    * an ElevenLabs voice, `both`), and whether there is a final step: offered only then.
    */
   models: { draft: string; final: string; finalStep: boolean; both: boolean }
-  /** The problems the page already shows above the panel, which it does not repeat. */
-  shown: Problem[]
 }) {
   const [retakeWeak, setRetakeWeak] = useState(false)
   const [stage, setStage] = useState<'draft' | 'final'>('draft')
   const hasFinal = models.finalStep
   const plan = usePlan(partId, speaker, retakeWeak, hasFinal ? stage : 'draft', language?.id)
+  // Its problems are listed unless a banner above already shows them.
+  const unshown = useBannerProblems(
+    'generation',
+    plan.data && !plan.data.ok ? plan.data.problems : [],
+  )
   const job = useJob(partId, language?.id)
   const { start, cancel } = useJobActions(partId, language?.id)
   // A paid plan's Generate asks once more; a different plan clears the question.
@@ -162,7 +163,6 @@ export function GeneratePanel({
     return <section className="panel muted">Could not plan: {plan.error.message}</section>
   const answer = plan.data
   if (!answer.ok) {
-    const unshown = notShown(answer.problems, shown)
     if (unshown.length === 0) {
       return (
         <section className="panel muted">

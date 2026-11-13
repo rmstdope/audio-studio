@@ -9,6 +9,13 @@ const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { GeneratePanel } = await import('./GeneratePanel')
+const { ProblemScope, useBannerProblems } = await import('../../components/ProblemScope')
+
+/** A banner above the panel that shows `problems`, as the page's own banners do. */
+function Above({ problems }: { problems: Problem[] }) {
+  useBannerProblems('above', problems)
+  return null
+}
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -90,7 +97,6 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
               finalStep: false,
               both: false,
             },
-            shown: [],
           }),
         ),
       ),
@@ -135,7 +141,6 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
               finalStep: true,
               both: true,
             },
-            shown: [],
           }),
         ),
       ),
@@ -186,18 +191,22 @@ describe('GeneratePanel, when generation cannot be planned', () => {
         createElement(
           QueryClientProvider,
           { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-          createElement(GeneratePanel, {
-            partId: 'act1',
-            language: null,
-            speaker: null,
-            models: {
-              draft: 's2.1-pro-free',
-              final: 's2.1-pro-free',
-              finalStep: false,
-              both: false,
-            },
-            shown,
-          }),
+          createElement(
+            ProblemScope,
+            null,
+            createElement(Above, { problems: shown }),
+            createElement(GeneratePanel, {
+              partId: 'act1',
+              language: null,
+              speaker: null,
+              models: {
+                draft: 's2.1-pro-free',
+                final: 's2.1-pro-free',
+                finalStep: false,
+                both: false,
+              },
+            }),
+          ),
         ),
       ),
     )
