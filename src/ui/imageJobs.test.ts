@@ -68,6 +68,17 @@ describe('imageJobTabs', () => {
     expect(tabs[3]!.chip).toEqual({ text: '1 of 1', tone: 'ok' })
   })
 
+  it('says not known on Make and Patches when the image’s own views find the lock unread, whatever the row says', () => {
+    const tabs = imageJobTabs({
+      row: row({ status: 'chosen', chosenTake: 1, patches: [{ id: 'p', chosenOn: [1] }] }),
+      ...quiet,
+      lockUnread: true,
+    })
+    const warn = { text: 'not known', tone: 'warn' as const }
+    expect(tabs[0]!.chip).toEqual(warn)
+    expect(tabs[2]!.chip).toEqual(warn)
+  })
+
   it('counts the unseen fine-tunes, and has no chip without any', () => {
     expect(imageJobTabs({ row: row({}), ...quiet, newFineTunes: 2 })[1]!.chip).toEqual({
       text: '2 new',
