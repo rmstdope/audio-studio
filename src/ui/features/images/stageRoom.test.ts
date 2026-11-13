@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { heightBesides, stageChrome, type Box } from './stageRoom'
+import { heightBesides, stageAcross, stageChrome, type Box } from './stageRoom'
 
 const box = (offsetHeight: number, ...kids: Box[]): Box => {
   const me: Box = { parentElement: null, children: kids, offsetHeight }
@@ -56,5 +56,31 @@ describe('what a side of the stage holds besides its picture', () => {
 
   it('is unknown when neither side shows a picture', () => {
     expect(stageChrome([{ side: box(400), picture: null }], gap)).toBeNull()
+  })
+})
+
+describe('what a side of the stage holds across besides its picture', () => {
+  it('adds the padding and border across of each box the picture sits inside, the side included', () => {
+    const frame = box(100)
+    const warn = box(0, box(18), frame)
+    const left = box(400, warn)
+    const pic = box(100)
+    const right = box(400, box(20), pic)
+    const across = (b: Box) => (b === warn ? 26 : b === left ? 2 : 0)
+    expect(
+      stageAcross(
+        [
+          { side: left, picture: frame },
+          { side: right, picture: pic },
+        ],
+        across,
+      ),
+    ).toBe(28)
+  })
+
+  it('is nothing when no picture sits inside a box of its own', () => {
+    const pic = box(100)
+    expect(stageAcross([{ side: box(400, pic), picture: pic }], () => 0)).toBe(0)
+    expect(stageAcross([{ side: box(400), picture: null }], () => 12)).toBe(0)
   })
 })

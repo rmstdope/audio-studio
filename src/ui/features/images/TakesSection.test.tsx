@@ -1755,4 +1755,20 @@ describe('the Make frame', () => {
     const at = css.indexOf('.image-stage-panel {')
     expect(css.slice(at, css.indexOf('}', at))).toMatch(/overflow(-y)?:\s*auto/)
   })
+
+  it('paints the images-lock warning inside its column, a gap from the take beside it and from the panel', () => {
+    const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    )
+    // Nothing of the block reaches past its column's edge: no negative inset or margin. The column
+    // sits the stage's gap from the take beside it and the panel's padding from its border.
+    const reaching = [...css.matchAll(/([^{}]*\.image-side-unknown[^{}]*)\{([^}]*)\}/g)].flatMap(
+      ([, selector, body]) =>
+        [...body!.matchAll(/(inset|margin[a-z-]*|left|right):\s*([^;]*-\d[^;]*);/g)].map(
+          ([, property, value]) => `${selector!.trim()} ${property}: ${value}`,
+        ),
+    )
+    expect(reaching).toEqual([])
+  })
 })

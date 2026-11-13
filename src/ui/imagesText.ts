@@ -247,25 +247,28 @@ const shrunk = (zoom: number) => Math.floor(zoom * 100) / 100
  * workbench's two sides stack. Side by side in `available` pixels: the largest whole number at
  * which both fit; when not even ×1 fits, shrunk to fit, down to half the game's size. Below that
  * they stack, each fitted to the width (at most ×1, at least a tenth). An unknown width (0) shows ×1
- * side by side.
+ * side by side. `across` is what a side holds across besides its picture (its padding and border).
  */
 export function lookZoom(
   available: number,
   gap: number,
   width: number,
+  across = 0,
 ): { zoom: number; stacked: boolean } {
   if (available <= 0 || width <= 0) return { zoom: 1, stacked: false }
-  const beside = (available - gap) / (2 * width)
+  const beside = (available - gap - 2 * across) / (2 * width)
   if (beside >= 1) return { zoom: Math.floor(beside), stacked: false }
   if (beside >= SMALLEST_BESIDE) return { zoom: shrunk(beside), stacked: false }
   // Never below a tenth: while the stage is being laid out it can measure a few pixels.
-  return { zoom: Math.max(SMALLEST_STACKED, shrunk(Math.min(1, available / width))), stacked: true }
+  const alone = (available - across) / width
+  return { zoom: Math.max(SMALLEST_STACKED, shrunk(Math.min(1, alone))), stacked: true }
 }
 
 /**
  * How big the two pictures are shown when the stage has a known height as well: as large as both
  * fit side by side in `availableWidth` x `availableHeight` (a hundredth of the game's size at a
- * time, at least a tenth), keeping their shape. With no known height (0) it is `lookZoom`.
+ * time, at least a tenth), keeping their shape, with `across` left on each side as `lookZoom` does.
+ * With no known height (0) it is `lookZoom`.
  */
 export function fitZoom(
   availableWidth: number,
@@ -273,11 +276,12 @@ export function fitZoom(
   gap: number,
   width: number,
   height: number,
+  across = 0,
 ): { zoom: number; stacked: boolean } {
   if (availableHeight <= 0 || availableWidth <= 0 || width <= 0 || height <= 0) {
-    return lookZoom(availableWidth, gap, width)
+    return lookZoom(availableWidth, gap, width, across)
   }
-  const fit = Math.min((availableWidth - gap) / (2 * width), availableHeight / height)
+  const fit = Math.min((availableWidth - gap - 2 * across) / (2 * width), availableHeight / height)
   return { zoom: Math.max(SMALLEST_STACKED, shrunk(fit)), stacked: false }
 }
 

@@ -126,6 +126,14 @@ describe('the game’s look words', () => {
     expect(lookZoom(300, 10, 320)).toEqual({ zoom: 0.93, stacked: true })
     expect(lookZoom(600, 10, 640)).toEqual({ zoom: 0.93, stacked: true })
   })
+  it('leaves room across for what a side holds besides its picture, on each side', () => {
+    // 1000 wide, 14 between, 26 across each side: 934 / 2 / 480, under the game's size.
+    expect(lookZoom(1000, 14, 480, 26)).toEqual({ zoom: 0.97, stacked: false })
+    expect(lookZoom(1000, 14, 480)).toEqual({ zoom: 1, stacked: false })
+    // Stacked, the side has the whole width less its own.
+    expect(lookZoom(300, 10, 320, 26)).toEqual({ zoom: 0.85, stacked: true })
+    expect(fitZoom(1000, 1000, 14, 480, 300, 26)).toEqual({ zoom: 0.97, stacked: false })
+  })
   it('never shrinks a picture away to nothing while the stage is still being laid out', () => {
     expect(lookZoom(5, 14, 640)).toEqual({ zoom: 0.1, stacked: true })
   })
