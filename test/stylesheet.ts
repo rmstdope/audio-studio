@@ -65,3 +65,54 @@ export function cssLength(
   if (!/^[\d.\s+\-*/(),Mathminax]*$/.test(js)) throw new Error(`Not a length this reads: ${value}`)
   return Number(new Function(`return ${js}`)())
 }
+
+/** The stylesheet without its comments. */
+function stylesheetText(): string {
+  return readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  )
+}
+
+/** The at-rules of the stylesheet (`@media …`, `@container …`) with their prelude and body. */
+function atBlocks(): { prelude: string; body: string }[] {
+  const css = stylesheetText()
+  const blocks: { prelude: string; body: string }[] = []
+  for (const start of css.matchAll(/^@(?:media|container)[^{]*\{/gm)) {
+    let depth = 1
+    let i = start.index + start[0].length
+    while (depth > 0 && i < css.length) {
+      if (css[i] === '{') depth++
+      else if (css[i] === '}') depth--
+      i++
+    }
+    blocks.push({
+      prelude: start[0].slice(0, -1).trim(),
+      body: css.slice(start.index + start[0].length, i - 1),
+    })
+  }
+  return blocks
+}
+
+/** Every `@media` prelude in the stylesheet, such as `@media (max-width: 600px)`. */
+export function mediaQueries(): string[] {
+  return atBlocks()
+    .map((b) => b.prelude)
+    .filter((p) => p.startsWith('@media'))
+}
+
+/**
+ * The selectors the stylesheet's `@container panel (max-width: N)` blocks apply to a panel `width`
+ * px wide, whatever the window's width is: the panel's own width decides, as a browser would.
+ */
+export function selectorsAtPanelWidth(width: number): string[] {
+  const selectors: string[] = []
+  for (const block of atBlocks()) {
+    const max = /^@container panel \(max-width: (\d+)px\)$/.exec(block.prelude)?.[1]
+    if (max === undefined || width > Number(max)) continue
+    for (const m of block.body.matchAll(/([^{}]+)\{[^}]*\}/g)) {
+      for (const s of m[1]!.split(',')) selectors.push(s.trim())
+    }
+  }
+  return selectors
+}

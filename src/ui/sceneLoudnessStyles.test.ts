@@ -5,7 +5,7 @@ const css = readFileSync(new URL('./styles.css', import.meta.url), 'utf8')
 
 /** The body of the Scenes page's narrow-window block, the one that stacks the scene list. */
 function narrow(): string {
-  const from = css.indexOf('@media (max-width: 700px) {\n  .scenes-body')
+  const from = css.indexOf('@container panel (max-width: 700px) {\n  .scenes-body')
   return from < 0 ? '' : css.slice(from, css.indexOf('\n}\n', from))
 }
 

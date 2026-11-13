@@ -27,7 +27,7 @@ describe('the scene editor’s styles', () => {
   it('uses tokens, not colours, in the editor’s rules', () => {
     const editor = css.slice(
       css.indexOf('.scene-status {'),
-      css.indexOf('@media (max-width: 700px)', css.indexOf('.scene-status {')),
+      css.indexOf('@container panel (max-width: 700px)', css.indexOf('.scene-status {')),
     )
     expect(editor).not.toMatch(/#[0-9a-f]{3,6}\b/i)
   })
@@ -38,7 +38,7 @@ describe('the scene editor’s styles', () => {
 
   it('stacks each effect as a card in a narrow window, the red line under its box', () => {
     const narrow = css.slice(
-      css.indexOf('@media (max-width: 700px)', css.indexOf('.scenes-body {')),
+      css.indexOf('@container panel (max-width: 700px)', css.indexOf('.scenes-body {')),
     )
     expect(narrow).toContain('.scene-effects .table tr {')
     expect(narrow).toContain('.scene-effects .table td.scene-how')
@@ -53,7 +53,7 @@ describe('the scene editor’s styles', () => {
 
   it('uses tokens, not colours, in the playing rules', () => {
     const from = css.indexOf('/* Playing a scene (as-p86.4) */')
-    const playing = css.slice(from, css.indexOf('@media (max-width: 700px)', from))
+    const playing = css.slice(from, css.indexOf('@container panel (max-width: 700px)', from))
     expect(playing).not.toMatch(/#[0-9a-f]{3,6}\b/i)
   })
 

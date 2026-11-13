@@ -15,7 +15,7 @@ describe('the brief grid keeps labels level', () => {
   })
 
   it('shares the head, input and message rows between fields on a wide screen', () => {
-    const wide = /@media \(min-width: 701px\) \{([\s\S]*?\n)\}/.exec(
+    const wide = /@container panel \(min-width: 701px\) \{([\s\S]*?\n)\}/.exec(
       css.slice(css.indexOf('.music-brief-grid')),
     )?.[1]
     expect(wide).toContain('.brief-field')

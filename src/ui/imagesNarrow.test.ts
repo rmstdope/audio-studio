@@ -11,9 +11,12 @@ const rule = (selector: string, from = css) => {
 
 describe('the images list in a narrow window', () => {
   it('drops the table’s minimum width, or each card is wider than the window and its status is off the edge', () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 700px) {\n  .images-cmp'))
+    const narrow = css.slice(css.indexOf('@container panel (max-width: 700px) {\n  .images-cmp'))
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
-    expect(block).toMatch(/^\s*\.images-table\s*\{[^}]*min-width:\s*0/m)
+    // The minimum width is dropped by the shared stack-table rule, which the table opts into.
+    expect(css).toMatch(
+      /\.stack-table,\n\s*\.stack-table tbody[^{]*\{\n\s*display: block;\n\s*min-width: 0;/,
+    )
     expect(block).toContain('minmax(0, 1fr) auto')
   })
 })
@@ -37,7 +40,9 @@ describe('an image’s workbench', () => {
   })
 
   it('puts the columns one above the other in a narrow window', () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 1000px) {\n  .image-workbench'))
+    const narrow = css.slice(
+      css.indexOf('@container panel (max-width: 1000px) {\n  .image-workbench'),
+    )
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
     expect(rule('.image-workbench', block)).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
     expect(rule('.image-workbench', block)).toMatch(/height:\s*auto/)
@@ -61,7 +66,7 @@ describe('the Patches workbench frame', () => {
 
 describe('the Patches tab in a narrow window', () => {
   it('puts the list, the stage and the tools one above the other', () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 700px) {\n  .patch-bench,'))
+    const narrow = css.slice(css.indexOf('@container panel (max-width: 700px) {\n  .patch-bench,'))
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
     expect(block).toMatch(/\.patches-lefty/)
     expect(block).toMatch(/grid-template-columns:\s*1fr/)
@@ -75,7 +80,9 @@ describe('the Patches tab in a narrow window', () => {
 
 describe('the named areas picture in a narrow window (as-5v0)', () => {
   const stacked = () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
+    const narrow = css.slice(
+      css.indexOf('@container panel (max-width: 760px) {\n  .named-areas-body'),
+    )
     return rule('.named-areas-picture', narrow.slice(0, narrow.indexOf('\n}\n')))
   }
 
@@ -95,7 +102,9 @@ describe('the named areas picture in a narrow window (as-5v0)', () => {
 
 describe('a named areas picture taller than a narrow window (as-e39)', () => {
   it('is capped by the window’s height, keeping its shape, or it hides every row held in front of them', () => {
-    const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
+    const narrow = css.slice(
+      css.indexOf('@container panel (max-width: 760px) {\n  .named-areas-body'),
+    )
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
     expect(block).toMatch(
       /\.named-area-stage,\s*\.named-area-empty\s*\{[^}]*width:\s*min\(100%, calc\(50vh \* var\(--picture-ratio\)\)\)/,
@@ -104,7 +113,9 @@ describe('a named areas picture taller than a narrow window (as-e39)', () => {
 })
 
 describe('the list beside the named areas picture (as-kw3x.6)', () => {
-  const narrow = css.slice(css.indexOf('@media (max-width: 760px) {\n  .named-areas-body'))
+  const narrow = css.slice(
+    css.indexOf('@container panel (max-width: 760px) {\n  .named-areas-body'),
+  )
   const block = narrow.slice(0, narrow.indexOf('\n}\n'))
 
   it('is never taller than the picture, and scrolls inside itself', () => {

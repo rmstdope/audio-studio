@@ -422,7 +422,7 @@ describe('the dropped effects', () => {
 
   it('stack in a narrow window, as the effects rows do, so Forget is never off the edge', () => {
     const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
-    const at = css.indexOf('@media (max-width: 700px) {\n  .effects-table')
+    const at = css.indexOf('@container panel (max-width: 700px) {\n  .stack-table')
     const narrow = at < 0 ? '' : css.slice(at, css.indexOf('\n}\n', at))
     const { container } = render(list, effects({ dropped }))
     const panel = container.querySelector('[aria-label="No longer in the game\'s list"]')!
