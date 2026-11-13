@@ -1186,6 +1186,13 @@ describe('the sound-effect models row for any number of models', () => {
     const absent = { download: 'absent' as const, failure: null }
     const check = effectModelsRow(facts('a', { a: whole, b: absent, c: absent }), family)
     expect(check.detail).toBe('Beta is not on this computer. Gamma is not on this computer.')
+    expect(check.steps?.list[0]!.parts).toEqual([
+      "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+      { link: 'org/beta', href: 'https://huggingface.co/org/beta' },
+      ' and ',
+      { link: 'org/gamma', href: 'https://huggingface.co/org/gamma' },
+      '.',
+    ])
     expect(check.steps?.list.map((s) => s.parts[0])).toEqual([
       "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
       'Make a read token at ',
@@ -1236,5 +1243,34 @@ describe('the Stable Audio row for any number of models', () => {
       'Download all of them into ~/.cache/stable-audio, where the studio looks for them:',
     )
     expect(steps[2]!.commands).toHaveLength(3)
+  })
+})
+
+describe('the sound-effect models row for one model', () => {
+  it('says nothing is in place when its only model failed', () => {
+    const only: EffectFamily = {
+      models: [
+        {
+          id: 'a',
+          name: 'Alpha',
+          short: 'Alpha',
+          repo: 'o/a',
+          gigabytes: 1,
+          source: { kind: 'hub' },
+        },
+      ],
+    }
+    const check = effectModelsRow(
+      {
+        uv: true,
+        listed: true,
+        model: 'a',
+        models: { a: { download: 'whole', failure: { error: 'x', effect: null } } },
+      },
+      only,
+    )
+    expect(check.failures![0]!.sentence).toBe(
+      "The last effect with Alpha, the project's sound-effects model, failed.",
+    )
   })
 })

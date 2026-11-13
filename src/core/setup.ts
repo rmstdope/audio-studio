@@ -876,6 +876,7 @@ export function effectModelsRow(facts: EffectFamilyFacts, family: EffectFamily):
   /** The models in place and well, to close a sentence about the only affected one. */
   const tail = (id: string) => {
     const inPlace = all.filter((m) => !affected.includes(m)).map((m) => m.name)
+    if (!inPlace.length) return ''
     return id === model
       ? ` ${listed(inPlace)} ${isAre(inPlace.length)} in place: an effect's takes can use ${inPlace.length > 1 ? 'them' : 'it'} meanwhile.`
       : ` ${listed(inPlace)} ${isAre(inPlace.length)} in place.`

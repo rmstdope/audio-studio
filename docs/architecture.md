@@ -1721,11 +1721,13 @@ too: in a narrow Takes panel it takes a line of its own, first, with Stop, the c
 **Setup's Sound-effect models row** (one row for every effects model, after Image models) is checked
 afresh each time and writes nothing to the project. It is always checked, since it needs no section
 of the project file, and judges each model's download and last failed effect separately, as the
-image models' row does. Only the project's own model makes "Needs attention", and only once the game
-lists effects; before that, and for the other model, whatever is missing shows as grey "Not set up",
+image models' row does. The row is built from the list of models (`effectModelsRow` in
+`core/setup.ts`, as `stableAudioRow` is for Stable Audio), so a model added to `EFFECT_MODEL_IDS`
+needs no new wording. Only the project's own model makes "Needs attention", and only once the game
+lists effects; before that, and for the other models, whatever is missing shows as grey "Not set up",
 optional, and is not counted in the sidebar. One sentence per model that has something to say, with a
 step for each download; what to fix first still wins: uv missing, then a download, then a failed
-effect. When neither model can run the row says sound effects can't be made. The last failure of each
+effect. When none of the models can run the row says sound effects can't be made. The last failure of each
 model is kept in `content-studio/cache/effect-model-health.json` with the effect it was made on
 (`createEffectHealth`: `record` when an effect fails, `clear` when one made with the model works,
 nothing when one is stopped); the row links the effect's page, and names no effect once the game no
