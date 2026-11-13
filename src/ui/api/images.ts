@@ -19,6 +19,7 @@ import type { ProjectFailure } from '../../services/workspace'
 
 import { useBatch, useMakeAllRequest, useStopAllRequest, type MakeAllMedium } from './batchHooks'
 import { getJson } from './core'
+import { useTakeAction, type TakeMedium } from './takeHooks'
 
 /**
  * Saves the project's image model in the project file (`was` is the one the page showed), then
@@ -549,12 +550,24 @@ export function useUseFineTune(imageId: string) {
   )
 }
 
+/** Where images keep their takes' queries, for the hooks every medium with takes shares. */
+const imageTakeMedium: TakeMedium = {
+  base: (id) => `/api/images/${encodeURIComponent(id)}`,
+  takesKey: 'image-takes',
+  makingKey: 'image-making',
+  // The patches lie on the image's chosen take, and the fine-tunes on the picture in the game.
+  alsoStale: (id) => [
+    ['image-patches', id],
+    ['image-fine-tunes', id],
+  ],
+}
+
 /** Asks for takes of an image (new ones, or a failed one again). */
 export function useMakeImageTakes(imageId: string) {
-  return useImageTakesChange<ImageMakeRequest>(
+  return useTakeAction<ImageMakeRequest, NonNullable<ImageTakesAnswer>>(
+    imageTakeMedium,
     imageId,
-    (body) => ({ path: '/takes', method: 'POST', body }),
-    false,
+    (a) => a.make,
   )
 }
 
@@ -569,14 +582,22 @@ export function useChooseImageTake(imageId: string) {
 
 /** Takes the image's chosen take back (its picture is deleted from the game). */
 export function useUnchooseImageTake(imageId: string) {
-  return useImageTakesChange<void>(imageId, () => ({ path: '/unchoose', method: 'POST' }), true)
+  return useTakeAction<void, NonNullable<ImageTakesAnswer>>(
+    imageTakeMedium,
+    imageId,
+    (a) => a.unchoose,
+  )
 }
 
 /**
  * Accepts an image's changed words or style: its chosen take is kept and counts as made from them.
  */
 export function useAcceptImageChange(imageId: string) {
-  return useImageTakesChange<void>(imageId, () => ({ path: '/accept', method: 'POST' }), true)
+  return useTakeAction<void, NonNullable<ImageTakesAnswer>>(
+    imageTakeMedium,
+    imageId,
+    (a) => a.accept,
+  )
 }
 
 /** Takes a take off the image's board. */
@@ -591,7 +612,7 @@ export function useDropImageTake(imageId: string) {
 
 /** Stops the image's takes (the one being made and those waiting). */
 export function useStopImageTakes(imageId: string) {
-  return useImageTakesChange<void>(imageId, () => ({ path: '/stop', method: 'POST' }), false)
+  return useTakeAction<void, NonNullable<ImageTakesAnswer>>(imageTakeMedium, imageId, (a) => a.stop)
 }
 
 /** Records that a take has been shown on the right once. */

@@ -75,6 +75,8 @@ export type TakeMedium = {
   base: (id: string) => string
   takesKey: string
   makingKey: string
+  /** Other queries that lie on the takes (images' patches and fine-tunes), given the id. */
+  alsoStale?: (id: string) => unknown[][]
 }
 
 /** Sends one take action to the track or effect at `base`; a status not tolerated is an error. */
@@ -96,6 +98,7 @@ export const takeQueryKeys = (medium: TakeMedium, id: string): unknown[][] => [
   ['project'],
   [medium.takesKey, id],
   [medium.makingKey],
+  ...(medium.alsoStale?.(id) ?? []),
 ]
 
 /**

@@ -92,4 +92,19 @@ describe('sendTake', () => {
       ['music-making'],
     ])
   })
+
+  it('also makes stale what a medium names, such as an image’s patches', () => {
+    const medium = {
+      base: (id: string) => id,
+      takesKey: 'image-takes',
+      makingKey: 'image-making',
+      alsoStale: (id: string) => [['image-patches', id]],
+    }
+    expect(takeQueryKeys(medium, 'i1')).toEqual([
+      ['project'],
+      ['image-takes', 'i1'],
+      ['image-making'],
+      ['image-patches', 'i1'],
+    ])
+  })
 })
