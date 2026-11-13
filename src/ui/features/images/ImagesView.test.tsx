@@ -375,6 +375,18 @@ describe('an image’s page', () => {
     )
   })
 
+  it('claims no take while the images lock cannot be read: the Make chip and the In the game side say so', () => {
+    const page = render(route, summary({ lockUnread: true }), {}, null, false, {
+      lockUnread: true,
+    })
+    const chip = page.querySelector('#job-tab-make .chip')
+    expect(chip?.textContent).toBe('not known')
+    expect(chip?.className).toContain('chip-warn')
+    const left = page.querySelector('[data-side="left"]')!
+    expect(left.textContent).toContain('The images lock could not be read')
+    expect(left.textContent).not.toContain('No picture yet')
+  })
+
   it('steps to the other image of the act by its buttons only, and the arrow keys leave it alone', () => {
     window.location.hash = '#/start'
     const page = render(route)

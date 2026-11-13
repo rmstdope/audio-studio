@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import type { ImageRow } from '../core/images'
+import type { ImageRow, ImageStatus } from '../core/images'
 import type { PatchRow } from '../core/images'
 import {
   imageJobTabs,
@@ -15,7 +15,7 @@ function row(over: {
   chosenTake?: number | null
   patches?: { id: string; chosenOn: number[] }[]
   areas?: { id: string; placed: boolean }[]
-  status?: string
+  status?: ImageStatus
 }): ImageRow {
   return {
     status: over.status ?? 'none yet',
