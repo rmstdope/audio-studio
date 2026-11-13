@@ -1,0 +1,47 @@
+<!doctype html><meta charset=utf-8><title>A — a failed take, naming the file</title><style>:root{--bg:#06070c;--panel:#10121a;--raised:#191c24;--line:rgb(255 255 255/7%);--text:#eceef3;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--warn:#ffc24b;--warn-bg:#2d2412;--danger-bg:#2e1720;--danger-ink:#ff94a8;--ok-ink:#5be3ae}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,sans-serif;margin:0;padding:24px;max-width:980px}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;color:var(--muted);margin:28px 0 8px;text-transform:uppercase;letter-spacing:.06em}
+.note{color:var(--faint);font-size:12px;margin:4px 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:8px 0}
+.take{display:flex;gap:12px;align-items:center;background:var(--raised);border-radius:8px;padding:10px 12px;margin:6px 0}
+.n{color:var(--faint);width:52px}.ok{color:var(--ok-ink)}
+.fail{background:var(--danger-bg);color:var(--danger-ink)}
+.unsaved{background:var(--warn-bg);color:var(--warn);border:1px dashed var(--warn)}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 12px;margin:6px 0}
+.struck{opacity:.45;text-decoration:line-through}
+button{background:var(--raised);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:inherit}
+.tag{font-size:11px;border-radius:99px;padding:1px 8px;border:1px solid currentColor}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:720px){.cols{grid-template-columns:1fr}}
+</style>
+<h1>Option A — it stays a failed take; its line names the file, and the model is not blamed</h1>
+<p class=note>What sound effects already does since last week, carried to music, images, patches and fine-tunes. No new state, no new button: the person makes another take once the disk is sorted.</p>
+
+<h2>Music — Act 1 · Tavern theme · Takes</h2>
+<div class=panel>
+<div class=take><span class=n>Take 1</span><span class=ok>▶ 0:42</span></div>
+<div class="take fail"><span class=n>Take 2</span><span>Failed: content-studio/cache/music-takes/tavern-theme/a91f.2.wav could not be written.</span></div>
+<div class="take fail"><span class=n>Take 3</span><span>Failed: content-studio/music/boards/tavern-theme.json cannot be used.</span></div>
+<p class=note>Before: Take 2 read “Failed: EACCES: permission denied, open /Users/…/a91f.2.wav.3c1e…tmp”. The half-written file is removed in both cases.</p>
+</div>
+
+<h2>Images — Act 1 · Forest clearing · Patches</h2>
+<div class=cols>
+<div class=panel><b>Before</b>
+<div class="take fail"><span class=n>Patch 2</span><span>Failed: EACCES: permission denied …</span></div>
+<div class="banner struck">FLUX Fill, the project's patch model, failed on its last take, so … Setup says what went wrong.</div>
+<p class=note>Setup's Images row also showed the model failing.</p></div>
+<div class=panel><b>After</b>
+<div class="take fail"><span class=n>Patch 2</span><span>Failed: content-studio/cache/image-patches/forest-clearing/sky.2.png could not be written.</span></div>
+<p class=note>No model warning on the page; Setup's Images row unchanged; the model menu stays where it was.</p></div>
+</div>
+
+<h2>Images — Fine-tune</h2>
+<div class=panel>
+<div class="take fail"><span class=n>Fine-tune 1</span><span>Failed: content-studio/images/boards/forest-clearing.json cannot be used.</span></div>
+<p class=note>Same: no model warning, Setup unchanged.</p></div>
+
+<h2>A real model failure — unchanged</h2>
+<div class=panel>
+<div class="take fail"><span class=n>Take 4</span><span>Failed: the model stopped responding.</span></div>
+<div class=banner>…the project's music model, failed on its last take … Setup says what went wrong.</div>
+<p class=note>Only this kind still warns about the model.</p></div>
