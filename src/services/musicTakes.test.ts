@@ -2013,7 +2013,10 @@ describe('trimming a stinger take', () => {
     })
     expect(
       await boardLocked(m, () => m.takes.trim(m.file, 'victory', one!.file, false)),
-    ).toMatchObject({ ok: false, message: 'The take board could not be written.' })
+    ).toMatchObject({
+      ok: false,
+      message: 'content-studio/cache/music/victory.json could not be written',
+    })
     expect(Object.keys(lockOf(m.root)).sort()).toEqual(['defeat', 'victory'])
     expect(manifestOf(m.root).victory.duration).toBe(6)
   })
@@ -2044,7 +2047,7 @@ describe('trimming a stinger take', () => {
     const [one] = (await viewOf(m)).takes
     expect(await boardLocked(m, () => m.takes.trim(m.file, 'victory', one!.file, false))).toEqual({
       ok: false,
-      message: 'The take board could not be written.',
+      message: 'content-studio/cache/music/victory.json could not be written',
     })
     expect((await viewOf(m)).takes[0]!.trim).toBeUndefined()
     expect(m.encoded).toHaveLength(0)
