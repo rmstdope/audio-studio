@@ -391,7 +391,7 @@ describe('an open patch with takes', () => {
     )
     // Take 1: the change runs the picture's height; widened from 300 x 576 to the tallest shape (here in the game's version, half the size).
     // Takes 2 and 3: the mark and a quarter round it, the same frame.
-    expect(ratios).toEqual(['192 / 288', '150 / 150', '150 / 150'])
+    expect(ratios).toEqual(['288 / 288', '150 / 150', '150 / 150'])
   })
 
   it('leaves the other close-ups as they were when a take lands, and frames a take still being made on the mark', async () => {
@@ -414,7 +414,7 @@ describe('an open patch with takes', () => {
         (c) => c.style.aspectRatio,
       )
     // The take being made is framed on the mark.
-    expect(ratios()).toEqual(['192 / 288', '150 / 150'])
+    expect(ratios()).toEqual(['288 / 288', '150 / 150'])
     takes = [
       takeOf(1, { kept: tall }),
       takeOf(2, { kept: { x: 100, y: 50, width: 300, height: 100 } }),
@@ -422,7 +422,7 @@ describe('an open patch with takes', () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0))
     })
-    expect(ratios()[0]).toBe('192 / 288')
+    expect(ratios()[0]).toBe('288 / 288')
   })
 
   it('heads the takes with their count and explains how to look at one', async () => {
@@ -1504,25 +1504,63 @@ describe('the three parts of an open patch', () => {
     )
   })
 
-  it('ends a portrait picture’s take thumbnails in a 1400 × 757 window (as-jkm2)', async () => {
-    const { host } = await render([patchRow('a')], () =>
-      view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
-        take: { n: 3, width: 160, height: 200, cropped: false },
-        game: { width: 160, height: 200 },
-      }),
-    )
-    const stage = host.querySelector<HTMLElement>('.patch-stage')!
-    const width = valuesInEveryWindow(stage, 'width')
-      .at(-1)!
-      .replace(/^[^:]+: /, '')
-    // Measured in Chrome 1400 px wide on the cellar door: the bench starts 243 px down the window;
-    // its left column is 28 px above the stage, the stage and 74 px of controls under it, its right
-    // column (the tools) 286 px; the strip starts 16 px under the taller of the two, and its
-    // thumbnails end 206 px into it.
-    const height = cssLength(width, { percent: 516, vh: 757, ratio: 160 / 200 }) / (160 / 200)
-    const thumbnailsEnd = 243 + Math.max(28 + height + 74, 286) + 16 + 206
-    expect(thumbnailsEnd).toBeLessThanOrEqual(757)
-  })
+  // On the 160 × 200 cellar door, a thin mark whose frame widens to a square inside the picture and
+  // a tall one whose frame stops at the picture's edges and is the whole picture; and on a 9 : 16
+  // picture, a mark whose frame is the whole of that much taller picture.
+  for (const [what, size, mark] of [
+    ['a small mark', { width: 160, height: 200 }, { x: 70, y: 80, width: 20, height: 60 }],
+    [
+      'a mark taller than the picture is wide',
+      { width: 160, height: 200 },
+      { x: 70, y: 20, width: 20, height: 160 },
+    ],
+    [
+      'a 9 : 16 picture marked top to bottom',
+      { width: 90, height: 160 },
+      { x: 35, y: 10, width: 20, height: 140 },
+    ],
+  ] as const) {
+    it(`ends a portrait picture’s take thumbnails in a 1400 × 757 window, with ${what} (as-jkm2)`, async () => {
+      const { host } = await render([patchRow('a')], () =>
+        view(
+          [
+            work('a', {
+              takes: [takeOf(1, { area: mark }), takeOf(2, { area: mark, chosen: true })],
+            }),
+          ],
+          {
+            take: { n: 3, ...size, cropped: false },
+            game: size,
+          },
+        ),
+      )
+      // A block with no width rule is as wide as its column.
+      const last = (element: Element) =>
+        (valuesInEveryWindow(element, 'width').at(-1) ?? 'all: 100%').replace(/^[^:]+: /, '')
+      const stage = host.querySelector<HTMLElement>('.patch-stage')!
+      const closeUps = [...host.querySelectorAll<HTMLElement>('.patch-thumb .patch-closeup')]
+      expect(closeUps.length).toBe(2)
+      // Measured in Chrome 1400 px wide on the cellar door: the bench starts 243 px down the window;
+      // its left column is 28 px above the stage, the stage and 74 px of controls under it, its right
+      // column (the tools) 286 px; the strip starts 16 px under the taller of the two, and its
+      // thumbnails 27 px into it. A thumbnail is 100 px wide inside: 6 px above its close-up, then
+      // 4, a label of 21 (with a chip), 4, the model line of 18 and 6 below.
+      const closeUp = Math.max(
+        ...closeUps.map((c) => {
+          const [w, h] = c.style.aspectRatio.split('/').map(Number)
+          // The box's width from the ratio the element itself gives the stylesheet (1 when it gives
+          // none, as the rule's fallback), its height from its shape.
+          const given = Number(c.style.getPropertyValue('--closeup-ratio') || 1)
+          return cssLength(last(c), { percent: 100, vh: 757, ratio: given }) / (w! / h!)
+        }),
+      )
+      const ratio = size.width / size.height
+      const height = cssLength(last(stage), { percent: 516, vh: 757, ratio }) / ratio
+      const thumbnailsEnd =
+        243 + Math.max(28 + height + 74, 286) + 16 + 27 + 6 + closeUp + 4 + 21 + 4 + 18 + 6
+      expect(thumbnailsEnd).toBeLessThanOrEqual(757)
+    })
+  }
 
   it('puts the stage on the left, the tools on the right headed by the patch’s title, and the takes below both', async () => {
     const { host } = await render([patchRow('a')], made)

@@ -52,7 +52,7 @@ import { gameSpace, modelSpace, type PatchSpace } from '../../patchGameSpace'
 import { tag } from './TakePicture'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { imageTimeLeftText } from '../../imageTakesText'
-import { closeUp, closeUpLayer } from '../../patchCloseUp'
+import { closeUp, closeUpBox, closeUpLayer } from '../../patchCloseUp'
 import { scrollWithin } from '../../scrollWithin'
 
 /** How many takes one press can make. */
@@ -107,15 +107,10 @@ function CloseUp({
   const layer = closeUpLayer(crop, space)
   const over = n === null ? null : sources.patch(n, look)
   if (n !== null && over === null) {
-    return (
-      <span
-        className="patch-closeup patch-closeup-empty"
-        style={{ aspectRatio: `${crop.width} / ${crop.height}` }}
-      />
-    )
+    return <span className="patch-closeup patch-closeup-empty" style={closeUpBox(crop)} />
   }
   return (
-    <span className="patch-closeup" style={{ aspectRatio: `${crop.width} / ${crop.height}` }}>
+    <span className="patch-closeup" style={closeUpBox(crop)}>
       <img
         src={sources.base}
         style={{ ...layer, imageRendering: 'pixelated' }}
@@ -149,10 +144,7 @@ function MakingThumb({
   const crop = closeUp(space.place(making.area), space)
   return (
     <div className="patch-thumb patch-thumb-making">
-      <span
-        className="patch-closeup patch-closeup-empty"
-        style={{ aspectRatio: `${crop.width} / ${crop.height}` }}
-      />
+      <span className="patch-closeup patch-closeup-empty" style={closeUpBox(crop)} />
       <span className="patch-thumb-label">
         <span className="grow">Take {making.n}</span>
       </span>

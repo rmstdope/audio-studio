@@ -4,8 +4,11 @@ import type { PatchArea } from '../core/imagePatches'
 /** The share of the area's width and height shown around it on each side. */
 const AROUND = 0.25
 
-/** The tallest a close-up is, as a multiple of its width. */
-const TALLEST = 1.5
+/**
+ * The tallest a close-up is, as a multiple of its width: square, where the picture is wide enough
+ * to widen it to that (as-jkm2).
+ */
+const TALLEST = 1
 
 /** The widest a close-up is, as a multiple of its height. */
 const WIDEST = 2.5
@@ -21,7 +24,7 @@ function around(from: number, length: number, size: number, limit: number): [num
 /**
  * The part of a take a close-up shows: the area joined with what the take keeps (when it keeps
  * something), with a little around the two, in whole pixels, inside the picture. Never taller than
- * 1.5 times its width nor wider than 2.5 times its height: a thinner frame is widened (or
+ * its width nor wider than 2.5 times its height: a thinner frame is widened (or
  * heightened) round the change, moved inward at an edge, and stops at the picture.
  */
 export function closeUp(
@@ -55,6 +58,17 @@ export function closeUp(
     return { ...frame, y: at, height: size }
   }
   return frame
+}
+
+/**
+ * The shape of a close-up's box: the crop's aspect ratio, and the ratio as `--closeup-ratio` for the
+ * stylesheet, which keeps the box no taller than its thumbnail is wide (as-jkm2).
+ */
+export function closeUpBox(crop: PatchArea): CSSProperties {
+  return {
+    aspectRatio: `${crop.width} / ${crop.height}`,
+    '--closeup-ratio': crop.width / crop.height,
+  } as CSSProperties
 }
 
 /**

@@ -5721,9 +5721,14 @@ textarea[aria-disabled='true'][data-why] {
   gap: 4px 6px;
   font-size: 12px;
 }
+/* No taller than the thumbnail is wide: a frame taller than square (one stopped at a portrait
+   picture's edges) is drawn narrower, in the middle, so the takes strip still ends inside a short
+   window (as-jkm2). */
 .patch-closeup {
   position: relative;
   display: block;
+  align-self: center;
+  width: min(100%, calc(100% * var(--closeup-ratio, 1)));
   overflow: hidden;
   border-radius: 5px;
   background: var(--inset);
