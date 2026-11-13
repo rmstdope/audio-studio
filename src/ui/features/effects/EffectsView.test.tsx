@@ -8,7 +8,7 @@ import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
 import { readFileSync } from 'node:fs'
 import { ProjectSchema } from '../../../core/project'
 import { projectJson } from '../../../../test/helpers'
-import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
+import { minWidthsInEveryWindow, valuesInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -267,6 +267,17 @@ describe('the Sound effects list', () => {
     expect(container.querySelectorAll('tbody tr')[1]!.querySelectorAll('td')[3]!.textContent).toBe(
       '0.5 s',
     )
+  })
+
+  it('keeps every Status pill on one line when a long id squeezes the column (as-95qk)', () => {
+    const long = 'distant-thunderclap-rolling-over-the-northern-mountains'
+    const rows = [row(long), row('coins', { status: 'not-chosen' })]
+    const { container } = render(list, effects({ rows }))
+    for (const tr of container.querySelectorAll('tbody tr')) {
+      // The cell keeps its pill on one line, as the Images table's Status cell does.
+      const cell = tr.querySelectorAll('td')[4]!
+      expect(valuesInEveryWindow(cell, 'white-space').join()).toContain(': nowrap')
+    }
   })
 
   it('tags the words changed here, and the game’s change after it', () => {
