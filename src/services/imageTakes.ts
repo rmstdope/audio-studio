@@ -481,15 +481,11 @@ export function createImageTakes({
       async job(stop, began) {
         const size = takeSize(found.row)
         const model = imageModel(entry.model)
-        let began_: number | null = null
         const generated = await makeImageTake(
           { generator, queue, free },
           { prompt: request.prompt, ...size, seed: newSeed(), model: entry.model },
           stop,
-          () => {
-            began()
-            began_ = entry.startedAt
-          },
+          began,
         ).catch(async (error: unknown) => {
           // Only a take the model failed to make is the model's failure; saving it is not.
           if (!stop.aborted) {
@@ -507,7 +503,7 @@ export function createImageTakes({
         })
         if (stop.aborted) return
         // Timed from when the take started making, so its wait for the GPU is not counted.
-        const took = began_ === null ? null : (now() - began_) / 1000
+        const took = entry.state === 'making' ? (now() - entry.startedAt) / 1000 : null
         const take: ImageBoardTake = {
           n: entry.n,
           seed: generated.seed,
@@ -849,7 +845,13 @@ export function createImageTakes({
           }
         }
         if (!(await generator.installed(failed.model))) return notHere(failed.model)
-        engine.retry(projectFile, id, request.retry, '')
+        // Another press may have taken it while the model was checked.
+        if (!engine.retry(projectFile, id, request.retry, '')) {
+          return {
+            ok: false,
+            message: `Take ${request.retry} did not fail, so it is not made again.`,
+          }
+        }
         queued.push(failed)
       } else {
         const states = await modelStates(projectFile)

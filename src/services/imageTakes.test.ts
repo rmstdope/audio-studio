@@ -250,6 +250,23 @@ describe('making takes', () => {
     expect(await takes.make(file, 'inn', { retry: 9 })).toMatchObject({ ok: false })
   })
 
+  it('makes a failed take again once when Try again is pressed twice at once', async () => {
+    const { takes, file, settled, requests } = setup(undefined, {
+      [EDITS]: { style: STYLE, images: { inn: { text: 'fail now', gameWas: 'a low inn' } } },
+    })
+    await takes.make(file, 'inn', { count: 1 })
+    await settled('inn')
+    await setImageWords(file, 'inn', 'a low inn')
+    const answers = await Promise.all([
+      takes.make(file, 'inn', { retry: 1 }),
+      takes.make(file, 'inn', { retry: 1 }),
+    ])
+    expect(answers.filter((a) => a && 'ok' in a && a.ok)).toHaveLength(1)
+    expect(answers.filter((a) => a && 'ok' in a && !a.ok)).toHaveLength(1)
+    await settled('inn')
+    expect(requests).toHaveLength(2)
+  })
+
   it('reports an image whose takes all failed with no takes being made and its failures counted', async () => {
     const { takes, file, settled } = setup(undefined, {
       [EDITS]: { style: STYLE, images: { inn: { text: 'fail now', gameWas: 'a low inn' } } },
