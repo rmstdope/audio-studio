@@ -133,7 +133,7 @@ export function useTrimControl({
           {trimFailure(take.n, reason, {
             inGame,
             undo: trim.variables?.undo ?? false,
-            gameChanged: trim.data && !trim.data.ok && 'gameChanged' in trim.data,
+            gameChanged: Boolean(trim.data && !trim.data.ok && 'gameChanged' in trim.data),
           })}
         </span>
       ) : null,
