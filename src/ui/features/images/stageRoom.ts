@@ -7,8 +7,8 @@ export interface Box {
 
 /**
  * The height `inside` holds besides `picture`: each sibling on the way up from the picture, and the
- * gaps between them, as laid out, and what each box on the way takes besides its content (`inset`:
- * its padding and border). A side's own height is no help, a grid stretches it to the row.
+ * gaps between them, as laid out, and what each box on the way, the side itself included, takes besides its content
+ * (`inset`: its padding and border). A side's own height is no help, a grid stretches it to the row.
  */
 export function heightBesides<B extends Box>(
   picture: B,
