@@ -142,7 +142,8 @@ content-studio/
 │   │                       projectFile.ts, narration.ts and jobs.ts (recording lines, the job queue),
 │   │                       fish.ts, elevenlabs.ts, transcriber.ts, audio.ts (ffmpeg); music.ts,
 │   │                       stableAudio.ts, elevenMusic.ts and musicTakes.ts; images.ts (mflux) and
-│   │                       imageTakes.ts; effects.ts and effectTakes.ts; scenes.ts and
+│   │                       imageTakes.ts; effects.ts and effectTakes.ts; takeEngine.ts (what music's and
+│   │                       effects' takes share: the entries being made, the board's turns, Stop); scenes.ts and
 │   │                       sceneLoudness.ts; refresh.ts (the game's commands), git.ts, setup.ts
 │   ├── server/             Bun.serve (index.ts: composes the routes, the static UI); context.ts (what
 │   │                       the routes share: generators, queues, guards); shared.ts (request bodies and the small helpers the routes share);
@@ -188,6 +189,14 @@ problem appears once on a page however many banners it has, and no banner knows 
 Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows. `core/` has no
 imports from the others, so the rules for status, staleness and alignment are tested without
 audio, network or disk.
+
+The takes of music and of sound effects share one engine, `services/takeEngine.ts` (as-viyc): the entries
+waiting, being made and failed (in memory, on `globalThis`, so a `--dev` reload keeps them), the numbers
+reserved on a board, the one-at-a-time changes to a board, Stop, the summary of what is being made and the
+split a view makes of the entries against the board. A medium gives it a board's reader and writer and the
+job that makes one take, and keeps what differs: its generator, its hash, its presses (per project for
+effects, per list for music) and what choosing, trimming and fading do to the game's files. A fix to how takes
+are queued, made or shown is made there once. Images' takes, patches and fine-tunes still have their own.
 
 ---
 

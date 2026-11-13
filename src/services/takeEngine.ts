@@ -53,12 +53,15 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
   slot,
   boards,
   now,
+  describe = describeFailure,
 }: {
   /** The name of the `globalThis` slot that keeps this medium's entries. */
   slot: string
   /** Changes to one board, one after another: a take finishing and a drop lose neither. */
   boards: Serial
   now: () => number
+  /** A failure as a sentence for the page, when the medium rewords some. */
+  describe?: (error: unknown) => string
 }) {
   const shared = globalThis as unknown as Record<string, Map<string, Map<number, E>> | undefined>
   const active = (shared[slot] ??= new Map<string, Map<number, E>>())
@@ -173,7 +176,7 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
       } catch (error) {
         if (stop.signal.aborted) return
         entry.state = 'failed'
-        entry.message = describeFailure(error)
+        entry.message = describe(error)
         await failed?.(error)
       } finally {
         await settled?.()
