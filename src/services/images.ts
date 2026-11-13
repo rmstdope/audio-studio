@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
-import { homedir, tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   checkImageRequest,
   EDIT_MODELS,
@@ -17,6 +16,7 @@ import {
 } from '../core/imageModels'
 import { freeGpu, gpuQueue, holdGpu, GPU } from './gpu'
 import { quietLines } from './lineWorker'
+import { HUB_DIR, hubDownload } from './hubCache'
 import { killGroup, stopWithStudio } from './stopWithStudio'
 import type { Serial } from './serial'
 import type { Machine } from './setup'
@@ -86,195 +86,15 @@ export class ImageToolError extends Error {
   }
 }
 
-/** Where Hugging Face keeps its downloads, where mflux finds and puts the models' weights. */
-export function hubDirOf(env: Record<string, string | undefined>, home: string): string {
-  if (env.HF_HUB_CACHE) return env.HF_HUB_CACHE
-  if (env.HF_HOME) return join(env.HF_HOME, 'hub')
-  return join(home, '.cache', 'huggingface', 'hub')
-}
-
-/** Where the Hugging Face downloads are on this computer. */
-export const HUB_DIR = hubDirOf(process.env, homedir())
-
-/** A weights file that is one shard of several, as in `model-00001-of-00004.safetensors`. */
-const SHARD_FILE = /-\d+-of-\d+\.safetensors$/
-
-/**
- * Whether a folder's `model_index.json` lists a part that has no folder there with something in it
- * (the folder is made before its first file arrives), or cannot be read. A part is listed as
- * `[library, class]`; `[null, null]` is one the model does without, and the other keys are settings.
- */
-function lacksListedPart(folder: string): boolean {
-  try {
-    const index = JSON.parse(readFileSync(join(folder, 'model_index.json'), 'utf8')) as Record<
-      string,
-      unknown
-    >
-    return Object.entries(index).some(
-      ([key, value]) =>
-        !key.startsWith('_') &&
-        Array.isArray(value) &&
-        value[0] !== null &&
-        readdirSync(join(folder, key)).length === 0,
-    )
-  } catch {
-    return true
-  }
-}
-
-/**
- * What a folder's snapshot holds: whether there is a weights file, whether anything in it is
- * unfinished, whether a part is still waiting (a folder with a `config.json` or shards has no index
- * or single weights file, or a part a `model_index.json` lists, where the snapshot has one, has
- * nothing in its folder), and whether a shard index is there to vouch for it.
- */
-function inspectSnapshots(dir: string): {
-  weights: boolean
-  broken: boolean
-  waiting: boolean
-  vouched: boolean
-} {
-  const found = { weights: false, broken: false, waiting: false, vouched: false }
-  const visit = (folder: string) => {
-    const names = readdirSync(folder)
-    const indexed = names.some((name) => name.endsWith('.safetensors.index.json'))
-    const single = names.some((name) => name.endsWith('.safetensors') && !SHARD_FILE.test(name))
-    if (indexed) found.vouched = true
-    if (
-      (names.includes('config.json') || names.some((n) => SHARD_FILE.test(n))) &&
-      !indexed &&
-      !single
-    )
-      found.waiting = true
-    if (names.includes('model_index.json') && lacksListedPart(folder)) found.waiting = true
-    for (const name of names) {
-      const path = join(folder, name)
-      // A link to a blob that is not there (a download stopped) cannot be followed.
-      if (!existsSync(path)) {
-        if (lstatSync(path).isSymbolicLink()) found.broken = true
-        continue
-      }
-      if (statSync(path).isDirectory()) visit(path)
-      else if (name.endsWith('.safetensors')) found.weights = true
-      else if (name.endsWith('.safetensors.index.json')) {
-        // The shards the index names must all be there.
-        try {
-          const map = (
-            JSON.parse(readFileSync(path, 'utf8')) as { weight_map?: Record<string, string> }
-          ).weight_map
-          for (const shard of new Set(Object.values(map ?? {})))
-            if (!existsSync(join(folder, shard))) found.broken = true
-        } catch {
-          found.broken = true
-        }
-      }
-    }
-  }
-  try {
-    visit(dir)
-  } catch {
-    // Unreadable counts as having nothing.
-  }
-  return found
-}
-
-/**
- * Whether a folder holds a blob not finished, still coming or stopped: a file ending `.incomplete`
- * (Hugging Face writes each attempt at `<blob>.incomplete` or `<blob>.<random>.incomplete`) whose
- * `<blob>` is not there. One whose `<blob>` is there is a leftover of an attempt that was interrupted
- * before a later one finished.
- */
-function hasUnfinishedBlob(dir: string): boolean {
-  try {
-    return readdirSync(dir).some(
-      (name) => name.endsWith('.incomplete') && !existsSync(join(dir, name.split('.')[0]!)),
-    )
-  } catch {
-    return false
-  }
-}
-
-/**
- * The revision to judge a download by: the one `refs/main` names, the revision last set out for, or
- * none when there is no ref, and then every snapshot is judged. A part waiting in an older snapshot a
- * finished retry left behind says nothing, and a retry that stopped is unfinished even beside a whole
- * older revision, though mflux, which looks for the newest complete snapshot, could still find that
- * one for its weights.
- */
-function currentRevision(folder: string): string | undefined {
-  try {
-    return readFileSync(join(folder, 'refs', 'main'), 'utf8').trim()
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * Whether `trees/<revision>.json`, the listing of the repository Hugging Face writes before it fetches
- * anything, names a file mflux fetches that is not in the revision's snapshot. It applies to any
- * snapshot with a listing, and is what catches a missing part, or a part that lost some of its files,
- * where there is no `model_index.json`, which mflux does not fetch. The listing also names what mflux
- * never fetches, so only what its download patterns take counts: the `.safetensors` and `.json` files
- * of a folder holding weights (`vae/*.json`, …; not the weights at the top of the repository), and
- * everything in the tokenizer's folder (`tokenizer/**`). A repository with no listing, or one that
- * cannot be read, says nothing.
- */
-function lacksFileOfListing(folder: string, revision: string): boolean {
-  let paths: string[]
-  try {
-    const listing = JSON.parse(readFileSync(join(folder, 'trees', `${revision}.json`), 'utf8')) as {
-      files?: Record<string, unknown>
-    }
-    paths = Object.keys(listing.files ?? {})
-  } catch {
-    return false
-  }
-  const parts = new Set(
-    paths
-      .filter((path) => path.endsWith('.safetensors'))
-      .map(dirname)
-      .filter((part) => part !== '.'),
-  )
-  const fetched = paths.filter(
-    (path) =>
-      path.startsWith('tokenizer/') ||
-      (parts.has(dirname(path)) && (path.endsWith('.safetensors') || path.endsWith('.json'))),
-  )
-  return fetched.some((path) => !existsSync(join(folder, 'snapshots', revision, path)))
-}
-
-/**
- * How much of a repository's download is in the Hugging Face cache `hubDir`: `absent` with no folder
- * for it, `whole` when its current snapshot holds weights and nothing is unfinished (no link to a missing blob,
- * every shard an index names, no part still waiting, none the repository's listing names missing, and
- * no `.incomplete` blob unless its finished blob is beside it or an index vouches for the snapshot,
- * for then it is a leftover), `partial` otherwise.
- */
-export function hubDownload(hubDir: string, repo: string): ImageDownload {
-  const folder = join(hubDir, `models--${repo.replace('/', '--')}`)
-  if (!existsSync(folder)) return 'absent'
-  const revision = currentRevision(folder)
-  const { weights, broken, waiting, vouched } = inspectSnapshots(
-    join(folder, 'snapshots', revision ?? ''),
-  )
-  const finished =
-    weights &&
-    !broken &&
-    !waiting &&
-    (revision === undefined || !lacksFileOfListing(folder, revision)) &&
-    (vouched || !hasUnfinishedBlob(join(folder, 'blobs')))
-  return finished ? 'whole' : 'partial'
-}
-
 /** How much of an image model's download is in the Hugging Face cache `hubDir` (see `hubDownload`). */
 export function imageModelDownload(
   hubDir: string,
   model: ImageModelId | EditModelId,
 ): ImageDownload {
-  return hubDownload(
-    hubDir,
-    (isEditModel(model) ? EDIT_MODELS[model] : imageModel(model as ImageModelId)).repo,
-  )
+  const { repo, needs } = isEditModel(model)
+    ? EDIT_MODELS[model]
+    : imageModel(model as ImageModelId)
+  return hubDownload(hubDir, repo, needs)
 }
 
 /** Whether a model's whole download is in the Hugging Face cache `hubDir`. */

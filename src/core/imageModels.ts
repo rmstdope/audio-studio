@@ -1,3 +1,4 @@
+import { MFLUX_NEEDS, type HubNeeds } from './hubDownload'
 import { perTakeText, timeKeyOfEdit, type Figures } from './takeTimes'
 
 /** The ids of the image models the studio makes takes with. */
@@ -17,6 +18,8 @@ export interface ImageModel {
   short: string
   /** The Hugging Face repository the weights are downloaded from. */
   repo: string
+  /** What the model fetches from the repository besides its weights. */
+  needs: HubNeeds
   /** About how many GB the weights take on disk. */
   gigabytes: number
   /** The `--model` value of the model's mflux command. */
@@ -37,6 +40,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     name: 'FLUX.2 klein 4B',
     short: 'FLUX.2 klein',
     repo: 'black-forest-labs/FLUX.2-klein-4B',
+    needs: MFLUX_NEEDS,
     gigabytes: 15,
     mflux: 'flux2-klein-4b',
     command: 'mflux-generate-flux2',
@@ -46,6 +50,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     name: 'Z-Image-Turbo',
     short: 'Z-Image-Turbo',
     repo: 'Tongyi-MAI/Z-Image-Turbo',
+    needs: MFLUX_NEEDS,
     gigabytes: 31,
     mflux: 'z-image-turbo',
     command: 'mflux-generate-z-image-turbo',
@@ -55,6 +60,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     name: 'Qwen-Image',
     short: 'Qwen-Image',
     repo: 'Qwen/Qwen-Image',
+    needs: MFLUX_NEEDS,
     gigabytes: 54,
     // mflux's own alias `qwen-image` is the 2512 weights, which are not the ones downloaded.
     mflux: 'Qwen/Qwen-Image',
@@ -88,6 +94,8 @@ export interface EditModel {
   short: string
   /** The Hugging Face repository the weights are downloaded from. */
   repo: string
+  /** What the model fetches from the repository besides its weights. */
+  needs: HubNeeds
   /** About how many GB the weights take on disk. */
   gigabytes: number
   /** The `--model` value of the model's mflux command. */
@@ -112,6 +120,7 @@ export const EDIT_MODELS: Record<EditModelId, EditModel> = {
     // mflux runs Qwen edits the way the 2509 and 2511 weights were made (a 384 × 384 view of the
     // picture); the first weights, run that way, paint a new scene instead of editing (as-3l6k).
     repo: 'Qwen/Qwen-Image-Edit-2511',
+    needs: MFLUX_NEEDS,
     gigabytes: 58,
     // mflux's own alias `qwen-image-edit` downloads the 2509 weights, so the repository is named.
     mflux: 'Qwen/Qwen-Image-Edit-2511',
@@ -128,6 +137,7 @@ export const EDIT_MODELS: Record<EditModelId, EditModel> = {
     name: IMAGE_MODELS.klein.name,
     short: IMAGE_MODELS.klein.short,
     repo: IMAGE_MODELS.klein.repo,
+    needs: IMAGE_MODELS.klein.needs,
     gigabytes: IMAGE_MODELS.klein.gigabytes,
     mflux: IMAGE_MODELS.klein.mflux,
     command: IMAGE_EDIT_COMMAND,
