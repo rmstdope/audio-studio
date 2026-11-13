@@ -52,6 +52,14 @@ function repo(extra: Record<string, unknown> = {}) {
 }
 
 describe('readImages', () => {
+  it('reads every image as not known while the images lock cannot be read', async () => {
+    const { summary } = repo({ 'content-studio/images/lock.json': { inn: { take: 'nope' } } })
+    const { images: read, problems } = await summary()
+    expect(problems.some((p) => p.file === 'content-studio/images/lock.json')).toBe(true)
+    expect(read!.acts[0]!.rows.map((row) => row.status)).toEqual(['unknown'])
+    expect(read!.acts[0]!.chosen).toBeNull()
+  })
+
   it('is null without an images section', async () => {
     const root = tempRepo({ 'content-studio.json': projectJson() })
     const opened = await openProject(join(root, 'content-studio.json'))

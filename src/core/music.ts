@@ -6,6 +6,7 @@ import {
   type LockEntry,
   type TrackStatus,
 } from './musicChoose'
+import { lockEntry, type LockRead } from './lockRead'
 import type { Problem } from './project'
 
 /** The longest stinger the game may ask for, in seconds. */
@@ -229,12 +230,12 @@ export interface MusicSummary {
  * The Music pages from the lists the game wrote and the studio's changes to their briefs. An id
  * used twice, in one list or two, is a problem at every place it is used, and none of those
  * tracks is shown: which one the music file belongs to is not for the studio to guess. `chosen`
- * is null when the music lock cannot be read, and then what each track plays is not known.
+ * is `LOCK_UNREAD` when the music lock cannot be read, and then what each track plays is not known.
  */
 export function summarizeMusic(
   lists: MusicListInput[],
   briefs: Briefs,
-  chosen: Record<string, ChosenState> | null = {},
+  chosen: LockRead<ChosenState> = { read: true, entries: {} },
   gameFiles: Record<string, boolean> = {},
 ): { music: MusicSummary; problems: Problem[] } {
   const uses = new Map<string, { file: string; path: string }[]>()
@@ -273,7 +274,7 @@ export function summarizeMusic(
         tracks: shown(list, uses).map((track) =>
           rowOf(track, briefs[track.id], list.kind, chosen, gameFiles[track.id] ?? false),
         ),
-        orphans: orphansOf(list, named, chosen ?? {}),
+        orphans: orphansOf(list, named, chosen.read ? chosen.entries : {}),
         dropped: listed(list).length - shown(list, uses).length,
         canRefresh: list.canRefresh,
       })),
@@ -344,10 +345,11 @@ function rowOf(
   track: Track,
   change: Briefs[string] | undefined,
   kind: MusicListInput['kind'],
-  lock: Record<string, ChosenState> | null,
+  lock: LockRead<ChosenState>,
   gameFileExists: boolean,
 ): TrackRow {
-  const chosen = lock?.[track.id]
+  const standing = lockEntry(lock, track.id)
+  const chosen = standing.standing === 'chosen' ? standing.entry : undefined
   const row = {
     id: track.id,
     title: track.title,
@@ -373,21 +375,23 @@ function rowOf(
     bpm: row.bpm,
     key: row.key,
   }
-  const status: TrackStatus = lock
-    ? trackStatus({ lock: chosen?.lock, current, fileExists: chosen?.fileExists ?? false })
-    : 'unknown'
+  const status: TrackStatus =
+    standing.standing === 'unknown'
+      ? 'unknown'
+      : trackStatus({ lock: chosen?.lock, current, fileExists: chosen?.fileExists ?? false })
   return {
     ...row,
     status,
     changed: status === 'changed' ? changedFields(chosen!.lock, current) : [],
     chosenAt: chosen?.lock.at ?? null,
-    current: !lock
-      ? { kind: 'unknown' }
-      : chosen
-        ? { kind: 'take', take: chosen.lock.take, exists: chosen.fileExists }
-        : track.file
-          ? { kind: 'game', file: track.file, exists: gameFileExists }
-          : { kind: 'none' },
+    current:
+      standing.standing === 'unknown'
+        ? { kind: 'unknown' }
+        : chosen
+          ? { kind: 'take', take: chosen.lock.take, exists: chosen.fileExists }
+          : track.file
+            ? { kind: 'game', file: track.file, exists: gameFileExists }
+            : { kind: 'none' },
     gameFile: track.file ? { file: track.file, exists: gameFileExists } : null,
   }
 }

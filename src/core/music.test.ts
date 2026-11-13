@@ -14,12 +14,14 @@ import {
   orphanTitle,
   staleIds,
   summarizeMusic,
+  type ChosenState,
   type MusicListInput,
   type Track,
 } from './music'
 import { MUSIC_MODEL } from './musicTake'
 import type { LockEntry } from './musicChoose'
 import { problemsFrom } from './project'
+import { LOCK_UNREAD } from './lockRead'
 
 const track = (id: string, extra: Partial<Track> = {}): Track => ({
   id,
@@ -38,6 +40,21 @@ const list = (id: string, tracks: Track[], over: Partial<MusicListInput> = {}): 
   canRefresh: true,
   ...over,
 })
+
+/** `summarizeMusic` with the lock given as plain entries, or null for one that cannot be read. */
+function summarize(
+  lists: Parameters<typeof summarizeMusic>[0],
+  briefs: Parameters<typeof summarizeMusic>[1],
+  chosen: Record<string, ChosenState> | null = {},
+  gameFiles?: Record<string, boolean>,
+) {
+  return summarizeMusic(
+    lists,
+    briefs,
+    chosen ? { read: true, entries: chosen } : LOCK_UNREAD,
+    gameFiles,
+  )
+}
 
 describe('the track schemas', () => {
   it('reads a loop with only what the game must give', () => {
@@ -126,7 +143,7 @@ describe('formatBriefs', () => {
 
 describe('summarizeMusic', () => {
   it('lists the tracks of each list in the game’s order, none of them chosen', () => {
-    const { music, problems } = summarizeMusic(
+    const { music, problems } = summarize(
       [list('act1', [track('b'), track('a')]), list('stingers', [track('v', { seconds: 5 })])],
       {},
     )
@@ -145,7 +162,7 @@ describe('summarizeMusic', () => {
   })
 
   it('tells a list that is empty from one that is not there, and one that is broken', () => {
-    const { music } = summarizeMusic(
+    const { music } = summarize(
       [
         list('act1', []),
         list('act2', [], { state: { status: 'missing' } }),
@@ -161,19 +178,19 @@ describe('summarizeMusic', () => {
   })
 
   it('puts the studio’s changes over the game’s brief and length', () => {
-    const { music } = summarizeMusic([list('act1', [track('a')])], {
+    const { music } = summarize([list('act1', [track('a')])], {
       a: { brief: 'ours', seconds: 60 },
     })
     expect(music.lists[0]!.tracks[0]).toMatchObject({ brief: 'ours', seconds: 60 })
   })
 
   it('gives every track the status not known while the music lock cannot be read', () => {
-    const { music } = summarizeMusic([list('act1', [track('a'), track('b')])], {}, null)
+    const { music } = summarize([list('act1', [track('a'), track('b')])], {}, null)
     expect(music.lists[0]!.tracks.map((t) => t.status)).toEqual(['unknown', 'unknown'])
   })
 
   it('carries tempo and key, and the game’s own values beside the studio’s', () => {
-    const { music } = summarizeMusic(
+    const { music } = summarize(
       [list('act1', [track('a', { bpm: 84, key: 'D major' }), track('b')])],
       { a: { bpm: 100, key: null, brief: 'ours' } },
     )
@@ -185,7 +202,7 @@ describe('summarizeMusic', () => {
   })
 
   it('reports an id used twice at both places and shows neither track', () => {
-    const { music, problems } = summarizeMusic(
+    const { music, problems } = summarize(
       [list('act1', [track('x'), track('a')]), list('act2', [track('b'), track('x')])],
       {},
     )
@@ -199,7 +216,7 @@ describe('summarizeMusic', () => {
   })
 
   it('counts the tracks left out for a repeated id', () => {
-    const { music } = summarizeMusic(
+    const { music } = summarize(
       [list('act1', [track('x'), track('a')]), list('act2', [track('x')])],
       {},
     )
@@ -207,13 +224,13 @@ describe('summarizeMusic', () => {
   })
 
   it('catches an id used twice in one list', () => {
-    const { music, problems } = summarizeMusic([list('act1', [track('x'), track('x')])], {})
+    const { music, problems } = summarize([list('act1', [track('x'), track('x')])], {})
     expect(music.lists[0]!.tracks).toEqual([])
     expect(problems.map((p) => p.path)).toEqual(['[0].id', '[1].id'])
   })
 
   it('says whether the list can be refreshed', () => {
-    const { music } = summarizeMusic([list('act1', [], { canRefresh: false })], {})
+    const { music } = summarize([list('act1', [], { canRefresh: false })], {})
     expect(music.lists[0]!.canRefresh).toBe(false)
   })
 })
@@ -256,9 +273,9 @@ describe('what a track plays now', () => {
   })
   const rows = (
     tracks: Track[],
-    chosen: Parameters<typeof summarizeMusic>[2],
+    chosen: Record<string, ChosenState> | null,
     gameFiles: Record<string, boolean>,
-  ) => summarizeMusic([list('act1', tracks)], {}, chosen, gameFiles).music.lists[0]!.tracks
+  ) => summarize([list('act1', tracks)], {}, chosen, gameFiles).music.lists[0]!.tracks
 
   it('is the chosen take, even when the brief changed since', () => {
     const [row] = rows(
@@ -316,8 +333,8 @@ describe('summarizeMusic with chosen takes', () => {
     at: '2026-11-02T10:00:00.000Z',
   })
   const made = { brief: 'a brief', kind: 'loop' as const, seconds: 80, bpm: null, key: null }
-  const rowsOf = (chosen: Parameters<typeof summarizeMusic>[2], briefs = {}) =>
-    summarizeMusic([list('act1', [track('a'), track('b'), track('c'), track('d')])], briefs, chosen)
+  const rowsOf = (chosen: Record<string, ChosenState> | null, briefs = {}) =>
+    summarize([list('act1', [track('a'), track('b'), track('c'), track('d')])], briefs, chosen)
       .music.lists[0]!.tracks
 
   it('gives each track its status, and what changed for a changed one', () => {
@@ -345,7 +362,7 @@ describe('summarizeMusic with chosen takes', () => {
   })
 
   it('takes a stinger’s kind from its list', () => {
-    const { music } = summarizeMusic(
+    const { music } = summarize(
       [list('stingers', [track('v', { seconds: 5 })])],
       {},
       {
@@ -361,7 +378,7 @@ describe('summarizeMusic with chosen takes', () => {
 
 describe('fieldSource', () => {
   const rows = (change: Parameters<typeof summarizeMusic>[1], extra: Partial<Track> = {}) =>
-    summarizeMusic([list('act1', [track('a', extra)])], change).music.lists[0]!.tracks[0]!
+    summarize([list('act1', [track('a', extra)])], change).music.lists[0]!.tracks[0]!
 
   it('says from the game, changed here, or not set', () => {
     const row = rows({ a: { seconds: 60, key: null } }, { key: 'D major', bpm: 84 })
@@ -441,7 +458,7 @@ describe('applyBriefChange', () => {
 
 describe('the game’s brief changed under the studio’s', () => {
   const row = (briefs: Parameters<typeof summarizeMusic>[1]) =>
-    summarizeMusic([list('act1', [track('a')])], briefs).music.lists[0]!.tracks[0]!
+    summarize([list('act1', [track('a')])], briefs).music.lists[0]!.tracks[0]!
 
   it('is not so while the studio’s brief was written over what the game says now', () => {
     expect(row({ a: { brief: 'ours', gameWas: 'a brief' } })).toMatchObject({
@@ -511,7 +528,7 @@ describe('orphans', () => {
   const orphansOf = (
     lists: MusicListInput[],
     chosenTracks: Record<string, ReturnType<typeof chosen>>,
-  ) => summarizeMusic(lists, {}, chosenTracks).music.lists.map((l) => l.orphans)
+  ) => summarize(lists, {}, chosenTracks).music.lists.map((l) => l.orphans)
 
   it('shows a chosen track the list it came from no longer names, on that list', () => {
     const lists = [list('act1', [track('a')]), list('act2', [track('b')])]
@@ -552,21 +569,21 @@ describe('orphans', () => {
 
   it('names an orphan from its id, and finds it with its list', () => {
     expect(orphanTitle('level-up-2')).toBe('Level up 2')
-    const { music } = summarizeMusic([list('act1', [])], {}, { gone: chosen('act1') })
+    const { music } = summarize([list('act1', [])], {}, { gone: chosen('act1') })
     expect(orphanOf(music.lists, 'gone')?.list.id).toBe('act1')
     expect(orphanOf(music.lists, 'other')).toBeUndefined()
   })
 
   it('finds the briefs and boards to drop only when every list is there', () => {
-    const ok = summarizeMusic([list('act1', [track('a')]), list('stingers', [])], {}, {}).music
+    const ok = summarize([list('act1', [track('a')]), list('stingers', [])], {}, {}).music
     expect(staleIds(ok, ['a', 'old', 'kept'], ['kept'])).toEqual(['old'])
-    const missing = summarizeMusic(
+    const missing = summarize(
       [list('act1', [track('a')]), list('stingers', [], { state: { status: 'missing' } })],
       {},
       {},
     ).music
     expect(staleIds(missing, ['old'], [])).toEqual([])
-    const repeated = summarizeMusic(
+    const repeated = summarize(
       [list('act1', [track('a')]), list('act2', [track('a')])],
       {},
       {},

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pyRound } from '../core/align'
+import { LOCK_UNREAD, type LockRead } from '../core/lockRead'
 import type { ChosenState } from '../core/music'
 import {
   MusicLockSchema,
@@ -46,23 +47,24 @@ export async function manifestNow(
 
 /**
  * Every track the lock says is chosen, with whether its music file is a plain file in the clips
- * folder. A lock that cannot be read adds its problems and gives null: which take is chosen is
- * then not known.
+ * folder. A lock that cannot be read adds its problems and is `LOCK_UNREAD`: which take is
+ * chosen is then not known.
  */
 export async function readChosen(
   root: string,
   music: MusicConfig,
   problems: Problem[],
-): Promise<Record<string, ChosenState> | null> {
+): Promise<LockRead<ChosenState>> {
   const lock = await lockNow(root, problems)
-  if (!lock) return null
+  if (!lock) return LOCK_UNREAD
   const files = await listFiles(resolveInRoot(root, music.clips))
-  return Object.fromEntries(
+  const entries = Object.fromEntries(
     Object.entries(lock).map(([id, entry]) => [
       id,
       { lock: entry, fileExists: files.has(`${id}.mp3`) },
     ]),
   )
+  return { read: true, entries }
 }
 
 /** One choice at a time per project: each reads the manifest and lock the one before wrote. */

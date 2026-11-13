@@ -159,13 +159,13 @@ export const EFFECT_STATUS_LABEL: Record<EffectStatus, string> = {
  * missing, said ahead of changed; no take chosen is "none yet" until a take exists.
  */
 export function effectStatus(input: {
-  lockUnread: boolean
+  standing: 'chosen' | 'not-chosen' | 'unknown'
   chosen: { lock: EffectLockEntry; fileExists: boolean } | undefined
   now: EffectInputs
   hasTakes: boolean
 }): EffectStatus {
-  const { lockUnread, chosen, now, hasTakes } = input
-  if (lockUnread) return 'unknown'
+  const { standing, chosen, now, hasTakes } = input
+  if (standing === 'unknown') return 'unknown'
   if (!chosen) return hasTakes ? 'not-chosen' : 'none-yet'
   if (!chosen.fileExists) return 'missing'
   return effectChangedFields(chosen.lock, now).length ? 'changed' : 'chosen'

@@ -170,6 +170,12 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
         </button>
       </div>
     )
+  } else if (plan?.kind === 'lock-unread') {
+    action = (
+      <span className="muted">
+        Which images have a chosen take is not known while the images lock cannot be read.
+      </span>
+    )
   } else if (plan?.kind === 'all-chosen') {
     action = (
       <span className="muted">

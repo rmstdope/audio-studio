@@ -8,6 +8,7 @@ import {
   disagreeText,
   makeAgainActLine,
   overlapActLine,
+  IMAGE_STATUS_LABEL,
 } from '../../imagesText'
 import { ActLinks } from './ActLinks'
 import { imageMakingStatusText } from '../../imageTakesText'
@@ -23,6 +24,7 @@ const STATUS_CHIP: Record<ImageRow['status'], string> = {
   'none yet': 'chip',
   chosen: 'chip chip-ok',
   'out of date': 'chip chip-warn',
+  unknown: 'chip chip-warn',
 }
 
 /** The act list's line for an image's named areas left to place; nothing when none are. */
@@ -233,7 +235,9 @@ export function ActPage({
                             {imageMakingStatusText(making[row.id]!)}
                           </span>
                         ) : (
-                          <span className={STATUS_CHIP[row.status]}>{row.status}</span>
+                          <span className={STATUS_CHIP[row.status]}>
+                            {IMAGE_STATUS_LABEL[row.status]}
+                          </span>
                         )}
                         {row.looksOld && <span className="chip chip-warn">Old look</span>}
                         <AreasLeft row={row} />

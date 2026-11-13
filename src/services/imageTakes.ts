@@ -705,6 +705,9 @@ export function createImageTakes({
       if (plan.kind === 'not-ready') {
         return { ok: false, message: "Images can't be made yet. Setup says what is missing." }
       }
+      if (plan.kind === 'lock-unread') {
+        return { ok: false, message: 'The images lock could not be read. Nothing was started.' }
+      }
       if (plan.kind === 'all-chosen') return { ok: true, images: [], takes: 0 }
       const started: string[] = []
       const before = await this.making(projectFile)

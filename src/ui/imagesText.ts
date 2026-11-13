@@ -1,10 +1,19 @@
-import type { ConflictKind, ImageRow, ImagesSummary } from '../core/images'
+import type { ConflictKind, ImageRow, ImageStatus, ImagesSummary } from '../core/images'
 import type { SetAsideAsk, SetAsideQuestion } from '../core/imagePatches'
 import type { ImagesRoute } from './route'
 
+/** What an image's status chip says; the lock being unreadable says "not known", as music's and effects' do. */
+export const IMAGE_STATUS_LABEL: Record<ImageStatus, string> = {
+  'none yet': 'none yet',
+  chosen: 'chosen',
+  'out of date': 'out of date',
+  unknown: 'not known',
+}
+
 /** The line under an act's heading: how many of its images have a chosen one. */
-export function chosenLine(name: string, total: number, chosen: number): string {
-  return `The images the game asks for in ${name}. ${chosen} of ${total} chosen.`
+export function chosenLine(name: string, total: number, chosen: number | null): string {
+  const lead = `The images the game asks for in ${name}.`
+  return chosen === null ? lead : `${lead} ${chosen} of ${total} chosen.`
 }
 
 /** Words joined as "a, b and c". */
