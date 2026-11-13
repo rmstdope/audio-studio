@@ -915,6 +915,14 @@ describe('what can go wrong', () => {
     expect(none.text()).toContain('Make takes to compare them here.')
   })
 
+  it('while the lock cannot be read, the empty frame is as wide as the take beside it', async () => {
+    const s = await show(view({ takes: [take(1), take(2)], lockUnread: true }))
+    const frame = s.container.querySelector<HTMLElement>('[data-side="left"] .image-take-empty')!
+    const picture = s.container.querySelector<HTMLElement>('[data-side="right"] img')!
+    expect(frame.style.width).not.toBe('')
+    expect(frame.style.width).toBe(picture.style.width)
+  })
+
   it('shows only the latest action’s refusal', async () => {
     const s = await show(view({ takes: three }))
     globalThis.fetch = (async (_url: string, init?: RequestInit) =>

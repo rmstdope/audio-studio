@@ -111,14 +111,17 @@ function EmptyFrame({
   hint,
   width,
   height,
+  shown,
 }: {
   title?: string
   hint?: string
   width: number
   height: number
+  /** Its width on the page, when set, as a picture's `shown`: the room a picture would take. */
+  shown?: number
 }) {
   return (
-    <div className="image-take-empty" style={{ aspectRatio: `${width} / ${height}` }}>
+    <div className="image-take-empty" style={{ aspectRatio: `${width} / ${height}`, width: shown }}>
       {title && <b>{title}</b>}
       {hint && <span className="faint small">{hint}</span>}
     </div>
@@ -262,7 +265,20 @@ export function TakesSection({
         side,
         picture: side.querySelector<HTMLElement>(PICTURE),
       }))
-      const chrome = stageChrome(sides, (box) => parseFloat(getComputedStyle(box).rowGap) || 0)
+      const px = (value: string) => parseFloat(value) || 0
+      const chrome = stageChrome(
+        sides,
+        (box) => px(getComputedStyle(box).rowGap),
+        (box) => {
+          const style = getComputedStyle(box)
+          return (
+            px(style.paddingTop) +
+            px(style.paddingBottom) +
+            px(style.borderTopWidth) +
+            px(style.borderBottomWidth)
+          )
+        },
+      )
       setAvailable((now) => {
         const next = {
           width: stage.clientWidth,
@@ -933,7 +949,7 @@ function LeftSide({
       <div className="image-side-unknown" data-unknown="true">
         <div className="take-row">{label}</div>
         <b>The images lock could not be read</b>
-        <EmptyFrame {...size} />
+        <EmptyFrame {...size} shown={size.width * zoom} />
         <span className="faint small">{IMAGE_TAKE_UNKNOWN}</span>
       </div>
     )

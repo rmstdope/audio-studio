@@ -4387,6 +4387,7 @@ textarea[aria-disabled='true'][data-why] {
 }
 .image-take-empty {
   width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
