@@ -89,6 +89,7 @@ import {
   TryBody,
   VoiceBody,
   languageOf,
+  fileResponse,
   notFound,
   parseOrNull,
 } from '../shared'
@@ -409,7 +410,7 @@ export function narrationRoutes(c: RouteContext) {
           request.params.file,
           languageOf(request),
         )
-        return file ? new Response(Bun.file(file)) : notFound()
+        return fileResponse(file)
       }),
     },
     '/api/characters/:id': {

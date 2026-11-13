@@ -17,6 +17,7 @@ import type { ModelsChange } from '../../services/models'
 import type { ProjectFailure } from '../../services/workspace'
 
 import { closeKept, getJson, useRefreshRun } from './core'
+import { useTakeAction, type TakeMedium } from './takeHooks'
 
 /**
  * Saves the project's sound-effects model in the project file (`was` is the one the page showed), then
@@ -125,66 +126,33 @@ export function useEffectTakes(id: string) {
   })
 }
 
-/**
- * One change to a sound effect's takes (make, stop, choose, drop, un-choose, accept), then the
- * effect's takes and the project are read again: the project's Sound effects pages show the status.
- */
-function useEffectTakesAction<V, R>(
-  id: string,
-  what: string,
-  request: (value: V) => { method: string; path: string; body?: unknown },
-  tolerated: readonly number[] = [409],
-) {
-  const client = useQueryClient()
-  const base = `/api/effects/${encodeURIComponent(id)}`
-  return useMutation({
-    mutationFn: async (value: V) => {
-      const { method, path, body } = request(value)
-      const response = await fetch(`${base}${path}`, {
-        method,
-        headers: { 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      })
-      if (!response.ok && !tolerated.includes(response.status)) {
-        throw new Error(`${what} answered ${response.status}`)
-      }
-      return (await response.json()) as R
-    },
-    // Both read again before a question closes, so the block never shows the old choice.
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['project'] }),
-        client.invalidateQueries({ queryKey: ['effect-takes', id] }),
-        client.invalidateQueries({ queryKey: ['effects-making'] }),
-      ]),
-  })
+/** Where sound effects keep their takes' queries, for the hooks every medium with takes shares. */
+const effectTakeMedium: TakeMedium = {
+  base: (id) => `/api/effects/${encodeURIComponent(id)}`,
+  takesKey: 'effect-takes',
+  makingKey: 'effects-making',
 }
 
 /** Asks for takes of a sound effect (new ones, or a failed one again). */
 export function useMakeEffectTakes(id: string) {
-  return useEffectTakesAction<MakeEffectRequest, NonNullable<EffectMakeResult>>(
+  return useTakeAction<MakeEffectRequest, NonNullable<EffectMakeResult>>(
+    effectTakeMedium,
     id,
-    'asking for takes',
-    (body) => ({ method: 'POST', path: '/takes', body }),
+    (a) => a.make,
   )
 }
 
 /** Stops a sound effect's takes (the one being made and those waiting). */
 export function useStopEffectTakes(id: string) {
-  return useEffectTakesAction<void, NonNullable<EffectStopResult>>(
-    id,
-    'stopping the takes',
-    () => ({ method: 'POST', path: '/stop' }),
-    [],
-  )
+  return useTakeAction<void, NonNullable<EffectStopResult>>(effectTakeMedium, id, (a) => a.stop)
 }
 
 /** Makes a take the sound effect's clip in the game. */
 export function useChooseEffectTake(id: string) {
-  return useEffectTakesAction<string, NonNullable<EffectChooseResult>>(
+  return useTakeAction<string, NonNullable<EffectChooseResult>>(
+    effectTakeMedium,
     id,
-    'choosing the take',
-    (file) => ({ method: 'POST', path: '/choose', body: { file } }),
+    (a) => a.choose,
   )
 }
 
@@ -193,51 +161,39 @@ export function useChooseEffectTake(id: string) {
  * one, the game's file is written again at once.
  */
 export function useSetEffectFades(id: string) {
-  return useEffectTakesAction<{ file: string; fades: Fades | null }, NonNullable<EffectMakeResult>>(
+  return useTakeAction<{ file: string; fades: Fades | null }, NonNullable<EffectMakeResult>>(
+    effectTakeMedium,
     id,
-    'saving the fades',
-    ({ file, fades }) => ({
-      method: fades ? 'PUT' : 'DELETE',
-      path: `/takes/${encodeURIComponent(file)}/fades`,
-      ...(fades && { body: fades }),
-    }),
+    (a) => a.fades,
   )
 }
 
 /** Cuts the near-silence of a one-shot sound effect take, or (with `undo`) gives the take back as generated. */
 export function useTrimEffectTake(id: string) {
-  return useEffectTakesAction<{ file: string; undo: boolean }, NonNullable<EffectTrimResult>>(
+  return useTakeAction<{ file: string; undo: boolean }, NonNullable<EffectTrimResult>>(
+    effectTakeMedium,
     id,
-    'trimming the take',
-    (body) => ({ method: 'POST', path: '/trim', body }),
+    (a) => a.trim,
   )
 }
 
 /** Takes a take off a sound effect's board. */
 export function useDropEffectTake(id: string) {
-  return useEffectTakesAction<string, NonNullable<EffectMakeResult>>(
-    id,
-    'dropping the take',
-    (file) => ({ method: 'DELETE', path: `/takes/${encodeURIComponent(file)}` }),
-  )
+  return useTakeAction<string, NonNullable<EffectMakeResult>>(effectTakeMedium, id, (a) => a.drop)
 }
 
 /** Takes the chosen take back: its clip is deleted from the game. */
 export function useUnchooseEffect(id: string) {
-  return useEffectTakesAction<void, NonNullable<EffectChooseResult>>(
+  return useTakeAction<void, NonNullable<EffectChooseResult>>(
+    effectTakeMedium,
     id,
-    'un-choosing the take',
-    () => ({ method: 'POST', path: '/unchoose' }),
+    (a) => a.unchoose,
   )
 }
 
 /** Accepts a changed description: the chosen take counts as made from it. */
 export function useAcceptEffect(id: string) {
-  return useEffectTakesAction<void, NonNullable<EffectChooseResult>>(
-    id,
-    'accepting the change',
-    () => ({ method: 'POST', path: '/accept' }),
-  )
+  return useTakeAction<void, NonNullable<EffectChooseResult>>(effectTakeMedium, id, (a) => a.accept)
 }
 
 /** Which sound-effects models can run, for the Sound effects page's Make all question. */

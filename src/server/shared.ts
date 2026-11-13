@@ -287,6 +287,10 @@ export const languageOf = (request: Request) =>
 /** The answer for a path or thing that is not there. */
 export const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
 
+/** A file served as it is, or the answer for one that is not there. */
+export const fileResponse = (file: string | null) =>
+  file ? new Response(Bun.file(file)) : notFound()
+
 /** The answer for a request the studio refuses to serve. */
 export const forbidden = (error: string) => Response.json({ error }, { status: 403 })
 
