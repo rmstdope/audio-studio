@@ -89,6 +89,7 @@ import {
   TryBody,
   VoiceBody,
   languageOf,
+  fileRoute,
   notFound,
   parseOrNull,
 } from '../shared'
@@ -402,14 +403,8 @@ export function narrationRoutes(c: RouteContext) {
       ),
     },
     '/api/parts/:part/clips/:file': {
-      GET: guard(async (request) => {
-        const file = await clipFile(
-          projectFile,
-          request.params.part,
-          request.params.file,
-          languageOf(request),
-        )
-        return file ? new Response(Bun.file(file)) : notFound()
+      GET: fileRoute(guard, async (request) => {
+        return clipFile(projectFile, request.params.part, request.params.file, languageOf(request))
       }),
     },
     '/api/characters/:id': {

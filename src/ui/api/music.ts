@@ -24,6 +24,7 @@ import type { ModelsChange } from '../../services/models'
 import type { ProjectFailure } from '../../services/workspace'
 
 import { closeKept, getJson, useKeptBatch, useRefreshRun } from './core'
+import { useTakeAction, type TakeMedium } from './takeHooks'
 
 /**
  * Saves the project's music model in the project file (`was` is the one the page showed), then
@@ -108,6 +109,13 @@ export function useKeepMyBrief(trackId: string) {
   })
 }
 
+/** Where music keeps its tracks' takes' queries, for the hooks every medium with takes shares. */
+const musicTakeMedium: TakeMedium = {
+  base: (id) => `/api/music/tracks/${encodeURIComponent(id)}`,
+  takesKey: 'music-takes',
+  makingKey: 'music-making',
+}
+
 /** A track's takes as its page shows them; polled while any is being made. */
 export function useMusicTakes(trackId: string) {
   return useQuery({
@@ -125,24 +133,11 @@ export function useMusicTakes(trackId: string) {
 
 /** Asks for takes of a track (new ones, or a failed one again), then reloads its takes. */
 export function useMakeTakes(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async (request: MakeRequest) => {
-      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/takes`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(request),
-      })
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`asking for takes answered ${response.status}`)
-      }
-      return (await response.json()) as NonNullable<MakeResult>
-    },
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: ['music-takes', trackId] })
-      return client.invalidateQueries({ queryKey: ['music-making'] })
-    },
-  })
+  return useTakeAction<MakeRequest, NonNullable<MakeResult>>(
+    musicTakeMedium,
+    trackId,
+    (a) => a.make,
+  )
 }
 
 /**
@@ -150,24 +145,7 @@ export function useMakeTakes(trackId: string) {
  * takes and the project, whose Music pages show the track's status.
  */
 export function useUnchooseTake(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/unchoose`, {
-        method: 'POST',
-      })
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`un-choosing the take answered ${response.status}`)
-      }
-      return (await response.json()) as NonNullable<ChooseResult>
-    },
-    // Both reloaded before the question closes, so the block never shows the old choice.
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['project'] }),
-        client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
-      ]),
-  })
+  return useTakeAction<void, NonNullable<ChooseResult>>(musicTakeMedium, trackId, (a) => a.unchoose)
 }
 
 /**
@@ -176,41 +154,12 @@ export function useUnchooseTake(trackId: string) {
  * the track's takes.
  */
 export function useAcceptTrackChange(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/accept`, {
-        method: 'POST',
-      })
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`accepting the change answered ${response.status}`)
-      }
-      return (await response.json()) as NonNullable<ChooseResult>
-    },
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ['project'] }),
-        client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
-      ]),
-  })
+  return useTakeAction<void, NonNullable<ChooseResult>>(musicTakeMedium, trackId, (a) => a.accept)
 }
 
 /** Takes a take off a track's board, then reloads its takes. */
 export function useDropTake(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async (file: string) => {
-      const response = await fetch(
-        `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${encodeURIComponent(file)}`,
-        { method: 'DELETE' },
-      )
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`dropping the take answered ${response.status}`)
-      }
-      return (await response.json()) as NonNullable<DropResult>
-    },
-    onSettled: () => client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
-  })
+  return useTakeAction<string, NonNullable<DropResult>>(musicTakeMedium, trackId, (a) => a.drop)
 }
 
 /**
@@ -218,26 +167,11 @@ export function useDropTake(trackId: string) {
  * take is the chosen one, the game's file is written again at once.
  */
 export function useSetFades(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ file, fades }: { file: string; fades: Fades | null }) => {
-      const response = await fetch(
-        `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${encodeURIComponent(file)}/fades`,
-        fades
-          ? {
-              method: 'PUT',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify(fades),
-            }
-          : { method: 'DELETE' },
-      )
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`saving the fades answered ${response.status}`)
-      }
-      return (await response.json()) as NonNullable<DropResult>
-    },
-    onSettled: () => client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
-  })
+  return useTakeAction<{ file: string; fades: Fades | null }, NonNullable<DropResult>>(
+    musicTakeMedium,
+    trackId,
+    (a) => a.fades,
+  )
 }
 
 /**
@@ -273,24 +207,7 @@ export function useMoveTake(trackId: string) {
  * the track's status.
  */
 export function useChooseTake(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async (file: string) => {
-      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/choose`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ file }),
-      })
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`choosing the take answered ${response.status}`)
-      }
-      return (await response.json()) as NonNullable<ChooseResult>
-    },
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: ['project'] })
-      return client.invalidateQueries({ queryKey: ['music-takes', trackId] })
-    },
-  })
+  return useTakeAction<string, NonNullable<ChooseResult>>(musicTakeMedium, trackId, (a) => a.choose)
 }
 
 /**
@@ -298,24 +215,11 @@ export function useChooseTake(trackId: string) {
  * reloads the track's takes and the project, since the take in the game may have been rewritten.
  */
 export function useTrimTake(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async (request: { file: string; undo: boolean }) => {
-      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/trim`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(request),
-      })
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`trimming the take answered ${response.status}`)
-      }
-      return (await response.json()) as NonNullable<TrimResult>
-    },
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: ['project'] })
-      return client.invalidateQueries({ queryKey: ['music-takes', trackId] })
-    },
-  })
+  return useTakeAction<{ file: string; undo: boolean }, NonNullable<TrimResult>>(
+    musicTakeMedium,
+    trackId,
+    (a) => a.trim,
+  )
 }
 
 /**
@@ -345,20 +249,7 @@ export function useRemoveOrphan(trackId: string) {
 
 /** Stops a track's takes (the one being made and those waiting), then reloads its takes. */
 export function useStopTakes(trackId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/stop`, {
-        method: 'POST',
-      })
-      if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
-      return (await response.json()) as NonNullable<StopResult>
-    },
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: ['music-takes', trackId] })
-      return client.invalidateQueries({ queryKey: ['music-making'] })
-    },
-  })
+  return useTakeAction<void, NonNullable<StopResult>>(musicTakeMedium, trackId, (a) => a.stop)
 }
 
 /** What is being made for each track of the project, for the lists' status; polled meanwhile. */
