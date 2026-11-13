@@ -249,6 +249,46 @@ describe('Trim silence on a stinger’s takes', () => {
     )
   })
 
+  it('says the board could not be written, and that the game still plays what it did', async () => {
+    answer = async () =>
+      new Response(JSON.stringify({ ok: false, message: 'The take board could not be written.' }), {
+        status: 409,
+      })
+    const a = render(view([take(3, { chosen: true })]), inGame)
+    await click(a.buttons('Trim silence')[0]!)
+    expect(a.container.querySelector('.track-in-game .adopt-error')?.textContent).toBe(
+      'Take 3 could not be trimmed: the take board could not be written. The game still plays it as it was.',
+    )
+    const b = render(view([take(3, { chosen: true, trim: trimmed, trimmable: undefined })]), inGame)
+    await click(b.buttons('Undo trim')[0]!)
+    expect(b.container.querySelector('.track-in-game .adopt-error')?.textContent).toBe(
+      'Take 3 could not be untrimmed: the take board could not be written. The game still plays it trimmed.',
+    )
+  })
+
+  it('says the game’s files could not be put back, and claims nothing about the game', async () => {
+    answer = async () =>
+      new Response(
+        JSON.stringify({
+          ok: false,
+          message:
+            'content-studio/cache/music/3.json could not be written, and the game’s files could not be put back',
+          gameChanged: true,
+        }),
+        { status: 409 },
+      )
+    const a = render(view([take(3, { chosen: true })]), inGame)
+    await click(a.buttons('Trim silence')[0]!)
+    expect(a.container.querySelector('.track-in-game .adopt-error')?.textContent).toBe(
+      'Take 3 could not be trimmed: content-studio/cache/music/3.json could not be written, and the game’s files could not be put back.',
+    )
+    const b = render(view([take(3, { chosen: true, trim: trimmed, trimmable: undefined })]), inGame)
+    await click(b.buttons('Undo trim')[0]!)
+    expect(b.container.querySelector('.track-in-game .adopt-error')?.textContent).toBe(
+      'Take 3 could not be untrimmed: content-studio/cache/music/3.json could not be written, and the game’s files could not be put back.',
+    )
+  })
+
   it('is on the take in the game too, with the trimmed tag before the chosen chip', () => {
     const { container, buttons } = render(
       view([take(1, { chosen: true, trim: trimmed, trimmable: undefined })]),

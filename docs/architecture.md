@@ -963,7 +963,11 @@ shows the waveform at its full width with the cut ends hatched, the new length (
 line saying what went from each end. Play uses `GET …/takes/:file?trimmed=1`, the part between the cuts.
 **Choose** cuts the WAV before encoding, so the game's file holds the trimmed sound and the manifest the
 trimmed duration; Trim silence and Undo trim on the take already in the game re-commit it (the same
-`commitChoice`) first and write the board only if that worked, so a failure leaves both as they were.
+`commitChoice`) first and write the board only if that worked, so a failure leaves both as they were. A board
+that cannot be written afterwards puts the track's clip, manifest entry and lock entry back (`keepMusicChoice`, in
+the project's choice turn, so what another track chose meanwhile stays; as-271h), answered with the refused
+board's name ("content-studio/cache/music/<id>.json could not be written", as the effects trim) so the line's "The game still plays it as it was." holds; if even that fails the refusal carries
+`gameChanged` and says ", and the game’s files could not be put back", with nothing claimed about the game.
 
 **Move a take** (built, as-824): a take that is made, not chosen and not dropped can be moved to another track of
 the same kind (loop to loop in any act, stinger to stinger) from the **Move…** button on its card, which opens a

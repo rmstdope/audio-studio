@@ -15,6 +15,7 @@ import { readWav, writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setTrackBrief } from './briefs'
 import { createSerial } from './serial'
+import { choices } from './musicClips'
 import type { MusicGenerator, MusicReady, MusicRequest } from './music'
 import { FileNotWritten, type Encoder } from './audio'
 import { loadProject } from './workspace'
@@ -1767,19 +1768,29 @@ describe('trimming a stinger take', () => {
   async function made(failEncode = false) {
     const encoded: Uint8Array[] = []
     let failing: boolean | Error = failEncode
+    let hook: (() => void) | null = null
     const encoder: Encoder = async (wav, out) => {
       if (failing instanceof Error) throw failing
       if (failing) throw new Error('the encoder broke')
       encoded.push(wav)
       mkdirSync(dirname(out), { recursive: true })
       writeFileSync(out, `mp3 ${encoded.length}`)
+      // Once, as the encoder returns: before the caller queues its commit in the choice turn.
+      hook?.()
+      hook = null
     }
     const m = setup(undefined, lists, [], undefined, [], false, encoder)
     await m.takes.make(m.file, 'victory', { count: 2 })
     await m.settled('victory')
     const folder = join(m.root, 'content-studio/cache/music-takes/victory')
     for (const name of readdirSync(folder)) writeFileSync(join(folder, name), padded())
-    return { ...m, encoded, folder, fail: (on: boolean | Error) => (failing = on) }
+    return {
+      ...m,
+      encoded,
+      folder,
+      fail: (on: boolean | Error) => (failing = on),
+      afterEncoded: (run: () => void) => (hook = run),
+    }
   }
   type Made = Awaited<ReturnType<typeof made>>
   const viewOf = async (m: Made, id = 'victory') => {
@@ -1926,6 +1937,120 @@ describe('trimming a stinger take', () => {
     expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })
     expect(readFileSync(join(m.root, 'audio/music/victory.mp3'), 'utf8')).toBe('mp3 1')
     expect(manifestOf(m.root).victory.duration).toBe(6)
+  })
+
+  /** Runs `act` with the take board unwritable, the server log quiet. */
+  async function boardLocked<T>(m: Made, act: () => Promise<T>): Promise<T> {
+    const folder = join(m.root, 'content-studio/cache/music')
+    chmodSync(folder, 0o555)
+    const quiet = console.error
+    console.error = () => {}
+    try {
+      return await act()
+    } finally {
+      console.error = quiet
+      chmodSync(folder, 0o755)
+    }
+  }
+  const gameOf = (m: Made) => [
+    readFileSync(join(m.root, 'audio/music/victory.mp3')),
+    readFileSync(join(m.root, 'audio/music/manifest.json')),
+    readFileSync(join(m.root, 'content-studio/music/lock.json')),
+  ]
+
+  it('puts the game back when the take in the game is trimmed or untrimmed and its board cannot be written', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    const refused = {
+      ok: false,
+      message: 'content-studio/cache/music/victory.json could not be written',
+    } as const
+    const before = gameOf(m)
+    expect(await boardLocked(m, () => m.takes.trim(m.file, 'victory', one!.file, false))).toEqual(
+      refused,
+    )
+    expect(gameOf(m)).toEqual(before)
+    expect((await viewOf(m)).takes[0]!.trim).toBeUndefined()
+    expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
+    const trimmed = gameOf(m)
+    expect(await boardLocked(m, () => m.takes.trim(m.file, 'victory', one!.file, true))).toEqual(
+      refused,
+    )
+    expect(gameOf(m)).toEqual(trimmed)
+    expect((await viewOf(m)).takes[0]!.trim).toBeDefined()
+  })
+
+  /**
+   * Holds the project's choice turn as the next encode returns, so the commit queues behind the
+   * hold; `between` is queued behind that commit and ahead of whatever the failed board queues.
+   */
+  function betweenCommitAndPutBack(m: Made, between: () => void) {
+    const turn = `music-choice\0${m.file}`
+    m.afterEncoded(() => {
+      let release = () => {}
+      void choices().run(turn, () => new Promise<void>((done) => (release = done)))
+      // A timer fires after the commit's own queueing, which follows the encoder's return at once.
+      setTimeout(() => {
+        void choices().run(turn, async () => between())
+        release()
+      }, 0)
+    })
+  }
+
+  it('keeps what another track chose meanwhile when it puts the game back', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    const lockFile = join(m.root, 'content-studio/music/lock.json')
+    betweenCommitAndPutBack(m, () => {
+      // Another track chosen after the trim's rewrite, before its put-back.
+      const lock = lockOf(m.root)
+      writeFileSync(
+        lockFile,
+        JSON.stringify({ ...lock, defeat: { ...lock.victory, list: 'stingers' } }),
+      )
+    })
+    expect(
+      await boardLocked(m, () => m.takes.trim(m.file, 'victory', one!.file, false)),
+    ).toMatchObject({
+      ok: false,
+      message: 'content-studio/cache/music/victory.json could not be written',
+    })
+    expect(Object.keys(lockOf(m.root)).sort()).toEqual(['defeat', 'victory'])
+    expect(manifestOf(m.root).victory.duration).toBe(6)
+  })
+
+  it('says so, and claims nothing, when the game cannot be put back either', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    await m.takes.choose(m.file, 'victory', one!.file)
+    const clips = join(m.root, 'audio/music')
+    // The music folder closes once the game has the trimmed sound: the put-back cannot write there.
+    betweenCommitAndPutBack(m, () => chmodSync(clips, 0o555))
+    try {
+      expect(await boardLocked(m, () => m.takes.trim(m.file, 'victory', one!.file, false))).toEqual(
+        {
+          ok: false,
+          message:
+            'content-studio/cache/music/victory.json could not be written, and the game’s files could not be put back',
+          gameChanged: true,
+        },
+      )
+    } finally {
+      chmodSync(clips, 0o755)
+    }
+  })
+
+  it('refuses a take that is not in the game, with its board unwritable, and changes nothing', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m)).takes
+    expect(await boardLocked(m, () => m.takes.trim(m.file, 'victory', one!.file, false))).toEqual({
+      ok: false,
+      message: 'content-studio/cache/music/victory.json could not be written',
+    })
+    expect((await viewOf(m)).takes[0]!.trim).toBeUndefined()
+    expect(m.encoded).toHaveLength(0)
   })
 
   it('says the game’s file could not be written when the take in the game cannot be trimmed or untrimmed there', async () => {
