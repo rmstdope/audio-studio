@@ -34,6 +34,7 @@ import { IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import {
   boardText,
   patchBoardKey,
+  patchEngineId,
   patchClipName,
   patchFolder,
   patchGameOf,
@@ -211,7 +212,7 @@ export function createImagePatches({
     ...image,
     patch,
     key: patchBoardKey(image.projectFile, image.id, patch.id),
-    engineId: `${image.id}\0${patch.id}`,
+    engineId: patchEngineId(image.id, patch.id),
     folder: patchFolder(image.id, patch.id),
     board: `${patchFolder(image.id, patch.id)}/board.json`,
     patchId: patch.id,
@@ -358,9 +359,11 @@ export function createImagePatches({
             return
           }
           saved = true
+          // With the entry's end, so a view never shows the take made and its model still failed.
+          failedModels.get(found.key)?.delete(entry.model)
         },
         failed() {
-          // The model is marked first, so a view never shows the failed take without its model's warning.
+          // Called right after the entry shows failed with no await between, so a view never shows the failed take without its model's warning.
           bringing.delete(mark)
           const failedHere = failedModels.get(found.key) ?? new Set<EditModelId>()
           failedHere.add(entry.model)
@@ -371,7 +374,6 @@ export function createImagePatches({
         if (!saved) return
         // The take is on the board and no longer an entry; what is left to do cannot undo it.
         try {
-          failedModels.get(found.key)?.delete(entry.model)
           if (took !== null)
             await recordTakeTime(found.projectFile, timeKeyOfEdit(entry.model), took)
           await bringTake(found, entry.n, entry.base)
@@ -434,6 +436,7 @@ export function createImagePatches({
         message: "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
       }
     }
+    const base = found.chosen
     let queued: Entry[] = []
     if ('retry' in request) {
       const again = engine.retry(found.projectFile, found.engineId, request.retry, '')
@@ -458,7 +461,7 @@ export function createImagePatches({
           startedAt: 0,
           message: '',
           hash: '',
-          base: found.chosen!,
+          base,
           model,
           area: request.area,
           words: found.patch.words,
@@ -578,7 +581,7 @@ export function createImagePatches({
       if ('ok' in board) return board
       total += ns.length
       for (const n of ns) {
-        const entry = engine.entry(image.projectFile, `${image.id}\0${patch}`, n)
+        const entry = engine.entry(image.projectFile, patchEngineId(image.id, patch), n)
         if (entry?.state === 'failed') {
           failedTakes++
           if (!failed.includes(patch)) failed.push(patch)
@@ -686,7 +689,9 @@ export function createImagePatches({
       const model = request.model ?? DEFAULT_EDIT_MODEL
       const takes = new Map<string, number[]>()
       const undo = () => {
-        for (const [patch, ns] of takes) engine.stopTakes(projectFile, `${id}\0${patch}`, ns)
+        for (const [patch, ns] of takes) {
+          engine.discardTakes(projectFile, patchEngineId(id, patch), ns)
+        }
       }
       for (const { id: patch, area } of plan.make) {
         const found = patchOf(
@@ -737,7 +742,7 @@ export function createImagePatches({
       const press = presses.get(`${projectFile}\0${id}`)
       let stopped = 0
       for (const [patch, ns] of press?.takes ?? []) {
-        stopped += engine.stopTakes(projectFile, `${id}\0${patch}`, ns)
+        stopped += engine.stopTakes(projectFile, patchEngineId(id, patch), ns)
       }
       return { ok: true, stopped }
     },
