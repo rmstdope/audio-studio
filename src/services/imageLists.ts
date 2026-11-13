@@ -6,10 +6,12 @@ import {
   ImageListSchema,
   readImageEditsValue,
   summarizeImages,
+  type ChosenEntry,
   type ImageEditsRead,
   type ImageListState,
   type ImagesSummary,
 } from '../core/images'
+import { LOCK_UNREAD, type LockRead } from '../core/lockRead'
 import {
   CACHE_DIR,
   IMAGES_EDITS_FILE,
@@ -178,7 +180,8 @@ export async function readImages(
   const edits = await readImageEdits(root)
   problems.push(...edits.problems)
   const lock = await readResource(root, IMAGES_LOCK_FILE, ImageLockSchema, problems)
-  const chosen = lock === 'missing' || lock === 'invalid' ? {} : lock
+  const chosen: LockRead<ChosenEntry> =
+    lock === 'invalid' ? LOCK_UNREAD : { read: true, entries: lock === 'missing' ? {} : lock }
   const gameFiles: Record<string, boolean> = {}
   for (const list of lists) {
     if (list.state.status !== 'ok') continue

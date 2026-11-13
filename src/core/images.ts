@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { describeLook, lookChanges, lookKey, lookOf, type Look } from './imageLook'
 import type { PatchArea } from './imagePatches'
+import { lockEntry, type LockRead } from './lockRead'
 import { problemsFrom, type Problem } from './project'
 
 /** The path of the picture the game shows for an image now: inside the project root, and a picture. */
@@ -897,7 +898,8 @@ export interface AreaRow {
 }
 
 /** The status chip of an image. */
-export type ImageStatus = 'none yet' | 'chosen' | 'out of date'
+/** `unknown` while the images lock cannot be read: the lock is what says a take is chosen. */
+export type ImageStatus = 'none yet' | 'chosen' | 'out of date' | 'unknown'
 
 /** One image as a page shows it. */
 export interface ImageRow {
@@ -1017,7 +1019,7 @@ export interface ImagesInput {
   /** The studio's changes to images, by image id. */
   edits: ImageEdits['images']
   /** What each image's chosen take was made from, and which take it is. */
-  chosen: Record<string, ChosenEntry>
+  chosen: LockRead<ChosenEntry>
   /** Whether the file each image names as the game's own is there, by image id. */
   gameFiles?: Record<string, boolean>
   /** The look the style asks for; null when it cannot be used (`lookError` says why). */
@@ -1113,7 +1115,8 @@ export function summarizeImages(input: ImagesInput): {
     const eff = effectiveStyle(style, styleAct, off)
     const words = own?.text ?? image.description
     const madeFrom = madeFromNow(words, image, eff)
-    const made = chosen[image.id]
+    const standing = lockEntry(chosen, image.id)
+    const made = standing.standing === 'chosen' ? standing.entry : undefined
     const reasons = made ? outOfDateReasons(madeFrom, made) : []
     const look =
       input.look === undefined
@@ -1206,7 +1209,14 @@ export function summarizeImages(input: ImagesInput): {
         ? { file: image.file, exists: input.gameFiles?.[image.id] ?? false }
         : null,
       madeFrom,
-      status: !made ? 'none yet' : reasons.length ? 'out of date' : 'chosen',
+      status:
+        standing.standing === 'unknown'
+          ? 'unknown'
+          : !made
+            ? 'none yet'
+            : reasons.length
+              ? 'out of date'
+              : 'chosen',
       reasons,
       look: {
         line: describeLook(look, image),
@@ -1251,7 +1261,7 @@ export function summarizeImages(input: ImagesInput): {
       rows,
       conflicts,
       order,
-      chosen: rows.filter((row) => row.status !== 'none yet').length,
+      chosen: rows.filter((row) => row.status === 'chosen' || row.status === 'out of date').length,
       canRefresh: list.canRefresh,
     }
   })

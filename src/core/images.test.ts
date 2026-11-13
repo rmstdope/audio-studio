@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { lookKey, lookOf } from './imageLook'
+import { LOCK_UNREAD } from './lockRead'
 import {
   ImageEditsSchema,
   ImageLockSchema,
@@ -274,7 +275,13 @@ describe('out of date', () => {
   })
 })
 
-function input(over: Partial<ImagesInput> = {}): ImagesInput {
+/** What a test changes in the input; the lock may be given as plain entries. */
+type InputOver = Omit<Partial<ImagesInput>, 'chosen'> & {
+  chosen?: Record<string, ChosenEntry> | ImagesInput['chosen']
+}
+
+function input(over: InputOver = {}): ImagesInput {
+  const { chosen = {}, ...rest } = over
   return {
     parts: [{ id: 'act1', title: 'Act I' }],
     lists: [
@@ -289,12 +296,20 @@ function input(over: Partial<ImagesInput> = {}): ImagesInput {
     editsFile: 'content-studio/images/edits.json',
     style,
     edits: {},
-    chosen: {},
-    ...over,
+    chosen: 'read' in chosen ? (chosen as ImagesInput['chosen']) : { read: true, entries: chosen },
+    ...rest,
   }
 }
 
 describe('summarizeImages', () => {
+  it('does not say "none yet" while the lock cannot be read', () => {
+    const { images } = summarizeImages(input({ chosen: LOCK_UNREAD }))
+    const act = images.acts[0]!
+    expect(act.rows[0]!.status).toBe('unknown')
+    expect(act.chosen).toBe(0)
+    expect(imagesDone(act).done).toBe(0)
+  })
+
   it('lists each act’s images with their words, size and status', () => {
     const { images } = summarizeImages(input())
     const row = images.acts[0]!.rows[0]!
@@ -409,9 +424,9 @@ describe('summarizeImages', () => {
 describe('the game’s look in the rows', () => {
   const size = { width: inn.width, height: inn.height }
   const nowKey = lookKey(lookOf(style), size)
-  const row = (over: Partial<ImagesInput> = {}) =>
+  const row = (over: InputOver = {}) =>
     summarizeImages(input({ look: lookOf(style), ...over })).images
-  const chosenAs = (look?: string): ImagesInput['chosen'] => {
+  const chosenAs = (look?: string): Record<string, ChosenEntry> => {
     const first = summarizeImages(input()).images.acts[0]!.rows[0]!
     return { [inn.id]: { ...first.madeFrom, take: 1, ...(look ? { look } : {}) } }
   }
@@ -492,7 +507,7 @@ describe('the game’s look in the rows', () => {
 
 describe('leaving the act’s style out of one image', () => {
   const off: ImageEdits['images'] = { [inn.id]: { partStyle: null } }
-  const row = (edits: ImageEdits['images'], extra: Partial<ImagesInput> = {}) =>
+  const row = (edits: ImageEdits['images'], extra: InputOver = {}) =>
     summarizeImages(input({ edits, ...extra })).images.acts[0]!.rows[0]!
   it('keeps the act’s line out of that image’s prompt only', () => {
     expect(assemblePrompt('w', effectiveStyle(style, 'act1', true))).toBe(
@@ -565,7 +580,7 @@ describe('an image the game lists in several acts', () => {
       state: { status: 'ok' as const, images: list },
       canRefresh: true,
     }))
-  const shared = (over: Partial<ImagesInput> = {}) =>
+  const shared = (over: InputOver = {}) =>
     summarizeImages(
       input({
         parts: [
@@ -607,7 +622,7 @@ describe('an image the game lists in several acts', () => {
   })
 
   describe('act style', () => {
-    const row = (over: Partial<ImagesInput> = {}, at = 0) => shared(over).images.acts[at]!.rows[0]!
+    const row = (over: InputOver = {}, at = 0) => shared(over).images.acts[at]!.rows[0]!
     it('offers the acts that add a style, starting on the first act in the game’s order', () => {
       const r = row()
       expect(r.actStyle).toEqual({
@@ -918,7 +933,7 @@ describe('the patches the game asks for', () => {
   })
 
   describe('in the rows', () => {
-    const rowOf = (over: Partial<ImagesInput> = {}, image = withPatches) =>
+    const rowOf = (over: InputOver = {}, image = withPatches) =>
       summarizeImages(
         input({
           lists: [

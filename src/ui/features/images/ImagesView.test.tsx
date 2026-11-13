@@ -127,16 +127,19 @@ function summary(options: Options = {}): ProjectSummary {
     editsInvalid: options.editsInvalid,
     style: options.style === undefined ? style : options.style,
     edits: options.edits ?? {},
-    chosen: Object.fromEntries(
-      Object.entries(options.chosen ?? {}).map(([id, made]) => [
-        id,
-        {
-          ...made,
-          ...(id === 'inn' && options.gameTake !== undefined ? { take: options.gameTake } : {}),
-          look: options.lookWas ?? lookKey(lookOf(style), id === 'inn' ? inn : barn),
-        },
-      ]),
-    ),
+    chosen: {
+      read: true,
+      entries: Object.fromEntries(
+        Object.entries(options.chosen ?? {}).map(([id, made]) => [
+          id,
+          {
+            ...made,
+            ...(id === 'inn' && options.gameTake !== undefined ? { take: options.gameTake } : {}),
+            look: options.lookWas ?? lookKey(lookOf(style), id === 'inn' ? inn : barn),
+          },
+        ]),
+      ),
+    },
     look: lookOf(style),
     ...(options.choices ? { patchChoices: { inn: options.choices } } : {}),
     ...(options.patchAreas ? { patchAreas: { inn: options.patchAreas } } : {}),
@@ -853,7 +856,7 @@ describe('the game’s look', () => {
       look: null,
       lookError: 'no',
       edits: {},
-      chosen: {},
+      chosen: { read: true, entries: {} },
     })
     const page = render({ view: 'images', page: 'image', image: 'inn' }, {
       images,
