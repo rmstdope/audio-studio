@@ -982,7 +982,8 @@ export interface ImagesAct {
   conflicts: ImageConflict[]
   /** The ids of the list in the game's order, rows and conflicts alike. */
   order: string[]
-  chosen: number
+  /** How many have a chosen take; null while the lock cannot be read, when that is not known. */
+  chosen: number | null
   canRefresh: boolean
 }
 
@@ -1261,7 +1262,9 @@ export function summarizeImages(input: ImagesInput): {
       rows,
       conflicts,
       order,
-      chosen: rows.filter((row) => row.status === 'chosen' || row.status === 'out of date').length,
+      chosen: chosen.read
+        ? rows.filter((row) => row.status === 'chosen' || row.status === 'out of date').length
+        : null,
       canRefresh: list.canRefresh,
     }
   })

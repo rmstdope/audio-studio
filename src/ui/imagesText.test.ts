@@ -9,6 +9,7 @@ import {
   bringFailureText,
   bringingText,
   chosenLine,
+  IMAGE_STATUS_LABEL,
   areaCaptionText,
   areasCountText,
   areasToPlaceText,
@@ -45,6 +46,9 @@ import { openWorkspace } from './sidebarActs'
 describe('the images words', () => {
   it('says how many are chosen', () => {
     expect(chosenLine('Act I', 4, 1)).toBe('The images the game asks for in Act I. 1 of 4 chosen.')
+    expect(IMAGE_STATUS_LABEL.unknown).toBe('not known')
+    // Which are chosen is not known while the lock cannot be read: no count to give.
+    expect(chosenLine('Act I', 4, null)).toBe('The images the game asks for in Act I.')
   })
   it('names what an out-of-date image changed, joined with "and"', () => {
     expect(outOfDateText(['the words'], 'Act I')).toBe(

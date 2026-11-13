@@ -285,7 +285,7 @@ describe('readChosen', () => {
     expect(problems).toEqual([])
   })
 
-  it('is empty without a lock, and null for a broken one, reported as a problem with its file', async () => {
+  it('is empty without a lock, and unread for a broken one, reported as a problem with its file', async () => {
     const root = tempRepo({})
     expect(await readChosen(root, config, [])).toEqual({ read: true, entries: {} })
     const broken = tempRepo({ 'content-studio/music/lock.json': { hall: { fp: 1 } } })

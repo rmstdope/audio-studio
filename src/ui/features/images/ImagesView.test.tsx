@@ -72,6 +72,8 @@ const barn = {
 interface Options {
   edits?: ImageEdits['images']
   chosen?: Record<string, MadeFrom>
+  /** The images lock cannot be read. */
+  lockUnread?: boolean
   style?: ImageStyle | null
   editsInvalid?: boolean
   actTwo?: 'missing' | 'empty'
@@ -127,19 +129,23 @@ function summary(options: Options = {}): ProjectSummary {
     editsInvalid: options.editsInvalid,
     style: options.style === undefined ? style : options.style,
     edits: options.edits ?? {},
-    chosen: {
-      read: true,
-      entries: Object.fromEntries(
-        Object.entries(options.chosen ?? {}).map(([id, made]) => [
-          id,
-          {
-            ...made,
-            ...(id === 'inn' && options.gameTake !== undefined ? { take: options.gameTake } : {}),
-            look: options.lookWas ?? lookKey(lookOf(style), id === 'inn' ? inn : barn),
-          },
-        ]),
-      ),
-    },
+    chosen: options.lockUnread
+      ? { read: false }
+      : {
+          read: true,
+          entries: Object.fromEntries(
+            Object.entries(options.chosen ?? {}).map(([id, made]) => [
+              id,
+              {
+                ...made,
+                ...(id === 'inn' && options.gameTake !== undefined
+                  ? { take: options.gameTake }
+                  : {}),
+                look: options.lookWas ?? lookKey(lookOf(style), id === 'inn' ? inn : barn),
+              },
+            ]),
+          ),
+        },
     look: lookOf(style),
     ...(options.choices ? { patchChoices: { inn: options.choices } } : {}),
     ...(options.patchAreas ? { patchAreas: { inn: options.patchAreas } } : {}),
@@ -322,6 +328,18 @@ describe('an act’s page', () => {
     expect(text(rows[0])).toContain("changed here · the game's words changed too")
     expect(text(rows[1])).toContain('changed here')
     expect(text(rows[1])).not.toContain('too')
+  })
+
+  it('says not known, and gives no count, while the images lock cannot be read', () => {
+    const page = render(
+      { view: 'images', page: 'act', part: 'act1' },
+      summary({ lockUnread: true }),
+    )
+    const chips = [...page.querySelectorAll('.images-status .chip')].map((c) => c.textContent)
+    expect(chips).toEqual(['not known', 'not known'])
+    expect(text(page.querySelector('.page-header .muted'))).toBe(
+      'The images the game asks for in Act I.',
+    )
   })
 
   it('shows chosen and out of date', () => {

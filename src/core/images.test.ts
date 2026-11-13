@@ -306,7 +306,7 @@ describe('summarizeImages', () => {
     const { images } = summarizeImages(input({ chosen: LOCK_UNREAD }))
     const act = images.acts[0]!
     expect(act.rows[0]!.status).toBe('unknown')
-    expect(act.chosen).toBe(0)
+    expect(act.chosen).toBeNull()
     expect(imagesDone(act).done).toBe(0)
   })
 

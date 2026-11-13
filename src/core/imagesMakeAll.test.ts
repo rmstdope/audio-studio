@@ -21,6 +21,11 @@ const base = {
 }
 
 describe('planImagesMakeAll', () => {
+  it('offers nothing while the lock cannot be read, and never says every image is chosen', () => {
+    const rows = [image('a', 'unknown'), image('b', 'unknown')]
+    expect(planImagesMakeAll({ ...base, rows })).toEqual({ kind: 'lock-unread' })
+  })
+
   it('makes four takes for every image with no chosen take, and leaves out the chosen', () => {
     const plan = planImagesMakeAll(base)
     expect(plan).toMatchObject({ kind: 'ready', model: 'klein', why: null, takes: 2 * TAKES_EACH })

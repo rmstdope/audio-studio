@@ -25,6 +25,8 @@ export type OtherModelReason = 'absent' | 'partial' | 'failed'
 export type ImagesMakeAllPlan =
   /** Images cannot be made yet: the generator is not ready, or neither model is on this computer. */
   | { kind: 'not-ready' }
+  /** Which images have a chosen take is not known: the lock cannot be read, so nothing is offered. */
+  | { kind: 'lock-unread' }
   /** No image can be started: each has a chosen take, or is left out for another reason. */
   | { kind: 'all-chosen' }
   | {
@@ -72,6 +74,7 @@ export function planImagesMakeAll({
   ready: boolean
   figures: Figures
 }): ImagesMakeAllPlan {
+  if (rows.some((r) => r.status === 'unknown')) return { kind: 'lock-unread' }
   const lacking = rows.filter((r) => r.status === 'none yet')
   const busy = lacking.filter((r) => (making[r.id]?.takes ?? 0) > 0)
   const images = lacking.filter((r) => !busy.includes(r))
