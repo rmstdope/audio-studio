@@ -193,4 +193,71 @@ describe('the take engine', () => {
     expect(await engine.changeBoard('p', 'x', access, () => 1)).toBe(failure)
     expect(await engine.reserve('p', 'x', access, 1, () => ({}) as TakeEntry)).toBe(failure)
   })
+
+  it('is making from its first line unless the job is queued, and a queued one waits until it says it began', async () => {
+    let clock = 0
+    const engine = createTakeEngine<TakeEntry, TakeBoard>({
+      slot: `testTakes${slots++}`,
+      boards: createSerial(),
+      now: () => ++clock,
+    })
+    const access: BoardAccess<TakeBoard> = {
+      read: async () => ({ next: 1, takes: [] }),
+      write: async () => {},
+    }
+    const entry = (n: number): TakeEntry => ({
+      n,
+      state: 'waiting',
+      startedAt: 0,
+      message: '',
+      hash: '',
+    })
+    const [now, later] = (await engine.reserve('p', 'x', access, 2, entry)) as TakeEntry[]
+    await engine.run('p', 'x', now!, { job: async () => expect(now!.state).toBe('making') })
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const running = engine.run('p', 'x', later!, {
+      queued: true,
+      job: async (_stop, began) => {
+        expect([later!.state, later!.startedAt]).toEqual(['waiting', 0])
+        await gate
+        began()
+        expect(later!.state).toBe('making')
+        expect(later!.startedAt).toBeGreaterThan(0)
+      },
+    })
+    release()
+    await running
+    expect(engine.entriesOf('p', 'x')).toEqual([])
+  })
+
+  it('discards one take in any state, stopping it if it is being made, and never makes it later', async () => {
+    const { engine, access, entry } = setup()
+    const [making, waiting, failed] = (await engine.reserve(
+      'p',
+      'x',
+      access,
+      3,
+      entry,
+    )) as TakeEntry[]
+    failed!.state = 'failed'
+    let signal: AbortSignal | undefined
+    const running = engine.run('p', 'x', making!, {
+      job: (s) =>
+        new Promise<void>((resolve) => {
+          signal = s
+          s.addEventListener('abort', () => resolve())
+        }),
+    })
+    expect(engine.discard('p', 'x', 1)).toBe(true)
+    await running
+    expect(signal?.aborted).toBe(true)
+    expect(engine.discard('p', 'x', 2)).toBe(true)
+    expect(engine.discard('p', 'x', 3)).toBe(true)
+    expect(engine.discard('p', 'x', 3)).toBe(false)
+    expect(engine.entriesOf('p', 'x')).toEqual([])
+    let ran = false
+    await engine.run('p', 'x', waiting!, { job: async () => void (ran = true) })
+    expect(ran).toBe(false)
+  })
 })

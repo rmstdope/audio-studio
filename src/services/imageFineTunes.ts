@@ -31,7 +31,8 @@ import { describeFailure, type ImageTakes } from './imageTakes'
 import { gameFilePath } from './musicLists'
 import { boardQueue, isSafeId } from './musicTakes'
 import { decodePng, encodePng, pngSize } from './png'
-import type { Serial } from './serial'
+import { createSerial, type Serial } from './serial'
+import { createTakeEngine, type BoardAccess, type TakeEntry } from './takeEngine'
 import { recordTakeTime, readTakeTimes } from './takeTimes'
 import { openProject, type ProjectFailure } from './workspace'
 
@@ -73,18 +74,12 @@ export interface ImageFineTunes {
 }
 
 /** A fine-tune waiting, being made, or failed, until it is made. */
-interface Entry {
-  n: number
-  state: 'waiting' | 'making' | 'failed'
-  startedAt: number
-  message: string
+interface Entry extends TakeEntry {
   /** The picture it is made from: a take's number, 0 for the game's own image. */
   base: number
   model: EditModelId
   words: string
   area: PatchArea | null
-  /** Ends it while it is being made (Stop). */
-  stop?: AbortController
 }
 
 /** The folder of an image's fine-tunes: the studio's cache, never committed and never read by the game. */
@@ -114,9 +109,14 @@ export function createImageFineTunes({
   now?: () => number
   newSeed?: () => number
 }): ImageFineTunes {
-  const shared = globalThis as { contentStudioFineTunes?: Map<string, Map<number, Entry>> }
-  // Kept across `--dev` reloads, as the takes being made are.
-  const active = (shared.contentStudioFineTunes ??= new Map())
+  const shared = globalThis as { contentStudioFineTuneBoards?: Serial }
+  // The entries are kept across `--dev` reloads, as the takes being made are.
+  const engine = createTakeEngine<Entry, FineTuneBoard>({
+    slot: 'contentStudioFineTunes',
+    boards: (shared.contentStudioFineTuneBoards ??= createSerial()),
+    now,
+    describe: describeFailure,
+  })
   const failedModels = new Map<string, Set<EditModelId>>()
   /** Images whose new fine-tunes are being checked and queued, so a second press at once is refused. */
   const starting = new Set<string>()
@@ -154,21 +154,18 @@ export function createImageFineTunes({
     return board
   }
 
-  /** Reads the board in its turn, lets `change` alter it and writes it back if it differs. */
-  function changeBoard<T>(
+  /** An image's board: read with its problems, written through the refusal. */
+  const accessOf = (image: Pick<Image, 'root' | 'board'>): BoardAccess<FineTuneBoard> => ({
+    read: () => readBoard(image),
+    write: (text) => writeOrRefuse(image.root, image.board, text),
+  })
+
+  /** Changes an image's board in its turn and saves it if it differs. */
+  const changeBoard = <T>(
     image: Pick<Image, 'projectFile' | 'root' | 'board' | 'id'>,
     change: (board: FineTuneBoard) => T | Promise<T>,
-  ): Promise<T | ProjectFailure> {
-    return boardQueue().run(`fine-tune\0${image.projectFile}\0${image.id}`, async () => {
-      const board = await readBoard(image)
-      if ('ok' in board) return board
-      const before = JSON.stringify(board, null, 2)
-      const answer = await change(board)
-      const after = JSON.stringify(board, null, 2)
-      if (after !== before) await writeOrRefuse(image.root, image.board, `${after}\n`)
-      return answer
-    })
-  }
+  ): Promise<T | ProjectFailure> =>
+    engine.changeBoard(image.projectFile, image.id, accessOf(image), change)
 
   /** The picture in the game, in the pixels fine-tunes are made in; the game's own image scaled to the take size. */
   async function pictureOf(image: Image): Promise<Pixels | null> {
@@ -225,87 +222,78 @@ export function createImageFineTunes({
     return null
   }
 
-  const entriesOf = (key: string) =>
-    [...(active.get(key)?.values() ?? [])].sort((a, b) => a.n - b.n)
-
   /** Edits the picture and saves the result as fine-tune `entry.n`. */
-  async function run(
-    image: Image,
-    entry: Entry,
-    source: Pixels,
-    entries: Map<number, Entry>,
-  ): Promise<void> {
-    if (entries.get(entry.n) !== entry || entry.state !== 'waiting') return
-    const stop = new AbortController()
-    entry.stop = stop
-    const seed = newSeed() // before any await, so the fine-tunes of one press take their seeds in order
-    try {
-      let began: number | null = null
-      const made = await editStep(
-        { generator, queue, free },
-        {
-          root: image.root,
-          cropFile: `${image.folder}/editing-${entry.n}.png`,
-          source,
-          area: entry.area,
-          words: entry.words,
-          model: entry.model,
-          seed,
-        },
-        stop.signal,
-        () => {
-          entry.state = 'making'
-          entry.startedAt = now()
-          began = entry.startedAt
-        },
-      )
-      if (!made) return
-      // Timed from when it started making, so its wait for the GPU is not counted.
-      const took = began === null ? null : (now() - began) / 1000
-      const saved: FineTune = {
-        n: entry.n,
-        base: entry.base,
-        seed: made.seed,
-        words: entry.words,
-        area: entry.area,
-        seen: false,
-        model: entry.model,
-      }
-      // The picture first: a fine-tune is on the board only once its file is there.
-      await writeOrRefuse(image.root, `${image.folder}/${entry.n}.png`, made.png)
-      const failure = await changeBoard(image, (board) => {
-        if (stop.signal.aborted) return
-        board.tunes = [...board.tunes.filter((t) => t.n !== saved.n), saved].sort(
-          (a, b) => a.n - b.n,
+  function run(image: Image, entry: Entry, source: Pixels): Promise<void> {
+    let took: number | null = null
+    return engine.run(image.projectFile, image.id, entry, {
+      // Waits on the GPU queue as waiting; being made from when the model starts.
+      queued: true,
+      async job(stop, began) {
+        const seed = newSeed() // before any await, so the fine-tunes of one press take their seeds in order
+        let started = false
+        const made = await editStep(
+          { generator, queue, free },
+          {
+            root: image.root,
+            cropFile: `${image.folder}/editing-${entry.n}.png`,
+            source,
+            area: entry.area,
+            words: entry.words,
+            model: entry.model,
+            seed,
+          },
+          stop,
+          () => {
+            began()
+            started = true
+          },
         )
-      })
-      if (stop.signal.aborted || (failure && 'ok' in failure)) {
-        await rm(resolveInRoot(image.root, `${image.folder}/${entry.n}.png`), { force: true })
-        if (failure && 'ok' in failure) throw new Error(`${failure.file} cannot be used`)
-        return
-      }
-      entries.delete(entry.n)
-      failedModels.get(image.key)?.delete(entry.model)
-      // A whole-picture edit takes far longer than a patch's window, so only marked ones are timed under the edit keys.
-      if (took !== null && entry.area)
-        await recordTakeTime(image.projectFile, timeKeyOfEdit(entry.model), took)
-    } catch (error) {
-      if (stop.signal.aborted) return
-      const failed = failedModels.get(image.key) ?? new Set<EditModelId>()
-      failed.add(entry.model)
-      failedModels.set(image.key, failed)
-      entry.message = describeFailure(error)
-      entry.state = 'failed'
-    }
+        if (!made) return
+        // Timed from when it started making, so its wait for the GPU is not counted.
+        const elapsed = started ? (now() - entry.startedAt) / 1000 : null
+        const saved: FineTune = {
+          n: entry.n,
+          base: entry.base,
+          seed: made.seed,
+          words: entry.words,
+          area: entry.area,
+          seen: false,
+          model: entry.model,
+        }
+        // The picture first: a fine-tune is on the board only once its file is there.
+        await writeOrRefuse(image.root, `${image.folder}/${entry.n}.png`, made.png)
+        const failure = await changeBoard(image, (board) => {
+          if (stop.aborted) return
+          board.tunes = [...board.tunes.filter((t) => t.n !== saved.n), saved].sort(
+            (a, b) => a.n - b.n,
+          )
+        })
+        if (stop.aborted || (failure && 'ok' in failure)) {
+          await rm(resolveInRoot(image.root, `${image.folder}/${entry.n}.png`), { force: true })
+          if (failure && 'ok' in failure) throw new Error(`${failure.file} cannot be used`)
+          return
+        }
+        failedModels.get(image.key)?.delete(entry.model)
+        took = elapsed
+      },
+      failed() {
+        const failed = failedModels.get(image.key) ?? new Set<EditModelId>()
+        failed.add(entry.model)
+        failedModels.set(image.key, failed)
+      },
+      async settled() {
+        // A whole-picture edit takes far longer than a patch's window, so only marked ones are timed under the edit keys.
+        if (took === null || !entry.area) return
+        // The time is a nicety: the fine-tune is made whether or not it is kept.
+        await recordTakeTime(image.projectFile, timeKeyOfEdit(entry.model), took).catch(() => {})
+      },
+    })
   }
 
   /** Checks the request and queues its fine-tunes. */
-  async function start(
-    image: Image,
-    entries: Map<number, Entry>,
-    request: FineTuneRequest,
-  ): Promise<FineTuneAnswer> {
-    const failed = 'retry' in request ? entries.get(request.retry) : undefined
+  async function start(image: Image, request: FineTuneRequest): Promise<FineTuneAnswer> {
+    const failed =
+      'retry' in request ? engine.entry(image.projectFile, image.id, request.retry) : undefined
     if ('retry' in request && (failed?.state !== 'failed' || failed.base !== image.base)) {
       return {
         ok: false,
@@ -335,40 +323,38 @@ export function createImageFineTunes({
     if (problem) return { ok: false, message: problem }
     const queued: Entry[] = []
     if (failed) {
-      failed.state = 'waiting'
-      queued.push(failed)
+      const again = engine.retry(image.projectFile, image.id, failed.n, '')
+      if (again) queued.push(again)
     } else if ('count' in request) {
-      const first = Math.max(...[...entries.values()].map((e) => e.n + 1), 1)
-      const reserved = await changeBoard(image, (board) => {
-        const at = Math.max(board.next, first)
-        board.next = at + request.count
-        return at
-      })
-      if (typeof reserved !== 'number') return reserved
-      for (let i = 0; i < request.count; i++) {
-        const entry: Entry = {
-          n: reserved + i,
+      const reserved = await engine.reserve(
+        image.projectFile,
+        image.id,
+        accessOf(image),
+        request.count,
+        (n) => ({
+          n,
           state: 'waiting',
           startedAt: 0,
           message: '',
+          hash: '',
           base: image.base,
           model,
           words: request.words,
           area: request.area,
-        }
-        entries.set(entry.n, entry)
-        queued.push(entry)
-      }
+        }),
+      )
+      if (!Array.isArray(reserved)) return reserved
+      queued.push(...reserved)
     }
-    for (const entry of queued) void run(image, entry, source, entries)
+    for (const entry of queued) void run(image, entry, source)
     return { ok: true }
   }
 
   /** Forgets every fine-tune of the image: stops what is waiting or being made, empties the board and deletes the pictures. */
   async function clear(image: Image): Promise<void> {
-    const entries = active.get(image.key)
-    for (const entry of entries?.values() ?? []) entry.stop?.abort()
-    entries?.clear()
+    for (const entry of engine.entriesOf(image.projectFile, image.id)) {
+      engine.discard(image.projectFile, image.id, entry.n)
+    }
     const board = await changeBoard(image, (b) => {
       const gone = b.tunes.map((t) => t.n)
       b.tunes = []
@@ -385,9 +371,12 @@ export function createImageFineTunes({
       const image = await resolve(projectFile, id)
       if (!image || 'ok' in image) return image
       // Before the board: a fine-tune that lands in between then shows as made, never as neither.
-      const entries = entriesOf(image.key).filter((e) => e.base === image.base)
+      const entries = engine
+        .entriesOf(image.projectFile, image.id)
+        .filter((e) => e.base === image.base)
       const board = await readBoard(image)
       if ('ok' in board) return board
+      const split = engine.split(entries, board.tunes)
       const picture = await pictureSize(image)
       const figures = figuresOf(await readTakeTimes(projectFile))
       const problem = await makerProblem()
@@ -413,24 +402,20 @@ export function createImageFineTunes({
         tunes: board.tunes
           .filter((t) => t.base === image.base)
           .map((t) => ({ n: t.n, words: t.words, area: t.area, model: t.model, isNew: !t.seen })),
-        making: entries
-          .filter((e) => e.state !== 'failed')
-          .map((e) => ({
-            n: e.n,
-            state: e.state as 'waiting' | 'making',
-            elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
-            expected: figures[timeKeyOfEdit(e.model)].seconds,
-            model: e.model,
-          })),
-        failed: entries
-          .filter((e) => e.state === 'failed')
-          .map((e) => ({
-            n: e.n,
-            message: e.message,
-            words: e.words,
-            area: e.area,
-            model: e.model,
-          })),
+        making: split.pending.map((e) => ({
+          n: e.n,
+          state: e.state as 'waiting' | 'making',
+          elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
+          expected: figures[timeKeyOfEdit(e.model)].seconds,
+          model: e.model,
+        })),
+        failed: split.failed.map((e) => ({
+          n: e.n,
+          message: e.message,
+          words: e.words,
+          area: e.area,
+          model: e.model,
+        })),
         failedModels: EDIT_MODEL_IDS.filter((m) => failedModels.get(image.key)?.has(m)),
       } satisfies FineTunesView
     },
@@ -438,17 +423,17 @@ export function createImageFineTunes({
     async make(projectFile, id, request) {
       const image = await resolve(projectFile, id)
       if (!image || 'ok' in image) return image
-      const entries = active.get(image.key) ?? new Map<number, Entry>()
-      active.set(image.key, entries)
       // Taken before the first wait, so that of two requests at once only one goes on.
       const guard = 'count' in request ? image.key : `${image.key}\0${request.retry}`
-      const busy = [...entries.values()].some((e) => e.state !== 'failed' && e.base === image.base)
+      const busy = engine
+        .entriesOf(projectFile, id)
+        .some((e) => e.state !== 'failed' && e.base === image.base)
       if (starting.has(guard) || ('count' in request && busy)) {
         return { ok: false, message: 'Fine-tunes are being made. Wait for them, or stop them.' }
       }
       starting.add(guard)
       try {
-        return await start(image, entries, request)
+        return await start(image, request)
       } finally {
         starting.delete(guard)
       }
@@ -457,12 +442,10 @@ export function createImageFineTunes({
     async stop(projectFile, id) {
       const image = await resolve(projectFile, id)
       if (!image || 'ok' in image) return image
-      const entries = active.get(image.key)
       let stopped = 0
-      for (const [n, entry] of entries ?? []) {
+      for (const entry of engine.entriesOf(projectFile, id)) {
         if (entry.state === 'failed' || entry.base !== image.base) continue
-        entry.stop?.abort()
-        entries!.delete(n)
+        engine.discard(projectFile, id, entry.n)
         stopped++
       }
       return { ok: true, stopped }
@@ -471,12 +454,10 @@ export function createImageFineTunes({
     async drop(projectFile, id, n) {
       const image = await resolve(projectFile, id)
       if (!image || 'ok' in image) return image
-      const entries = active.get(image.key)
-      const entry = entries?.get(n)
+      const entry = engine.entry(projectFile, id, n)
       // A failed one is only forgotten; one waiting or being made is stopped first, and the next waiting one starts.
       if (entry && (entry.state === 'failed' || entry.base === image.base)) {
-        entry.stop?.abort()
-        entries!.delete(n)
+        engine.discard(projectFile, id, n)
         return { ok: true }
       }
       const outcome = await changeBoard(image, (board): FineTuneAnswer | { dropped: true } => {

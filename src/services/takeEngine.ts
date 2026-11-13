@@ -13,10 +13,9 @@ export interface TakeEntry {
   stop?: AbortController
 }
 
-/** What every medium's board has in common: the next take number and the takes on it. */
+/** What every medium's board has in common: the next take number (each names its list of takes itself). */
 export interface TakeBoard {
   next: number
-  takes: { n: number }[]
 }
 
 /** How a medium reads and writes one board: the file is the medium's, the turns are the engine's. */
@@ -29,8 +28,13 @@ export interface BoardAccess<B> {
 
 /** What a take's job is told, and what happens around it. */
 export interface TakeJob {
-  /** Makes the take; ends when it is on the board. The signal is aborted by Stop. */
-  job(stop: AbortSignal): Promise<void>
+  /**
+   * Makes the take; ends when it is on the board. The signal is aborted by Stop. `began` marks the
+   * take as being made: the engine calls it before the job unless the job is `queued`.
+   */
+  job(stop: AbortSignal, began: () => void): Promise<void>
+  /** The job waits for something (the GPU) before it starts, and calls `began` when that is over. */
+  queued?: boolean
   /** Called with the error when the job failed and was not stopped, after the entry shows failed. */
   failed?(error: unknown): void | Promise<void>
   /** Called last, whatever happened. */
@@ -167,16 +171,24 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
      * shown failed when `job` throws. A take stopped meanwhile (or while it waited) is never
      * shown failed and never made.
      */
-    async run(projectFile: string, id: string, entry: E, { job, failed, settled }: TakeJob) {
+    async run(
+      projectFile: string,
+      id: string,
+      entry: E,
+      { job, queued, failed, settled }: TakeJob,
+    ) {
       const entries = active.get(keyOf(projectFile, id))
       // Stopped while it waited: it is no longer in the map.
       if (entries?.get(entry.n) !== entry || entry.state !== 'waiting') return
-      entry.state = 'making'
-      entry.startedAt = now()
+      const began = () => {
+        entry.state = 'making'
+        entry.startedAt = now()
+      }
+      if (!queued) began()
       const stop = new AbortController()
       entry.stop = stop
       try {
-        await job(stop.signal)
+        await job(stop.signal, began)
         if (stop.signal.aborted) return
         entries.delete(entry.n)
       } catch (error) {
@@ -187,6 +199,16 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
       } finally {
         await settled?.()
       }
+    },
+
+    /** Ends one take in any state (a failed one is only forgotten) and forgets it; false when there is none. */
+    discard(projectFile: string, id: string, n: number): boolean {
+      const entries = active.get(keyOf(projectFile, id))
+      const entry = entries?.get(n)
+      if (!entries || !entry) return false
+      entry.stop?.abort()
+      entries.delete(n)
+      return true
     },
 
     /** Stops an id's takes that are waiting or being made; how many. Failed ones stay. */
