@@ -1,4 +1,4 @@
-import { WEIGHTS_ONLY_NEEDS, type HubNeeds } from './hubDownload'
+import { MFLUX_NEEDS, WEIGHTS_ONLY_NEEDS, type HubNeeds } from './hubDownload'
 import type { ImageDownload } from './imageModels'
 
 /** The ids of the sound-effect models the studio makes takes with. */
@@ -38,7 +38,8 @@ export const EFFECT_MODELS: Record<EffectModelId, EffectModel> = {
     name: 'Stable Audio 3 Small SFX',
     short: 'Small SFX',
     repo: 'stabilityai/stable-audio-3-small-sfx',
-    needs: WEIGHTS_ONLY_NEEDS,
+    // Judged as before this field existed: by the same files the listing names for the image models.
+    needs: MFLUX_NEEDS,
     gigabytes: 6.5,
     seconds: 2,
     source: { kind: 'hub' },
