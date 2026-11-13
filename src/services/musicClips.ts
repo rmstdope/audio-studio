@@ -193,6 +193,45 @@ export async function commitChoice({
 }
 
 /**
+ * What the game has of one track now (its music file, manifest entry and lock entry), and a way to
+ * put exactly that back later. The put-back runs in the project's choice turn and touches only this
+ * track's entries, so what other tracks chose meanwhile stays.
+ */
+export async function keepMusicChoice({
+  root,
+  projectFile = root,
+  music,
+  id,
+}: {
+  root: string
+  projectFile?: string
+  music: MusicConfig
+  id: string
+}): Promise<() => Promise<void>> {
+  const clip = join(music.clips, `${id}.mp3`)
+  const sound = await Bun.file(resolveInRoot(root, clip))
+    .bytes()
+    .catch(() => null)
+  const manifestWas = (await manifestNow(root, music, []))?.[id]
+  const lockWas = (await lockNow(root, []))?.[id]
+  return () =>
+    choices().run(`music-choice\0${projectFile}`, async () => {
+      if (sound) await writeOrRefuse(root, clip, sound)
+      else await rm(resolveInRoot(root, clip), { force: true })
+      const found: Problem[] = []
+      const manifest = await manifestNow(root, music, found)
+      const lock = await lockNow(root, found)
+      if (!manifest || !lock) throw new Error('The music manifest or lock could not be read.')
+      if (manifestWas) manifest[id] = manifestWas
+      else delete manifest[id]
+      await writeOrRefuse(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
+      if (lockWas) lock[id] = lockWas
+      else delete lock[id]
+      await writeOrRefuse(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
+    })
+}
+
+/**
  * Takes the chosen take back: in the project's choice turn, once the manifest and lock could be
  * read, the track's manifest entry, then its music file, then its lock entry last, so a failure
  * part-way leaves the track chosen and the same click can be pressed again (as removing an

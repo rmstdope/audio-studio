@@ -130,7 +130,11 @@ export function useTrimControl({
     failure:
       reason !== null && actions.shows(`trim:${take.n}`) ? (
         <span className="adopt-error" role="alert">
-          {trimFailure(take.n, reason, { inGame, undo: trim.variables?.undo ?? false })}
+          {trimFailure(take.n, reason, {
+            inGame,
+            undo: trim.variables?.undo ?? false,
+            gameChanged: trim.data && !trim.data.ok && 'gameChanged' in trim.data,
+          })}
         </span>
       ) : null,
   }

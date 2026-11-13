@@ -49,6 +49,7 @@ import type { MusicGenerator } from './music'
 import {
   acceptChange,
   commitChoice,
+  keepMusicChoice,
   readChosen,
   uncommitChoice,
   type CommitResult,
@@ -118,7 +119,16 @@ export type StopAllResult =
 export type ChooseResult = CommitResult | null
 
 /** What trimming or untrimming a take answered; null for a track the project does not list. */
-export type TrimResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
+export type TrimResult =
+  | { ok: true }
+  | {
+      ok: false
+      message: string
+      /** Set when a failed board write could not put the game's files back: the game plays the new sound. */
+      gameChanged?: true
+    }
+  | ProjectFailure
+  | null
 
 /** A track's takes as the page shows them, a project failure, or null for an unknown track. */
 export type TakesResult = MusicTakesView | ProjectFailure | null
@@ -952,68 +962,101 @@ export function createMusicTakes({
       if (found.inputs.kind !== 'stinger') {
         return { ok: false, message: 'Only a stinger’s take can be trimmed.' }
       }
-      return changeBoard(projectFile, found, async (board): Promise<TrimResult> => {
-        const take = board.takes.find((t) => fileOf(t) === name)
-        if (!take) return { ok: false, message: 'That take is not on the board.' }
-        let bytes: Uint8Array
-        try {
-          bytes = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
-        } catch {
-          return { ok: false, message: 'The take’s sound file could not be read.' }
-        }
-        let trim: Trim | undefined
-        if (undo) {
-          if (!take.trim) return { ok: false, message: 'That take is not trimmed.' }
-        } else {
-          let finding: ReturnType<typeof findTrim>
+      /** Puts the game's files back, once the board turned out not to be writable. */
+      let putBack: (() => Promise<void>) | null = null
+      let stuck = false
+      return changeBoard(
+        projectFile,
+        found,
+        async (board): Promise<TrimResult> => {
+          const take = board.takes.find((t) => fileOf(t) === name)
+          if (!take) return { ok: false, message: 'That take is not on the board.' }
+          let bytes: Uint8Array
           try {
-            finding = findTrim(readWav(bytes))
+            bytes = new Uint8Array(
+              await Bun.file(join(found.root, found.folder, name)).arrayBuffer(),
+            )
           } catch {
             return { ok: false, message: 'The take’s sound file could not be read.' }
           }
-          if (finding.kind === 'nothing') return { ok: false, message: NOTHING_LINE }
-          if (finding.kind === 'silent') return { ok: false, message: SILENT_LINE }
-          trim = { start: finding.start, end: finding.end }
-        }
-        const { trim: _was, ...rest } = take
-        const next: BoardTake = trim ? { ...rest, trim } : rest
-        const problems: Problem[] = []
-        const chosenTracks = await readChosen(found.root, found.music, problems)
-        if (!chosenTracks.read || problems.length) {
-          return { ok: false, message: 'The music lock could not be read.' }
-        }
-        const chosen = chosenTracks.entries[id]?.lock
-        if (chosen?.take === take.n && chosen.fp === take.hash) {
-          let played: ReturnType<typeof playedOf>
-          try {
-            played = playedOf(next, bytes)
-          } catch {
-            return { ok: false, message: 'The take’s sound file could not be read.' }
+          let trim: Trim | undefined
+          if (undo) {
+            if (!take.trim) return { ok: false, message: 'That take is not trimmed.' }
+          } else {
+            let finding: ReturnType<typeof findTrim>
+            try {
+              finding = findTrim(readWav(bytes))
+            } catch {
+              return { ok: false, message: 'The take’s sound file could not be read.' }
+            }
+            if (finding.kind === 'nothing') return { ok: false, message: NOTHING_LINE }
+            if (finding.kind === 'silent') return { ok: false, message: SILENT_LINE }
+            trim = { start: finding.start, end: finding.end }
           }
-          const committed = await commitChoice({
-            root: found.root,
-            projectFile,
-            music: found.music,
-            id,
-            listId: found.listId,
-            // The lock keeps what Accept made it count the take as made from, and when it was chosen.
-            take: { ...played.take, inputs: chosen.inputs },
-            now: () => new Date(chosen.at),
-            wav: played.wav,
-            encode,
-          })
-          if (!committed.ok) {
-            return 'message' in committed
-              ? {
-                  ok: false,
-                  message: committed.reason ?? committed.message,
-                }
-              : { ok: false, message: `${committed.file} could not be read` }
+          const { trim: _was, ...rest } = take
+          const next: BoardTake = trim ? { ...rest, trim } : rest
+          const problems: Problem[] = []
+          const chosenTracks = await readChosen(found.root, found.music, problems)
+          if (!chosenTracks.read || problems.length) {
+            return { ok: false, message: 'The music lock could not be read.' }
           }
-        }
-        board.takes = board.takes.map((t) => (t === take ? next : t))
-        return { ok: true }
-      }).catch(refusalAnswer('saving the trim failed', (sentence) => sentence))
+          const chosen = chosenTracks.entries[id]?.lock
+          if (chosen?.take === take.n && chosen.fp === take.hash) {
+            let played: ReturnType<typeof playedOf>
+            try {
+              played = playedOf(next, bytes)
+            } catch {
+              return { ok: false, message: 'The take’s sound file could not be read.' }
+            }
+            // This track's clip, manifest and lock entries as they are, put back if the board cannot be.
+            putBack = await keepMusicChoice({
+              root: found.root,
+              projectFile,
+              music: found.music,
+              id,
+            })
+            const committed = await commitChoice({
+              root: found.root,
+              projectFile,
+              music: found.music,
+              id,
+              listId: found.listId,
+              // The lock keeps what Accept made it count the take as made from, and when it was chosen.
+              take: { ...played.take, inputs: chosen.inputs },
+              now: () => new Date(chosen.at),
+              wav: played.wav,
+              encode,
+            })
+            if (!committed.ok) {
+              return 'message' in committed
+                ? {
+                    ok: false,
+                    message: committed.reason ?? committed.message,
+                  }
+                : { ok: false, message: `${committed.file} could not be read` }
+            }
+          }
+          board.takes = board.takes.map((t) => (t === take ? next : t))
+          return { ok: true }
+        },
+        () =>
+          (putBack?.() ?? Promise.resolve()).catch((error) => {
+            stuck = true
+            console.error('putting the game’s files back failed', error)
+          }),
+      ).catch((error): TrimResult => {
+        const sentence = refusalSentence(error)
+        if (sentence === null) throw error
+        // Kept in the server log: the person is told which file, not the stack.
+        console.error('saving the trim failed', error)
+        return stuck
+          ? {
+              ok: false,
+              message: `${sentence}, and the game’s files could not be put back`,
+              gameChanged: true,
+            }
+          : { ok: false, message: sentence }
+      })
     },
 
     async trimmedSound(projectFile, id, name) {
