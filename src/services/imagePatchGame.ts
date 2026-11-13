@@ -25,9 +25,12 @@ export const patchGameOf = (image: string, patch: string, n: number) =>
 /** The patch picture the game reads, in the clips folder beside the image's own: `<image>.<patch>.png`. */
 export const patchClipName = (image: string, patch: string) => `${image}.${patch}.png`
 
-/** The queue key of a patch's board, so that every change to it goes one after another. */
+/**
+ * The queue key of a patch's board, so that every change to it goes one after another: the take
+ * engine's own key for the id `<image>\0<patch>`, so the engine's turns and these share one queue.
+ */
 export const patchBoardKey = (projectFile: string, image: string, patch: string) =>
-  `patch\0${projectFile}\0${image}\0${patch}`
+  `${projectFile}\0${image}\0${patch}`
 
 /** A patch's board as it is: empty when there is none; the failure when it cannot be read. */
 export async function readPatchBoard(

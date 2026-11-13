@@ -221,6 +221,22 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
       return stopped
     },
 
+    /** Stops the named takes of an id that are waiting or being made; how many. Failed ones stay. */
+    stopTakes(
+      projectFile: string,
+      id: string,
+      ns: number[],
+      onStopped?: (entry: E) => void,
+    ): number {
+      const entries = active.get(keyOf(projectFile, id))
+      let stopped = 0
+      for (const n of ns) {
+        const entry = entries?.get(n)
+        if (entry && stopEntry(entries!, entry, onStopped)) stopped++
+      }
+      return stopped
+    },
+
     /** Stops every take of the project, whichever id; how many. */
     stopIn(projectFile: string, onStopped?: (id: string, entry: E) => void): number {
       const prefix = `${projectFile}\0`

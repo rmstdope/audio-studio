@@ -32,7 +32,6 @@ import { readResource, writeOrRefuse } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import {
-  changePatchBoard,
   boardText,
   patchBoardKey,
   patchClipName,
@@ -42,13 +41,13 @@ import {
   renderPatchGame,
 } from './imagePatchGame'
 import { downloadOf, type ImageGenerator } from './images'
-import { describeFailure } from './imageTakes'
 import { editStep } from './imageEditStep'
 import { takeOut } from './takeOut'
 import { choices, sorted } from './musicClips'
-import { isSafeId } from './musicTakes'
+import { boardQueue, isSafeId } from './musicTakes'
 import { decodePng, pngSize } from './png'
 import type { Serial } from './serial'
+import { createTakeEngine, type BoardAccess, type TakeEntry } from './takeEngine'
 import { openProject, type ProjectFailure } from './workspace'
 
 /** The model that made every take before there was a choice, so a board take without `model` reads as this. */
@@ -124,11 +123,7 @@ export interface ImagePatches {
 }
 
 /** A take waiting, being made, or failed, until it is made. */
-interface Entry {
-  n: number
-  state: 'waiting' | 'making' | 'failed'
-  startedAt: number
-  message: string
+interface Entry extends TakeEntry {
   /** The image's take it is painted on, and that take's picture. */
   base: number
   /** The edit model it is made with, kept for making it again. */
@@ -136,8 +131,6 @@ interface Entry {
   /** The area and words it is made with, kept for making it again. */
   area: PatchArea
   words: string
-  /** Ends the take while it is being made (Stop). */
-  stop?: AbortController
 }
 
 /**
@@ -162,9 +155,13 @@ export function createImagePatches({
   now?: () => number
   newSeed?: () => number
 }): ImagePatches {
-  const shared = globalThis as { contentStudioPatchTakes?: Map<string, Map<number, Entry>> }
-  // Kept across `--dev` reloads, as the takes being made are.
-  const active = (shared.contentStudioPatchTakes ??= new Map())
+  // The entries are kept across `--dev` reloads, as the takes being made are. A patch's id is
+  // `<image>\0<patch>`; its board is changed in the engine's turn, as `changePatchBoard` does.
+  const engine = createTakeEngine<Entry, PatchBoard>({
+    slot: 'contentStudioPatchTakes',
+    boards: boardQueue(),
+    now,
+  })
   // What each take file keeps, by project root and path, with the file's time and size it was read at.
   const keptBoxes = new Map<string, { key: string; kept: PatchArea | null }>()
   // Takes being brought to the look right now (`<patch key>\0<n>`), kept across `--dev` reloads.
@@ -214,6 +211,7 @@ export function createImagePatches({
     ...image,
     patch,
     key: patchBoardKey(image.projectFile, image.id, patch.id),
+    engineId: `${image.id}\0${patch.id}`,
     folder: patchFolder(image.id, patch.id),
     board: `${patchFolder(image.id, patch.id)}/board.json`,
     patchId: patch.id,
@@ -231,14 +229,17 @@ export function createImagePatches({
   const readBoard = (found: Pick<Found, 'root' | 'id' | 'patchId'>) =>
     readPatchBoard(found.root, found.id, found.patchId)
 
+  /** A patch's board: read with its problems, written through the refusal. */
+  const accessOf = (found: Pick<Found, 'root' | 'id' | 'patchId'>): BoardAccess<PatchBoard> => ({
+    read: () => readBoard(found),
+    write: (text) =>
+      writeOrRefuse(found.root, `${patchFolder(found.id, found.patchId)}/board.json`, text),
+  })
+
   const changeBoard = <T>(
-    found: Pick<Found, 'projectFile' | 'root' | 'id' | 'patchId'>,
+    found: Pick<Found, 'projectFile' | 'root' | 'id' | 'patchId' | 'engineId'>,
     change: (board: PatchBoard) => T | Promise<T>,
-  ) =>
-    changePatchBoard(
-      { projectFile: found.projectFile, root: found.root, image: found.id, patch: found.patchId },
-      change,
-    )
+  ) => engine.changeBoard(found.projectFile, found.engineId, accessOf(found), change)
 
   /** The images manifest as it is: empty if there is none; null if it cannot be read. */
   async function manifestNow(found: Pick<Found, 'root' | 'config'>): Promise<ImageManifest | null> {
@@ -276,9 +277,6 @@ export function createImagePatches({
     return null
   }
 
-  const entriesOf = (key: string) =>
-    [...(active.get(key)?.values() ?? [])].sort((a, b) => a.n - b.n)
-
   /** Brings a take just made to the look and notes it on the board; a take that cannot be stays as the model made it. */
   async function bringTake(found: Found, n: number, base: number): Promise<void> {
     const mark = `${found.key}\0${n}`
@@ -301,87 +299,94 @@ export function createImagePatches({
   }
 
   /** Edits a window of the image take around the marked area and saves what the edit changed as take `entry.n`. */
-  async function run(
-    found: Found,
-    entry: Entry,
-    around: Pixels,
-    entries: Map<number, Entry>,
-  ): Promise<void> {
-    if (entries.get(entry.n) !== entry || entry.state !== 'waiting') return
-    const stop = new AbortController()
-    entry.stop = stop
-    const seed = newSeed() // before any await, so the takes of one press take their seeds in order
-    try {
-      let began: number | null = null
-      const made = await editStep(
-        { generator, queue, free },
-        {
-          root: found.root,
-          cropFile: `${found.folder}/editing-${entry.n}.png`,
-          source: around,
-          area: entry.area,
-          words: entry.words,
-          model: entry.model,
-          seed,
+  function run(found: Found, entry: Entry, around: Pixels): Promise<void> {
+    // Whether the take is on the board, and the seconds it took from when it started making.
+    let saved = false
+    let took: number | null = null
+    const mark = `${found.key}\0${entry.n}`
+    return engine
+      .run(found.projectFile, found.engineId, entry, {
+        async job(stop) {
+          // The engine says making at once; a take waits for the GPU first, and says so.
+          entry.state = 'waiting'
+          const seed = newSeed() // before any await, so the takes of one press take their seeds in order
+          let began: number | null = null
+          const made = await editStep(
+            { generator, queue, free },
+            {
+              root: found.root,
+              cropFile: `${found.folder}/editing-${entry.n}.png`,
+              source: around,
+              area: entry.area,
+              words: entry.words,
+              model: entry.model,
+              seed,
+            },
+            stop,
+            () => {
+              entry.state = 'making'
+              entry.startedAt = now()
+              began = entry.startedAt
+            },
+          )
+          if (!made) return
+          // Timed from when the take started making, so its wait for the GPU is not counted.
+          took = began === null ? null : (now() - began) / 1000
+          const saving: PatchTake = {
+            n: entry.n,
+            base: entry.base,
+            seed: made.seed,
+            words: entry.words,
+            area: entry.area,
+            seen: false,
+            model: entry.model,
+          }
+          // The picture first: a take is on the board only once its file is there.
+          await writeOrRefuse(found.root, `${found.folder}/${entry.n}.png`, made.png)
+          // Marked before it is on the board, so the page never sees it between made and brought.
+          bringing.add(mark)
+          const failure = await changeBoard(found, (board) => {
+            if (stop.aborted) return
+            board.takes = [...board.takes.filter((t) => t.n !== saving.n), saving].sort(
+              (a, b) => a.n - b.n,
+            )
+          })
+          if (stop.aborted || (failure && 'ok' in failure)) {
+            bringing.delete(mark)
+            await rm(resolveInRoot(found.root, `${found.folder}/${entry.n}.png`), { force: true })
+            if (failure && 'ok' in failure) throw new Error(`${failure.file} cannot be used`)
+            return
+          }
+          saved = true
         },
-        stop.signal,
-        () => {
-          entry.state = 'making'
-          entry.startedAt = now()
-          began = entry.startedAt
+        failed() {
+          // The model is marked first, so a view never shows the failed take without its model's warning.
+          bringing.delete(mark)
+          const failedHere = failedModels.get(found.key) ?? new Set<EditModelId>()
+          failedHere.add(entry.model)
+          failedModels.set(found.key, failedHere)
         },
-      )
-      if (!made) return
-      // Timed from when the take started making, so its wait for the GPU is not counted.
-      const took = began === null ? null : (now() - began) / 1000
-      const png = made.png
-      const saved: PatchTake = {
-        n: entry.n,
-        base: entry.base,
-        seed: made.seed,
-        words: entry.words,
-        area: entry.area,
-        seen: false,
-        model: entry.model,
-      }
-      // The picture first: a take is on the board only once its file is there.
-      await writeOrRefuse(found.root, `${found.folder}/${entry.n}.png`, png)
-      // Marked before it is on the board, so the page never sees it between made and brought.
-      bringing.add(`${found.key}\0${entry.n}`)
-      const failure = await changeBoard(found, (board) => {
-        if (stop.signal.aborted) return
-        board.takes = [...board.takes.filter((t) => t.n !== saved.n), saved].sort(
-          (a, b) => a.n - b.n,
-        )
       })
-      if (stop.signal.aborted || (failure && 'ok' in failure)) {
-        bringing.delete(`${found.key}\0${entry.n}`)
-        await rm(resolveInRoot(found.root, `${found.folder}/${entry.n}.png`), { force: true })
-        if (failure && 'ok' in failure) throw new Error(`${failure.file} cannot be used`)
-        return
-      }
-      entries.delete(entry.n)
-      failedModels.get(found.key)?.delete(entry.model)
-      if (took !== null) await recordTakeTime(found.projectFile, timeKeyOfEdit(entry.model), took)
-      await bringTake(found, entry.n, entry.base)
-    } catch (error) {
-      if (stop.signal.aborted) return
-      // The model is marked first, so a view never shows the failed take without its model's warning.
-      const failed = failedModels.get(found.key) ?? new Set<EditModelId>()
-      failed.add(entry.model)
-      failedModels.set(found.key, failed)
-      entry.message = describeFailure(error)
-      entry.state = 'failed'
-    }
+      .then(async () => {
+        if (!saved) return
+        // The take is on the board and no longer an entry; what is left to do cannot undo it.
+        try {
+          failedModels.get(found.key)?.delete(entry.model)
+          if (took !== null)
+            await recordTakeTime(found.projectFile, timeKeyOfEdit(entry.model), took)
+          await bringTake(found, entry.n, entry.base)
+        } catch {
+          // The take stays as the model made it.
+        }
+      })
   }
 
   /** Checks the request and queues its takes. */
-  async function start(
-    found: Found,
-    entries: Map<number, Entry>,
-    request: PatchMakeRequest,
-  ): Promise<ImagePatchAnswer> {
-    const failed = 'retry' in request ? entries.get(request.retry) : undefined
+  async function start(found: Found, request: PatchMakeRequest): Promise<ImagePatchAnswer> {
+    const failed =
+      'retry' in request
+        ? engine.entry(found.projectFile, found.engineId, request.retry)
+        : undefined
     if ('retry' in request && failed?.state !== 'failed') {
       return {
         ok: false,
@@ -429,36 +434,41 @@ export function createImagePatches({
         message: "The chosen take's picture is missing or cannot be read, so it cannot be patched.",
       }
     }
-    const queued: Entry[] = []
-    if (failed) {
-      failed.state = 'waiting'
-      queued.push(failed)
-    } else if ('count' in request) {
+    let queued: Entry[] = []
+    if ('retry' in request) {
+      const again = engine.retry(found.projectFile, found.engineId, request.retry, '')
+      // Another press of Try again got there first.
+      if (!again) {
+        return {
+          ok: false,
+          message: `Take ${request.retry} did not fail, so it is not made again.`,
+        }
+      }
+      queued = [again]
+    } else {
       // The entries are added before the first wait, so a second request at once is refused above.
-      const first = Math.max(...[...entries.values()].map((e) => e.n + 1), 1)
-      const reserved = await changeBoard(found, (board) => {
-        const at = Math.max(board.next, first)
-        board.next = at + request.count
-        return at
-      })
-      if (typeof reserved !== 'number') return reserved
-      for (let i = 0; i < request.count; i++) {
-        const entry: Entry = {
-          n: reserved + i,
+      const reserved = await engine.reserve(
+        found.projectFile,
+        found.engineId,
+        accessOf(found),
+        request.count,
+        (n) => ({
+          n,
           state: 'waiting',
           startedAt: 0,
           message: '',
-          base: found.chosen,
+          hash: '',
+          base: found.chosen!,
           model,
           area: request.area,
           words: found.patch.words,
-        }
-        entries.set(entry.n, entry)
-        queued.push(entry)
-      }
+        }),
+      )
+      if (!Array.isArray(reserved)) return reserved
+      queued = reserved
     }
     // No await from here until every take is in line, so the takes of one press are made in number order.
-    for (const entry of queued) void run(found, entry, around, entries)
+    for (const entry of queued) void run(found, entry, around)
     return { ok: true }
   }
 
@@ -485,9 +495,12 @@ export function createImagePatches({
     for (const patch of image.row.patches) {
       const found = patchOf(image, patch)
       // Before the board: a take that lands in between then shows as made, never as neither.
-      const entries = entriesOf(found.key).filter((e) => e.base === image.chosen)
+      const read = engine
+        .entriesOf(found.projectFile, found.engineId)
+        .filter((e) => e.base === image.chosen)
       const board = await readBoard(found)
       if ('ok' in board) return board
+      const split = engine.split(read, board.takes)
       // The take chosen on the newest other take of the image that is still on the board.
       const was = Object.keys(board.chosen)
         .map(Number)
@@ -527,19 +540,20 @@ export function createImagePatches({
           key !== null &&
           inGame !== undefined &&
           board.takes.find((t) => t.n === inGame)?.look !== key,
-        making: entries
-          .filter((e) => e.state !== 'failed')
-          .map((e) => ({
-            n: e.n,
-            state: e.state as 'waiting' | 'making',
-            elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
-            expected: figures[timeKeyOfEdit(e.model)].seconds,
-            area: e.area,
-            model: e.model,
-          })),
-        failed: entries
-          .filter((e) => e.state === 'failed')
-          .map((e) => ({ n: e.n, message: e.message, area: e.area, model: e.model })),
+        making: split.pending.map((e) => ({
+          n: e.n,
+          state: e.state as 'waiting' | 'making',
+          elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
+          expected: figures[timeKeyOfEdit(e.model)].seconds,
+          area: e.area,
+          model: e.model,
+        })),
+        failed: split.failed.map((e) => ({
+          n: e.n,
+          message: e.message,
+          area: e.area,
+          model: e.model,
+        })),
         failedModels: EDIT_MODEL_IDS.filter((m) => failedModels.get(found.key)?.has(m)),
       })
     }
@@ -560,12 +574,11 @@ export function createImagePatches({
     let failedTakes = 0
     const failed: string[] = []
     for (const [patch, ns] of press.takes) {
-      const entries = active.get(patchBoardKey(image.projectFile, image.id, patch))
       const board = await readPatchBoard(image.root, image.id, patch)
       if ('ok' in board) return board
       total += ns.length
       for (const n of ns) {
-        const entry = entries?.get(n)
+        const entry = engine.entry(image.projectFile, `${image.id}\0${patch}`, n)
         if (entry?.state === 'failed') {
           failedTakes++
           if (!failed.includes(patch)) failed.push(patch)
@@ -673,21 +686,13 @@ export function createImagePatches({
       const model = request.model ?? DEFAULT_EDIT_MODEL
       const takes = new Map<string, number[]>()
       const undo = () => {
-        for (const [patch, ns] of takes) {
-          const entries = active.get(patchOf(image, { id: patch } as PatchRow).key)
-          for (const n of ns) {
-            entries?.get(n)?.stop?.abort()
-            entries?.delete(n)
-          }
-        }
+        for (const [patch, ns] of takes) engine.stopTakes(projectFile, `${id}\0${patch}`, ns)
       }
       for (const { id: patch, area } of plan.make) {
         const found = patchOf(
           image,
           image.row.patches.find((p) => p.id === patch)!,
         )
-        const entries = active.get(found.key) ?? new Map<number, Entry>()
-        active.set(found.key, entries)
         if (starting.has(found.key)) {
           undo()
           return {
@@ -696,9 +701,9 @@ export function createImagePatches({
           }
         }
         starting.add(found.key)
-        const before = new Set(entries.keys())
+        const before = new Set(engine.entriesOf(projectFile, found.engineId).map((e) => e.n))
         try {
-          const answer = await start(found, entries, { count: request.count, area, model })
+          const answer = await start(found, { count: request.count, area, model })
           if (!answer || !answer.ok) {
             undo()
             return answer
@@ -712,7 +717,10 @@ export function createImagePatches({
         }
         takes.set(
           patch,
-          [...entries.keys()].filter((n) => !before.has(n)),
+          engine
+            .entriesOf(projectFile, found.engineId)
+            .map((e) => e.n)
+            .filter((n) => !before.has(n)),
         )
       }
       presses.set(`${projectFile}\0${id}`, { base, model, takes })
@@ -729,14 +737,7 @@ export function createImagePatches({
       const press = presses.get(`${projectFile}\0${id}`)
       let stopped = 0
       for (const [patch, ns] of press?.takes ?? []) {
-        const entries = active.get(patchBoardKey(projectFile, id, patch))
-        for (const n of ns) {
-          const entry = entries?.get(n)
-          if (!entry || entry.state === 'failed') continue
-          entry.stop?.abort()
-          entries!.delete(n)
-          stopped++
-        }
+        stopped += engine.stopTakes(projectFile, `${id}\0${patch}`, ns)
       }
       return { ok: true, stopped }
     },
@@ -752,13 +753,11 @@ export function createImagePatches({
     async make(projectFile, id, patch, request) {
       const found = await resolvePatch(projectFile, id, patch)
       if (!found || 'ok' in found) return found
-      const entries = active.get(found.key) ?? new Map<number, Entry>()
-      active.set(found.key, entries)
       // Taken before the first wait, so that of two requests at once only one goes on.
       const guard = 'count' in request ? found.key : `${found.key}\0${request.retry}`
-      const busy = [...entries.values()].some(
-        (e) => e.state !== 'failed' && e.base === found.chosen,
-      )
+      const busy = engine
+        .entriesOf(projectFile, found.engineId)
+        .some((e) => e.state !== 'failed' && e.base === found.chosen)
       if (starting.has(guard) || ('count' in request && busy)) {
         return {
           ok: false,
@@ -767,7 +766,7 @@ export function createImagePatches({
       }
       starting.add(guard)
       try {
-        return await start(found, entries, request)
+        return await start(found, request)
       } finally {
         starting.delete(guard)
       }
@@ -776,15 +775,7 @@ export function createImagePatches({
     async stop(projectFile, id, patch) {
       const found = await resolvePatch(projectFile, id, patch)
       if (!found || 'ok' in found) return found
-      const entries = active.get(found.key)
-      let stopped = 0
-      for (const [n, entry] of entries ?? []) {
-        if (entry.state === 'failed') continue
-        entry.stop?.abort()
-        entries!.delete(n)
-        stopped++
-      }
-      return { ok: true, stopped }
+      return { ok: true, stopped: engine.stop(projectFile, found.engineId) }
     },
 
     async choose(projectFile, id, patch, n) {

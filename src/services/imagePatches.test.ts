@@ -10,6 +10,7 @@ import {
   type PatchWorkView,
 } from '../core/imagePatches'
 import { createImagePatches } from './imagePatches'
+import { changePatchBoard } from './imagePatchGame'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
 import { cropPixels, editWindow } from '../core/imagePixels'
@@ -1410,5 +1411,19 @@ describe('remaking patches on a new take', () => {
     release()
     await new Promise((r) => setTimeout(r, 30))
     expect(requests).toHaveLength(0)
+  })
+})
+
+describe('a patch board changed from two places', () => {
+  it('loses neither a take finishing nor a change made by another module at the same time', async () => {
+    const { root, file, patches, work } = setup()
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    await changePatchBoard({ projectFile: file, root, image: 'inn', patch: 'door' }, (board) => {
+      board.inGame['9'] = 9
+    })
+    await work()
+    const board = JSON.parse(readFileSync(join(root, BOARD), 'utf8'))
+    expect(board.takes.map((t: { n: number }) => t.n)).toEqual([1])
+    expect(board.inGame).toEqual({ '9': 9 })
   })
 })
