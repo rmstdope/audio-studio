@@ -130,14 +130,15 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
       make: (n: number) => E,
     ): Promise<E[] | ProjectFailure> {
       const key = keyOf(projectFile, id)
+      // Registered before the board is awaited, so two presses at once share one map.
       const entries = active.get(key) ?? new Map<number, E>()
+      active.set(key, entries)
       const first = await this.changeBoard(projectFile, id, access, (board) => {
         const first = Math.max(board.next, ...[...entries.values()].map((entry) => entry.n + 1))
         board.next = first + count
         return first
       })
       if (typeof first !== 'number') return first
-      active.set(key, active.get(key) ?? entries)
       const made: E[] = []
       for (let i = 0; i < count; i++) {
         const entry = make(first + i)
@@ -145,6 +146,11 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
         made.push(entry)
       }
       return made
+    },
+
+    /** The take `n` of an id, if it is waiting, being made or failed. */
+    entry(projectFile: string, id: string, n: number): E | undefined {
+      return active.get(keyOf(projectFile, id))?.get(n)
     },
 
     /** A failed take made to wait again, filed under `hash`; null when there is no failed take `n`. */

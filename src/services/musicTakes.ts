@@ -427,7 +427,6 @@ export function createMusicTakes({
     // stopped while being made (the request was sent, so it may be billed).
     const price = takePrice(entry.model, inputs)
     let generated = false
-    let stopped = false
     await engine.run(projectFile, found.id, entry, {
       async job(stop) {
         const seed = newSeed()
@@ -473,7 +472,7 @@ export function createMusicTakes({
         if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       },
       async settled() {
-        stopped = entry.stop?.signal.aborted ?? false
+        const stopped = entry.stop?.signal.aborted ?? false
         const outcome = generated ? 'done' : stopped ? 'stopped' : null
         if (price !== null && outcome) {
           // Saving what was spent must never undo or crash the take it describes.
@@ -537,10 +536,7 @@ export function createMusicTakes({
           ...(take.fades && { fades: take.fades }),
         })
       }
-      const split = engine.split(
-        entries,
-        takes.map(({ n }) => ({ n })),
-      )
+      const split = engine.split(entries, takes)
       const making: MakingView[] = split.pending.map((entry) => ({
         n: entry.n,
         state: entry.state as 'waiting' | 'making',
@@ -584,10 +580,7 @@ export function createMusicTakes({
       if (!found || !('inputs' in found)) return found
       const { inputs, hash } = found
       // A retry is made with the model the take was first asked with.
-      const retried =
-        'retry' in request
-          ? entriesOf(projectFile, id).find((entry) => entry.n === request.retry)
-          : undefined
+      const retried = 'retry' in request ? engine.entry(projectFile, id, request.retry) : undefined
       const model =
         retried?.model ?? ('retry' in request ? found.model : (request.model ?? found.model))
       const tooLong = tooLongOnTrack(model, inputs.kind, inputs.seconds)

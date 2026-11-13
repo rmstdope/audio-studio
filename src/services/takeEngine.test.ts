@@ -41,6 +41,16 @@ describe('the take engine', () => {
     expect(Array.isArray(second) && second.map((e) => e.n)).toEqual([4, 5])
   })
 
+  it('shows the takes of two presses made at once on an id with none yet', async () => {
+    const { engine, access, entry } = setup()
+    const both = await Promise.all([
+      engine.reserve('p', 'x', access, 1, entry),
+      engine.reserve('p', 'x', access, 1, entry),
+    ])
+    expect(both.map((made) => (Array.isArray(made) ? made[0]!.n : null))).toEqual([1, 2])
+    expect(engine.entriesOf('p', 'x').map((e) => e.n)).toEqual([1, 2])
+  })
+
   it('keeps a failed take shown when the inputs change, and Try again files it under the new ones', async () => {
     const { engine, access, entry } = setup()
     const [take] = (await engine.reserve('p', 'x', access, 1, entry)) as TakeEntry[]

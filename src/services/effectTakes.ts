@@ -477,10 +477,7 @@ export function createEffectTakes({
           ...(trimmable && { trimmable }),
         })
       }
-      const split = engine.split(
-        entries,
-        takes.map(({ n }) => ({ n })),
-      )
+      const split = engine.split(entries, takes)
       const { pending } = split
       // The first Open 1.0 take that waits for the chip says so and what is using it, unless one
       // of this effect's own takes is making: then the takes behind it say "waiting".
@@ -516,7 +513,7 @@ export function createEffectTakes({
       const { hash } = found
       let model: EffectModelId
       if ('retry' in request) {
-        const failed = engine.entriesOf(projectFile, id).find((e) => e.n === request.retry)
+        const failed = engine.entry(projectFile, id, request.retry)
         if (!failed || failed.state !== 'failed') {
           return {
             ok: false,
@@ -539,7 +536,15 @@ export function createEffectTakes({
       let queued: Entry[]
       if ('retry' in request) {
         // The words may have changed since it failed: it is made from them, so it is filed under them.
-        queued = [engine.retry(projectFile, id, request.retry, hash)!]
+        const failed = engine.retry(projectFile, id, request.retry, hash)
+        // Another press of Try again got there first.
+        if (!failed) {
+          return {
+            ok: false,
+            message: `Take ${request.retry} did not fail, so it is not made again.`,
+          }
+        }
+        queued = [failed]
       } else {
         const reserved = await engine
           .reserve(projectFile, id, accessOf(found), request.count, (n) => ({
