@@ -27,9 +27,18 @@ export function minWidthsInEveryWindow(element: Element): string[] {
  * the cascade and inheritance are not looked at.
  */
 export function valuesInEveryWindow(element: Element, property: string): string[] {
+  return valuesIn(alwaysRules(), element, property)
+}
+
+/** The values `rules` give `property` on an element, each with the selector that gives it. */
+function valuesIn(
+  rules: { selectors: string[]; body: string }[],
+  element: Element,
+  property: string,
+): string[] {
   const found: string[] = []
   const declaration = new RegExp(`(?:^|[;\\s])${property}:\\s*([^;]+);`)
-  for (const rule of alwaysRules()) {
+  for (const rule of rules) {
     const value = declaration.exec(rule.body)?.[1]?.trim()
     if (!value) continue
     for (const selector of rule.selectors) {
@@ -119,29 +128,21 @@ export function selectorsAtPanelWidth(width: number): string[] {
 
 /**
  * The non-zero `min-width`s the stylesheet gives an element in a panel `width` px wide: the rules
- * for every width and those of the `@container panel` blocks that apply at that width, each with
- * the selector that gives it. Like `minWidthsInEveryWindow`, the cascade is not looked at.
+ * for every width and those of the `@container panel (max-width: N)` and `(min-width: N)` blocks
+ * that apply at that width, each with the selector that gives it. Other at-rules (`@media`, a
+ * container query with more than one condition) are not read; like `minWidthsInEveryWindow`, the
+ * cascade is not looked at.
  */
 export function minWidthsAtPanelWidth(element: Element, width: number): string[] {
-  const found = minWidthsInEveryWindow(element)
+  const rules = [...alwaysRules()]
   for (const block of atBlocks()) {
     const query = /^@container panel \((max|min)-width: (\d+)px\)$/.exec(block.prelude)
     if (!query) continue
     const limit = Number(query[2])
     if (query[1] === 'max' ? width > limit : width < limit) continue
     for (const m of block.body.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
-      const value = /(?:^|[;\s])min-width:\s*([^;]+);/.exec(m[2]!)?.[1]?.trim()
-      if (!value || /^0(px)?$/.test(value)) continue
-      for (const selector of m[1]!.split(',').map((s) => s.trim())) {
-        let matches = false
-        try {
-          matches = element.matches(selector)
-        } catch {
-          // A selector the DOM cannot test (a pseudo-element) applies to no element.
-        }
-        if (matches) found.push(`${selector}: ${value}`)
-      }
+      rules.push({ selectors: m[1]!.split(',').map((s) => s.trim()), body: m[2]! })
     }
   }
-  return found
+  return valuesIn(rules, element, 'min-width').filter((found) => !/: 0(px)?$/.test(found))
 }
