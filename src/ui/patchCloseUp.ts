@@ -4,8 +4,11 @@ import type { PatchArea } from '../core/imagePatches'
 /** The share of the area's width and height shown around it on each side. */
 const AROUND = 0.25
 
-/** The tallest a close-up is, as a multiple of its width. */
-const TALLEST = 1.5
+/**
+ * The tallest a close-up is, as a multiple of its width: square at most, so a portrait picture's
+ * thumbnails on Patches still end inside a short window (as-jkm2).
+ */
+const TALLEST = 1
 
 /** The widest a close-up is, as a multiple of its height. */
 const WIDEST = 2.5
@@ -21,7 +24,7 @@ function around(from: number, length: number, size: number, limit: number): [num
 /**
  * The part of a take a close-up shows: the area joined with what the take keeps (when it keeps
  * something), with a little around the two, in whole pixels, inside the picture. Never taller than
- * 1.5 times its width nor wider than 2.5 times its height: a thinner frame is widened (or
+ * its width nor wider than 2.5 times its height: a thinner frame is widened (or
  * heightened) round the change, moved inward at an edge, and stops at the picture.
  */
 export function closeUp(

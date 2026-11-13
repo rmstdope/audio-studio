@@ -47,13 +47,13 @@ describe('closeUp with what a take keeps', () => {
   it('joins the mark and the change, with a quarter of the joined box round it', () => {
     // Change 100 wide, 200 tall, from 100 above the mark to its bottom: joined (400, 300, 100, 200).
     const crop = closeUp(mark, big, { x: 400, y: 300, width: 100, height: 200 })
-    // A quarter more on each side is 150 x 300 (twice as tall as wide), widened to 200 round its middle.
-    expect(crop).toEqual({ x: 350, y: 250, width: 200, height: 300 })
+    // A quarter more on each side is 150 x 300 (twice as tall as wide), widened to 300 round its middle.
+    expect(crop).toEqual({ x: 300, y: 250, width: 300, height: 300 })
   })
 
-  it('never makes a frame taller than 1.5 times its width, widening round the change', () => {
+  it('never makes a frame taller than it is wide, widening round the change', () => {
     const crop = closeUp(mark, big, { x: 440, y: 200, width: 20, height: 300 })
-    expect(crop.height / crop.width).toBeLessThanOrEqual(1.5)
+    expect(crop.height / crop.width).toBeLessThanOrEqual(1)
     // Still holds the whole change and the mark.
     expect(crop.x).toBeLessThanOrEqual(400)
     expect(crop.x + crop.width).toBeGreaterThanOrEqual(500)
@@ -69,7 +69,7 @@ describe('closeUp with what a take keeps', () => {
   })
 
   it('moves the widened frame inward at the picture’s edge', () => {
-    // Joined (0, 100, 20, 400) plus a quarter: 30 x 600 at x 0; widened to 400, centred at 15 and moved inward.
+    // Joined (0, 100, 20, 400) plus a quarter: 30 x 600 at x 0; widened to 600, centred at 15 and moved inward.
     expect(
       closeUp({ x: 0, y: 400, width: 20, height: 20 }, big, {
         x: 0,
@@ -77,7 +77,7 @@ describe('closeUp with what a take keeps', () => {
         width: 20,
         height: 400,
       }),
-    ).toEqual({ x: 0, y: 0, width: 400, height: 600 })
+    ).toEqual({ x: 0, y: 0, width: 600, height: 600 })
     // At the right edge it moves inward the other way.
     expect(
       closeUp({ x: 980, y: 400, width: 20, height: 20 }, big, {
@@ -86,7 +86,7 @@ describe('closeUp with what a take keeps', () => {
         width: 20,
         height: 400,
       }),
-    ).toEqual({ x: 600, y: 0, width: 400, height: 600 })
+    ).toEqual({ x: 400, y: 0, width: 600, height: 600 })
   })
 
   it('stops at the picture when it is too small for the usual shape', () => {
