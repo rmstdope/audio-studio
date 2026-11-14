@@ -1,3 +1,6 @@
+import { rm } from 'node:fs/promises'
+import { resolveInRoot } from '../core/paths'
+import { WriteRefused, writeOrRefuse } from './files'
 import type { Serial } from './serial'
 import type { ProjectFailure } from './workspace'
 
@@ -35,10 +38,20 @@ export interface TakeJob {
   job(stop: AbortSignal, began: () => void): Promise<void>
   /** The job waits for something (the GPU) before it starts, and calls `began` when that is over. */
   queued?: boolean
-  /** Called with the error when the job failed and was not stopped, after the entry shows failed. */
+  /**
+   * Called with the error when the model's job failed and was not stopped, after the entry shows
+   * failed. Never called for a take that was made but could not be saved (`save`'s refusals).
+   */
   failed?(error: unknown): void | Promise<void>
   /** Called last, whatever happened. */
   settled?(): void | Promise<void>
+}
+
+/** A take's board that could not be read after its file was written: no news of the model. */
+export class BoardUnusable extends Error {
+  constructor(file: string) {
+    super(`${file} cannot be used`)
+  }
 }
 
 /** A failure as a sentence for the page. */
@@ -195,10 +208,60 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
         if (stop.signal.aborted) return
         entry.state = 'failed'
         entry.message = describe(error)
-        await failed?.(error)
+        // The model made it; only saving it failed, which is no news of the model.
+        if (error instanceof WriteRefused) console.error('saving the take failed', error)
+        else if (!(error instanceof BoardUnusable)) await failed?.(error)
       } finally {
         await settled?.()
       }
+    },
+
+    /**
+     * Saves a made take: its file first (a take is on the board only once its file is there), then
+     * the board in its turn, where `change` puts it (not run once `stop` is aborted). The file is
+     * removed again, and `cleanup` called, when the take was stopped or could not be saved.
+     * Answers false when stopped; throws the `WriteRefused` of a file or board that cannot be
+     * written, or `BoardUnusable` when the board cannot be read: neither is the model's failure.
+     */
+    async save(
+      projectFile: string,
+      id: string,
+      access: BoardAccess<B>,
+      take: {
+        root: string
+        /** The file's path in the project. */
+        path: string
+        bytes: Uint8Array
+        stop: AbortSignal
+        change: (board: B) => void | Promise<void>
+        cleanup?: () => void
+      },
+    ): Promise<boolean> {
+      await writeOrRefuse(take.root, take.path, take.bytes)
+      const removeFile = async () => {
+        take.cleanup?.()
+        await rm(resolveInRoot(take.root, take.path), { force: true }).catch(() => {})
+      }
+      let saved: void | ProjectFailure
+      try {
+        saved = await this.changeBoard(projectFile, id, access, async (board) => {
+          // Stopped while its file was written or it waited for the board: not put on it.
+          if (take.stop.aborted) return
+          await take.change(board)
+        })
+      } catch (error) {
+        await removeFile()
+        throw error
+      }
+      if (take.stop.aborted) {
+        await removeFile()
+        return false
+      }
+      if (saved && 'ok' in saved) {
+        await removeFile()
+        throw new BoardUnusable(saved.file)
+      }
+      return true
     },
 
     /** Ends one take in any state (a failed one is only forgotten) and forgets it; false when there is none. */

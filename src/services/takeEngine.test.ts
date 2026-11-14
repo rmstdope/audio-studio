@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { createTakeEngine, type BoardAccess, type TakeBoard, type TakeEntry } from './takeEngine'
 import { createSerial } from './serial'
+import { WriteRefused } from './files'
+import { tempRepo } from '../../test/helpers'
+import { chmodSync, existsSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 
 let slots = 0
 
@@ -277,5 +281,135 @@ describe('the take engine', () => {
     let ran = false
     await engine.run('p', 'x', waiting!, { job: async () => void (ran = true) })
     expect(ran).toBe(false)
+  })
+
+  describe('saving a made take', () => {
+    /** An engine with a folder for the take's file, standing for any medium. */
+    function saving() {
+      const root = tempRepo({})
+      mkdirSync(join(root, 'takes'), { recursive: true })
+      return { root, ...setup() }
+    }
+    const file = (root: string) => join(root, 'takes/1.wav')
+
+    it('writes the file, then changes the board, and answers true', async () => {
+      const { root, engine, access, writes } = saving()
+      const saved = await engine.save('p', 'x', access, {
+        root,
+        path: 'takes/1.wav',
+        bytes: new Uint8Array([1]),
+        stop: new AbortController().signal,
+        change: (board) => void (board.next = 7),
+      })
+      expect(saved).toBe(true)
+      expect(existsSync(file(root))).toBe(true)
+      expect(JSON.parse(writes[0]!).next).toBe(7)
+    })
+
+    it('removes the file and throws BoardUnusable naming the board when the board cannot be read', async () => {
+      const { root, engine } = saving()
+      const broken: BoardAccess<TakeBoard> = {
+        read: async () => ({ ok: false, file: 'boards/x.json', problems: [] }),
+        write: async () => {},
+      }
+      let cleaned = 0
+      await expect(
+        engine.save('p', 'x', broken, {
+          root,
+          path: 'takes/1.wav',
+          bytes: new Uint8Array([1]),
+          stop: new AbortController().signal,
+          change: () => {},
+          cleanup: () => void cleaned++,
+        }),
+      ).rejects.toThrow('boards/x.json cannot be used')
+      expect(existsSync(file(root))).toBe(false)
+      expect(cleaned).toBe(1)
+    })
+
+    it('removes the file and rethrows the refusal when the board cannot be written', async () => {
+      const { root, engine, access } = saving()
+      const refusing: BoardAccess<TakeBoard> = {
+        read: access.read,
+        write: async () => {
+          throw new WriteRefused('boards/x.json', 'permission denied', null)
+        },
+      }
+      await expect(
+        engine.save('p', 'x', refusing, {
+          root,
+          path: 'takes/1.wav',
+          bytes: new Uint8Array([1]),
+          stop: new AbortController().signal,
+          change: (board) => void board.next++,
+        }),
+      ).rejects.toBeInstanceOf(WriteRefused)
+      expect(existsSync(file(root))).toBe(false)
+    })
+
+    it('throws the refusal naming the file, writing nothing to the board, when the file cannot be written', async () => {
+      const { root, engine, access, writes } = saving()
+      chmodSync(join(root, 'takes'), 0o555)
+      try {
+        await expect(
+          engine.save('p', 'x', access, {
+            root,
+            path: 'takes/1.wav',
+            bytes: new Uint8Array([1]),
+            stop: new AbortController().signal,
+            change: (board) => void board.next++,
+          }),
+        ).rejects.toThrow('takes/1.wav could not be written')
+      } finally {
+        chmodSync(join(root, 'takes'), 0o755)
+      }
+      expect(writes).toEqual([])
+    })
+
+    it('removes the file and answers false when stopped, leaving the board as it was', async () => {
+      const { root, engine, access, writes } = saving()
+      const stop = new AbortController()
+      stop.abort()
+      const saved = await engine.save('p', 'x', access, {
+        root,
+        path: 'takes/1.wav',
+        bytes: new Uint8Array([1]),
+        stop: stop.signal,
+        change: (board) => void board.next++,
+      })
+      expect(saved).toBe(false)
+      expect(existsSync(file(root))).toBe(false)
+      expect(writes).toEqual([])
+    })
+
+    it('shows a save failure as a failed take without calling the medium’s failed hook', async () => {
+      const { engine, access, entry } = setup()
+      const [take] = (await engine.reserve('p', 'x', access, 1, entry)) as TakeEntry[]
+      let blamed = 0
+      const quiet = console.error
+      console.error = () => {}
+      try {
+        await engine.run('p', 'x', take!, {
+          job: async () => {
+            throw new WriteRefused('takes/1.wav', 'permission denied', null)
+          },
+          failed: () => void blamed++,
+        })
+      } finally {
+        console.error = quiet
+      }
+      expect(take!.state).toBe('failed')
+      expect(take!.message).toBe('takes/1.wav could not be written.')
+      expect(blamed).toBe(0)
+      // A model's own failure still reaches it.
+      const [other] = (await engine.reserve('p', 'x', access, 1, entry)) as TakeEntry[]
+      await engine.run('p', 'x', other!, {
+        job: async () => {
+          throw new Error('The model stopped')
+        },
+        failed: () => void blamed++,
+      })
+      expect(blamed).toBe(1)
+    })
   })
 })
