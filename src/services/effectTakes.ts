@@ -359,14 +359,15 @@ export function createEffectTakes({
           path: `${found.folder}/${fileOf(made)}`,
           bytes,
           stop,
-          async change(board) {
-            // The model worked: its failure is cleared before the take shows, so a page that sees the
-            // take made sees the model well too.
-            await health?.clear(projectFile, entry.model).catch(() => {})
-            if (stop.aborted) return
+          change(board) {
             board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort(
               (a, b) => a.n - b.n,
             )
+          },
+          // The model worked and the board lists the take: its failure is cleared before the take
+          // shows. A refused board write never gets here, so it clears nothing.
+          async written() {
+            await health?.clear(projectFile, entry.model).catch(() => {})
           },
         })
       },
@@ -437,7 +438,9 @@ export function createEffectTakes({
       // The entries first: one is dropped only after the board has it, so a take is then in the
       // board read after, never in neither.
       const entries = entriesOf(projectFile, id)
-      const board = await readEffectBoard(root, id)
+      // Read in the board's turn: a save is done, the model's failure cleared included, before
+      // the take it put on the board can be seen.
+      const board = await engine.inTurn(projectFile, id, () => readEffectBoard(root, id))
       if ('ok' in board) return board
       const chosenEffects = await readEffectChosen(root, found.effects, [])
       const chosen = chosenEffects.read ? chosenEffects.entries[id]?.lock : undefined

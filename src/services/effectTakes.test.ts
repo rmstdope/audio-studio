@@ -373,8 +373,8 @@ describe('createEffectTakes', () => {
       await new Promise((r) => setTimeout(r, 5))
     }
     expect(readdirSync(takes)).toEqual([])
-    // The model made the take: no failure is recorded, and an earlier one is cleared.
-    expect(held.calls).toEqual(['clear small-sfx'])
+    // A save the board refused neither records a failure nor clears an earlier one.
+    expect(held.calls).toEqual([])
   })
 
   it('names the take’s file, not the model, when its WAV cannot be written, and leaves the model’s health as it was', async () => {
