@@ -336,8 +336,10 @@ export function PatchWorkbench({
   const showMark = marked !== null && !(overlaid && sameArea(marked, overlaid.area))
   const problem = refusal(make.data) ?? refusal(choose.data) ?? refusal(drop.data)
   const error = make.error ?? choose.error ?? drop.error ?? stop.error
-  // Un-choose answers beside its own button, where it was pressed.
-  const unchooseProblem = refusal(unchoose.data) ?? unchoose.error?.message ?? null
+  // Un-choose answers beside its own button, and only while the chosen take is the one shown.
+  const unchooseProblem = shown?.chosen
+    ? (refusal(unchoose.data) ?? unchoose.error?.message)
+    : undefined
   const beforeChange = () => {
     for (const mutation of [make, choose, drop, unchoose]) mutation.reset()
   }
