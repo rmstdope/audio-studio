@@ -669,6 +669,22 @@ export function PatchWorkbench({
             <span className="muted small">Drag over the picture to mark what should change.</span>
           )
         )}
+        {problem && <span className="adopt-error">{problem}</span>}
+        {error && <span className="adopt-error">{error.message}</span>}
+      </div>
+      <div className="patch-takes">
+        <div className="patch-takes-head">
+          <h3>{takes.length === 0 ? 'Takes' : `Takes · ${takes.length}`}</h3>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={game}
+              onChange={(event) => onGame(event.target.checked)}
+            />
+            What the game gets
+          </label>
+        </div>
+        {/* A take that could not be made is told among the takes, which stay in view (as-2ida). */}
         {failed.map((f) => (
           <div className="errbox" role="alert" key={f.n}>
             <div className="errbox-text">
@@ -689,21 +705,6 @@ export function PatchWorkbench({
             </button>
           </div>
         ))}
-        {problem && <span className="adopt-error">{problem}</span>}
-        {error && <span className="adopt-error">{error.message}</span>}
-      </div>
-      <div className="patch-takes">
-        <div className="patch-takes-head">
-          <h3>{takes.length === 0 ? 'Takes' : `Takes · ${takes.length}`}</h3>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={game}
-              onChange={(event) => onGame(event.target.checked)}
-            />
-            What the game gets
-          </label>
-        </div>
         {lockUnread && takes.length > 0 && (
           <span className="takes-missing small">
             Choosing, dropping and un-choosing wait until the images lock can be read. You can still
