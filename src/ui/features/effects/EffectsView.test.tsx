@@ -248,6 +248,17 @@ describe('the Sound effects list, with takes', () => {
     expect(client.getQueryState(['project'])!.isInvalidated).toBe(true)
   })
 
+  it('reads the project again when the last effect being made is done', async () => {
+    const { client, settle } = render(list, effects({ rows: [row('coins')] }), undefined, [
+      [['project'], {}],
+      [['effects-making'], { coins: { takes: 1, left: 2 } }],
+    ])
+    await settle()
+    act(() => client.setQueryData(['effects-making'], {}))
+    await settle()
+    expect(client.getQueryState(['project'])!.isInvalidated).toBe(true)
+  })
+
   it('does not read the project again while the same effects are still being made', async () => {
     const { client, settle } = render(
       list,

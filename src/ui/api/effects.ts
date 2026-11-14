@@ -247,6 +247,7 @@ export function useEffectsMaking() {
   })
   // An effect no longer being made has its takes now, so its status changed: read the project
   // again, without waiting for the rest of the batch.
+  // The ids as one string, so the effect below runs only when the set of effects changes.
   const key = Object.keys(query.data ?? {})
     .sort()
     .join('\n')
