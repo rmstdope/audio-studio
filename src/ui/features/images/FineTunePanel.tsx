@@ -51,6 +51,7 @@ import {
 } from '../../imagesText'
 import { progressOf } from '../../musicTakesText'
 import { off } from '../../off'
+import { Problems } from '../../components/Problems'
 import { EditModelMenu } from './EditModelMenu'
 import { scrollWithin } from '../../scrollWithin'
 
@@ -251,6 +252,10 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       : null
   if (came && !cameHere) setCame(null)
   keys.current = () => {}
+  if (query.data && !('picture' in query.data))
+    return <Problems title="The takes could not be listed" problems={query.data.problems} />
+  if (!query.data && query.isError)
+    return <section className="panel">The takes could not be loaded.</section>
   if (!view)
     return (
       <section className="panel fine-tune" aria-label="Fine-tune the picture">
