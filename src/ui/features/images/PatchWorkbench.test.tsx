@@ -565,6 +565,29 @@ describe('an open patch with takes', () => {
     return host
   }
 
+  it('moves focus without scrolling the page after an Un-choose is confirmed (as-uucl.3)', async () => {
+    const { host } = await render([patchRow('a')], made())
+    await open(host)
+    await act(async () => button(host, 'Un-choose')!.click())
+    const quiet: unknown[] = []
+    const focus = HTMLElement.prototype.focus
+    HTMLElement.prototype.focus = function (options?: FocusOptions) {
+      quiet.push(options?.preventScroll)
+      focus.call(this, options)
+    }
+    try {
+      await act(async () =>
+        button(host.querySelector('[role="alertdialog"]')!, 'Un-choose')!.click(),
+      )
+      await settle()
+      expect(host.querySelector('[role="alertdialog"]')).toBeNull()
+      expect(quiet.length).toBeGreaterThan(0)
+      expect(quiet.every((q) => q === true)).toBe(true)
+    } finally {
+      HTMLElement.prototype.focus = focus
+    }
+  })
+
   it('shows a refused un-choose beside the Un-choose button, not in the side column', async () => {
     const reason = 'content-studio/cache/image-patches/inn/a/board.json could not be written.'
     const host = await unchooseAnswered({ status: 409, body: { ok: false, message: reason } })
@@ -832,18 +855,40 @@ describe('takes being made and failed', () => {
     ])
   })
 
-  it('shows a take that could not be made in the takes strip, not at the foot of the side column (as-2ida)', async () => {
+  it('shows a take that could not be made in the controls band under the words, in view without scrolling (as-uucl.3)', async () => {
     const message =
       'content-studio/cache/image-patches/inn/a/1.png could not be written. Your other takes are kept.'
     const { host } = await render([patchRow('a')], () =>
       view([work('a', { takes: [takeOf(2)], failed: [{ n: 1, message, area, model: 'klein' }] })]),
     )
     await open(host)
-    const strip = host.querySelector('.patch-takes')!
-    // Right under the strip's heading, before the takes, where the stage leaves it room.
-    expect(strip.querySelector(':scope > .patch-takes-head + .errbox')).not.toBeNull()
-    expect(text(strip.querySelector('.errbox'))).toContain('Take 1 could not be made.')
-    expect(text(host.querySelector('.patch-band'))).not.toContain('could not be made')
+    const words = host.querySelector('.patch-band-words')!
+    expect(text(words.querySelector(':scope > .errbox'))).toContain('Take 1 could not be made.')
+    expect(host.querySelector('.patch-takes .errbox')).toBeNull()
+  })
+
+  it('moves focus without scrolling the page after Choose, Drop and Un-choose (as-uucl.3)', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })]),
+    )
+    await open(host)
+    await act(async () => thumbs(host)[0]!.click())
+    const quiet: unknown[] = []
+    const focus = HTMLElement.prototype.focus
+    HTMLElement.prototype.focus = function (options?: FocusOptions) {
+      quiet.push(options?.preventScroll)
+      focus.call(this, options)
+    }
+    try {
+      await act(async () => button(host, 'Choose')!.click())
+      await settle()
+      await act(async () => button(host, 'Drop')!.click())
+      await settle()
+      expect(quiet.length).toBeGreaterThan(0)
+      expect(quiet.every((q) => q === true)).toBe(true)
+    } finally {
+      HTMLElement.prototype.focus = focus
+    }
   })
 
   it('does not promise other takes when there are none', async () => {
