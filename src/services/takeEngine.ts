@@ -114,7 +114,7 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
       change: (board: B) => T | Promise<T>,
       /** Called when the board cannot be written, to take back what `change` did elsewhere. */
       undo?: () => Promise<void>,
-      /** Called in the same turn once the board is written, before anything else can read it. */
+      /** Called in the same turn once the board is saved (or needed no write), before the turn ends. */
       written?: () => Promise<void>,
     ): Promise<T | ProjectFailure> {
       return this.inTurn(projectFile, id, async () => {
@@ -239,7 +239,7 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
         stop: AbortSignal
         change: (board: B) => void | Promise<void>
         cleanup?: () => void
-        /** Called in the board's turn once the board lists the take, before the turn ends. */
+        /** Called in the board's turn once the board lists the take, before the turn ends; must not throw. */
         written?: () => Promise<void>
       },
     ): Promise<boolean> {
