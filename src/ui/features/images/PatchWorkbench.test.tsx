@@ -546,6 +546,37 @@ describe('an open patch with takes', () => {
     ])
   })
 
+  it('shows a refused un-choose beside the Un-choose button, not in the side column', async () => {
+    const reason = 'content-studio/cache/image-patches/inn/a/board.json could not be written.'
+    const { host } = await render([patchRow('a')], made(), {
+      status: 409,
+      body: { ok: false, message: reason },
+    })
+    await open(host)
+    await act(async () => button(host, 'Un-choose')!.click())
+    await act(async () => button(host.querySelector('[role="alertdialog"]')!, 'Un-choose')!.click())
+    await settle()
+    const left = host.querySelector('.patch-bench-left')!
+    expect(text(left.querySelector('.patch-controls'))).toContain('Un-choose')
+    expect(text(left)).toContain(reason)
+    expect(text(host.querySelector('.patch-bench-right'))).not.toContain(reason)
+  })
+
+  it('shows an un-choose that failed beside the Un-choose button, not in the side column', async () => {
+    const { host } = await render([patchRow('a')], made(), {
+      status: 500,
+      body: {},
+    })
+    await open(host)
+    await act(async () => button(host, 'Un-choose')!.click())
+    await act(async () => button(host.querySelector('[role="alertdialog"]')!, 'Un-choose')!.click())
+    await settle()
+    const shown = text(host.querySelector('.patch-bench-left'))
+    expect(shown).toContain('Un-choose')
+    expect(text(host.querySelector('.patch-bench-right'))).not.toContain('answered 500')
+    expect(shown).toContain('answered 500')
+  })
+
   it('marks a take that was made from earlier words, and one not yet looked at', async () => {
     const { host } = await render([patchRow('a')], () =>
       view([
