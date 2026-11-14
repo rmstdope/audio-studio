@@ -231,6 +231,39 @@ describe('the Sound effects list, with takes', () => {
     )
   })
 
+  it('reads the project again as soon as one effect’s takes are all made, while others go on (as-qxya)', async () => {
+    const { client, settle } = render(
+      list,
+      effects({ rows: [row('coins'), row('wind')] }),
+      undefined,
+      [
+        [['project'], {}],
+        [['effects-making'], { coins: { takes: 4, left: 10 }, wind: { takes: 4, left: 20 } }],
+      ],
+    )
+    await settle()
+    expect(client.getQueryState(['project'])!.isInvalidated).toBe(false)
+    act(() => client.setQueryData(['effects-making'], { wind: { takes: 4, left: 20 } }))
+    await settle()
+    expect(client.getQueryState(['project'])!.isInvalidated).toBe(true)
+  })
+
+  it('does not read the project again while the same effects are still being made', async () => {
+    const { client, settle } = render(
+      list,
+      effects({ rows: [row('coins'), row('wind')] }),
+      undefined,
+      [
+        [['project'], {}],
+        [['effects-making'], { coins: { takes: 4, left: 10 } }],
+      ],
+    )
+    await settle()
+    act(() => client.setQueryData(['effects-making'], { coins: { takes: 3, left: 8 } }))
+    await settle()
+    expect(client.getQueryState(['project'])!.isInvalidated).toBe(false)
+  })
+
   it('counts up to date effects in the ring and the subtitle counts out-of-date ones as chosen', () => {
     const rows = [chosen('a'), chosen('b', { status: 'changed', changed: ['length'] }), row('c')]
     const { text } = render(list, effects({ rows, done: { done: 1, total: 3, needs: ['b', 'c'] } }))
