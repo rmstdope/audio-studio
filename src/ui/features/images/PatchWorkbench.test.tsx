@@ -827,6 +827,20 @@ describe('takes being made and failed', () => {
     ])
   })
 
+  it('shows a take that could not be made in the takes strip, not at the foot of the side column (as-2ida)', async () => {
+    const message =
+      'content-studio/cache/image-patches/inn/a/1.png could not be written. Your other takes are kept.'
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a', { takes: [takeOf(2)], failed: [{ n: 1, message, area, model: 'klein' }] })]),
+    )
+    await open(host)
+    const strip = host.querySelector('.patch-takes')!
+    // Right under the strip's heading, before the takes, where the stage leaves it room.
+    expect(strip.querySelector(':scope > .patch-takes-head + .errbox')).not.toBeNull()
+    expect(text(strip.querySelector('.errbox'))).toContain('Take 1 could not be made.')
+    expect(text(host.querySelector('.patch-bench-right'))).not.toContain('could not be made')
+  })
+
   it('does not promise other takes when there are none', async () => {
     const { host } = await render([patchRow('a')], () =>
       view([work('a', { failed: [{ n: 1, message: 'Out of memory.', area, model: 'klein' }] })]),
