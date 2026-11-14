@@ -125,6 +125,21 @@ describe('GamePatchesPanel', () => {
       expect(pickButtons(host).length).toBe(2)
       expect(host.querySelectorAll('.patch-pick-row .mono').length).toBe(2)
     })
+    // Unread, the lock gives no take of the image as chosen, so a patch chosen on one looked dropped.
+    it('says nothing of a patch to make again, on its chip or when opened', async () => {
+      for (const shape of [{}, { width: 600, height: 800 }]) {
+        const { host } = await render(two(), undefined, { lockUnread: true }, shape)
+        expect(host.querySelectorAll('.patch-pick .chip-warn').length).toBe(0)
+        expect(host.querySelector('.make-again-line')).toBeNull()
+      }
+    })
+    it('marks the patch to make again and opens on its line when the lock is readable', async () => {
+      const { host } = await render(two(), undefined, {}, {})
+      expect(text(pickButtons(host)[0]!.querySelector('.chip-warn'))).toBe('Make again')
+      expect(text(host.querySelector('.make-again-line'))).toBe(
+        'Chosen on take 1 of the image, so the game does not show it now. Choose take 1 again to bring it back.',
+      )
+    })
     it('keeps the count of chosen and the dots when the lock is readable', async () => {
       const { host } = await render(two(), undefined, {}, { chosenTake: 1 })
       expect(heading(host)).toBe('Patches · 1 of 2 chosen')
