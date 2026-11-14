@@ -565,6 +565,29 @@ describe('an open patch with takes', () => {
     return host
   }
 
+  it('moves focus without scrolling the page after an Un-choose is confirmed (as-uucl.3)', async () => {
+    const { host } = await render([patchRow('a')], made())
+    await open(host)
+    await act(async () => button(host, 'Un-choose')!.click())
+    const quiet: unknown[] = []
+    const focus = HTMLElement.prototype.focus
+    HTMLElement.prototype.focus = function (options?: FocusOptions) {
+      quiet.push(options?.preventScroll)
+      focus.call(this, options)
+    }
+    try {
+      await act(async () =>
+        button(host.querySelector('[role="alertdialog"]')!, 'Un-choose')!.click(),
+      )
+      await settle()
+      expect(host.querySelector('[role="alertdialog"]')).toBeNull()
+      expect(quiet.length).toBeGreaterThan(0)
+      expect(quiet.every((q) => q === true)).toBe(true)
+    } finally {
+      HTMLElement.prototype.focus = focus
+    }
+  })
+
   it('shows a refused un-choose beside the Un-choose button, not in the side column', async () => {
     const reason = 'content-studio/cache/image-patches/inn/a/board.json could not be written.'
     const host = await unchooseAnswered({ status: 409, body: { ok: false, message: reason } })
