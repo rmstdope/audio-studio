@@ -177,6 +177,7 @@ async function press(target: Element, key: string, shiftKey = false, altKey = fa
   await settle()
 }
 
+const text = (e: Element) => e.textContent ?? ''
 const rows = (host: HTMLElement) => [...host.querySelectorAll('.named-area')]
 const mainOf = (host: HTMLElement, at: number) =>
   rows(host)[at]!.querySelector<HTMLButtonElement>('.named-area-main')!
@@ -201,7 +202,7 @@ describe('the named areas panel', () => {
       'Title of b',
       'Title of a',
     ])
-    expect(rows(host)[0]!.querySelector('.mono')!.textContent).toBe('b')
+    expect(mainOf(host, 0).title).toBe('b')
   })
 
   it('marks an area placed or to place, and counts the placed ones', async () => {
@@ -219,7 +220,7 @@ describe('the named areas panel', () => {
 
   it('shows two areas with one title, told apart by their ids', async () => {
     const { host } = await render([area('a', { title: 'Door' }), area('b', { title: 'Door' })])
-    expect(rows(host).map((r) => r.querySelector('.mono')!.textContent)).toEqual(['a', 'b'])
+    expect(rows(host).map((r) => r.querySelector('button')!.title)).toEqual(['a', 'b'])
   })
 
   describe('arriving', () => {
@@ -248,36 +249,6 @@ describe('the named areas panel', () => {
         '/api/images/inn/takes/2',
       )
       expect(stage!.style.aspectRatio).toBe('320 / 200')
-    })
-
-    it('tells the stylesheet the picture’s shape, so a narrow window can cap it keeping that shape (as-e39)', async () => {
-      const { stage } = await render([area('a')])
-      expect(stage!.style.getPropertyValue('--picture-ratio')).toBe('1.6')
-    })
-
-    for (const [what, size] of [
-      ['a portrait picture', { width: 160, height: 200 }],
-      ['a landscape picture', { width: 320, height: 200 }],
-    ] as const) {
-      it(`fits ${what} to the room its track has, so the caption, switches and S hint stay in view (as-5wln)`, async () => {
-        const { stage } = await render([area('a')], { size })
-        expect(stage!.style.getPropertyValue('--picture-ratio')).toBe(
-          String(size.width / size.height),
-        )
-        expect(stage!.classList.contains('fit-shape')).toBe(true)
-        expect(stage!.parentElement!.className).toBe('fit-picture')
-      })
-    }
-
-    it('fits the picture’s place before its take has arrived the same way', async () => {
-      const { host } = await render([area('a')], {
-        size: { width: 160, height: 200 },
-        answer: () => new Promise<Response>(() => {}),
-      })
-      const empty = host.querySelector<HTMLElement>('.named-area-empty')!
-      expect(empty.classList.contains('fit-shape')).toBe(true)
-      expect(empty.parentElement!.className).toBe('fit-picture')
-      expect(empty.style.getPropertyValue('--picture-ratio')).toBe('0.8')
     })
   })
 
@@ -343,11 +314,9 @@ describe('the named areas panel', () => {
     it('keeps the picture’s place empty while it loads, with the list as usual', async () => {
       const { host } = await render([area('a')], { answer: () => new Promise<Response>(() => {}) })
       expect(host.querySelector('.named-area-empty')!.textContent).toBe('')
-      expect(
-        host
-          .querySelector<HTMLElement>('.named-area-empty')!
-          .style.getPropertyValue('--picture-ratio'),
-      ).toBe('1.6')
+      expect(host.querySelector<HTMLElement>('.named-area-empty')!.style.aspectRatio).toBe(
+        '320 / 200',
+      )
       expect(host.querySelector('.named-area-line')).toBeNull()
       expect(rows(host).length).toBe(1)
     })
@@ -360,7 +329,7 @@ describe('the named areas panel', () => {
       await act(async () => mainOf(host, 1).click())
       expect(selectedIds(host)).toEqual([1])
       expect(line(host)).toContain('Take 2 · drag the box to move it')
-      expect(rows(host)[1]!.querySelector('.named-area-clear')!.textContent).toBe('Clear')
+      expect(host.querySelector('.named-area-clear')!.textContent).toBe('Clear')
       await act(async () => mainOf(host, 0).click())
       expect(selectedIds(host)).toEqual([0])
       expect(host.querySelector('.named-area-clear')).toBeNull()
@@ -759,15 +728,6 @@ describe('the named areas panel', () => {
       expect(host.querySelector('input[type=checkbox]')).toBeNull()
     })
 
-    it('keeps the switches in the sticky picture, or it slides over them on scrolling (as-7dz)', async () => {
-      const { host } = await render([area('a')], { patches })
-      const picture = host.querySelector<HTMLElement>('.named-areas-picture')!
-      const switches = host.querySelector('.named-area-switches')!
-      expect(valuesInEveryWindow(picture, 'position')).toContain('.named-areas-picture: sticky')
-      expect(switches.parentElement).toBe(picture)
-      expect(picture.lastElementChild).toBe(switches)
-    })
-
     it('has a switch per patch, all off, that lays the patch over the picture', async () => {
       const { host } = await render([area('a'), area('b')], { patches })
       expect(host.querySelector('.named-area-switches')!.textContent).toContain(
@@ -902,7 +862,7 @@ describe('areas to place again', () => {
       'Placed on take 2 of the image, so the game does not use them now. Place them here, or choose take 2 again to bring them back.',
     )
     const line = host.querySelector('.place-again-line')!
-    expect(line.nextElementSibling?.classList.contains('named-area-list')).toBe(true)
+    expect(line.nextElementSibling?.classList.contains('named-areas-bar')).toBe(true)
     // The picture is clean: only the box of the take in the game shows.
     expect(boxes(host)).toHaveLength(1)
   })
@@ -1008,7 +968,7 @@ describe('the point of a box', () => {
     await drag(stage!, [130, 70], [110, 60], dotOf(host, 'a')!)
     expect(puts.map((p) => p.body.box)).toEqual([{ ...box, point: { x: 110, y: 60 } }])
     expect(at(dotOf(host, 'a')!).map(Math.round)).toEqual([17, 25])
-    const centre = rows(host)[0]!.querySelector('.named-area-point-centre')!
+    const centre = host.querySelector('.named-area-point-centre')!
     expect(centre.textContent).toBe('Centre the point')
     expect(centre.nextElementSibling!.textContent).toBe('Clear')
     expect(document.activeElement).toBe(mainOf(host, 0))
@@ -1162,5 +1122,109 @@ describe('the point of a box', () => {
     expect(line(host)).toBe(
       'Take 2 · drag the box to move it, or its corners and sides to resize it. Drag the point to choose where What’s there marks it. Arrow keys move the box; with Shift they resize it; with Alt they move the point.',
     )
+  })
+})
+
+describe('the pinned bar and the full-width picture (as-uucl.4)', () => {
+  const box = { x: 100, y: 50, width: 60, height: 40 }
+  const patches = [{ id: 'p1', title: 'Bread taken', takes: [{ n: 7, chosen: true }] }]
+
+  it('reads top to bottom: heading, bar (row, then switches), picture, caption', async () => {
+    const { host } = await render([placedAt('a', box), area('b')], { patches })
+    const bar = host.querySelector('.named-areas-bar')!
+    expect(bar.querySelector('.named-area-list')).not.toBeNull()
+    expect(bar.querySelector('.named-area-switches')).toBe(bar.lastElementChild)
+    const section = host.querySelector('section')!
+    const order = [...section.children].map((c) => c.className)
+    expect(order).toEqual(['named-areas-head', 'named-areas-bar', 'named-areas-picture'])
+    const picture = host.querySelector('.named-areas-picture')!
+    expect([...picture.children].map((c) => c.className)).toEqual([
+      'named-area-stage',
+      'muted named-area-line',
+    ])
+  })
+
+  it('puts the chosen area’s title, Centre the point and Clear at the row’s end, for it alone', async () => {
+    const { host } = await render([
+      placedAt('a', { ...box, point: { x: 110, y: 60 } }, { title: 'Hearth' }),
+      placedAt('b', box),
+    ])
+    expect(host.querySelector('.named-area-actions')).toBeNull()
+    await act(async () => mainOf(host, 0).click())
+    const actions = host.querySelector('.named-area-actions')!
+    expect(actions.parentElement).toBe(host.querySelector('.named-area-list'))
+    expect(actions.parentElement!.lastElementChild).toBe(actions)
+    expect(text(actions)).toBe('Hearth:Centre the pointClear')
+    await act(async () => mainOf(host, 1).click())
+    expect(text(host.querySelector('.named-area-actions')!)).toBe('Title of b:Clear')
+  })
+
+  it('sizes the picture by its own pixels, never upscaled, left-aligned', async () => {
+    for (const size of [
+      { width: 1536, height: 1024 },
+      { width: 320, height: 200 },
+    ]) {
+      const { stage } = await render([area('a')], { size })
+      expect(stage!.style.maxWidth).toBe(`${size.width}px`)
+      expect(stage!.style.aspectRatio).toBe(`${size.width} / ${size.height}`)
+      expect(stage!.classList.contains('fit-shape')).toBe(false)
+    }
+  })
+
+  it('keeps the same shape for the empty box and the row of areas', async () => {
+    const { host } = await render([area('a')], {
+      size: { width: 160, height: 200 },
+      answer: () => new Promise<Response>(() => {}),
+    })
+    const empty = host.querySelector<HTMLElement>('.named-area-empty')!
+    expect(empty.style.maxWidth).toBe('160px')
+    expect(empty.style.aspectRatio).toBe('160 / 200')
+    expect(rows(host)).toHaveLength(1)
+  })
+
+  describe('scrolling to the chosen area', () => {
+    const scrolls = () => {
+      const calls: ScrollToOptions[] = []
+      const real = window.scrollBy
+      window.scrollBy = ((o: ScrollToOptions) => void calls.push(o)) as typeof window.scrollBy
+      cleanups.push(() => (window.scrollBy = real))
+      return calls
+    }
+    const place = (host: HTMLElement, top: number, bottom: number) => {
+      host.querySelector('.named-areas-bar')!.getBoundingClientRect = () =>
+        ({ top: 0, bottom: 100 }) as DOMRect
+      tagOf(host, 'a').getBoundingClientRect = () => ({ top, bottom }) as DOMRect
+    }
+
+    it('scrolls smoothly when the pressed area’s box is out of sight', async () => {
+      const calls = scrolls()
+      const { host } = await render([placedAt('a', box), area('b')], { chosenTake: 2 })
+      window.innerHeight = 800
+      place(host, 900, 1000)
+      await act(async () => mainOf(host, 0).click())
+      expect(calls).toEqual([{ top: 208, behavior: 'smooth' }])
+    })
+
+    it('does not move for a box in view, or an area with no box', async () => {
+      const calls = scrolls()
+      const { host } = await render([placedAt('a', box), area('b')], { chosenTake: 2 })
+      window.innerHeight = 800
+      place(host, 300, 400)
+      await act(async () => mainOf(host, 0).click())
+      await act(async () => mainOf(host, 1).click())
+      expect(calls).toEqual([])
+    })
+  })
+
+  it('stops a drag at the window’s edge and never scrolls the page by itself', async () => {
+    const calls: unknown[] = []
+    const real = window.scrollBy
+    window.scrollBy = ((o: unknown) => void calls.push(o)) as typeof window.scrollBy
+    cleanups.push(() => (window.scrollBy = real))
+    window.innerHeight = 100
+    const { stage, puts } = await render([area('a')])
+    await drag(stage!, [10, 10], [50, 190])
+    expect(puts[0]!.body.box).toEqual({ x: 10, y: 10, width: 40, height: 90 })
+    expect(calls).toEqual([])
   })
 })

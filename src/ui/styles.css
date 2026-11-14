@@ -3296,8 +3296,7 @@ button.cue-chip[aria-expanded='true'] {
 .patches p {
   margin: 0;
 }
-/* The picture as wide as its column, but no taller than its track: a portrait picture is fitted to
-   the height (`.fit-shape`). Patches overrides the width cap (`.patch-picture > .patch-stage`). */
+/* The picture as wide as its column. Patches overrides the width cap (`.patch-picture > .patch-stage`). */
 .patch-stage {
   position: relative;
   max-width: 1024px;
@@ -5204,40 +5203,37 @@ textarea[aria-disabled='true'][data-why] {
 .named-areas p {
   margin: 0;
 }
-.named-areas-body {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  grid-template-areas: 'picture list';
-  gap: 8px 24px;
-  align-items: start;
-}
-.named-areas-picture {
-  grid-area: picture;
-  position: sticky;
-  top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-/* The list column is as tall as the picture's (`contain: size` leaves its rows out of the row's height). */
-.named-areas-side {
-  grid-area: list;
-  align-self: stretch;
-  contain: size;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-.named-areas-side h2 {
-  margin: 0;
-}
-.named-areas-side .named-areas-head {
+.named-areas-head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0 6px;
+}
+.named-areas-head h2 {
+  margin: 0;
+}
+/* The areas and the patch switches, pinned at the window's top while the page scrolls under them (as-uucl.4). */
+.named-areas-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+/* The picture is as wide as the panel, up to its own pixel size (set on the stage), left-aligned. */
+.named-areas-picture {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.named-areas-picture > .named-area-stage,
+.named-areas-picture > .named-area-empty {
+  width: 100%;
 }
 .named-area-stage {
   position: relative;
@@ -5419,75 +5415,43 @@ textarea[aria-disabled='true'][data-why] {
   margin: 0;
   padding: 0;
   min-width: 0;
-  flex: 1 1 0;
-  min-height: 7rem;
-  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
 }
 .named-area {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 0;
-  border-top: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--raised);
 }
 .named-area.selected {
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .named-area-main {
-  flex: 1 1 8rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 5px 10px;
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  overflow-wrap: anywhere;
 }
 .named-area-main[aria-disabled='true'] {
   cursor: default;
 }
-.named-area-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.named-area-text .mono {
-  display: block;
-}
-.named-area > .chip {
-  margin-right: 10px;
-}
-@container panel (max-width: 760px) {
-  .named-areas-body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'picture'
-      'list';
-  }
-  .named-areas-side {
-    contain: none;
-  }
-  .named-area-list {
-    flex: none;
-    max-height: 50vh;
-  }
-  /* Stacked, the list scrolls under the held picture: opaque and in front, up to the window's top. */
-  .named-areas-picture {
-    top: 0;
-    z-index: 1;
-    margin-top: -12px;
-    padding: 12px 0 8px;
-    background: var(--panel);
-  }
-  /* Held in front of the list, the picture must leave room for the rows, however tall its image. */
-  .named-area-stage,
-  .named-area-empty {
-    width: min(100%, calc(50vh * var(--picture-ratio)));
-    margin-inline: auto;
-  }
+.named-area-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-left: auto;
 }
 /* The warm attention pill as a chip: the outline adds no size, so it matches its neighbours */
 .chip-attention {
@@ -5912,40 +5876,6 @@ textarea[aria-disabled='true'][data-why] {
 .fine-picture {
   width: 100%;
   margin-inline: auto;
-}
-/* The room a picture is fitted to (as-5wln). A page that shows a picture is a grid whose stage row
-   takes what the rows around it leave, and `useFillWindow` makes the page end at the window's
-   bottom, so no rule names the pixels of what else is on the page. The picture sits in a
-   `.fit-picture` track, as wide as its column and as tall as the row gives it (a row never shorter
-   than what its column holds at the track's floor, so a tall strip makes the page scroll and never
-   draws over the controls), and a `.fit-shape`
-   picture is the largest of its shape inside it. The floors are the smallest a page is allowed to
-   shrink to, and below them it scrolls. In a narrow panel (under 821 px, as the other panel layouts
-   follow the panel's width) nothing is fitted: the picture is as wide as its column and no taller
-   than half the window. */
-.fit-picture {
-  min-width: 0;
-  min-height: 0;
-}
-.fit-shape {
-  width: min(100%, calc(50vh * var(--picture-ratio, 1)));
-}
-@container panel (min-width: 821px) {
-  .fit-picture {
-    container-type: size;
-    flex: 1 1 0;
-    min-height: 160px;
-  }
-  .fit-shape {
-    width: min(100cqw, calc(100cqh * var(--picture-ratio, 1)));
-  }
-  .named-areas-body {
-    height: max(360px, var(--fill-height, 360px));
-    grid-template-rows: minmax(auto, 1fr);
-  }
-  .named-areas-picture {
-    align-self: stretch;
-  }
 }
 .fine-bar {
   display: flex;
