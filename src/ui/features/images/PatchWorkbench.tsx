@@ -334,9 +334,12 @@ export function PatchWorkbench({
   const chooseWhy = !canChange ? changeWhy : lookError !== null ? STYLE_BROKEN_WHY : BRINGING_WHY
   const overlaid = showing ? shown : null
   const showMark = marked !== null && !(overlaid && sameArea(marked, overlaid.area))
-  const problem =
-    refusal(make.data) ?? refusal(choose.data) ?? refusal(drop.data) ?? refusal(unchoose.data)
-  const error = make.error ?? choose.error ?? drop.error ?? unchoose.error ?? stop.error
+  const problem = refusal(make.data) ?? refusal(choose.data) ?? refusal(drop.data)
+  const error = make.error ?? choose.error ?? drop.error ?? stop.error
+  // Un-choose answers beside its own button, and only while the chosen take is the one shown.
+  const unchooseProblem = shown?.chosen
+    ? (refusal(unchoose.data) ?? unchoose.error?.message)
+    : undefined
   const beforeChange = () => {
     for (const mutation of [make, choose, drop, unchoose]) mutation.reset()
   }
@@ -562,6 +565,7 @@ export function PatchWorkbench({
             )}
           </div>
         )}
+        {unchooseProblem && <span className="adopt-error">{unchooseProblem}</span>}
         {shown && lookError !== null && (
           <span className="faint small">Fix the style to choose this take.</span>
         )}
