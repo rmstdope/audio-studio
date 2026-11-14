@@ -1,8 +1,7 @@
 import { fieldOwnsKeys, usePendingFocus } from './useWorkbenchKeys'
 import { useAfterSaved } from '../../useAfterSaved'
 import { useJobOpen } from './ImageJobTabs'
-import { FitPicture, pictureShape } from './FitPicture'
-import { useFillWindow } from '../../fillWindow'
+import { pictureShape } from './FitPicture'
 import {
   useEffect,
   useRef,
@@ -233,7 +232,6 @@ export function PatchWorkbench({
   // Focus goes to Make once a stopped press has left it free again.
   const [landOnMake, setLandOnMake] = useState(false)
   const start = useRef<{ x: number; y: number } | null>(null)
-  const fill = useFillWindow()
   const asked = useRef(new Set<number>())
   // A choice or drop asked for by a key and not yet settled: a second press waits for it.
   const changing = useRef(false)
@@ -410,7 +408,7 @@ export function PatchWorkbench({
     if (key === 'd' && !shown.chosen) onDrop(shown.n)
   }
 
-  const left =
+  const row =
     asking && shown ? (
       <Confirm
         title={`Un-choose take ${shown.n}?`}
@@ -446,7 +444,7 @@ export function PatchWorkbench({
         </button>
       </Confirm>
     ) : (
-      <>
+      <div className="patch-row">
         <div className="patch-looking">
           {shown ? (
             <>
@@ -464,67 +462,6 @@ export function PatchWorkbench({
             </span>
           )}
         </div>
-        <FitPicture>
-          {game &&
-          (lookError !== null || shown?.look === 'bringing' || shown?.look === 'missing') ? (
-            <div
-              className={`look-empty fit-shape${lookError !== null ? ' look-empty-err' : ''}`}
-              style={pictureShape(space.width, space.height)}
-              role={lookError !== null ? 'alert' : 'status'}
-            >
-              {lookError !== null
-                ? lookError
-                : shown?.look === 'missing'
-                  ? "Not brought to the game's look yet."
-                  : "Bringing to the game's look…"}
-            </div>
-          ) : (
-            <div
-              className="patch-stage fit-shape"
-              style={{
-                ...pictureShape(space.width, space.height),
-                ...(game ? ({ imageRendering: 'pixelated' } as CSSProperties) : {}),
-              }}
-              onPointerDown={(event) => {
-                if (event.button !== 0 || event.ctrlKey) return
-                event.preventDefault()
-                event.currentTarget.setPointerCapture(event.pointerId)
-                start.current = { x: event.clientX, y: event.clientY }
-              }}
-              onPointerMove={dragTo}
-              onPointerUp={(event) => {
-                dragTo(event)
-                start.current = null
-              }}
-              onPointerCancel={() => {
-                start.current = null
-              }}
-            >
-              <img
-                className="patch-take"
-                src={sources.base}
-                alt="The chosen take of the image"
-                draggable={false}
-              />
-              {overlaid && sources.patch(overlaid.n, overlaid.look) && (
-                <img
-                  className="patch-over"
-                  src={sources.patch(overlaid.n, overlaid.look)!}
-                  alt={`Take ${overlaid.n}`}
-                  draggable={false}
-                />
-              )}
-              {showMark && marked && (
-                <div className="patch-mark" style={placed(space.place(marked), space)} />
-              )}
-            </div>
-          )}
-        </FitPicture>
-        <span className="faint small">
-          {game
-            ? `${view.game.width} × ${view.game.height}`
-            : modelCaption(take.width, take.height, take.cropped)}
-        </span>
         {shown && (
           <div className="patch-controls">
             <button type="button" className="btn" onClick={() => setShowing((on) => !on)}>
@@ -565,12 +502,72 @@ export function PatchWorkbench({
             )}
           </div>
         )}
-        {unchooseProblem && <span className="adopt-error">{unchooseProblem}</span>}
-        {shown && lookError !== null && (
-          <span className="faint small">Fix the style to choose this take.</span>
-        )}
-      </>
+      </div>
     )
+
+  const picture = (
+    <>
+      <div
+        className="patch-picture"
+        style={{ ...pictureShape(space.width, space.height), maxWidth: take.width }}
+      >
+        {game && (lookError !== null || shown?.look === 'bringing' || shown?.look === 'missing') ? (
+          <div
+            className={`look-empty${lookError !== null ? ' look-empty-err' : ''}`}
+            role={lookError !== null ? 'alert' : 'status'}
+          >
+            {lookError !== null
+              ? lookError
+              : shown?.look === 'missing'
+                ? "Not brought to the game's look yet."
+                : "Bringing to the game's look…"}
+          </div>
+        ) : (
+          <div
+            className="patch-stage"
+            style={game ? ({ imageRendering: 'pixelated' } as CSSProperties) : undefined}
+            onPointerDown={(event) => {
+              if (event.button !== 0 || event.ctrlKey) return
+              event.preventDefault()
+              event.currentTarget.setPointerCapture(event.pointerId)
+              start.current = { x: event.clientX, y: event.clientY }
+            }}
+            onPointerMove={dragTo}
+            onPointerUp={(event) => {
+              dragTo(event)
+              start.current = null
+            }}
+            onPointerCancel={() => {
+              start.current = null
+            }}
+          >
+            <img
+              className="patch-take"
+              src={sources.base}
+              alt="The chosen take of the image"
+              draggable={false}
+            />
+            {overlaid && sources.patch(overlaid.n, overlaid.look) && (
+              <img
+                className="patch-over"
+                src={sources.patch(overlaid.n, overlaid.look)!}
+                alt={`Take ${overlaid.n}`}
+                draggable={false}
+              />
+            )}
+            {showMark && marked && (
+              <div className="patch-mark" style={placed(space.place(marked), space)} />
+            )}
+          </div>
+        )}
+      </div>
+      <span className="faint small">
+        {game
+          ? `${view.game.width} × ${view.game.height}`
+          : modelCaption(take.width, take.height, take.cropped)}
+      </span>
+    </>
+  )
 
   const items = [
     ...takes.map((t) => ({ n: t.n, take: t, making: null as PatchMakingView | null })),
@@ -578,99 +575,110 @@ export function PatchWorkbench({
   ].sort((a, b) => a.n - b.n)
 
   return (
-    <div className="patch-bench" ref={fill} onKeyDown={onKeyDown}>
-      <div className="patch-bench-left">{left}</div>
-      <div className="patch-bench-right">
-        <h3 className="patch-title">{title}</h3>
-        {words}
-        {tie &&
-          (atArea ? (
-            <span className="muted small">{markedFromAreaText(tie.title)}</span>
-          ) : fromArea ? (
+    <div className="patch-bench" onKeyDown={onKeyDown}>
+      <div className="patch-band">
+        <div className="patch-band-words">
+          <h3 className="patch-title">{title}</h3>
+          {words}
+          {tie &&
+            (atArea ? (
+              <span className="muted small">{markedFromAreaText(tie.title)}</span>
+            ) : fromArea ? (
+              <button
+                type="button"
+                className="patch-back"
+                onClick={() => {
+                  onBackToArea()
+                  // Make may be off (no model, takes being made): focus then goes to the heading.
+                  if (
+                    makeButton.current &&
+                    makeButton.current.getAttribute('aria-disabled') !== 'true'
+                  )
+                    makeButton.current.focus()
+                  else focusOn('heading')
+                }}
+              >
+                {backToAreaText(tie.title)}
+              </button>
+            ) : (
+              !marked && <span className="muted small">{areaNoPlaceText(tie.title)}</span>
+            ))}
+          {!view.maker.ok ? (
+            <span className="takes-missing small" role="status">
+              {view.maker.message}
+            </span>
+          ) : (
+            !marked &&
+            !tie && (
+              <span className="muted small">Drag over the picture to mark what should change.</span>
+            )
+          )}
+          {problem && <span className="adopt-error">{problem}</span>}
+          {error && <span className="adopt-error">{error.message}</span>}
+        </div>
+        <div className="patch-band-tools">
+          <EditModelMenu
+            value={model}
+            onChange={onModel}
+            downloads={view.models}
+            failed={work.failedModels}
+            label="Model for new takes"
+            why={menuWhy}
+          />
+          <div className="patch-make">
+            <select
+              className="takes-count"
+              aria-label="Number of new takes"
+              value={count}
+              {...off(menuWhy)}
+              onChange={(event) => setCount(Number(event.target.value))}
+            >
+              {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {takeCountText(n)}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
-              className="patch-back"
+              className="btn btn-primary"
+              {...off(makeWhy)}
+              ref={makeButton}
               onClick={() => {
-                onBackToArea()
-                // Make may be off (no model, takes being made): focus then goes to the heading.
-                if (
-                  makeButton.current &&
-                  makeButton.current.getAttribute('aria-disabled') !== 'true'
-                )
-                  makeButton.current.focus()
-                else focusOn('heading')
+                if (!marked) return
+                // The button is off while takes are made, and the browser drops focus from it; focus
+                // goes to the take looked at in the grid, so ← and → keep stepping it.
+                focusOn(lookingAt ?? 'heading', true)
+                afterWordsSaved(() => make.mutate({ count, area: marked, model }))
               }}
             >
-              {backToAreaText(tie.title)}
+              {makeTakesText(count, hasTakes)}
             </button>
-          ) : (
-            !marked && <span className="muted small">{areaNoPlaceText(tie.title)}</span>
-          ))}
-        <EditModelMenu
-          value={model}
-          onChange={onModel}
-          downloads={view.models}
-          failed={work.failedModels}
-          label="Model for new takes"
-          why={menuWhy}
-        />
-        <div className="patch-make">
-          <select
-            className="takes-count"
-            aria-label="Number of new takes"
-            value={count}
-            {...off(menuWhy)}
-            onChange={(event) => setCount(Number(event.target.value))}
-          >
-            {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {takeCountText(n)}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn-primary"
-            {...off(makeWhy)}
-            ref={makeButton}
-            onClick={() => {
-              if (!marked) return
-              // The button is off while takes are made, and the browser drops focus from it; focus
-              // goes to the take looked at in the grid, so ← and → keep stepping it.
-              focusOn(lookingAt ?? 'heading', true)
-              afterWordsSaved(() => make.mutate({ count, area: marked, model }))
-            }}
-          >
-            {makeTakesText(count, hasTakes)}
-          </button>
-          {busy && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              {...off(stop.isPending && WAIT_FOR_CHANGE)}
-              onClick={() => stop.mutate(undefined, { onSuccess: () => setLandOnMake(true) })}
-            >
-              Stop
-            </button>
-          )}
-        </div>
-        {absentLine && <span className="faint small">{absentLine}</span>}
-        <span className="faint small patch-keys">
-          <kbd>←</kbd> <kbd>→</kbd> take · <kbd>C</kbd> choose · <kbd>D</kbd> drop · <kbd>S</kbd>{' '}
-          patch off/on
-        </span>
-        {!view.maker.ok ? (
-          <span className="takes-missing small" role="status">
-            {view.maker.message}
+            {busy && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                {...off(stop.isPending && WAIT_FOR_CHANGE)}
+                onClick={() => stop.mutate(undefined, { onSuccess: () => setLandOnMake(true) })}
+              >
+                Stop
+              </button>
+            )}
+          </div>
+          {absentLine && <span className="faint small">{absentLine}</span>}
+          <span className="faint small patch-keys">
+            <kbd>←</kbd> <kbd>→</kbd> take · <kbd>C</kbd> choose · <kbd>D</kbd> drop · <kbd>S</kbd>{' '}
+            patch off/on
           </span>
-        ) : (
-          !marked &&
-          !tie && (
-            <span className="muted small">Drag over the picture to mark what should change.</span>
-          )
+        </div>
+      </div>
+      <div className="patch-bench-left">
+        {row}
+        {unchooseProblem && <span className="adopt-error">{unchooseProblem}</span>}
+        {shown && lookError !== null && (
+          <span className="faint small">Fix the style to choose this take.</span>
         )}
-        {problem && <span className="adopt-error">{problem}</span>}
-        {error && <span className="adopt-error">{error.message}</span>}
+        {picture}
       </div>
       <div className="patch-takes">
         <div className="patch-takes-head">

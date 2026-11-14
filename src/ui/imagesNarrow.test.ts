@@ -51,26 +51,30 @@ describe('an image’s workbench', () => {
   })
 })
 
-describe('the Patches workbench frame', () => {
-  it('puts the stage beside a 300 px tools column, the takes below both', () => {
-    expect(rule('.game-patches .patch-bench')).toMatch(
-      /grid-template-columns:\s*minmax\(0, 1fr\) 300px/,
-    )
-    expect(rule('.game-patches .patch-bench > .patch-takes')).toMatch(/grid-column:\s*1 \/ -1/)
+describe('the Patches workbench frame (as-uucl.3)', () => {
+  it('stands the band, the picture and the takes one above the other, as wide as the panel', () => {
+    expect(rule('.patch-bench')).toMatch(/flex-direction:\s*column/)
+    expect(rule('.patch-band')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) auto/)
   })
 
-  it('leaves the Fine-tune workbench its own two columns', () => {
-    expect(rule('.patch-bench')).toMatch(
-      /grid-template-columns:\s*minmax\(0, 3fr\) minmax\(0, 2fr\)/,
-    )
+  it('holds the picture to its width and never to the window’s height', () => {
+    const box = rule('.patch-picture')
+    expect(box).toMatch(/width:\s*100%/)
+    expect(box).not.toMatch(/vh|cqh|height:/)
+    expect(css).not.toMatch(/\.patch-bench[^{]*\{[^}]*--fill-height/)
+  })
+
+  it('pushes Patch off, Drop and Choose to the right end of the take’s row', () => {
+    expect(rule('.patch-row .patch-controls')).toMatch(/margin-left:\s*auto/)
   })
 })
 
 describe('the Patches tab in a narrow window', () => {
   it('puts the list, the stage and the tools one above the other', () => {
-    const narrow = css.slice(css.indexOf('@container panel (max-width: 700px) {\n  .patch-bench,'))
+    const narrow = css.slice(css.indexOf('@container panel (max-width: 700px) {\n  .patch-band,'))
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
     expect(block).toMatch(/\.patches-lefty/)
+    expect(block).toMatch(/\.patch-band/)
     expect(block).toMatch(/grid-template-columns:\s*1fr/)
   })
 
@@ -161,17 +165,17 @@ describe('fitting a picture to the window (as-5wln)', () => {
   it('gives the pages a frame as tall as the window below where it starts, the stage row taking what the rest leaves', () => {
     const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
     const block = wide.slice(0, wide.indexOf('\n}\n'))
-    expect(block).toMatch(/\.patch-bench,\s*\.fine-job\s*\{[^}]*var\(--fill-height, 0px\)/)
+    expect(block).toMatch(/\.fine-job\s*\{[^}]*var\(--fill-height, 0px\)/)
     // `auto` as the least, not 0: a tall strip makes the page scroll instead of crushing the stage.
     expect(block).toMatch(/grid-template-rows:\s*minmax\(auto, 1fr\) auto/)
-    expect(block).not.toMatch(/\.(patch-bench-left|fine-stage)\s*\{[^}]*min-height:\s*0/)
+    expect(block).not.toMatch(/\.(fine-stage)\s*\{[^}]*min-height:\s*0/)
     expect(block).toMatch(/\.named-areas-body\s*\{[^}]*var\(--fill-height, 360px\)/)
   })
 
   it('lets the Patches and Fine-tune frames shrink to the window, and grow only to what their rows hold (as-3xtn)', () => {
     const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
     const block = wide.slice(0, wide.indexOf('\n}\n'))
-    const frame = rule('.patch-bench,\n  .fine-job', block)
+    const frame = rule('.fine-job', block)
     // The window's room is the least the frame is, never a fixed height with a pixel floor: a
     // 480 px floor kept the frame past a 763 px window's 413 px with the picture still able to
     // shrink, and a fixed height lets a tall takes strip draw past the panel.
@@ -179,7 +183,7 @@ describe('fitting a picture to the window (as-5wln)', () => {
     expect(frame).not.toMatch(/(^|[\s;])height:/)
     // The tools take no room of their own, so the row is what the picture's track and the strip
     // leave, and they scroll inside it.
-    expect(rule('.patch-bench-right,\n  .fine-tools', block)).toMatch(/contain:\s*size/)
+    expect(rule('.fine-tools', block)).toMatch(/contain:\s*size/)
   })
 
   it('caps a picture by half the window when nothing is fitted', () => {

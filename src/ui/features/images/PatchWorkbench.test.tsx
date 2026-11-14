@@ -521,7 +521,7 @@ describe('an open patch with takes', () => {
     expect(client.getQueryState(['project'])?.isInvalidated).toBe(false)
   })
 
-  it('asks before un-choosing, in the picture’s place, and Cancel gives focus back', async () => {
+  it('asks before un-choosing, in the take’s row above the picture, and Cancel gives focus back', async () => {
     const { host, sent } = await render([patchRow('a')], made())
     await open(host)
     await act(async () => button(host, 'Un-choose')!.click())
@@ -530,7 +530,11 @@ describe('an open patch with takes', () => {
     expect(text(host)).toContain(
       'The game shows the image without this patch until you choose another. Take 2 stays among the takes.',
     )
-    expect(host.querySelector('.patch-stage')).toBeNull()
+    // The question takes the row's place; the picture stays in view under it (as-uucl.3).
+    const picture = host.querySelector('.patch-picture')!
+    expect(picture.querySelector('.patch-stage')).not.toBeNull()
+    expect(picture.previousElementSibling!.getAttribute('role')).toBe('alertdialog')
+    expect(host.querySelector('.patch-looking')).toBeNull()
     expect(document.activeElement).toBe(
       button(host.querySelector('[role="alertdialog"]')!, 'Un-choose') ?? null,
     )
@@ -548,7 +552,7 @@ describe('an open patch with takes', () => {
 
   /** The line right after the left column's controls, where Un-choose answers; '' if none. */
   const besideControls = (host: Element) => {
-    const next = host.querySelector('.patch-bench-left .patch-controls')?.nextElementSibling
+    const next = host.querySelector('.patch-row')?.nextElementSibling
     return next?.classList.contains('adopt-error') ? text(next) : ''
   }
   const unchooseAnswered = async (posted: { status: number; body: unknown }) => {
@@ -563,15 +567,15 @@ describe('an open patch with takes', () => {
   it('shows a refused un-choose beside the Un-choose button, not in the side column', async () => {
     const reason = 'content-studio/cache/image-patches/inn/a/board.json could not be written.'
     const host = await unchooseAnswered({ status: 409, body: { ok: false, message: reason } })
-    expect(text(host.querySelector('.patch-bench-left .patch-controls'))).toContain('Un-choose')
+    expect(text(host.querySelector('.patch-row .patch-controls'))).toContain('Un-choose')
     expect(besideControls(host)).toBe(reason)
-    expect(text(host.querySelector('.patch-bench-right'))).not.toContain(reason)
+    expect(text(host.querySelector('.patch-band'))).not.toContain(reason)
   })
 
   it('shows an un-choose that failed beside the Un-choose button, not in the side column', async () => {
     const host = await unchooseAnswered({ status: 500, body: {} })
     expect(besideControls(host)).toContain('answered 500')
-    expect(text(host.querySelector('.patch-bench-right'))).not.toContain('answered 500')
+    expect(text(host.querySelector('.patch-band'))).not.toContain('answered 500')
   })
 
   it('keeps a refused un-choose’s reason to the chosen take, not the take stepped to', async () => {
@@ -838,7 +842,7 @@ describe('takes being made and failed', () => {
     // Right under the strip's heading, before the takes, where the stage leaves it room.
     expect(strip.querySelector(':scope > .patch-takes-head + .errbox')).not.toBeNull()
     expect(text(strip.querySelector('.errbox'))).toContain('Take 1 could not be made.')
-    expect(text(host.querySelector('.patch-bench-right'))).not.toContain('could not be made')
+    expect(text(host.querySelector('.patch-band'))).not.toContain('could not be made')
   })
 
   it('does not promise other takes when there are none', async () => {
@@ -1076,7 +1080,7 @@ describe('what the game gets', () => {
       view([work('a', over), work('b')], more)
   const box = (host: Element, at = 0) =>
     [...host.querySelectorAll<HTMLInputElement>('.patch-takes input[type=checkbox]')][at]!
-  const caption = (host: Element) => text(host.querySelector('.fit-picture + .faint'))
+  const caption = (host: Element) => text(host.querySelector('.patch-picture + .faint'))
 
   it('has a box in the Takes heading, ticked, also before any takes exist', async () => {
     const { host } = await render([patchRow('a')], one())
@@ -1549,86 +1553,91 @@ describe('the model of new takes', () => {
 describe('the three parts of an open patch', () => {
   const made = () => view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })])
 
-  // The shapes a picture comes in: portrait, landscape, and the game's whole frame (the picture
-  // the game uses, shown at its own size) as well as a model's take.
+  // The shapes a picture comes in: portrait, landscape, and the game's whole frame.
   for (const [what, size] of [
-    ['a portrait picture', { width: 160, height: 200 }],
-    ['a landscape picture', { width: 320, height: 200 }],
+    ['a portrait picture', { width: 816, height: 1024 }],
+    ['a landscape picture', { width: 1024, height: 640 }],
   ] as const) {
-    it(`fits ${what} to the room its track has, so Choose and the takes stay in view (as-5wln)`, async () => {
+    it(`gives ${what} the panel's width up to the take's own size, never a height cap (as-uucl.3)`, async () => {
       const { host } = await render([patchRow('a')], () =>
         view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
           take: { n: 3, ...size, cropped: false },
-          game: size,
+          game: { width: 320, height: 200 },
         }),
       )
-      const stage = host.querySelector<HTMLElement>('.patch-stage')!
-      expect(stage.style.getPropertyValue('--picture-ratio')).toBe(String(size.width / size.height))
-      expect(stage.classList.contains('fit-shape')).toBe(true)
-      expect(stage.parentElement!.className).toBe('fit-picture')
-      expect(stage.parentElement!.parentElement!.className).toBe('patch-bench-left')
+      const box = host.querySelector<HTMLElement>('.patch-picture')!
+      expect(box.querySelector('.patch-stage')).not.toBeNull()
+      expect(box.style.maxWidth).toBe(`${size.width}px`)
+      expect(box.style.getPropertyValue('--picture-ratio')).toBe(String(320 / 200))
+      expect(host.querySelector('.fit-shape, .fit-picture')).toBeNull()
     })
   }
 
-  it('fits the game’s whole frame, once ticked, the same way as a take (as-5wln)', async () => {
+  it('keeps the picture as large as the take once ticking What the game gets changes its shape (as-uucl.3)', async () => {
     const { host } = await render([patchRow('a')], () =>
       view([work('a', { takes: [takeOf(1)] })], {
-        take: { n: 3, width: 160, height: 200, cropped: false },
-        game: { width: 512, height: 288 },
+        take: { n: 3, width: 1024, height: 640, cropped: false },
+        game: { width: 320, height: 200 },
       }),
     )
     await open(host)
-    const ratio = () =>
-      host
-        .querySelector<HTMLElement>('.fit-picture > .patch-stage')!
-        .style.getPropertyValue('--picture-ratio')
-    expect(ratio()).toBe(String(512 / 288))
+    const box = () => host.querySelector<HTMLElement>('.patch-picture')!
+    expect(box().style.maxWidth).toBe('1024px')
     await act(async () =>
       host.querySelector<HTMLInputElement>('.patch-takes input[type=checkbox]')!.click(),
     )
-    expect(ratio()).toBe(String(160 / 200))
+    expect(box().style.maxWidth).toBe('1024px')
+    expect(box().style.getPropertyValue('--picture-ratio')).toBe(String(1024 / 640))
   })
 
-  it('lays the stage and the takes strip out as the two rows of one frame, so the stage takes what the strip leaves (as-jkm2, as-5wln)', async () => {
+  it('gives the placeholder the box the picture will take (as-uucl.3)', async () => {
     const { host } = await render([patchRow('a')], () =>
-      view([work('a', { takes: [takeOf(1), takeOf(2, { chosen: true })] })], {
-        take: { n: 3, width: 90, height: 160, cropped: false },
-        game: { width: 90, height: 160 },
+      view([work('a', { takes: [takeOf(1, { look: 'bringing' })] })], {
+        take: { n: 3, width: 1024, height: 640, cropped: false },
+        game: { width: 320, height: 200 },
       }),
     )
-    const bench = host.querySelector('.patch-bench')!
-    expect(bench.querySelector(':scope > .patch-bench-left .fit-picture')).not.toBeNull()
-    expect(bench.querySelector(':scope > .patch-takes')).not.toBeNull()
+    await open(host)
+    const box = host.querySelector<HTMLElement>('.patch-picture')!
+    expect(box.style.maxWidth).toBe('1024px')
+    expect(box.querySelector('.look-empty')).not.toBeNull()
   })
 
-  it('puts the stage on the left, the tools on the right headed by the patch’s title, and the takes below both', async () => {
+  it('lays the controls band, the take’s row, the picture and the takes one under another (as-uucl.3)', async () => {
     const { host } = await render([patchRow('a')], made)
     const bench = host.querySelector('.patch-bench')!
     expect([...bench.children].map((c) => c.className)).toEqual([
+      'patch-band',
       'patch-bench-left',
-      'patch-bench-right',
       'patch-takes',
     ])
-    const [stage, tools, strip] = [...bench.children]
-    expect(stage!.querySelector('.patch-stage')).not.toBeNull()
-    expect(text(tools!.querySelector('.patch-title'))).toBe('Title of a')
-    expect(tools!.querySelector('textarea')).not.toBeNull()
-    expect(tools!.querySelector('select[aria-label="Number of new takes"]')).not.toBeNull()
+    const [band, stage, strip] = [...bench.children]
+    expect(text(band!.querySelector('.patch-title'))).toBe('Title of a')
+    expect(band!.querySelector('textarea')).not.toBeNull()
+    expect(band!.querySelector('select[aria-label="Number of new takes"]')).not.toBeNull()
+    expect(band!.querySelector('.patch-keys')).not.toBeNull()
+    expect([...stage!.children].map((c) => c.className.split(' ')[0])).toEqual([
+      'patch-row',
+      'patch-picture',
+      'faint',
+    ])
     expect(text(strip!.querySelector('h3'))).toBe('Takes · 2')
     expect(strip!.querySelectorAll('button.patch-thumb').length).toBe(2)
   })
 
-  it('puts Patch off, Drop and Choose with their keys under the picture, and the keys line in the tools', async () => {
+  it('puts Patch off, Drop and Choose with their keys in the take’s row above the picture, the keys line in the band', async () => {
     const { host } = await render([patchRow('a')], made)
     await act(async () => thumbs(host)[0]!.click())
-    const under = host.querySelector('.patch-controls')!
+    const row = host.querySelector('.patch-row')!
+    const under = row.querySelector('.patch-controls')!
     expect([...under.querySelectorAll('button')].map((b) => text(b))).toEqual([
       'Patch off S',
       'Drop D',
       'Choose C',
     ])
-    expect(under.closest('.patch-bench-left')).not.toBeNull()
-    expect(host.querySelector('.patch-bench-right .patch-keys')).not.toBeNull()
+    expect(text(row.querySelector('.patch-looking'))).toContain('Looking at Take 1')
+    expect(row.nextElementSibling!.classList.contains('patch-picture')).toBe(true)
+    expect(host.querySelector('.patch-band .patch-keys')).not.toBeNull()
   })
 
   it('turns the patch off and on with S as well as with its button', async () => {
