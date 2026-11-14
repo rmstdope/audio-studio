@@ -477,7 +477,7 @@ export function createImageTakes({
     let made: { n: number; took: number | null } | null = null
     await engine.run(found.projectFile, found.id, entry, {
       // A take waits for the GPU as `waiting`: it is being made when the model starts.
-      begins: 'with-job',
+      queued: true,
       async job(stop, began) {
         const size = takeSize(found.row)
         const model = imageModel(entry.model)
