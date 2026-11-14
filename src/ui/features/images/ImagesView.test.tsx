@@ -1358,8 +1358,8 @@ describe('the named areas the game declares', () => {
     ])
     expect(text(page.querySelector('.named-areas-head'))).toBe('Named areas · 0 of 2 placed')
     expect([...page.querySelectorAll('.named-area')].map((r) => text(r))).toEqual([
-      'FountainfountainTo place',
-      'Old noticeold-noticeTo place',
+      'FountainTo place',
+      'Old noticeTo place',
     ])
   })
   it('keeps one panel when the page is drawn again with new data (siblings need their own keys)', () => {
