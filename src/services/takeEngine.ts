@@ -40,7 +40,7 @@ export interface TakeJob {
   queued?: boolean
   /**
    * Called with the error when the model's job failed and was not stopped, after the entry shows
-   * failed. Never called for a take that was made but could not be saved (`save`'s refusals).
+   * failed. Never called for a take that was made but could not be saved: any `WriteRefused` or `BoardUnusable` the job throws (`save`'s refusals) is no news of the model.
    */
   failed?(error: unknown): void | Promise<void>
   /** Called last, whatever happened. */
@@ -237,10 +237,15 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
         cleanup?: () => void
       },
     ): Promise<boolean> {
-      await writeOrRefuse(take.root, take.path, take.bytes)
       const removeFile = async () => {
         take.cleanup?.()
         await rm(resolveInRoot(take.root, take.path), { force: true }).catch(() => {})
+      }
+      try {
+        await writeOrRefuse(take.root, take.path, take.bytes)
+      } catch (error) {
+        await removeFile()
+        throw error
       }
       let saved: void | ProjectFailure
       try {

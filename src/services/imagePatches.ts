@@ -339,23 +339,18 @@ export function createImagePatches({
           }
           // Marked before it is on the board, so the page never sees it between made and brought.
           bringing.add(mark)
-          const onBoard = await engine
-            .save(found.projectFile, found.engineId, accessOf(found), {
-              root: found.root,
-              path: `${found.folder}/${entry.n}.png`,
-              bytes: made.png,
-              stop,
-              change(board) {
-                board.takes = [...board.takes.filter((t) => t.n !== saving.n), saving].sort(
-                  (a, b) => a.n - b.n,
-                )
-              },
-              cleanup: () => bringing.delete(mark),
-            })
-            .catch((error: unknown) => {
-              bringing.delete(mark)
-              throw error
-            })
+          const onBoard = await engine.save(found.projectFile, found.engineId, accessOf(found), {
+            root: found.root,
+            path: `${found.folder}/${entry.n}.png`,
+            bytes: made.png,
+            stop,
+            change(board) {
+              board.takes = [...board.takes.filter((t) => t.n !== saving.n), saving].sort(
+                (a, b) => a.n - b.n,
+              )
+            },
+            cleanup: () => bringing.delete(mark),
+          })
           if (!onBoard) return
           saved = true
           // With the entry's end, so a view never shows the take made and its model still failed.

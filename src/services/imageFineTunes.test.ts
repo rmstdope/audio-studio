@@ -132,6 +132,18 @@ describe('a fine-tune the model made but the studio cannot save', () => {
   const pictures = (root: string) =>
     readdirSync(join(root, FOLDER)).filter((f) => f.endsWith('.png'))
 
+  it('still warns about the model when the model itself fails', async () => {
+    const { file, tunes, settled } = setup({
+      makes: () => {
+        throw new Error('out of memory')
+      },
+    })
+    await tunes.make(file, 'inn', { count: 1, words: 'Add a cat', area })
+    const view = await settled()
+    expect(view.failed[0]!.message).toContain('out of memory')
+    expect(view.failedModels).toEqual(['klein'])
+  })
+
   it('names the picture’s file and does not warn about the model, when the picture cannot be written', async () => {
     const { root, file, tunes, settled, onMade } = spoiled()
     // A folder where the picture belongs: the rename onto it is refused.
