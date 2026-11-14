@@ -4237,10 +4237,6 @@ textarea[aria-disabled='true'][data-why] {
   margin-top: auto;
 }
 /* The box is narrow: the model menu takes a line of its own, the count and Make the next. */
-.image-make {
-  display: flex;
-  flex-direction: column;
-}
 .image-make .takes-make {
   flex-wrap: wrap;
   justify-content: flex-start;
@@ -4279,8 +4275,7 @@ textarea[aria-disabled='true'][data-why] {
   }
 }
 
-/* The image the game uses beside one other take, one above the other when the column is too
-   narrow for both at the game's size */
+/* The image the game uses beside one other take, always in two halves */
 .image-stage {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4302,7 +4297,6 @@ textarea[aria-disabled='true'][data-why] {
   width: auto;
 }
 .look-side .image-take-picture {
-  max-width: 100%;
   flex: none;
 }
 .look-empty {
@@ -4363,8 +4357,8 @@ textarea[aria-disabled='true'][data-why] {
 }
 /* The In the game side while the images lock cannot be read: the warning tone, as music's, painted
    inside its column so it keeps the stage's gap from the take beside it and the panel's padding from
-   the panel's border. Its padding and border take room, which the stage's fit counts across and
-   down, so the frame keeps the picture's size and the two sides stay level. */
+   the panel's border. Its padding and border take room from the frame inside, so on a wide image
+   this side's frame is about 26 px narrower than the take beside it. */
 .image-side-unknown {
   display: flex;
   flex-direction: column;

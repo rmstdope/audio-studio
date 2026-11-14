@@ -346,7 +346,8 @@ export function TakesSection({
       },
       onSettled: (answer) => {
         changing.current = false
-        if (!confirmed || answer?.ok) focusOn(focus)
+        // Quietly: the page scrolls now, and a key must not move it.
+        if (!confirmed || answer?.ok) focusOn(focus, true)
       },
     })
   }
@@ -368,7 +369,7 @@ export function TakesSection({
       },
       onSettled: (answer) => {
         changing.current = false
-        if (!confirmed || answer?.ok) focusOn(next ?? 'right')
+        if (!confirmed || answer?.ok) focusOn(next ?? 'right', true)
       },
     })
   }

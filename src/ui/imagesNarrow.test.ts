@@ -29,6 +29,16 @@ describe('the two sides of an image’s takes', () => {
   })
 })
 
+describe('the pictures on the stage', () => {
+  it('are centred in their halves and drawn smooth', () => {
+    expect(css).toMatch(
+      /\.image-stage \.image-take-picture,\s*\.image-stage \.image-take-empty \{[^}]*margin-inline:\s*auto/,
+    )
+    expect(rule('.look-side')).toMatch(/align-items:\s*center/)
+    expect(rule('.image-stage .image-take-picture')).toMatch(/image-rendering:\s*auto/)
+  })
+})
+
 describe('an image’s workbench', () => {
   it('is a column: the band, a Make takes box of 360 px beside Prompt, the stage, the strip', () => {
     expect(rule('.image-workbench')).toMatch(/flex-direction:\s*column/)

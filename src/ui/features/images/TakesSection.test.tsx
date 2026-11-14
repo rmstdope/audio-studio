@@ -1645,6 +1645,37 @@ describe('the Make frame', () => {
     ).toEqual(['DropD', 'ChooseC'])
   })
 
+  it('never scrolls the page when D or C moves focus after the change', async () => {
+    const original = HTMLElement.prototype.focus
+    const options: (FocusOptions | undefined)[] = []
+    HTMLElement.prototype.focus = function (o?: FocusOptions) {
+      options.push(o)
+      original.call(this, o)
+    }
+    try {
+      const s = await show(view({ takes: [take(1, { chosen: true }), take(2), take(3)] }), {
+        width: 480,
+        height: 640,
+      })
+      await s.key('d')
+      await s.key('c')
+      expect(options.length).toBeGreaterThan(0)
+      expect(options.every((o) => o?.preventScroll === true)).toBe(true)
+    } finally {
+      HTMLElement.prototype.focus = original
+    }
+  })
+
+  it('draws a tall image at its own size, not enlarged', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2)] }), {
+      width: 480,
+      height: 640,
+    })
+    const imgs = [...s.container.querySelectorAll<HTMLImageElement>('[data-side] img')]
+    expect(imgs.map((i) => i.style.maxWidth)).toEqual(['480px', '480px'])
+    expect(imgs.map((i) => i.style.aspectRatio)).toEqual(['480 / 640', '480 / 640'])
+  })
+
   it('has no buttons on the right caption with no take to compare', async () => {
     const s = await show(view())
     const row = s.container.querySelector('[data-side="right"] .take-row')!
