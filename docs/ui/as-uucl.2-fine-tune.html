@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fine-tune: the picture as large as the window allows — agreed</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --side: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line2: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --asoft: #2a1b12;
+        --asoft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --info: #7aa7ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1280px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 22px;
+        color: var(--soft);
+      }
+      .note b {
+        color: var(--text);
+      }
+      .frame {
+        width: 1280px;
+        margin: 0 auto;
+        border: 1px solid var(--line2);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        background: var(--bg);
+        position: relative;
+      }
+      .winline {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 2px dashed #ff94a8;
+        z-index: 5;
+      }
+      .winline span {
+        position: absolute;
+        right: 8px;
+        top: -20px;
+        font-size: 11px;
+        color: #ff94a8;
+        background: #07080b;
+        padding: 0 6px;
+      }
+      .sidebar {
+        width: 200px;
+        background: var(--side);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        color: var(--muted);
+        font-size: 13px;
+        flex: none;
+      }
+      .sidebar div {
+        padding: 5px 8px;
+        border-radius: 6px;
+      }
+      .sidebar .on {
+        background: var(--raised);
+        color: var(--text);
+      }
+      .main {
+        flex: 1;
+        padding: 20px 24px;
+        min-width: 0;
+      }
+      .crumb {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 4px 0 2px;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-top: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tabs span {
+        padding: 7px 12px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .tabs .on {
+        color: var(--text);
+        border-bottom: 2px solid var(--accent);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-top: 14px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 7px;
+        border: 1px solid var(--line2);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .k {
+        color: var(--faint);
+        font-size: 11px;
+      }
+      .lbl {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .input {
+        background: var(--inset);
+        border: 1px solid var(--line2);
+        border-radius: 7px;
+        padding: 7px 9px;
+        color: var(--soft);
+        font-size: 13px;
+      }
+      .sel {
+        background: var(--inset);
+        border: 1px solid var(--line2);
+        border-radius: 7px;
+        padding: 6px 9px;
+        color: var(--soft);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .pic {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        background: linear-gradient(160deg, #2b3d5c 0%, #4d6b8a 35%, #7b6a4a 60%, #3a2f22 100%);
+        margin: 0 auto;
+      }
+      .pic::before {
+        content: '';
+        position: absolute;
+        left: 8%;
+        bottom: 18%;
+        width: 22%;
+        height: 34%;
+        background: #1d2633;
+        clip-path: polygon(0 100%, 10% 30%, 30% 0, 55% 25%, 70% 10%, 100% 100%);
+      }
+      .pic::after {
+        content: '';
+        position: absolute;
+        right: 12%;
+        top: 14%;
+        width: 9%;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: #f3d27a;
+        opacity: 0.8;
+      }
+      .pic .size {
+        position: absolute;
+        left: 10px;
+        top: 10px;
+        background: #000a;
+        color: #fff;
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 5px;
+        z-index: 2;
+      }
+      .mark {
+        position: absolute;
+        border: 2px dashed var(--accent);
+        background: #ff6b2c22;
+        z-index: 2;
+      }
+      .under {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .cap {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .chip {
+        font-size: 11px;
+        padding: 1px 7px;
+        border-radius: 9px;
+        background: var(--asoft);
+        color: var(--asoft-ink);
+      }
+      .strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+        gap: 10px;
+        margin-top: 6px;
+      }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--line2);
+        border-radius: 8px;
+        padding: 6px;
+      }
+      .card.on {
+        border-color: var(--accent);
+      }
+      .card .t {
+        aspect-ratio: 3/2;
+        border-radius: 5px;
+        background: linear-gradient(160deg, #2b3d5c, #7b6a4a 60%, #3a2f22);
+      }
+      .card .t.making {
+        background: var(--inset);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .card .l {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-top: 5px;
+        color: var(--soft);
+      }
+      .bar {
+        height: 4px;
+        background: var(--line2);
+        border-radius: 3px;
+        margin-top: 5px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        width: 40%;
+        background: var(--accent);
+        border-radius: 3px;
+      }
+      .hist {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--soft);
+        flex-wrap: wrap;
+      }
+      .hist .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 1px solid var(--muted);
+        display: inline-block;
+        margin-right: 5px;
+      }
+      .hist .now .dot {
+        background: var(--ok);
+        border-color: var(--ok);
+      }
+      .hist .after {
+        opacity: 0.55;
+      }
+      .hist .sep {
+        color: var(--faint);
+      }
+      h3 {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .callout {
+        outline: 2px solid var(--info);
+        outline-offset: 3px;
+        border-radius: 6px;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        color: var(--info);
+        margin-bottom: 4px;
+      }
+      .hlist {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        border-left: 1px solid var(--line2);
+        margin-left: 5px;
+        max-height: 132px;
+        overflow-y: auto;
+      }
+      .hstep {
+        position: relative;
+        padding-left: 14px;
+        font-size: 13px;
+        color: var(--soft);
+      }
+      .hstep .d {
+        position: absolute;
+        left: -5px;
+        top: 5px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 1px solid var(--muted);
+        background: var(--panel);
+      }
+      .hstep.now {
+        color: var(--text);
+      }
+      .hstep.now .d {
+        background: var(--ok);
+        border-color: var(--ok);
+      }
+      .hstep.after {
+        opacity: 0.55;
+      }
+      .hstep u {
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .pop {
+        position: absolute;
+        z-index: 4;
+        background: var(--raised);
+        border: 1px solid var(--line2);
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-shadow: 0 8px 24px #000a;
+        width: 420px;
+      }
+      .hlist {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        border-left: 1px solid var(--line2);
+        margin-left: 5px;
+      }
+      .hstep {
+        position: relative;
+        padding-left: 14px;
+        font-size: 13px;
+        color: var(--soft);
+      }
+      .hstep .d {
+        position: absolute;
+        left: -5px;
+        top: 5px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 1px solid var(--muted);
+        background: var(--panel);
+      }
+      .hstep.now {
+        color: var(--text);
+      }
+      .hstep.now .d {
+        background: var(--ok);
+        border-color: var(--ok);
+      }
+      .hstep.after {
+        opacity: 0.55;
+      }
+      .hstep u {
+        text-decoration: none;
+      }
+      .pop {
+        background: var(--raised);
+        border: 1px solid var(--line2);
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-shadow: 0 8px 24px #000a;
+        width: 420px;
+        margin-top: 6px;
+      }
+      .grid {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .case {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .case h2 {
+        font-size: 14px;
+        margin: 0 0 4px;
+      }
+      .case p {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .grid {
+        max-width: 1280px;
+        margin: 22px auto 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .case {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .case h2 {
+        font-size: 14px;
+        margin: 0 0 4px;
+      }
+      .case p {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .case .pop {
+        position: static;
+      }
+      .grid {
+        align-items: start;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Fine-tune: the picture as large as the window allows — agreed</h1>
+      <p>
+        The words, the model and Make sit in a band above the picture, with History behind a button
+        next to Undo. A bar with the caption and Before / after, Drop and Choose sits between the
+        band and the picture. The picture takes the panel's whole width, up to its own pixel size
+        and never stretched beyond it; on a MacBook the page scrolls to the rest of the picture and
+        the fine-tunes below it.
+      </p>
+    </div>
+    <div class="frame">
+      <div class="winline" style="top: 860px"><span>bottom of a MacBook window</span></div>
+      <div class="sidebar">
+        <div>Setup</div>
+        <div>Narration</div>
+        <div>Music</div>
+        <div class="on">Images</div>
+        <div>Sound effects</div>
+        <div>Scenes</div>
+      </div>
+      <div class="main">
+        <div class="crumb">Images › Act 1 › The harbour at dawn</div>
+        <div class="h1">The harbour at dawn</div>
+        <div class="tabs">
+          <span>Make</span><span class="on">Fine-tune</span><span>Patches</span
+          ><span>Named areas</span>
+        </div>
+        <div class="panel">
+          <div style="display: flex; gap: 10px; align-items: flex-end">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+              <label style="display: flex; flex-direction: column; gap: 4px"
+                ><span class="lbl">What to change</span
+                ><span class="input" style="min-height: 58px"
+                  >Make the boat on the right red, with a white stripe</span
+                ></label
+              ><span class="small muted"
+                >Drag on the picture to change only part of it; with no mark the whole picture is
+                changed. <u>Clear the mark</u></span
+              >
+            </div>
+            <div style="display: flex; gap: 8px; align-items: flex-end">
+              <label style="display: flex; flex-direction: column; gap: 4px"
+                ><span class="lbl">Model for new takes</span
+                ><span class="sel">FLUX Kontext ▾</span></label
+              ><span class="sel">4 ▾</span><span class="btn primary">Make 4 fine-tunes</span
+              ><span class="btn ghost">Stop</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 10px">
+            <span class="btn">History (4) ▾</span
+            ><span class="btn">Undo: back to Take 2 <span class="k">Z</span></span>
+          </div>
+          <div class="under" style="margin: 14px 0 8px">
+            <span class="cap"
+              >In the game · Take 3, with Fine-tune 2 over it <span class="chip">new</span></span
+            ><span style="display: flex; gap: 8px"
+              ><span class="btn">Before / after <span class="k">S</span></span
+              ><span class="btn ghost">Drop <span class="k">D</span></span
+              ><span class="btn primary">Choose <span class="k">C</span></span></span
+            >
+          </div>
+          <div class="pic" style="width: 100%; aspect-ratio: 1536/1024">
+            <span class="size">1536 × 1024 · shown 998 px wide</span>
+            <div class="mark" style="left: 56%; top: 22%; width: 20%; height: 24%"></div>
+          </div>
+          <div style="margin-top: 16px">
+            <h3>Fine-tunes</h3>
+            <div class="strip">
+              <div class="card">
+                <div class="t"></div>
+                <div class="l"><span>Fine-tune 1</span></div>
+              </div>
+              <div class="card on">
+                <div class="t"></div>
+                <div class="l"><span>Fine-tune 2</span><span class="chip">new</span></div>
+              </div>
+              <div class="card">
+                <div class="t making">making…</div>
+                <div class="l">
+                  <span><b>Fine-tune 3</b> · about 20 s left</span>
+                </div>
+                <div class="bar"><i></i></div>
+              </div>
+              <div class="card">
+                <div class="t making">waiting</div>
+                <div class="l">
+                  <span><b>Fine-tune 4</b> · waiting</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="case">
+        <h2>Closed</h2>
+        <p>The count is every step in the list, the game's own image included.</p>
+        <div class="row">
+          <span class="btn">History (4) ▾</span
+          ><span class="btn">Undo: back to Take 2 <span class="k">Z</span></span>
+        </div>
+      </div>
+
+      <div class="case">
+        <h2>Open</h2>
+        <p>
+          Opens under the button, over the picture. Click a step to choose it again (the list then
+          closes). Esc, a click outside, or the button again close it; focus goes back to the
+          button.
+        </p>
+        <div class="row">
+          <span class="btn" style="outline: 2px solid var(--accent)">History (4) ▴</span
+          ><span class="btn">Undo: back to Take 2 <span class="k">Z</span></span>
+        </div>
+        <div class="pop">
+          <div class="hlist">
+            <div class="hstep"><span class="d"></span>The game&apos;s own image</div>
+            <div class="hstep"><span class="d"></span><u>Take 2 · made from the prompt</u></div>
+            <div class="hstep now">
+              <span class="d"></span>Take 3 · in the game · “Make the sky a deep orange sunrise”
+            </div>
+            <div class="hstep after">
+              <span class="d"></span><u>Take 4 · “Add gulls over the water”</u>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="case">
+        <h2>Too many steps</h2>
+        <p>
+          The list is at most about twelve lines tall and scrolls; it opens scrolled so the step in
+          the game is in view.
+        </p>
+        <div class="row"><span class="btn">History (14) ▴</span></div>
+        <div class="pop" style="max-height: 230px; overflow-y: auto">
+          <div class="hlist">
+            <div class="hstep"><span class="d"></span>The game&apos;s own image</div>
+            <div class="hstep"><span class="d"></span><u>Take 2 · made from the prompt</u></div>
+            <div class="hstep now">
+              <span class="d"></span>Take 3 · in the game · “Make the sky a deep orange sunrise”
+            </div>
+            <div class="hstep after">
+              <span class="d"></span><u>Take 4 · “Add gulls over the water”</u>
+            </div>
+            <div class="hstep after"><span class="d"></span><u>Take 5 · “Change number 5”</u></div>
+            <div class="hstep after"><span class="d"></span><u>Take 6 · “Change number 6”</u></div>
+            <div class="hstep after"><span class="d"></span><u>Take 7 · “Change number 7”</u></div>
+            <div class="hstep after"><span class="d"></span><u>Take 8 · “Change number 8”</u></div>
+            <div class="hstep after"><span class="d"></span><u>Take 9 · “Change number 9”</u></div>
+            <div class="hstep after">
+              <span class="d"></span><u>Take 10 · “Change number 10”</u>
+            </div>
+            <div class="hstep after">
+              <span class="d"></span><u>Take 11 · “Change number 11”</u>
+            </div>
+            <div class="hstep after">
+              <span class="d"></span><u>Take 12 · “Change number 12”</u>
+            </div>
+            <div class="hstep after">
+              <span class="d"></span><u>Take 13 · “Change number 13”</u>
+            </div>
+            <div class="hstep after">
+              <span class="d"></span><u>Take 14 · “Change number 14”</u>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="case">
+        <h2>Only one step</h2>
+        <p>A picture never fine-tuned (only the game's own image, or one take). No Undo.</p>
+        <div class="row"><span class="btn">History (1) ▾</span></div>
+        <div class="pop">
+          <div class="hlist">
+            <div class="hstep now"><span class="d"></span>The game&apos;s own image</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="case">
+        <h2>While the takes are being read</h2>
+        <p>
+          Same as today: History and Undo are not shown until the steps are known; no placeholder.
+        </p>
+      </div>
+      <div class="case">
+        <h2>A narrow window</h2>
+        <p>
+          The band wraps: the words across the width, then the model, count and Make, then History
+          and Undo, then the caption, with the picture's buttons under it.
+        </p>
+        <div
+          style="
+            width: 380px;
+            border: 1px dashed var(--line2);
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          "
+        >
+          <label style="display: flex; flex-direction: column; gap: 4px"
+            ><span class="lbl">What to change</span
+            ><span class="input" style="min-height: 58px"
+              >Make the boat on the right red</span
+            ></label
+          >
+          <div class="row">
+            <span class="sel">FLUX Kontext ▾</span><span class="sel">4 ▾</span
+            ><span class="btn primary">Make 4 fine-tunes</span>
+          </div>
+          <div class="row">
+            <span class="btn">History (4) ▾</span
+            ><span class="btn">Undo: back to Take 2 <span class="k">Z</span></span>
+          </div>
+          <span class="cap">In the game · Take 3, with Fine-tune 2 over it</span>
+          <div class="row">
+            <span class="btn">Before / after <span class="k">S</span></span
+            ><span class="btn ghost">Drop <span class="k">D</span></span
+            ><span class="btn primary">Choose <span class="k">C</span></span>
+          </div>
+          <div class="pic" style="width: 100%; aspect-ratio: 1536/1024"></div>
+        </div>
+      </div>
+      <div class="case">
+        <h2>A picture smaller than the panel</h2>
+        <p>
+          Shown at its own size, never stretched, centred under the bar; the bar still spans the
+          panel.
+        </p>
+        <div style="border: 1px dashed var(--line2); padding: 8px; border-radius: 8px">
+          <div class="row" style="justify-content: space-between">
+            <span class="cap">In the game · Take 2</span
+            ><span class="btn">Before / after <span class="k">S</span></span>
+          </div>
+          <div class="pic" style="width: 55%; aspect-ratio: 3/2; margin-top: 8px">
+            <span class="size">640 × 427 · own size</span>
+          </div>
+        </div>
+      </div>
+      <div class="case">
+        <h2>A refusal or failure</h2>
+        <p>Shown in the band under the Make row, as today under Make.</p>
+        <div class="row">
+          <span class="sel">FLUX Kontext ▾</span><span class="sel">4 ▾</span
+          ><span class="btn primary" style="opacity: 0.45">Make 4 fine-tunes</span>
+        </div>
+        <div style="margin-top: 6px">
+          <span class="small" style="color: #ff94a8"
+            >FLUX Kontext is not on this computer. Setup says how to download it.</span
+          >
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
