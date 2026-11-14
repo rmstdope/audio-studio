@@ -233,66 +233,6 @@ export function makeAgainOpenLine(takes: number[], chosen: number | null): strin
   return `Chosen on ${where} of the image, so the game does not show it now. ${way}`
 }
 
-/** The smallest share of the game's size the two pictures are shrunk to side by side, before they stack. */
-const SMALLEST_BESIDE = 0.5
-
-/** The smallest share of the game's size a stacked picture is shown at. */
-const SMALLEST_STACKED = 0.1
-
-/** A zoom below 1, rounded down to hundredths so the pictures never overflow. */
-const shrunk = (zoom: number) => Math.floor(zoom * 100) / 100
-
-/**
- * How big the takes' pictures are shown, as a multiple of the game's `width`, and whether the
- * workbench's two sides stack. Side by side in `available` pixels: the largest whole number at
- * which both fit; when not even ×1 fits, shrunk to fit, down to half the game's size. Below that
- * they stack, each fitted to the width (at most ×1, at least a tenth). An unknown width (0) shows ×1
- * side by side. `across` is what a side holds across besides its picture (its padding and border).
- */
-export function lookZoom(
-  available: number,
-  gap: number,
-  width: number,
-  across = 0,
-): { zoom: number; stacked: boolean } {
-  if (available <= 0 || width <= 0) return { zoom: 1, stacked: false }
-  const beside = (available - gap - 2 * across) / (2 * width)
-  if (beside >= 1) return { zoom: Math.floor(beside), stacked: false }
-  if (beside >= SMALLEST_BESIDE) return { zoom: shrunk(beside), stacked: false }
-  // Never below a tenth: while the stage is being laid out it can measure a few pixels.
-  const alone = (available - across) / width
-  return { zoom: Math.max(SMALLEST_STACKED, shrunk(Math.min(1, alone))), stacked: true }
-}
-
-/**
- * How big the two pictures are shown when the stage has a known height as well: as large as both
- * fit side by side in `availableWidth` x `availableHeight` (a hundredth of the game's size at a
- * time, at least a tenth), keeping their shape, with `across` left on each side as `lookZoom` does.
- * With no known height (0) it is `lookZoom`.
- */
-export function fitZoom(
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  width: number,
-  height: number,
-  across = 0,
-): { zoom: number; stacked: boolean } {
-  if (availableHeight <= 0 || availableWidth <= 0 || width <= 0 || height <= 0) {
-    return lookZoom(availableWidth, gap, width, across)
-  }
-  const fit = Math.min((availableWidth - gap - 2 * across) / (2 * width), availableHeight / height)
-  return { zoom: Math.max(SMALLEST_STACKED, shrunk(fit)), stacked: false }
-}
-
-/**
- * How a picture at `zoom` is drawn: with hard pixels at a whole size, as the game's pixel art is;
- * smooth when shrunk or enlarged by a part, where hard pixels would be uneven.
- */
-export function pictureRendering(zoom: number): 'pixelated' | 'auto' {
-  return zoom >= 1 && Math.abs(zoom - Math.round(zoom)) < 1e-6 ? 'pixelated' : 'auto'
-}
-
 /** The caption under the model's picture: its size, and that its edges are cut when it is another shape. */
 export function modelCaption(width: number, height: number, cropped: boolean): string {
   return `${width} × ${height}${cropped ? ' · cropped to fit' : ''}`

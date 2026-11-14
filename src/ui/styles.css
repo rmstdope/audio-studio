@@ -4211,47 +4211,32 @@ textarea[aria-disabled='true'][data-why] {
   }
 }
 
-/* Images: the Make job's frame, shared by the image jobs. The pictures (the stage) in the middle,
-   the tools column of about 300 px on the right, the strip of takes along the bottom, the whole
-   filling the window's height below the tabs. A narrow window puts the three one above the other. */
+/* Images: the Make job's frame. From the top: the band (Prompt, and Make takes of 360 px), the stage
+   (the image the game uses beside one other take, each under its caption line and as wide as its half
+   but never wider than its own size) and the strip of takes along the bottom. The frame is as tall
+   as its parts: the page scrolls when the pictures are taller than the window. */
 .image-workbench {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 12px;
-  height: max(520px, var(--fill-height, 520px));
-}
-.image-workbench > [data-area='stage'] {
-  grid-column: 1;
-  grid-row: 1;
-}
-.image-workbench > [data-area='tools'] {
-  grid-column: 2;
-  grid-row: 1;
-}
-.image-workbench > [data-area='strip'] {
-  grid-column: 1 / -1;
-  grid-row: 2;
-}
-.image-workbench-tools {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+.image-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 16px;
+  align-items: stretch;
+}
+.image-band > * {
   min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
 }
-.image-workbench-tools > * {
-  flex: none;
-}
-/* What the game gets and the keys stay at the foot of the column. */
+/* What the game gets and the keys stay at the foot of the Make takes box. */
 .image-tools-foot {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-top: auto;
 }
-/* The column is narrow: the model menu takes a line of its own, the count and Make the next. */
+/* The box is narrow: the model menu takes a line of its own, the count and Make the next. */
 .image-make .takes-make {
   flex-wrap: wrap;
   justify-content: flex-start;
@@ -4283,46 +4268,35 @@ textarea[aria-disabled='true'][data-why] {
   gap: 12px;
   padding: 14px;
   min-width: 0;
-  min-height: 0;
-  overflow: auto;
 }
 @container panel (max-width: 1000px) {
-  .image-workbench {
+  .image-band {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-    height: auto;
-  }
-  .image-workbench > [data-area] {
-    grid-column: 1;
-    grid-row: auto;
-  }
-  .image-workbench-tools,
-  .image-stage-panel {
-    overflow: visible;
   }
 }
 
-/* The image the game uses beside one other take, one above the other when the column is too
-   narrow for both at the game's size */
+/* The image the game uses beside one other take, always in two halves */
 .image-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-  flex: 1;
-  min-height: 0;
-}
-.image-stage[data-stacked='false'] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
 }
 .look-side {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
   min-width: 0;
   max-width: 100%;
 }
+.look-side > * {
+  width: 100%;
+}
+.look-side > .small {
+  width: auto;
+}
 .look-side .image-take-picture {
-  max-width: 100%;
   flex: none;
 }
 .look-empty {
@@ -4354,12 +4328,22 @@ textarea[aria-disabled='true'][data-why] {
 .image-side .take-row {
   flex-wrap: wrap;
 }
-/* A take's buttons, under its picture */
+/* A take's buttons, at the right end of its caption line */
 .image-take-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
+}
+/* Pictures on the stage are never enlarged, and drawn smooth when shrunk. */
+.image-stage .image-take-picture {
+  image-rendering: auto;
+}
+/* Each picture, or frame in its place, is centred in its half. */
+.image-stage .image-take-picture,
+.image-stage .image-take-empty {
+  margin-inline: auto;
 }
 .image-take-picture {
   display: block;
@@ -4373,8 +4357,8 @@ textarea[aria-disabled='true'][data-why] {
 }
 /* The In the game side while the images lock cannot be read: the warning tone, as music's, painted
    inside its column so it keeps the stage's gap from the take beside it and the panel's padding from
-   the panel's border. Its padding and border take room, which the stage's fit counts across and
-   down, so the frame keeps the picture's size and the two sides stay level. */
+   the panel's border. Its padding and border take room from the frame inside, so on a wide image
+   this side's frame is about 26 px narrower than the take beside it. */
 .image-side-unknown {
   display: flex;
   flex-direction: column;

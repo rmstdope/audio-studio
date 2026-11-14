@@ -915,12 +915,12 @@ describe('what can go wrong', () => {
     expect(none.text()).toContain('Make takes to compare them here.')
   })
 
-  it('while the lock cannot be read, the empty frame is as wide as the take beside it', async () => {
+  it('while the lock cannot be read, the empty frame is as wide as the take beside it can be', async () => {
     const s = await show(view({ takes: [take(1), take(2)], lockUnread: true }))
     const frame = s.container.querySelector<HTMLElement>('[data-side="left"] .image-take-empty')!
     const picture = s.container.querySelector<HTMLElement>('[data-side="right"] img')!
-    expect(frame.style.width).not.toBe('')
-    expect(frame.style.width).toBe(picture.style.width)
+    expect(frame.style.maxWidth).not.toBe('')
+    expect(frame.style.maxWidth).toBe(picture.style.maxWidth)
   })
 
   it('shows only the latest action’s refusal', async () => {
@@ -1294,7 +1294,7 @@ describe('a take’s picture', () => {
     expect(captions(s, 'right')).toEqual(['480 × 360'])
   })
 
-  it('draws a game picture smaller than the image with hard pixels when it is enlarged', async () => {
+  it('limits a game picture made before the image’s size changed to its own size once it loads', async () => {
     const container = document.createElement('div')
     document.body.append(container)
     const root = createRoot(container)
@@ -1311,19 +1311,17 @@ describe('a take’s picture', () => {
           row: big,
           lookError: null,
           showing: 'game',
-          zoom: 0.5,
         }),
       ),
     )
     const picture = container.querySelector<HTMLImageElement>('img')!
-    expect(picture.style.imageRendering).toBe('auto')
+    expect(picture.style.maxWidth).toBe('1920px')
     await act(async () => {
       Object.defineProperty(picture, 'naturalWidth', { value: 480 })
       Object.defineProperty(picture, 'naturalHeight', { value: 360 })
       picture.dispatchEvent(new Event('load'))
     })
-    expect(picture.style.width).toBe('960px')
-    expect(picture.style.imageRendering).toBe('pixelated')
+    expect(picture.style.maxWidth).toBe('480px')
   })
 
   it('shows what the model made for every take when the box is cleared, and back when it is ticked', async () => {
@@ -1392,18 +1390,6 @@ describe('a take’s picture', () => {
     expect(s.text()).not.toContain('Fix the game')
   })
 
-  it('puts Drop and Choose under the compared picture, and Un-choose under the chosen one', async () => {
-    const s = await show(view({ takes: [take(1, { chosen: true }), take(2)] }))
-    const after = (side: string, text: string) => {
-      const picture = s.container.querySelector(`[data-side="${side}"] img`)!
-      const button = s.button(text)
-      return !!(picture.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
-    }
-    expect(after('right', 'Drop')).toBe(true)
-    expect(after('right', 'Choose')).toBe(true)
-    expect(after('left', 'Un-choose')).toBe(true)
-  })
-
   it('has no box before there are takes', async () => {
     const s = await show(view())
     expect(s.container.querySelector('input[type="checkbox"]')).toBeNull()
@@ -1411,29 +1397,28 @@ describe('a take’s picture', () => {
 })
 
 describe('the workbench', () => {
-  const tools = (s: { container: HTMLElement }) =>
-    s.container.querySelector('.image-workbench-tools')!
+  const band = (s: { container: HTMLElement }) => s.container.querySelector('.image-band')!
 
-  it('keeps the prompt, Make and the other takes in one column, and the two pictures in another', async () => {
+  it('keeps the prompt and Make in the band above the two pictures, the strip below both', async () => {
     const prompt = createElement('section', { className: 'panel', 'aria-label': 'Prompt' }, 'words')
     const s = await show(view({ takes: [take(1, { chosen: true }), take(2), take(3)] }), {}, prompt)
-    const column = [...tools(s).children].map((c) => c.getAttribute('aria-label'))
-    expect(column.slice(0, 2)).toEqual(['Prompt', 'Make takes'])
-    expect(tools(s).contains(s.container.querySelector('[data-area="strip"]'))).toBe(false)
-    const make = tools(s).querySelector('[aria-label="Make takes"]')!
+    const column = [...band(s).children].map((c) => c.getAttribute('aria-label'))
+    expect(column).toEqual(['Prompt', 'Make takes'])
+    expect(band(s).contains(s.container.querySelector('[data-area="strip"]'))).toBe(false)
+    const make = band(s).querySelector('[aria-label="Make takes"]')!
     expect(make.querySelector('select[aria-label="Model for new takes"]')).not.toBeNull()
     expect(make.querySelector('select[aria-label="Number of new takes"]')).not.toBeNull()
     expect(make.textContent).toContain('Make 4 takes')
     expect(s.container.querySelectorAll('[data-strip] button')).toHaveLength(2)
     const stage = s.container.querySelector('.image-stage')!
-    expect(tools(s).contains(stage)).toBe(false)
+    expect(band(s).contains(stage)).toBe(false)
     expect(stage.querySelector('[data-side="left"]')).not.toBeNull()
     expect(stage.querySelector('[data-side="right"]')).not.toBeNull()
   })
 
-  it('has Make in its column before there are takes, and one make button only', async () => {
+  it('has Make in its band before there are takes, and one make button only', async () => {
     const s = await show(view())
-    expect(tools(s).querySelector('[aria-label="Make takes"]')?.textContent).toContain(
+    expect(band(s).querySelector('[aria-label="Make takes"]')?.textContent).toContain(
       'Make 4 takes',
     )
     expect(s.buttons('Make 4 takes')).toHaveLength(1)
@@ -1636,10 +1621,66 @@ describe('the Make frame', () => {
   const chosenRow = { chosenTake: 2, status: 'chosen' as const }
   const frame = (s: { container: HTMLElement }) => s.container.querySelector('.image-workbench')!
 
-  it('lays out the stage, the tools column and the strip as the three areas of the frame', async () => {
+  it('lays out the band, the stage and the strip as the three areas of the frame', async () => {
     const s = await show(view({ takes: chosenAndTwo }), chosenRow)
     const areas = [...frame(s).children].map((c) => c.getAttribute('data-area'))
-    expect(areas).toEqual(['stage', 'tools', 'strip'])
+    expect(areas).toEqual(['band', 'stage', 'strip'])
+    expect(s.container.querySelector('.image-workbench-tools')).toBeNull()
+  })
+
+  it('puts a caption line above each picture, with the buttons at the line’s end', async () => {
+    const s = await show(view({ takes: chosenAndTwo }), chosenRow)
+    for (const side of ['left', 'right']) {
+      const box = s.container.querySelector(`[data-side="${side}"]`)!
+      const row = box.querySelector('.take-row')!
+      const picture = box.querySelector('img')!
+      expect(row.compareDocumentPosition(picture) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(row.querySelector('.image-take-actions')).not.toBeNull()
+    }
+    const left = s.container.querySelector('[data-side="left"] .take-row')!
+    const right = s.container.querySelector('[data-side="right"] .take-row')!
+    expect([...left.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Un-choose'])
+    expect(
+      [...right.querySelectorAll('button')].map((b) => b.textContent?.replace(/\s/g, '')),
+    ).toEqual(['DropD', 'ChooseC'])
+  })
+
+  it('never scrolls the page when D or C moves focus after the change', async () => {
+    const original = HTMLElement.prototype.focus
+    const options: (FocusOptions | undefined)[] = []
+    HTMLElement.prototype.focus = function (o?: FocusOptions) {
+      options.push(o)
+      original.call(this, o)
+    }
+    try {
+      const s = await show(view({ takes: [take(1, { chosen: true }), take(2), take(3)] }), {
+        width: 480,
+        height: 640,
+      })
+      await s.key('d')
+      await s.key('c')
+      expect(options.length).toBeGreaterThan(0)
+      expect(options.every((o) => o?.preventScroll === true)).toBe(true)
+    } finally {
+      HTMLElement.prototype.focus = original
+    }
+  })
+
+  it('draws a tall image at its own size, not enlarged', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2)] }), {
+      width: 480,
+      height: 640,
+    })
+    const imgs = [...s.container.querySelectorAll<HTMLImageElement>('[data-side] img')]
+    expect(imgs.map((i) => i.style.maxWidth)).toEqual(['480px', '480px'])
+    expect(imgs.map((i) => i.style.aspectRatio)).toEqual(['480 / 640', '480 / 640'])
+  })
+
+  it('has no buttons on the right caption with no take to compare', async () => {
+    const s = await show(view())
+    const row = s.container.querySelector('[data-side="right"] .take-row')!
+    expect(row.textContent).toBe('Comparing')
+    expect(row.querySelector('button')).toBeNull()
   })
 
   it('captions the two sides “In the game · Take N” and “Comparing · Take N” with the new chip', async () => {
@@ -1670,15 +1711,49 @@ describe('the Make frame', () => {
     expect(strip.querySelector('[aria-pressed="true"]')?.textContent).toContain('Take 3')
   })
 
-  it('has the prompt, Make takes, then at the foot What the game gets and the keys', async () => {
+  it('has the prompt, then Make takes, holding What the game gets and the keys, in the band', async () => {
     const prompt = createElement('section', { className: 'panel', 'aria-label': 'Prompt' }, 'words')
     const s = await show(view({ takes: chosenAndTwo }), chosenRow, prompt)
-    const tools = s.container.querySelector('[data-area="tools"]')!
-    expect(tools.children[0]!.getAttribute('aria-label')).toBe('Prompt')
-    expect(tools.children[1]!.getAttribute('aria-label')).toBe('Make takes')
-    const foot = tools.lastElementChild!
-    expect(foot.textContent).toContain('What the game gets')
-    expect(foot.textContent).toContain('← → takes · C choose · D drop')
+    const band = s.container.querySelector('[data-area="band"]')!
+    expect(band.children).toHaveLength(2)
+    expect(band.children[0]!.getAttribute('aria-label')).toBe('Prompt')
+    const make = band.children[1]!
+    expect(make.getAttribute('aria-label')).toBe('Make takes')
+    expect(make.textContent).toContain('What the game gets')
+    expect(make.textContent).toContain('← → takes · C choose · D drop')
+  })
+
+  it('draws each picture no wider than its own size, never enlarged', async () => {
+    const wide = await show(view({ takes: [take(1, { chosen: true }), take(2)] }), {
+      width: 1920,
+      height: 1080,
+    })
+    for (const side of ['left', 'right']) {
+      const img = wide.container.querySelector<HTMLImageElement>(`[data-side="${side}"] img`)!
+      expect(img.style.maxWidth).toBe('1920px')
+      expect(img.style.aspectRatio).toBe('1920 / 1080')
+    }
+    await wide.click(wide.container.querySelector<HTMLInputElement>('input[type="checkbox"]')!)
+    const model = wide.container.querySelector<HTMLImageElement>('[data-side="right"] img')!
+    expect(model.style.maxWidth).toBe('1024px')
+  })
+
+  it('draws a small image at its own size, with the frames of no take capped the same', async () => {
+    const small = await show(
+      view({ takes: [take(1, { chosen: true }), take(2, { look: 'old' })] }),
+      {
+        width: 320,
+        height: 200,
+      },
+    )
+    const imgs = [...small.container.querySelectorAll<HTMLImageElement>('[data-side] img')]
+    expect(imgs.map((i) => i.style.maxWidth)).toEqual(['320px', '320px'])
+    const none = await show(view(), { width: 320, height: 200 })
+    const frame = none.container.querySelector<HTMLElement>(
+      '[data-side="right"] .image-take-empty',
+    )!
+    expect(frame.style.maxWidth).toBe('320px')
+    expect(frame.style.aspectRatio).toBe('320 / 200')
   })
 
   it('offers 1 to 10 takes, starts at 4, and keeps the pick across a redraw', async () => {
@@ -1750,10 +1825,17 @@ describe('the Make frame', () => {
     )
   })
 
-  it('keeps the stage from clipping a tall side or question: it scrolls', () => {
-    const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
-    const at = css.indexOf('.image-stage-panel {')
-    expect(css.slice(at, css.indexOf('}', at))).toMatch(/overflow(-y)?:\s*auto/)
+  it('lets the page scroll for the pictures: the frame has no fixed height and the stage no clipping', () => {
+    const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    )
+    const block = (selector: string) => {
+      const at = css.indexOf(`${selector} {`)
+      return css.slice(at, css.indexOf('}', at))
+    }
+    expect(block('.image-workbench')).not.toMatch(/height|fill-height/)
+    expect(block('.image-stage-panel')).not.toMatch(/overflow/)
   })
 
   it('paints the images-lock warning inside its column, a gap from the take beside it and from the panel', () => {
