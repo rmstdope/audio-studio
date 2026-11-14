@@ -673,7 +673,8 @@ describe('createMusicTakes', () => {
     writeFileSync(board, '{ nope')
     release()
     const folder = join(root, 'content-studio/cache/music-takes/hall')
-    for (let i = 0; i < 400 && !(existsSync(folder) && readdirSync(folder).length === 0); i++) {
+    // Once the entry shows failed, the take is not kept without its place on the board.
+    for (let i = 0; i < 400 && !(await takes.making(file)).hall?.failed; i++) {
       await new Promise((r) => setTimeout(r, 5))
     }
     writeFileSync(board, text)

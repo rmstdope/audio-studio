@@ -175,7 +175,8 @@ describe.skipIf(process.getuid?.() === 0)('a take the model made but the studio 
     const text = readFileSync(board, 'utf8')
     writeFileSync(board, '{ nope')
     held.release()
-    for (let i = 0; i < 400 && !(existsSync(held.folder) && !readdirSync(held.folder).length); i++) {
+    // Once the entry shows failed, the take is not kept without its place on the board.
+    for (let i = 0; i < 400 && !(await held.takes.making(held.file)).inn?.failed; i++) {
       await new Promise((r) => setTimeout(r, 5))
     }
     writeFileSync(board, text)
