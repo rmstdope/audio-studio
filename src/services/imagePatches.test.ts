@@ -397,8 +397,15 @@ describe('takes of a declared patch', () => {
   })
 
   it("times a finished patch take under the model's own key, klein's patches apart from its takes", async () => {
+    // The clock moves only while the model makes the take, never on a read of the view.
     let clock = 0
-    const { root, file, patches, work } = setup({ now: () => (clock += 3000) })
+    const { root, file, patches, work } = setup({
+      now: () => clock,
+      makes: (request) => {
+        clock += 3000
+        return fakePng(request.width, request.height, 1)
+      },
+    })
     await patches.make(file, 'inn', 'door', { count: 1, area })
     await work()
     const times = JSON.parse(
