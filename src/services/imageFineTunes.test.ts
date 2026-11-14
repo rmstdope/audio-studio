@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { EditModelId } from '../core/imageModels'
@@ -116,6 +116,52 @@ function setup({
   const read = (path: string) => readFileSync(join(root, path), 'utf8')
   return { root, file, tunes, takes, patches, requests, settled, read }
 }
+
+describe('a fine-tune the model made but the studio cannot save', () => {
+  /** A project whose model, once it has made the picture, spoils the folder as `spoil` says. */
+  function spoiled() {
+    let spoil = () => {}
+    const made = setup({
+      makes: (request) => {
+        spoil()
+        return fakePng(request.width, request.height, 1)
+      },
+    })
+    return { ...made, onMade: (what: () => void) => (spoil = what) }
+  }
+  const pictures = (root: string) =>
+    readdirSync(join(root, FOLDER)).filter((f) => f.endsWith('.png'))
+
+  it('names the picture’s file and does not warn about the model, when the picture cannot be written', async () => {
+    const { root, file, tunes, settled, onMade } = spoiled()
+    // A folder where the picture belongs: the rename onto it is refused.
+    onMade(() => mkdirSync(join(root, FOLDER, '1.png')))
+    const quiet = console.error
+    console.error = () => {}
+    try {
+      await tunes.make(file, 'inn', { count: 1, words: 'Add a cat', area })
+      const view = await settled()
+      expect(view.failed[0]!.message).toBe(`${FOLDER}/1.png could not be written.`)
+      expect(view.failedModels).toEqual([])
+    } finally {
+      console.error = quiet
+    }
+  })
+
+  it('names the board file, removes the picture and does not warn about the model, when the board cannot be read', async () => {
+    const { root, file, tunes, settled, onMade } = spoiled()
+    const board = join(root, FOLDER, 'board.json')
+    onMade(() => writeFileSync(board, '{ nope'))
+    await tunes.make(file, 'inn', { count: 1, words: 'Add a cat', area })
+    // The view cannot be read while the board is broken: give the fake model time to be saved.
+    await new Promise((r) => setTimeout(r, 150))
+    writeFileSync(board, JSON.stringify({ next: 2 }))
+    const view = await settled()
+    expect(view.failed[0]!.message).toBe(`${FOLDER}/board.json cannot be used.`)
+    expect(view.failedModels).toEqual([])
+    expect(pictures(root)).toEqual([])
+  })
+})
 
 describe('making fine-tunes', () => {
   it('edits the whole picture of the chosen take when nothing is marked, and keeps it whole', async () => {

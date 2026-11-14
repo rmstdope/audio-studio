@@ -133,61 +133,64 @@ describe.skipIf(process.getuid?.() === 0)('a board that cannot be written', () =
   })
 })
 
-describe.skipIf(process.getuid?.() === 0)('a take the model made but the studio cannot save', () => {
-  /** Holds the model at its picture, so the board can be spoiled once the picture is made. */
-  async function heldAtTheBoard() {
-    let release = () => {}
-    const gate = new Promise<void>((resolve) => (release = resolve))
-    const made = setup(undefined, {}, gate)
-    await made.takes.make(made.file, 'inn', { count: 1 })
-    const folder = join(made.root, 'content-studio/cache/image-takes/inn')
-    const failedOf = async () => {
-      const view = await made.settled('inn')
-      if (!view || !('failed' in view)) throw new Error('no view')
-      return view
+describe.skipIf(process.getuid?.() === 0)(
+  'a take the model made but the studio cannot save',
+  () => {
+    /** Holds the model at its picture, so the board can be spoiled once the picture is made. */
+    async function heldAtTheBoard() {
+      let release = () => {}
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const made = setup(undefined, {}, gate)
+      await made.takes.make(made.file, 'inn', { count: 1 })
+      const folder = join(made.root, 'content-studio/cache/image-takes/inn')
+      const failedOf = async () => {
+        const view = await made.settled('inn')
+        if (!view || !('failed' in view)) throw new Error('no view')
+        return view
+      }
+      return { ...made, release, folder, failedOf }
     }
-    return { ...made, release, folder, failedOf }
-  }
 
-  it('names the board file, removes the picture and does not blame the model, when the board cannot be written', async () => {
-    const held = await heldAtTheBoard()
-    const boards = join(held.root, 'content-studio/cache/images')
-    chmodSync(boards, 0o555)
-    const quiet = console.error
-    console.error = () => {}
-    try {
+    it('names the board file, removes the picture and does not blame the model, when the board cannot be written', async () => {
+      const held = await heldAtTheBoard()
+      const boards = join(held.root, 'content-studio/cache/images')
+      chmodSync(boards, 0o555)
+      const quiet = console.error
+      console.error = () => {}
+      try {
+        held.release()
+        const view = await held.failedOf()
+        expect(view.failed.map((f) => f.message)).toEqual([
+          'content-studio/cache/images/inn.json could not be written.',
+        ])
+        expect(view.models.every((m) => !m.failed)).toBe(true)
+      } finally {
+        console.error = quiet
+        chmodSync(boards, 0o755)
+      }
+      expect(readdirSync(held.folder)).toEqual([])
+    })
+
+    it('names the board file, removes the picture and does not blame the model, when the board cannot be read', async () => {
+      const held = await heldAtTheBoard()
+      const board = join(held.root, 'content-studio/cache/images/inn.json')
+      const text = readFileSync(board, 'utf8')
+      writeFileSync(board, '{ nope')
       held.release()
+      // Once the entry shows failed, the take is not kept without its place on the board.
+      for (let i = 0; i < 400 && !(await held.takes.making(held.file)).inn?.failed; i++) {
+        await new Promise((r) => setTimeout(r, 5))
+      }
+      writeFileSync(board, text)
       const view = await held.failedOf()
       expect(view.failed.map((f) => f.message)).toEqual([
-        'content-studio/cache/images/inn.json could not be written.',
+        'content-studio/cache/images/inn.json cannot be used.',
       ])
       expect(view.models.every((m) => !m.failed)).toBe(true)
-    } finally {
-      console.error = quiet
-      chmodSync(boards, 0o755)
-    }
-    expect(readdirSync(held.folder)).toEqual([])
-  })
-
-  it('names the board file, removes the picture and does not blame the model, when the board cannot be read', async () => {
-    const held = await heldAtTheBoard()
-    const board = join(held.root, 'content-studio/cache/images/inn.json')
-    const text = readFileSync(board, 'utf8')
-    writeFileSync(board, '{ nope')
-    held.release()
-    // Once the entry shows failed, the take is not kept without its place on the board.
-    for (let i = 0; i < 400 && !(await held.takes.making(held.file)).inn?.failed; i++) {
-      await new Promise((r) => setTimeout(r, 5))
-    }
-    writeFileSync(board, text)
-    const view = await held.failedOf()
-    expect(view.failed.map((f) => f.message)).toEqual([
-      'content-studio/cache/images/inn.json cannot be used.',
-    ])
-    expect(view.models.every((m) => !m.failed)).toBe(true)
-    expect(readdirSync(held.folder)).toEqual([])
-  })
-})
+      expect(readdirSync(held.folder)).toEqual([])
+    })
+  },
+)
 
 describe('making takes', () => {
   it('makes takes one after another from the whole prompt, at the take size, and lists them', async () => {

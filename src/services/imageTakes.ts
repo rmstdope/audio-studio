@@ -515,21 +515,23 @@ export function createImageTakes({
         // Marked before it is on the board, so the page never sees it between made and brought.
         const mark = `${found.key}\0${take.n}`
         bringing.add(mark)
-        const saved = await engine.save(found.projectFile, found.id, accessOf(found), {
-          root: found.root,
-          path: pictureOf(found.id, take.n),
-          bytes: generated.png,
-          stop,
-          change(board) {
-            board.takes = [...board.takes.filter((t) => t.n !== take.n), take].sort(
-              (a, b) => a.n - b.n,
-            )
-          },
-          cleanup: () => bringing.delete(mark),
-        }).catch((error: unknown) => {
-          bringing.delete(mark)
-          throw error
-        })
+        const saved = await engine
+          .save(found.projectFile, found.id, accessOf(found), {
+            root: found.root,
+            path: pictureOf(found.id, take.n),
+            bytes: generated.png,
+            stop,
+            change(board) {
+              board.takes = [...board.takes.filter((t) => t.n !== take.n), take].sort(
+                (a, b) => a.n - b.n,
+              )
+            },
+            cleanup: () => bringing.delete(mark),
+          })
+          .catch((error: unknown) => {
+            bringing.delete(mark)
+            throw error
+          })
         if (!saved) return
         made = { n: take.n, took }
       },
