@@ -52,6 +52,7 @@ import {
 import { progressOf } from '../../musicTakesText'
 import { off } from '../../off'
 import { EditModelMenu } from './EditModelMenu'
+import { Problems } from '../../components/Problems'
 import { scrollWithin } from '../../scrollWithin'
 
 /** How many fine-tunes one press can make. */
@@ -251,6 +252,8 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
       : null
   if (came && !cameHere) setCame(null)
   keys.current = () => {}
+  if (query.data && !('picture' in query.data))
+    return <Problems title="The takes could not be listed" problems={query.data.problems} />
   if (!view)
     return (
       <section className="panel fine-tune" aria-label="Fine-tune the picture">

@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { FineTunesView } from '../../../core/imageFineTunes'
 import type { ImageRow } from '../../../core/images'
+import type { ProjectFailure } from '../../../services/workspace'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -47,7 +48,7 @@ const view = (over: Partial<FineTunesView> = {}): FineTunesView => ({
 
 /** Renders the panel of image `inn` over a server answering `current()` and every change `posted`. */
 async function render(
-  current: () => FineTunesView,
+  current: () => FineTunesView | ProjectFailure,
   posted: { status: number; body: unknown } = { status: 200, body: { ok: true } },
   takes: () => unknown = () => ({}),
   open = true,
@@ -141,6 +142,17 @@ const wordsBox = (host: Element) => host.querySelector<HTMLTextAreaElement>('tex
 const cards = (host: Element) => [...host.querySelectorAll<HTMLElement>('.fine-card')]
 
 describe('the states of the panel', () => {
+  it('says the takes could not be listed, naming the file and the problem, when the board cannot be read', async () => {
+    const file = 'content-studio/cache/image-fine-tunes/inn/board.json'
+    const { host } = await render(() => ({
+      ok: false,
+      file,
+      problems: [{ file, path: '', message: 'not valid JSON' }],
+    }))
+    expect(text(host)).toBe(`The takes could not be listed ${file} : not valid JSON`)
+    expect(host.querySelector('textarea')).toBeNull()
+  })
+
   it('says only that there is no picture when there is none', async () => {
     const { host } = await render(() => view({ picture: { kind: 'none' } }))
     expect(text(host)).toBe(
