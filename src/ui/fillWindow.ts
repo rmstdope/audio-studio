@@ -108,7 +108,18 @@ export function useFillWindow(): (element: HTMLElement | null) => void {
       )
     update()
     window.addEventListener('resize', update)
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    // A size seen by the observer is acted on in the next frame, never inside its delivery: the new
+    // height resizes the body it watches, and a box resized inside its own delivery is refused
+    // ("ResizeObserver loop completed with undelivered notifications", as-tp58).
+    let frame = 0
+    const later = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        update()
+      })
+    }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(later)
     // The boxes before the frame come and go (a notice, a failure line): each is watched while it
     // is there, and a change of what is there asks again, since the body, at least a window tall,
     // does not change size when a box that filled it goes away.
@@ -129,6 +140,7 @@ export function useFillWindow(): (element: HTMLElement | null) => void {
       window.removeEventListener('resize', update)
       observer?.disconnect()
       mutations.disconnect()
+      cancelAnimationFrame(frame)
     }
   }, [])
 }
