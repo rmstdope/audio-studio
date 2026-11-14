@@ -142,6 +142,13 @@ const wordsBox = (host: Element) => host.querySelector<HTMLTextAreaElement>('tex
 const cards = (host: Element) => [...host.querySelectorAll<HTMLElement>('.fine-card')]
 
 describe('the states of the panel', () => {
+  it('says the takes could not be loaded when the board cannot be fetched', async () => {
+    const { host } = await render(() => {
+      throw new Error('the server went away')
+    })
+    expect(text(host)).toBe('The takes could not be loaded.')
+  })
+
   it('says the takes could not be listed, naming the file and the problem, when the board cannot be read', async () => {
     const file = 'content-studio/cache/image-fine-tunes/inn/board.json'
     const { host } = await render(() => ({
