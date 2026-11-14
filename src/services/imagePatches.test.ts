@@ -10,10 +10,12 @@ import {
   type PatchWorkView,
 } from '../core/imagePatches'
 import { createImagePatches } from './imagePatches'
+import { changePatchBoard } from './imagePatchGame'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { fakePng } from './imagesFake'
 import { cropPixels, editWindow } from '../core/imagePixels'
 import { decodePng, encodePng, encodeTransparentPng } from './png'
+import { GPU } from './gpu'
 import { createSerial, type Serial } from './serial'
 
 const images = {
@@ -1410,5 +1412,51 @@ describe('remaking patches on a new take', () => {
     release()
     await new Promise((r) => setTimeout(r, 30))
     expect(requests).toHaveLength(0)
+  })
+})
+
+describe('a patch board changed from two places', () => {
+  it('loses neither a take finishing nor a change of another module under way at the same time', async () => {
+    const queue = createSerial()
+    const { root, file, patches, work } = setup({ queue })
+    // The GPU is busy, so the take waits after its numbers are reserved.
+    let freeGpu!: () => void
+    const gpuBusy = new Promise<void>((resolve) => (freeGpu = resolve))
+    void queue.run(GPU, () => gpuBusy)
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    // The other module's change is in its turn on the board, and waits there.
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const other = changePatchBoard(
+      { projectFile: file, root, image: 'inn', patch: 'door' },
+      async (board) => {
+        await held
+        board.inGame['9'] = 9
+      },
+    )
+    freeGpu()
+    // The take's picture is written before its board change, which then waits for the other's turn.
+    for (let i = 0; i < 200 && !existsSync(join(root, FOLDER, '1.png')); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    release()
+    await other
+    await work()
+    const board = JSON.parse(readFileSync(join(root, BOARD), 'utf8'))
+    expect(board.takes.map((t: { n: number }) => t.n)).toEqual([1])
+    expect(board.inGame).toEqual({ '9': 9 })
+  })
+})
+
+describe('a take whose time cannot be kept', () => {
+  it('stays on the board and is not shown as failed', async () => {
+    const { root, file, patches, work } = setup()
+    // A folder where the timings file should be: the write is refused.
+    mkdirSync(join(root, 'content-studio/cache/take-times.json'), { recursive: true })
+    await patches.make(file, 'inn', 'door', { count: 1, area })
+    const view = await work()
+    expect(view.takes.map((t) => t.n)).toEqual([1])
+    expect(view.failed).toEqual([])
   })
 })

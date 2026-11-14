@@ -114,6 +114,24 @@ describe('the take engine', () => {
     expect(ran).toBe(false)
   })
 
+  it('stops only the named takes that are waiting or being made, and says how many', async () => {
+    const { engine, access, entry } = setup()
+    const [one, two, three] = (await engine.reserve('p', 'x', access, 3, entry)) as TakeEntry[]
+    three!.state = 'failed'
+    expect(engine.stopTakes('p', 'x', [2, 3, 9])).toBe(1)
+    expect(engine.entriesOf('p', 'x').map((e) => e.n)).toEqual([1, 3])
+    expect(one!.n).toBe(1)
+    expect(two!.n).toBe(2)
+  })
+
+  it('discards the named takes whatever their state, failed ones too, and says how many', async () => {
+    const { engine, access, entry } = setup()
+    const [, , three] = (await engine.reserve('p', 'x', access, 3, entry)) as TakeEntry[]
+    three!.state = 'failed'
+    expect(engine.discardTakes('p', 'x', [1, 3, 9])).toBe(2)
+    expect(engine.entriesOf('p', 'x').map((e) => e.n)).toEqual([2])
+  })
+
   it('stops every list of one project and no other project', async () => {
     const { engine, access, entry } = setup()
     await engine.reserve('p', 'x', access, 1, entry)

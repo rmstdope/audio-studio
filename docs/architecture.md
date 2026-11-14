@@ -143,7 +143,7 @@ content-studio/
 │   │                       fish.ts, elevenlabs.ts, transcriber.ts, audio.ts (ffmpeg); music.ts,
 │   │                       stableAudio.ts, elevenMusic.ts and musicTakes.ts; images.ts (mflux) and
 │   │                       imageTakes.ts; effects.ts and effectTakes.ts; takeEngine.ts (what music's,
-│   │                       effects' and fine-tunes' takes share: the entries being made, the board's turns, Stop); scenes.ts and
+│   │                       effects', patches' and fine-tunes' takes share: the entries being made, the board's turns, Stop); scenes.ts and
 │   │                       sceneLoudness.ts; refresh.ts (the game's commands), git.ts, setup.ts
 │   ├── server/             Bun.serve (index.ts: composes the routes, the static UI); context.ts (what
 │   │                       the routes share: generators, queues, guards); shared.ts (request bodies and the small helpers the routes share);
@@ -190,7 +190,7 @@ Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows
 imports from the others, so the rules for status, staleness and alignment are tested without
 audio, network or disk.
 
-The takes of music, of sound effects and the fine-tunes of an image share one engine, `services/takeEngine.ts` (as-viyc): the entries
+The takes of music, of sound effects, of image patches and the fine-tunes of an image share one engine, `services/takeEngine.ts` (as-viyc): the entries
 waiting, being made and failed (in memory, on `globalThis`, so a `--dev` reload keeps them), the numbers
 reserved on a board, the one-at-a-time changes to a board, Stop, the summary of what is being made and the
 split a view makes of the entries against the board. A medium gives it a board's reader and writer and the
@@ -198,7 +198,7 @@ job that makes one take, and keeps what differs: its generator, its hash, its pr
 effects, per list for music) and what choosing, trimming and fading do to the game's files. A fix to how takes
 are queued, made or shown is made there once. A fine-tune keeps its own batches (a press makes the
 fine-tunes of the picture in the game, one press at a time) and waits on the GPU queue as waiting, so its job
-tells the engine when the model starts (`queued`, `began`). Images' takes and patches still have their own.
+tells the engine when the model starts (`queued`, `began`). Image patches (as-b45w) use it with the id `<image>\0<patch>` and keep their remake presses and the failed-model warnings. Images' own takes still have their own.
 
 ---
 
