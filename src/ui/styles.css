@@ -3297,7 +3297,7 @@ button.cue-chip[aria-expanded='true'] {
   margin: 0;
 }
 /* The picture as wide as its column, but no taller than its track: a portrait picture is fitted to
-   the height (`.fit-shape`). */
+   the height (`.fit-shape`). Patches overrides the width cap (`.patch-picture > .patch-stage`). */
 .patch-stage {
   position: relative;
   max-width: 1024px;

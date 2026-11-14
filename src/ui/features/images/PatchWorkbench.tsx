@@ -1,6 +1,7 @@
 import { fieldOwnsKeys, usePendingFocus } from './useWorkbenchKeys'
 import { useAfterSaved } from '../../useAfterSaved'
 import { useJobOpen } from './ImageJobTabs'
+import { cropWindow } from '../../../core/imagePixels'
 import { pictureShape } from './FitPicture'
 import {
   useEffect,
@@ -289,6 +290,9 @@ export function PatchWorkbench({
   }
 
   const space = game ? gameSpace(take, view.game) : modelSpace(take)
+  // The picture's own pixels: the take's, or in the game view the part of it the game keeps, so a
+  // cropped take is never enlarged and a mark sits at one scale in both views.
+  const pictureWidth = game ? cropWindow(take, view.game).width : take.width
   const version = tag(`${view.lookKey ?? ''}${take.n}`)
   const image = encodeURIComponent(imageId)
   const patch = encodeURIComponent(patchId)
@@ -509,7 +513,7 @@ export function PatchWorkbench({
     <>
       <div
         className="patch-picture"
-        style={{ ...pictureShape(space.width, space.height), maxWidth: take.width }}
+        style={{ ...pictureShape(space.width, space.height), maxWidth: pictureWidth }}
       >
         {game && (lookError !== null || shown?.look === 'bringing' || shown?.look === 'missing') ? (
           <div

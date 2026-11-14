@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { cropWindow } from '../../../core/imagePixels'
 import type { ImagePatchesView, PatchWorkView } from '../../../core/imagePatches'
 import type { ImageRow, PatchRow } from '../../../core/images'
 
@@ -1567,7 +1568,9 @@ describe('the three parts of an open patch', () => {
       )
       const box = host.querySelector<HTMLElement>('.patch-picture')!
       expect(box.querySelector('.patch-stage')).not.toBeNull()
-      expect(box.style.maxWidth).toBe(`${size.width}px`)
+      // The game keeps the middle of the take in its own shape, at the take's own scale.
+      const kept = cropWindow(size, { width: 320, height: 200 })
+      expect(box.style.maxWidth).toBe(`${kept.width}px`)
       expect(box.style.getPropertyValue('--picture-ratio')).toBe(String(320 / 200))
       expect(host.querySelector('.fit-shape, .fit-picture')).toBeNull()
     })
@@ -1588,6 +1591,22 @@ describe('the three parts of an open patch', () => {
     )
     expect(box().style.maxWidth).toBe('1024px')
     expect(box().style.getPropertyValue('--picture-ratio')).toBe(String(1024 / 640))
+  })
+
+  it('keeps a cropped take at its own scale in the game view, never enlarged past its pixels (as-uucl.3)', async () => {
+    const { host } = await render([patchRow('a')], () =>
+      view([work('a', { takes: [takeOf(1)] })], {
+        take: { n: 3, width: 1024, height: 512, cropped: true },
+        game: { width: 320, height: 200 },
+      }),
+    )
+    await open(host)
+    // The game keeps the middle 819 × 512 of the take, shown at one screen pixel per take pixel.
+    expect(host.querySelector<HTMLElement>('.patch-picture')!.style.maxWidth).toBe('819px')
+    await act(async () =>
+      host.querySelector<HTMLInputElement>('.patch-takes input[type=checkbox]')!.click(),
+    )
+    expect(host.querySelector<HTMLElement>('.patch-picture')!.style.maxWidth).toBe('1024px')
   })
 
   it('gives the placeholder the box the picture will take (as-uucl.3)', async () => {
