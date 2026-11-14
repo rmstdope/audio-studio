@@ -24,15 +24,25 @@ export function HistoryMenu({
   const [seen, setSeen] = useState({ resetKey, active })
   const button = useRef<HTMLButtonElement>(null)
   const box = useRef<HTMLDivElement>(null)
+  const refocus = useRef(false)
   // A new picture, or a tab put away, ends the popover before it can show a list that is not this one's.
   if (seen.resetKey !== resetKey || seen.active !== active) {
     setSeen({ resetKey, active })
-    if (open) setOpen(false)
+    if (open) {
+      refocus.current = box.current?.contains(document.activeElement) ?? false
+      setOpen(false)
+    }
   }
   const close = () => {
     setOpen(false)
     button.current?.focus({ preventScroll: true })
   }
+  // Focus that was inside the list when another picture closed it goes back to the button, not to the page.
+  useEffect(() => {
+    if (open || !refocus.current) return
+    refocus.current = false
+    button.current?.focus({ preventScroll: true })
+  }, [open])
   useEffect(() => {
     if (!open) return
     const now = box.current?.querySelector<HTMLElement>('[data-now="true"]')
@@ -44,7 +54,7 @@ export function HistoryMenu({
       event.preventDefault()
       close()
     }
-    const onPress = (event: MouseEvent) => {
+    const onPress = (event: PointerEvent) => {
       const target = event.target
       if (
         target instanceof Node &&
@@ -54,10 +64,11 @@ export function HistoryMenu({
       setOpen(false)
     }
     document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onPress)
+    // Pointer events, in the capture phase: the picture's own handler stops the mouse events after a press.
+    document.addEventListener('pointerdown', onPress, true)
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onPress)
+      document.removeEventListener('pointerdown', onPress, true)
     }
   }, [open])
   return (

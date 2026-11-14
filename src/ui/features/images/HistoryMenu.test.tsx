@@ -78,7 +78,7 @@ describe('the History button', () => {
     expect(document.activeElement).toBe(toggle(host))
     await act(async () => toggle(host).click())
     await act(async () =>
-      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })),
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })),
     )
     expect(host.querySelector('.history-popover')).toBeNull()
     await act(async () => toggle(host).click())
@@ -101,5 +101,45 @@ describe('the History button', () => {
     await act(async () => toggle(host).click())
     await rerender({ active: false })
     expect(host.querySelector('.history-popover')).toBeNull()
+  })
+
+  it('closes on a press whose own element stops it from bubbling or prevents the mouse events', async () => {
+    const { host } = await render()
+    const picture = document.createElement('div')
+    picture.addEventListener('pointerdown', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+    })
+    document.body.append(picture)
+    cleanups.push(() => picture.remove())
+    await act(async () => toggle(host).click())
+    await act(async () => picture.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })))
+    expect(host.querySelector('.history-popover')).toBeNull()
+  })
+
+  it('puts focus back on the button when another picture closes it while focus is inside', async () => {
+    const { host, rerender } = await render()
+    await act(async () => toggle(host).click())
+    expect(document.activeElement?.id).toBe('now')
+    await rerender({ resetKey: 'take-2' })
+    expect(document.activeElement).toBe(toggle(host))
+  })
+
+  it('opens scrolled so the step in the game is in view', async () => {
+    const rect = HTMLElement.prototype.getBoundingClientRect
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const box = (top: number, bottom: number) =>
+        ({ left: 0, right: 100, top, bottom, width: 100, height: bottom - top }) as DOMRect
+      if (this.classList.contains('history-popover')) return box(0, 100)
+      if (this.id === 'now') return box(300, 320)
+      return rect.call(this)
+    }
+    try {
+      const { host } = await render()
+      await act(async () => toggle(host).click())
+      expect(host.querySelector('.history-popover')!.scrollTop).toBe(220)
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = rect
+    }
   })
 })

@@ -936,14 +936,40 @@ describe('History and Undo', () => {
       focus.call(this, options)
     }
     try {
-      await act(async () => button(host, 'Drop D')!.click())
+      await type(wordsBox(host), 'Add a cat')
+      await act(async () => button(host, 'Make 4 fine-tunes')!.click())
+      await settle()
+      expect(quiet.length).toBeGreaterThan(0)
+      expect(quiet.every((q) => q === true)).toBe(true)
+      quiet.length = 0
       await act(async () => await new Promise((r) => setTimeout(r, 1050)))
       await act(async () => button(host, 'Drop D')!.click())
       await settle()
+      expect(quiet.length).toBeGreaterThan(0)
+      expect(quiet.every((q) => q === true)).toBe(true)
     } finally {
       HTMLElement.prototype.focus = focus
     }
-    expect(quiet.length).toBeGreaterThan(0)
-    expect(quiet.every((q) => q === true)).toBe(true)
+  })
+
+  it('turns the steps in the popover off with the reason while the style needs fixing or the lock is unreadable', async () => {
+    for (const [over, why] of [
+      [
+        { lookError: 'The style is broken.' },
+        'The style needs fixing first. Fix it to choose this take.',
+      ],
+      [{ lockUnread: true }, IMAGES_LOCK_WHY],
+    ] as const) {
+      const { host } = await render(
+        () => view({ picture: picture(8) }),
+        undefined,
+        () => takesView(8, CHAIN, over),
+      )
+      await openHistory(host)
+      const picks = [...host.querySelectorAll<HTMLElement>('.history-pick')]
+      expect(picks.length).toBe(2)
+      expect(picks.every(isOff)).toBe(true)
+      expect(picks.every((p) => p.getAttribute('data-why') === why)).toBe(true)
+    }
   })
 })
