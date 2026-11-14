@@ -1,0 +1,412 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Named areas, full width</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --edge: rgb(255 255 255/8%);
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: rgb(255 255 255/7%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok-bg: #10291f;
+        --ok-ink: #5be3ae;
+        --att-ink: #ffb38f;
+        --att-bg: rgb(255 122 61/10%);
+        --att-line: rgb(255 122 61/25%);
+        --chip: #1a1d26;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 -apple-system,
+          system-ui,
+          sans-serif;
+      }
+      .app {
+        display: flex;
+        min-height: 100vh;
+      }
+      .sidebar {
+        flex: 0 0 212px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        padding: 16px 10px;
+        border-right: 1px solid var(--edge);
+        background: rgb(10 11 18/55%);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .sidebar b {
+        display: block;
+        color: var(--text);
+        margin: 0 0 14px 6px;
+      }
+      .sidebar div {
+        padding: 6px 8px;
+        border-radius: 8px;
+      }
+      .sidebar .on {
+        background: var(--raised);
+        color: var(--text);
+      }
+      .content {
+        flex: 1;
+        min-width: 0;
+        padding: 20px 24px 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .note {
+        background: #1f1936;
+        color: #c4b5ff;
+        border: 1px dashed #5a4a9a;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+      }
+      .tab {
+        padding: 7px 14px;
+        border-radius: 9px;
+        background: var(--raised);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .tab.on {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+        box-shadow: inset 0 0 0 1px #5a3218;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--edge);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        background: var(--chip);
+        color: var(--soft);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok-ink);
+      }
+      .chip.att {
+        background: var(--att-bg);
+        color: var(--att-ink);
+        box-shadow: inset 0 0 0 1px var(--att-line);
+      }
+      .btn {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 8px;
+        background: var(--raised);
+        color: var(--text);
+        border: 1px solid var(--line);
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .sw {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .sw.off {
+        color: var(--faint);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 12px;
+      }
+      .stage {
+        position: relative;
+        width: 100%;
+        max-width: 1536px;
+        aspect-ratio: 3/2;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #222;
+      }
+      .stage svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .box {
+        position: absolute;
+        border: 2px solid rgb(255 255 255/75%);
+        border-radius: 4px;
+      }
+      .box span {
+        position: absolute;
+        top: -22px;
+        left: -2px;
+        background: rgb(0 0 0/70%);
+        padding: 1px 7px;
+        border-radius: 5px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .box.sel {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 9999px rgb(0 0 0/0);
+      }
+      .box.sel span {
+        background: var(--accent);
+        color: #1a0a02;
+      }
+      .box i {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+        left: calc(50% - 5px);
+        top: calc(60% - 5px);
+        box-shadow: 0 0 0 2px #fff;
+      }
+      .cap {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .sizeTag {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        background: rgb(0 0 0/65%);
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        color: var(--soft);
+      }
+      .areachip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 6px 5px 12px;
+        border-radius: 10px;
+        background: var(--raised);
+        border: 1px solid var(--line);
+        cursor: pointer;
+      }
+      .areachip.sel {
+        border-color: var(--accent);
+        background: var(--accent-soft-bg);
+      }
+      .areachip b {
+        font-weight: 600;
+      }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        overflow: auto;
+      }
+      .list li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--raised);
+        border: 1px solid var(--line);
+      }
+      .list li.sel {
+        border-color: var(--accent);
+        background: var(--accent-soft-bg);
+      }
+      .list li .t {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .sticky {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--panel);
+        padding: 8px 0;
+      }
+    </style>
+    <style>
+      .panel {
+        overflow: visible;
+      }
+      .sticky {
+        top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <nav class="sidebar">
+        <b>Content Studio</b>
+        <div>Narration</div>
+        <div>Music</div>
+        <div class="on">Images</div>
+        <div>Sound effects</div>
+        <div>Scenes</div>
+      </nav>
+      <main class="content">
+        <div class="note">
+          Agreed (as-uucl.4): the areas are a wrapping row above the picture, with “Hearth:” Centre
+          the point and Clear for the chosen area at its end, and the patch switches and Hold S
+          under it. That bar stays pinned at the top of the window while you scroll. The picture
+          takes the panel’s whole width, up to its own size and never larger, and the page scrolls
+          when it is taller than the window. The caption stays under the picture.
+        </div>
+        <h1>The lantern hall</h1>
+        <div class="tabs">
+          <span class="tab">Make · Take 3</span><span class="tab">Fine-tune</span
+          ><span class="tab">Patches · 1 of 2</span><span class="tab on">Named areas · 4 of 9</span>
+        </div>
+        <section class="panel" id="panel">
+          <div class="row">
+            <b style="font-size: 16px">Named areas</b><span class="muted">4 of 9 placed</span>
+          </div>
+          <p style="margin: 0; color: var(--att-ink); font-size: 13px">
+            Placed on an earlier take of the image, so the game does not use it now. Place it here,
+            or choose take 2 again to bring it back.
+          </p>
+          <div
+            class="sticky"
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              border-bottom: 1px solid var(--line);
+            "
+          >
+            <div class="row">
+              <span class="areachip"><b>Table</b><span class="chip ok">Placed</span></span
+              ><span class="areachip sel"><b>Hearth</b><span class="chip ok">Placed</span></span
+              ><span class="areachip"><b>Lantern</b><span class="chip att">To place</span></span
+              ><span class="areachip"><b>Window</b><span class="chip ok">Placed</span></span
+              ><span class="areachip"
+                ><b>Cellar hatch</b><span class="chip att">Place again</span></span
+              ><span class="areachip"><b>Bench</b><span class="chip att">To place</span></span
+              ><span class="areachip"><b>Barrel</b><span class="chip ok">Placed</span></span
+              ><span class="areachip"><b>Coat rack</b><span class="chip att">To place</span></span
+              ><span class="areachip"><b>Back door</b><span class="chip att">To place</span></span
+              ><span style="flex: 1"></span><span class="muted">Hearth:</span
+              ><span class="btn">Centre the point</span><span class="btn">Clear</span>
+            </div>
+            <div class="row">
+              <span class="muted">Patches on the picture</span
+              ><label class="sw"><input type="checkbox" checked /> Bread taken</label
+              ><span class="sw off" title="No take chosen yet">Fire out</span
+              ><span class="muted" style="margin-left: auto">Hold S to hide the areas</span>
+            </div>
+          </div>
+          <div class="stage" id="stage">
+            <svg viewBox="0 0 1536 1024" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="w" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#3a2a22" />
+                  <stop offset="1" stop-color="#1a1210" />
+                </linearGradient>
+                <radialGradient id="f" cx=".5" cy=".6" r=".5">
+                  <stop offset="0" stop-color="#ffb347" />
+                  <stop offset="1" stop-color="#ff5a1f" stop-opacity="0" />
+                </radialGradient>
+              </defs>
+              <rect width="1536" height="1024" fill="url(#w)" />
+              <rect y="700" width="1536" height="324" fill="#2a1d16" />
+              <g fill="#4a372c">
+                <rect x="80" y="60" width="18" height="640" />
+                <rect x="260" y="60" width="18" height="640" />
+                <rect x="440" y="60" width="18" height="640" />
+                <rect x="620" y="60" width="18" height="640" />
+                <rect x="800" y="60" width="18" height="640" />
+                <rect x="980" y="60" width="18" height="640" />
+                <rect x="1160" y="60" width="18" height="640" />
+                <rect x="1340" y="60" width="18" height="640" />
+                <rect x="1520" y="60" width="18" height="640" />
+              </g>
+              <rect
+                x="1060"
+                y="380"
+                width="360"
+                height="320"
+                fill="#120c0a"
+                stroke="#5a4438"
+                stroke-width="14"
+              />
+              <ellipse cx="1240" cy="640" rx="150" ry="90" fill="url(#f)" />
+              <rect x="300" y="620" width="620" height="40" fill="#6b4a33" />
+              <rect x="330" y="660" width="24" height="200" fill="#4a3324" />
+              <rect x="866" y="660" width="24" height="200" fill="#4a3324" />
+              <ellipse cx="560" cy="610" rx="70" ry="22" fill="#c9a26b" />
+              <rect x="700" y="570" width="40" height="50" fill="#9aa" />
+              <line x1="610" y1="0" x2="610" y2="210" stroke="#555" stroke-width="4" />
+              <rect x="580" y="210" width="60" height="80" rx="10" fill="#ffcf6b" />
+              <circle cx="610" cy="250" r="60" fill="#ffcf6b" opacity=".18" />
+            </svg>
+            <div class="box" style="left: 19.5%; top: 55%; width: 40.5%; height: 30%">
+              <span>Table</span><i></i>
+            </div>
+            <div class="box sel" style="left: 69%; top: 37%; width: 23.5%; height: 31.5%">
+              <span>Hearth</span><i></i>
+            </div>
+            <span class="sizeTag">shown at its own size at most: 1536 × 1024</span>
+          </div>
+          <p class="cap" style="margin: 0">
+            Take 3 · drag the box to move it, or its corners and sides to resize it. Drag the point
+            to choose where What’s there marks it. Arrow keys move the box; with Shift they resize
+            it; with Alt they move the point.
+          </p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
