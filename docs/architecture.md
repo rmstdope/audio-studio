@@ -200,6 +200,8 @@ are queued, made or shown is made there once. A fine-tune keeps its own batches 
 fine-tunes of the picture in the game, one press at a time) and waits on the GPU queue as waiting, so its job
 tells the engine when the model starts (`queued`, `began`). Image patches (as-b45w) use it with the id `<image>\0<patch>` and keep their remake presses and the failed-model warnings. Images' own takes (as-tur0) use it with the image's id and keep their presses (per act).
 
+Saving a made take is the engine's too (`save`, as-3za7): the file first, through `writeOrRefuse`, then the board in its turn, and the file is removed again when the take was stopped or could not be saved. A take whose file or board cannot be written, or whose board cannot be read after its file (`BoardUnusable`), shows failed with the file named, but is never reported to the medium's model-failure hook: only the model's own failures record a failed model, move to a fallback or warn on the page.
+
 ---
 
 ## 5. The project file

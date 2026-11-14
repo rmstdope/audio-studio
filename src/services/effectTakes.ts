@@ -49,7 +49,7 @@ import type { EffectGenerator } from './effects'
 import type { EffectHealthStore } from './effectHealth'
 import { gpuInUse, gpuQueue, GPU, holdGpu } from './gpu'
 import { createTakeEngine, type BoardAccess, type TakeEntry } from './takeEngine'
-import { WriteRefused, refusalAnswer, refusalSentence, writeAtomic, writeOrRefuse } from './files'
+import { refusalAnswer, refusalSentence, writeAtomic, writeOrRefuse } from './files'
 import type { CommitResult } from './musicClips'
 import { createSerial, type Serial } from './serial'
 import { MAKE_ALL_TAKES, type EffectBatch } from '../core/effectsMakeAll'
@@ -210,13 +210,6 @@ function playedOf(take: EffectBoardTake, bytes: Uint8Array) {
 const modelName = (id: string) =>
   (EFFECT_MODEL_IDS as readonly string[]).includes(id) ? effectModel(id as EffectModelId).name : id
 
-/** A take's board that could not be read after its WAV was written: no news of the model. */
-class BoardUnusable extends Error {
-  constructor(file: string) {
-    super(`${file} cannot be used`)
-  }
-}
-
 /**
  * The takes of the game's sound effects: made by `generator` one at a time (the CPU), each ending
  * where its sound ends, and kept on a board per effect in `content-studio/cache/effect-boards/<effect>.json`
@@ -361,35 +354,23 @@ export function createEffectTakes({
           inputs,
           ...(shaped?.quietAt != null && { quietAt: shaped.quietAt }),
         }
-        // The file first: a take is on the board only once its WAV is there.
-        await writeOrRefuse(found.root, `${found.folder}/${fileOf(made)}`, bytes)
-        const saved = await changeBoard(projectFile, found, async (board) => {
-          // A stopped take is no news of the model: its last failure stays.
-          if (stop.aborted) return
-          // The model worked: its failure is cleared before the take shows, so a page that sees the
-          // take made sees the model well too.
-          await health?.clear(projectFile, entry.model).catch(() => {})
-          if (stop.aborted) return
-          board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort(
-            (a, b) => a.n - b.n,
-          )
+        await engine.save(projectFile, found.id, accessOf(found), {
+          root: found.root,
+          path: `${found.folder}/${fileOf(made)}`,
+          bytes,
+          stop,
+          async change(board) {
+            // The model worked: its failure is cleared before the take shows, so a page that sees the
+            // take made sees the model well too.
+            await health?.clear(projectFile, entry.model).catch(() => {})
+            if (stop.aborted) return
+            board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort(
+              (a, b) => a.n - b.n,
+            )
+          },
         })
-        if (stop.aborted) {
-          await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
-          return
-        }
-        if (saved && 'ok' in saved) throw new BoardUnusable(saved.file)
       },
-      async failed(error) {
-        // The model made the take; only its file or its board could not be saved, or its board could not be read
-        // once the WAV was, which is no news of the model.
-        if (error instanceof WriteRefused || error instanceof BoardUnusable) {
-          if (error instanceof WriteRefused) console.error('saving the take failed', error)
-          await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(entry)}`), {
-            force: true,
-          }).catch(() => {})
-          return
-        }
+      async failed() {
         const last = entry.message.split('\n').filter(Boolean).pop() ?? entry.message
         await health
           ?.record(projectFile, entry.model, { error: last, effect: found.id })

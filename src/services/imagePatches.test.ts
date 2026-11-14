@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { chmodSync, existsSync, utimesSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  utimesSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { EditModelId } from '../core/imageModels'
@@ -126,6 +134,55 @@ function setup({
     (await settled(patch)).patches.find((p) => p.id === patch)!
   return { root, file, patches, requests, settled, work }
 }
+
+describe.skipIf(process.getuid?.() === 0)(
+  'a take the model made but the studio cannot save',
+  () => {
+    /** A project whose model, once it has made the picture, spoils the folder or the board as `spoil` says. */
+    function spoiled() {
+      let spoil = () => {}
+      const made = setup({
+        makes: (request) => {
+          spoil()
+          return fakePng(request.width, request.height, 1)
+        },
+      })
+      return { ...made, onMade: (what: () => void) => (spoil = what) }
+    }
+    const pictures = (root: string) =>
+      readdirSync(join(root, FOLDER)).filter((f) => f.endsWith('.png'))
+
+    it('names the picture’s file, does not warn about the model, when the picture cannot be written', async () => {
+      const { root, file, patches, work, onMade } = spoiled()
+      // A folder where the picture belongs: the rename onto it is refused.
+      onMade(() => mkdirSync(join(root, FOLDER, '1.png')))
+      const quiet = console.error
+      console.error = () => {}
+      try {
+        await patches.make(file, 'inn', 'door', { count: 1, area })
+        const view = await work()
+        expect(view.failed).toMatchObject([{ n: 1 }])
+        expect(view.failed[0]!.message).toBe(`${FOLDER}/1.png could not be written.`)
+        expect(view.failedModels).toEqual([])
+      } finally {
+        console.error = quiet
+      }
+    })
+
+    it('names the board file, removes the picture and does not warn about the model, when the board cannot be read', async () => {
+      const { root, file, patches, work, onMade } = spoiled()
+      onMade(() => writeFileSync(join(root, BOARD), '{ nope'))
+      await patches.make(file, 'inn', 'door', { count: 1, area })
+      // The view cannot be read while the board is broken: give the fake model time to be saved.
+      await new Promise((r) => setTimeout(r, 150))
+      writeFileSync(join(root, BOARD), JSON.stringify({ next: 2 }))
+      const view = await work()
+      expect(view.failed[0]!.message).toBe(`${BOARD} cannot be used.`)
+      expect(view.failedModels).toEqual([])
+      expect(pictures(root)).toEqual([])
+    })
+  },
+)
 
 describe('takes of a declared patch', () => {
   it("edits the chosen take with the patch's words, at its size when the area fills it, with klein", async () => {

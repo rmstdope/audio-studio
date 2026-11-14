@@ -337,22 +337,21 @@ export function createImagePatches({
             seen: false,
             model: entry.model,
           }
-          // The picture first: a take is on the board only once its file is there.
-          await writeOrRefuse(found.root, `${found.folder}/${entry.n}.png`, made.png)
           // Marked before it is on the board, so the page never sees it between made and brought.
           bringing.add(mark)
-          const failure = await changeBoard(found, (board) => {
-            if (stop.aborted) return
-            board.takes = [...board.takes.filter((t) => t.n !== saving.n), saving].sort(
-              (a, b) => a.n - b.n,
-            )
+          const onBoard = await engine.save(found.projectFile, found.engineId, accessOf(found), {
+            root: found.root,
+            path: `${found.folder}/${entry.n}.png`,
+            bytes: made.png,
+            stop,
+            change(board) {
+              board.takes = [...board.takes.filter((t) => t.n !== saving.n), saving].sort(
+                (a, b) => a.n - b.n,
+              )
+            },
+            cleanup: () => bringing.delete(mark),
           })
-          if (stop.aborted || (failure && 'ok' in failure)) {
-            bringing.delete(mark)
-            await rm(resolveInRoot(found.root, `${found.folder}/${entry.n}.png`), { force: true })
-            if (failure && 'ok' in failure) throw new Error(`${failure.file} cannot be used`)
-            return
-          }
+          if (!onBoard) return
           saved = true
           // With the entry's end, so a view never shows the take made and its model still failed.
           failedModels.get(found.key)?.delete(entry.model)

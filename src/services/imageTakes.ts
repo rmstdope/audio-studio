@@ -512,26 +512,22 @@ export function createImageTakes({
           madeFrom: request.madeFrom,
           seen: false,
         }
-        // The picture first: a take is on the board only once its file is there.
-        await writeOrRefuse(found.root, pictureOf(found.id, take.n), generated.png)
         // Marked before it is on the board, so the page never sees it between made and brought.
-        bringing.add(`${found.key}\0${take.n}`)
-        const saved = await changeBoard(found, (board) => {
-          if (stop.aborted) return
-          board.takes = [...board.takes.filter((t) => t.n !== take.n), take].sort(
-            (a, b) => a.n - b.n,
-          )
+        const mark = `${found.key}\0${take.n}`
+        bringing.add(mark)
+        const saved = await engine.save(found.projectFile, found.id, accessOf(found), {
+          root: found.root,
+          path: pictureOf(found.id, take.n),
+          bytes: generated.png,
+          stop,
+          change(board) {
+            board.takes = [...board.takes.filter((t) => t.n !== take.n), take].sort(
+              (a, b) => a.n - b.n,
+            )
+          },
+          cleanup: () => bringing.delete(mark),
         })
-        if (stop.aborted) {
-          bringing.delete(`${found.key}\0${take.n}`)
-          await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
-          return
-        }
-        if (saved && 'ok' in saved) {
-          bringing.delete(`${found.key}\0${take.n}`)
-          await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
-          throw new Error(`${saved.file} cannot be used`)
-        }
+        if (!saved) return
         made = { n: take.n, took }
       },
       async settled() {

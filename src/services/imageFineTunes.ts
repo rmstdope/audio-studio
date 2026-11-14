@@ -260,19 +260,18 @@ export function createImageFineTunes({
           seen: false,
           model: entry.model,
         }
-        // The picture first: a fine-tune is on the board only once its file is there.
-        await writeOrRefuse(image.root, `${image.folder}/${entry.n}.png`, made.png)
-        const failure = await changeBoard(image, (board) => {
-          if (stop.aborted) return
-          board.tunes = [...board.tunes.filter((t) => t.n !== saved.n), saved].sort(
-            (a, b) => a.n - b.n,
-          )
+        const onBoard = await engine.save(image.projectFile, image.id, accessOf(image), {
+          root: image.root,
+          path: `${image.folder}/${entry.n}.png`,
+          bytes: made.png,
+          stop,
+          change(board) {
+            board.tunes = [...board.tunes.filter((t) => t.n !== saved.n), saved].sort(
+              (a, b) => a.n - b.n,
+            )
+          },
         })
-        if (stop.aborted || (failure && 'ok' in failure)) {
-          await rm(resolveInRoot(image.root, `${image.folder}/${entry.n}.png`), { force: true })
-          if (failure && 'ok' in failure) throw new Error(`${failure.file} cannot be used`)
-          return
-        }
+        if (!onBoard) return
         failedModels.get(image.key)?.delete(entry.model)
         took = elapsed
       },
