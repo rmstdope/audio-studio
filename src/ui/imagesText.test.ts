@@ -17,10 +17,7 @@ import {
   listSeparator,
   joined,
   lookNoticeText,
-  fitZoom,
-  lookZoom,
   makeTakesText,
-  pictureRendering,
   modelCaption,
   outOfDateText,
   paletteText,
@@ -110,41 +107,6 @@ describe('the image takes words', () => {
 })
 
 describe('the game’s look words', () => {
-  it('zooms by the largest whole number at which both pictures fit side by side', () => {
-    expect(lookZoom(1000, 10, 320)).toEqual({ zoom: 1, stacked: false })
-    expect(lookZoom(1380, 10, 320)).toEqual({ zoom: 2, stacked: false })
-    expect(lookZoom(2000, 10, 320)).toEqual({ zoom: 3, stacked: false })
-    expect(lookZoom(650, 10, 320)).toEqual({ zoom: 1, stacked: false })
-  })
-  it('shrinks them side by side to fit when not even the game’s size fits, down to half', () => {
-    expect(lookZoom(890, 14, 640)).toEqual({ zoom: 0.68, stacked: false })
-    expect(lookZoom(890, 14, 480)).toEqual({ zoom: 0.91, stacked: false })
-    expect(lookZoom(640, 10, 320)).toEqual({ zoom: 0.98, stacked: false })
-    expect(lookZoom(0, 10, 320)).toEqual({ zoom: 1, stacked: false })
-  })
-  it('stacks them, each fitted to the width, when side by side they would be under half size', () => {
-    expect(lookZoom(300, 10, 320)).toEqual({ zoom: 0.93, stacked: true })
-    expect(lookZoom(600, 10, 640)).toEqual({ zoom: 0.93, stacked: true })
-  })
-  it('leaves room across for what a side holds besides its picture, on each side', () => {
-    // 1000 wide, 14 between, 26 across each side: 934 / 2 / 480, under the game's size.
-    expect(lookZoom(1000, 14, 480, 26)).toEqual({ zoom: 0.97, stacked: false })
-    expect(lookZoom(1000, 14, 480)).toEqual({ zoom: 1, stacked: false })
-    // Stacked, the side has the whole width less its own.
-    expect(lookZoom(300, 10, 320, 26)).toEqual({ zoom: 0.85, stacked: true })
-    expect(fitZoom(1000, 1000, 14, 480, 300, 26)).toEqual({ zoom: 0.97, stacked: false })
-  })
-  it('never shrinks a picture away to nothing while the stage is still being laid out', () => {
-    expect(lookZoom(5, 14, 640)).toEqual({ zoom: 0.1, stacked: true })
-  })
-  it('draws a shrunk picture smooth, and one at a whole size with hard pixels', () => {
-    expect(pictureRendering(0.68)).toBe('auto')
-    expect(pictureRendering(1)).toBe('pixelated')
-    expect(pictureRendering(2)).toBe('pixelated')
-  })
-  it('draws an enlargement that is not a whole number smooth, as hard pixels would be uneven', () => {
-    expect(pictureRendering(1.37)).toBe('auto')
-  })
   it('captions the model’s picture, adding that it is cropped', () => {
     expect(modelCaption(1280, 720, false)).toBe('1280 × 720')
     expect(modelCaption(1024, 1024, true)).toBe('1024 × 1024 · cropped to fit')
@@ -563,23 +525,5 @@ describe('areaRowWhy', () => {
     expect(areaRowWhy('none')).toBe(
       'Choose a take of the image first. Areas are placed on the take the game shows.',
     )
-  })
-})
-
-describe('fitZoom', () => {
-  it('fits two pictures side by side to the width when the height allows', () => {
-    // (1014 - 14) / 2 = 500 wide each; 500 / 640 of the game's width.
-    expect(fitZoom(1014, 900, 14, 640, 360)).toEqual({ zoom: 0.78, stacked: false })
-  })
-  it('fits them to the height when that is the tighter limit, keeping the shape', () => {
-    expect(fitZoom(2000, 360, 14, 640, 360)).toEqual({ zoom: 1, stacked: false })
-    expect(fitZoom(2000, 540, 14, 640, 360)).toEqual({ zoom: 1.5, stacked: false })
-    expect(fitZoom(2000, 600, 14, 360, 640)).toEqual({ zoom: 0.93, stacked: false })
-  })
-  it('never goes below a tenth while the stage is laid out', () => {
-    expect(fitZoom(20, 5, 14, 640, 360)).toEqual({ zoom: 0.1, stacked: false })
-  })
-  it('falls back to the width alone when the height is not known', () => {
-    expect(fitZoom(1380, 0, 10, 320, 200)).toEqual(lookZoom(1380, 10, 320))
   })
 })

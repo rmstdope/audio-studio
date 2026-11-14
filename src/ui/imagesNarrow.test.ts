@@ -22,32 +22,27 @@ describe('the images list in a narrow window', () => {
 })
 
 describe('the two sides of an image’s takes', () => {
-  it('sit side by side when both fit, and one above the other when the stage says they stack', () => {
-    expect(rule(".image-stage[data-stacked='false']")).toMatch(
-      /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
-    )
-    expect(rule('.image-stage')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
+  it('always sit side by side, each half the width, however narrow the window', () => {
+    expect(rule('.image-stage')).toMatch(/grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/)
+    const narrow = css.slice(css.indexOf('@container panel (max-width: 1000px) {\n  .image-band'))
+    expect(narrow.slice(0, narrow.indexOf('\n}\n'))).not.toContain('.image-stage')
   })
 })
 
 describe('an image’s workbench', () => {
-  it('is a frame: the stage, the tools column of about 300 px, and the strip along the bottom', () => {
-    expect(rule('.image-workbench')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) 300px/)
-    expect(rule('.image-workbench')).toMatch(/grid-template-rows:\s*minmax\(0, 1fr\) auto/)
-    // The window's height reaches the frame as where it starts (--fill-height), never as a sum of
-    // what is above it.
-    expect(rule('.image-workbench')).toMatch(/height:\s*max\(520px, var\(--fill-height, 520px\)\)/)
-    expect(rule(".image-workbench > [data-area='strip']")).toMatch(/grid-column:\s*1 \/ -1/)
+  it('is a column: the band, a Make takes box of 360 px beside Prompt, the stage, the strip', () => {
+    expect(rule('.image-workbench')).toMatch(/flex-direction:\s*column/)
+    expect(rule('.image-band')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) 360px/)
+    // The page scrolls for the pictures: the frame takes no height of the window's.
+    expect(rule('.image-workbench')).not.toMatch(/height/)
+    expect(rule('.image-stage-panel')).not.toMatch(/overflow/)
     expect(rule('.image-thumbs')).toMatch(/overflow-x:\s*auto/)
   })
 
-  it('puts the columns one above the other in a narrow window', () => {
-    const narrow = css.slice(
-      css.indexOf('@container panel (max-width: 1000px) {\n  .image-workbench'),
-    )
+  it('puts Prompt above Make takes in a narrow window', () => {
+    const narrow = css.slice(css.indexOf('@container panel (max-width: 1000px) {\n  .image-band'))
     const block = narrow.slice(0, narrow.indexOf('\n}\n'))
-    expect(rule('.image-workbench', block)).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
-    expect(rule('.image-workbench', block)).toMatch(/height:\s*auto/)
+    expect(rule('.image-band', block)).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
   })
 })
 

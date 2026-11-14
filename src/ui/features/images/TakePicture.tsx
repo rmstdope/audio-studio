@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ImageRow } from '../../../core/images'
 import type { ImageTakeView } from '../../../core/imageTakes'
-import { modelCaption, pictureRendering } from '../../imagesText'
+import { modelCaption } from '../../imagesText'
 
 /** Which of a take's pictures the Takes section shows: what the model made, or what the game gets. */
 export type Showing = 'model' | 'game'
@@ -40,15 +40,14 @@ export function modelSource(id: string, take: ImageTakeView): string {
 }
 
 /**
- * A take's one picture, what the model made or what the game gets as `showing` says, `zoom` times
- * the game's size, with crisp pixels. `current` shows the picture the game has now instead of the
+ * A take's one picture, what the model made or what the game gets as `showing` says, as wide as its
+ * box but never wider than its own size. `current` shows the picture the game has now instead of the
  * take's own game version (the chosen take, whose version the game may still have under an old
  * look). In place of the game's version it says so while the take is being brought to the look, and
  * says what to fix when the style cannot be used. While the choice of the take shown as
  * `current` is still being saved the game has no such picture yet, so none is asked for. The game's
  * version is captioned and shaped by its own size once it loads, which is the old one for a picture
- * brought to the look before the image's size changed; it is drawn as wide as the image would be,
- * with hard pixels when that enlarges it.
+ * brought to the look before the image's size changed; it is limited to that size, not the image's.
  */
 export function TakePicture({
   id,
@@ -56,7 +55,6 @@ export function TakePicture({
   row,
   lookError,
   showing,
-  zoom,
   current = false,
   saving = false,
   saved = 0,
@@ -66,12 +64,10 @@ export function TakePicture({
   row: ImageRow
   lookError: string | null
   showing: Showing
-  zoom: number
   current?: boolean
   saving?: boolean
   saved?: number
 }) {
-  const width = row.width * zoom
   const [loaded, setLoaded] = useState<{ src: string; width: number; height: number } | null>(null)
   if (showing === 'model') {
     return (
@@ -80,7 +76,7 @@ export function TakePicture({
           className="image-take-picture"
           src={modelSource(id, take)}
           alt={`Take ${take.n}, what the model made`}
-          style={{ width, aspectRatio: `${take.width} / ${take.height}` }}
+          style={{ maxWidth: take.width, aspectRatio: `${take.width} / ${take.height}` }}
         />
         <span className="faint small">{modelCaption(take.width, take.height, take.cropped)}</span>
       </div>
@@ -96,11 +92,7 @@ export function TakePicture({
           className="image-take-picture"
           src={src}
           alt={`Take ${take.n}, what the game gets`}
-          style={{
-            width,
-            aspectRatio: `${size.width} / ${size.height}`,
-            imageRendering: pictureRendering(width / size.width),
-          }}
+          style={{ maxWidth: size.width, aspectRatio: `${size.width} / ${size.height}` }}
           onLoad={(e) => {
             const { naturalWidth, naturalHeight } = e.currentTarget
             if (naturalWidth && naturalHeight)
@@ -110,7 +102,7 @@ export function TakePicture({
       ) : (
         <div
           className={`look-empty${state === 'error' ? ' look-empty-err' : ''}`}
-          style={{ width, aspectRatio: `${row.width} / ${row.height}` }}
+          style={{ maxWidth: row.width, aspectRatio: `${row.width} / ${row.height}` }}
           role={state === 'error' ? 'alert' : 'status'}
         >
           {state === 'error'

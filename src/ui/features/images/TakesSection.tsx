@@ -43,7 +43,6 @@ import { MenuFace } from '../../components/MenuFace'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import {
   BRINGING_WHY,
-  fitZoom,
   IMAGES_LOCK_WHY,
   IMAGE_TAKE_UNKNOWN,
   imageMakeWhy,
@@ -51,7 +50,6 @@ import {
   makeTakesText,
   QUESTION_OPEN_WHY,
   refusal,
-  pictureRendering,
   setAsideDim,
   setAsideLead,
   setAsideTitle,
@@ -65,63 +63,54 @@ import { imageTimeLeftText } from '../../imageTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 import { scrollWithin } from '../../scrollWithin'
-import { useFillWindow } from '../../fillWindow'
-import { stageAcross, stageChrome } from './stageRoom'
 
 /** How many takes the count menu starts on. */
 const STARTING_COUNT = 4
 
-/** What a side of the stage shows its picture in. */
-const PICTURE = '.image-take-picture, .look-empty, .image-take-empty'
-
 /**
- * A take's picture; `shown` is its width on the page, when set, and a picture shown smaller than
- * its own `width` is drawn smooth, else with hard pixels.
+ * A take's picture. With `limit` it is as wide as its box but never wider than its own `width`,
+ * smooth when shrunk; without it, it fills its box (a thumb in the strip).
  */
 function Picture({
   src,
   alt,
   width,
   height,
-  shown,
+  limit = false,
 }: {
   src: string
   alt: string
   width: number
   height: number
-  shown?: number
+  limit?: boolean
 }) {
   return (
     <img
       className="image-take-picture"
       src={src}
       alt={alt}
-      style={{
-        width: shown,
-        aspectRatio: `${width} / ${height}`,
-        imageRendering: shown === undefined ? undefined : pictureRendering(shown / width),
-      }}
+      style={{ maxWidth: limit ? width : undefined, aspectRatio: `${width} / ${height}` }}
     />
   )
 }
 
-/** A frame with nothing in it yet. */
+/** A frame with nothing in it yet, in the picture's shape and never wider than the picture's own width. */
 function EmptyFrame({
   title,
   hint,
   width,
   height,
-  shown,
 }: {
   title?: string
   hint?: string
   width: number
   height: number
-  /** Its width on the page, when set, as a picture's `shown`: the room a picture would take. */
-  shown?: number
 }) {
   return (
-    <div className="image-take-empty" style={{ aspectRatio: `${width} / ${height}`, width: shown }}>
+    <div
+      className="image-take-empty"
+      style={{ aspectRatio: `${width} / ${height}`, maxWidth: width }}
+    >
       {title && <b>{title}</b>}
       {hint && <span className="faint small">{hint}</span>}
     </div>
@@ -155,12 +144,13 @@ function SetAsideLists({ ask, question }: { ask: SetAsideAsk; question: SetAside
 }
 
 /**
- * An image's workbench: in one column `prompt` (the image's words), making takes, and the other
- * takes to put on the right; in the other the image the game uses beside one other take (one
- * above the other when the column is too narrow for both at the game's size), with choosing,
- * un-choosing and dropping under them, also by C and D. A box switches every take shown between
- * what the model made and what the game gets. Which take is on the right, and what the box says,
- * are this page's, never saved; after a reload it is the newest, and what the game gets.
+ * An image's workbench: in a band across the top `prompt` (the image's words) and making takes;
+ * under it the image the game uses beside one other take, each under a caption line with its
+ * buttons (choosing, un-choosing and dropping, also by C and D) and as wide as its half but never
+ * wider than its own size; under both the strip of takes to put on the right. A box switches every
+ * take shown between what the model made and what the game gets. Which take is on the right, and
+ * what the box says, are this page's, never saved; after a reload it is the newest, and what the
+ * game gets.
  */
 export function TakesSection({
   row,
@@ -208,10 +198,6 @@ export function TakesSection({
   )
   const { waiting: waitingForWords, afterSaved: afterWordsSaved } = useAfterSaved(saveWords)
   const [showing, setShowing] = useState<Showing>('game')
-  const [stage, setStage] = useState<HTMLDivElement | null>(null)
-  const fill = useFillWindow()
-  const measureStage = useRef<(() => void) | null>(null)
-  const [available, setAvailable] = useState({ width: 0, height: 0, gap: 0, across: 0 })
   const asked = useRef(new Set<number>())
   const chooseButton = useRef<HTMLButtonElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
@@ -252,77 +238,6 @@ export function TakesSection({
     const thumb = onRight === null ? undefined : thumbs.current.get(onRight)
     scrollWithin(thumb, thumb?.closest<HTMLElement>('[data-strip]'))
   }, [onRight])
-  useEffect(() => {
-    if (!stage || typeof ResizeObserver === 'undefined') return
-    // The picture's room is the stage less what a side holds besides its picture, and the gap
-    // between the sides: both read from the laid-out page.
-    const measure = () => {
-      // A narrow panel stacks the frame (the stylesheet's `@container panel` rule, which has no grid
-      // rows then): only the width counts.
-      const frame = stage.closest('.image-workbench')
-      const stacked = frame !== null && getComputedStyle(frame).gridTemplateRows === 'none'
-      const sides = Array.from(stage.querySelectorAll<HTMLElement>('.image-side')).map((side) => ({
-        side,
-        picture: side.querySelector<HTMLElement>(PICTURE),
-      }))
-      const px = (value: string) => parseFloat(value) || 0
-      const chrome = stageChrome(
-        sides,
-        (box) => px(getComputedStyle(box).rowGap),
-        (box) => {
-          const style = getComputedStyle(box)
-          return (
-            px(style.paddingTop) +
-            px(style.paddingBottom) +
-            px(style.borderTopWidth) +
-            px(style.borderBottomWidth)
-          )
-        },
-      )
-      // A side may hold its picture in a box of its own (the images-lock warning): its padding and
-      // border across are room the picture does not have.
-      const across = stageAcross(sides, (box) => {
-        const style = getComputedStyle(box)
-        return (
-          px(style.paddingLeft) +
-          px(style.paddingRight) +
-          px(style.borderLeftWidth) +
-          px(style.borderRightWidth)
-        )
-      })
-      setAvailable((now) => {
-        const next = {
-          width: stage.clientWidth,
-          across,
-          // Not stacked, and the room not known (no picture on either side yet): none, as stacked.
-          height: stacked || chrome === null ? 0 : Math.max(0, stage.clientHeight - chrome),
-          gap: parseFloat(getComputedStyle(stage).columnGap) || 0,
-        }
-        // The same room again is no change, or the sides, which a change reflows, would ask again.
-        return next.width === now.width &&
-          next.height === now.height &&
-          next.gap === now.gap &&
-          next.across === now.across
-          ? now
-          : next
-      })
-    }
-    measure()
-    measureStage.current = measure
-    const observer = new ResizeObserver(measure)
-    observer.observe(stage)
-    // A side takes a picture, or loses one, without the stage changing size.
-    for (const side of stage.querySelectorAll('.image-side')) observer.observe(side)
-    return () => {
-      measureStage.current = null
-      observer.disconnect()
-    }
-  }, [stage])
-  // A side's content (a question closing, a row going) changes what the pictures leave room for
-  // without changing the size of the stage or its sides, which a grid stretches: ask after each
-  // render. The same room is no change.
-  useEffect(() => measureStage.current?.())
-
   // While the takes load, no key does anything: the last render's handler must not outlive its takes.
   keys.current = () => {}
   if (!view || !ready) {
@@ -332,7 +247,10 @@ export function TakesSection({
       <>
         {null}
         {[]}
-        <div className="image-workbench" ref={fill}>
+        <div className="image-workbench">
+          <div className="image-band" data-area="band">
+            {prompt}
+          </div>
           <section className="panel image-stage-panel" data-area="stage">
             {!view
               ? query.isError
@@ -340,9 +258,6 @@ export function TakesSection({
                 : 'Loading takes…'
               : 'The takes could not be listed.'}
           </section>
-          <div className="image-workbench-tools" data-area="tools">
-            {prompt}
-          </div>
         </div>
       </>
     )
@@ -373,16 +288,6 @@ export function TakesSection({
   const menuWhy = imageMenuWhy(why)
   const makeWhy = imageMakeWhy(why)
   const size = { width: row.width, height: row.height }
-  // The two sides sit side by side as large as both fit the stage; in a narrow window, whole sizes
-  // else shrunk down to half the game's size, else one above the other (fitZoom).
-  const { zoom, stacked } = fitZoom(
-    available.width,
-    available.height,
-    available.gap,
-    row.width,
-    row.height,
-    available.across,
-  )
   const set = (update: (v: ImageTakesView) => ImageTakesView) =>
     client.setQueryData<ImageTakesView>(['image-takes', id], (v) =>
       v && 'takes' in v ? update(v) : v,
@@ -602,13 +507,59 @@ export function TakesSection({
           </button>
         </div>
       ))}
-      <div className="image-workbench" ref={fill}>
+      <div className="image-workbench">
+        <div className="image-band" data-area="band">
+          {prompt}
+          <section className="panel takes-panel image-make" aria-label="Make takes">
+            <div className="takes-head">
+              <h2>Make takes</h2>
+              {busy && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  {...off(stop.isPending && WAIT_FOR_CHANGE)}
+                  onClick={() => stop.mutate()}
+                >
+                  Stop
+                </button>
+              )}
+            </div>
+            {otherInUse && generator.ok && (
+              <span className="takes-missing small" role="status">
+                {states[ready.projectModel].installed
+                  ? imageSwitchedLine(ready.projectModel, fallback)
+                  : states[ready.projectModel].download === 'partial'
+                    ? `${imageModel(ready.projectModel).short}, the project's image model, is only partly downloaded, so these takes use ${imageModel(fallback).short}. Setup says how to finish it.`
+                    : `${imageModel(ready.projectModel).short}, the project's image model, isn't on this computer, so these takes use ${imageModel(fallback).short}. Setup says how to download it.`}
+              </span>
+            )}
+            <div className="takes-make">{controls}</div>
+            <span className="faint small">
+              1 to {MAX_IMAGE_TAKES_AT_ONCE} at a time · {forTakesText(figures[model], count)}
+            </span>
+            {!none && (
+              <div className="image-tools-foot">
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={showing === 'game'}
+                    onChange={(event) => setShowing(event.target.checked ? 'game' : 'model')}
+                  />
+                  What the game gets
+                </label>
+                <span className="faint small">
+                  <kbd>←</kbd> <kbd>→</kbd> takes · <kbd>C</kbd> choose · <kbd>D</kbd> drop
+                </span>
+              </div>
+            )}
+          </section>
+        </div>
         <section
           className="panel image-stage-panel"
           data-area="stage"
           aria-label="The chosen take and one to compare"
         >
-          <div className="image-stage" data-stacked={stacked} ref={setStage}>
+          <div className="image-stage">
             <div className="image-side" data-side="left">
               {asking && asking.kind !== 'drop' ? (
                 <Confirm
@@ -687,7 +638,6 @@ export function TakesSection({
                   id={id}
                   lookError={lookError}
                   showing={showing}
-                  zoom={zoom}
                 />
               )}
             </div>
@@ -704,6 +654,29 @@ export function TakesSection({
                     <ModelName id={rightTake.model} />
                     {rightTake.earlier && <span className="faint small">earlier words</span>}
                     <FineTunedFrom take={rightTake} />
+                    <div className="image-take-actions">
+                      <button
+                        type="button"
+                        ref={dropButton}
+                        className="btn btn-ghost btn-small"
+                        {...off(!canDrop && dropWhy, open && QUESTION_OPEN_WHY)}
+                        onClick={() => request({ kind: 'drop', n: rightTake.n })}
+                      >
+                        Drop <kbd>D</kbd>
+                      </button>
+                      <button
+                        type="button"
+                        ref={chooseButton}
+                        className="btn btn-primary btn-small"
+                        {...off(
+                          !canChoose(rightTake) && chooseWhy(rightTake),
+                          open && QUESTION_OPEN_WHY,
+                        )}
+                        onClick={() => request({ kind: 'choose', n: rightTake.n })}
+                      >
+                        Choose <kbd>C</kbd>
+                      </button>
+                    </div>
                   </>
                 ) : (
                   chosen && <b>No other takes yet</b>
@@ -738,32 +711,8 @@ export function TakesSection({
                       row={row}
                       lookError={lookError}
                       showing={showing}
-                      zoom={zoom}
                     />
                   )}
-                  <div className="image-take-actions">
-                    <button
-                      type="button"
-                      ref={dropButton}
-                      className="btn btn-ghost btn-small"
-                      {...off(!canDrop && dropWhy, open && QUESTION_OPEN_WHY)}
-                      onClick={() => request({ kind: 'drop', n: rightTake.n })}
-                    >
-                      Drop <kbd>D</kbd>
-                    </button>
-                    <button
-                      type="button"
-                      ref={chooseButton}
-                      className="btn btn-primary btn-small"
-                      {...off(
-                        !canChoose(rightTake) && chooseWhy(rightTake),
-                        open && QUESTION_OPEN_WHY,
-                      )}
-                      onClick={() => request({ kind: 'choose', n: rightTake.n })}
-                    >
-                      Choose <kbd>C</kbd>
-                    </button>
-                  </div>
                   {lookError !== null && (
                     <span className="faint small">Fix the style to choose this take.</span>
                   )}
@@ -783,52 +732,6 @@ export function TakesSection({
           {!open && problem && <span className="adopt-error">{problem}</span>}
           {!open && error && <span className="adopt-error">{error.message}</span>}
         </section>
-        <div className="image-workbench-tools" data-area="tools">
-          {prompt}
-          <section className="panel takes-panel image-make" aria-label="Make takes">
-            <div className="takes-head">
-              <h2>Make takes</h2>
-              {busy && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  {...off(stop.isPending && WAIT_FOR_CHANGE)}
-                  onClick={() => stop.mutate()}
-                >
-                  Stop
-                </button>
-              )}
-            </div>
-            {otherInUse && generator.ok && (
-              <span className="takes-missing small" role="status">
-                {states[ready.projectModel].installed
-                  ? imageSwitchedLine(ready.projectModel, fallback)
-                  : states[ready.projectModel].download === 'partial'
-                    ? `${imageModel(ready.projectModel).short}, the project's image model, is only partly downloaded, so these takes use ${imageModel(fallback).short}. Setup says how to finish it.`
-                    : `${imageModel(ready.projectModel).short}, the project's image model, isn't on this computer, so these takes use ${imageModel(fallback).short}. Setup says how to download it.`}
-              </span>
-            )}
-            <div className="takes-make">{controls}</div>
-            <span className="faint small">
-              1 to {MAX_IMAGE_TAKES_AT_ONCE} at a time · {forTakesText(figures[model], count)}
-            </span>
-          </section>
-          {!none && (
-            <div className="image-tools-foot">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={showing === 'game'}
-                  onChange={(event) => setShowing(event.target.checked ? 'game' : 'model')}
-                />
-                What the game gets
-              </label>
-              <span className="faint small">
-                <kbd>←</kbd> <kbd>→</kbd> takes · <kbd>C</kbd> choose · <kbd>D</kbd> drop
-              </span>
-            </div>
-          )}
-        </div>
         <section className="panel takes-panel image-takes" data-area="strip" aria-label="Takes">
           <div className="takes-head">
             <h2>{none ? 'Takes' : `Takes · ${takes.length}`}</h2>
@@ -937,7 +840,6 @@ function LeftSide({
   id,
   lookError,
   showing,
-  zoom,
 }: {
   row: ImageRow
   chosen: ImageTakeView | undefined
@@ -952,7 +854,6 @@ function LeftSide({
   id: string
   lookError: string | null
   showing: Showing
-  zoom: number
 }) {
   const label = (
     <span className="lbl" ref={heading} tabIndex={-1}>
@@ -965,7 +866,7 @@ function LeftSide({
       <div className="image-side-unknown" data-unknown="true">
         <div className="take-row">{label}</div>
         <b>The images lock could not be read</b>
-        <EmptyFrame {...size} shown={size.width * zoom} />
+        <EmptyFrame {...size} />
         <span className="faint small">{IMAGE_TAKE_UNKNOWN}</span>
       </div>
     )
@@ -980,6 +881,17 @@ function LeftSide({
           {row.looksOld && <span className="chip chip-warn">Old look</span>}
           <ModelName id={chosen.model} />
           <FineTunedFrom take={chosen} />
+          <div className="image-take-actions">
+            <button
+              type="button"
+              ref={opener}
+              className="btn btn-small"
+              {...off(unchoosing && WAIT_FOR_CHANGE)}
+              onClick={onUnchoose}
+            >
+              Un-choose
+            </button>
+          </div>
         </div>
         <TakePicture
           id={id}
@@ -987,22 +899,10 @@ function LeftSide({
           row={row}
           lookError={lookError}
           showing={showing}
-          zoom={zoom}
           current
           saving={saving}
           saved={saved}
         />
-        <div className="image-take-actions">
-          <button
-            type="button"
-            ref={opener}
-            className="btn btn-small"
-            {...off(unchoosing && WAIT_FOR_CHANGE)}
-            onClick={onUnchoose}
-          >
-            Un-choose
-          </button>
-        </div>
       </>
     )
   }
@@ -1018,7 +918,7 @@ function LeftSide({
             src={`/api/images/${encodeURIComponent(id)}/current`}
             alt="The game's own image"
             {...size}
-            shown={size.width * zoom}
+            limit
           />
         ) : (
           <EmptyFrame title="The file is not there." {...size} />
