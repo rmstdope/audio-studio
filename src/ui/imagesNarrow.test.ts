@@ -170,30 +170,36 @@ describe('fitting a picture to the window (as-5wln)', () => {
   it('gives the pages a frame as tall as the window below where it starts, the stage row taking what the rest leaves', () => {
     const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
     const block = wide.slice(0, wide.indexOf('\n}\n'))
-    expect(block).toMatch(/\.fine-job\s*\{[^}]*var\(--fill-height, 0px\)/)
-    // `auto` as the least, not 0: a tall strip makes the page scroll instead of crushing the stage.
-    expect(block).toMatch(/grid-template-rows:\s*minmax\(auto, 1fr\) auto/)
-    expect(block).not.toMatch(/\.(fine-stage)\s*\{[^}]*min-height:\s*0/)
     expect(block).toMatch(/\.named-areas-body\s*\{[^}]*var\(--fill-height, 360px\)/)
-  })
-
-  it('lets the Patches and Fine-tune frames shrink to the window, and grow only to what their rows hold (as-3xtn)', () => {
-    const wide = css.slice(css.indexOf('@container panel (min-width: 821px) {\n  .fit-picture'))
-    const block = wide.slice(0, wide.indexOf('\n}\n'))
-    const frame = rule('.fine-job', block)
-    // The window's room is the least the frame is, never a fixed height with a pixel floor: a
-    // 480 px floor kept the frame past a 763 px window's 413 px with the picture still able to
-    // shrink, and a fixed height lets a tall takes strip draw past the panel.
-    expect(frame).toMatch(/min-height:\s*var\(--fill-height, 0px\);/)
-    expect(frame).not.toMatch(/(^|[\s;])height:/)
-    // The tools take no room of their own, so the row is what the picture's track and the strip
-    // leave, and they scroll inside it.
-    expect(rule('.fine-tools', block)).toMatch(/contain:\s*size/)
   })
 
   it('caps a picture by half the window when nothing is fitted', () => {
     expect(rule('.fit-shape')).toMatch(
       /width:\s*min\(100%, calc\(50vh \* var\(--picture-ratio, 1\)\)\)/,
+    )
+  })
+})
+
+describe('the Fine-tune tab’s layout (as-uucl.2)', () => {
+  it('is a column of the band, the bar, the picture and the strip, with no fitted frame', () => {
+    expect(rule('.fine-job')).toMatch(/flex-direction:\s*column/)
+    expect(css).not.toMatch(/\.fine-job\s*\{[^}]*--fill-height/)
+    // The picture is as wide as the panel; its own pixel size is the max-width the page sets.
+    expect(rule('.fine-picture')).toMatch(/width:\s*100%/)
+    expect(rule('.fine-picture')).toMatch(/margin-inline:\s*auto/)
+  })
+
+  it('lays the history over the picture, about twelve lines tall, scrolling', () => {
+    const pop = rule('.history-popover')
+    expect(pop).toMatch(/position:\s*absolute/)
+    expect(pop).toMatch(/max-height:\s*calc\(12 \* 1\.6em/)
+    expect(pop).toMatch(/overflow-y:\s*auto/)
+  })
+
+  it('puts the words box across the full width in a narrow panel', () => {
+    const narrow = css.slice(css.indexOf('@container panel (max-width: 820px) {\n  .fine-words'))
+    expect(rule('.fine-words', narrow.slice(0, narrow.indexOf('\n}\n')))).toMatch(
+      /flex-basis:\s*100%/,
     )
   })
 })
