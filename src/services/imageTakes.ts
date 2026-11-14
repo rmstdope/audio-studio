@@ -60,11 +60,12 @@ import { decodePng, encodePng, pngSize } from './png'
 import { choices, sorted } from './musicClips'
 import { takeOut } from './takeOut'
 import { gameFilePath } from './musicLists'
-import { boardQueue, isSafeId } from './musicTakes'
-import type { Serial } from './serial'
+import { isSafeId } from './musicTakes'
+import { createSerial, type Serial } from './serial'
+import { createTakeEngine, describeFailure, type BoardAccess, type TakeEntry } from './takeEngine'
 import { openProject, type ProjectFailure } from './workspace'
 
-export { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR }
+export { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR, describeFailure }
 
 /** The refusal for boxes that could not be moved onto a take: the edits file's own message. */
 function notAdopted(
@@ -86,15 +87,9 @@ export type ImageTakesResult = ImageTakesView | ProjectFailure | null
 export type ImageMakeRequest = { count: number; model?: ImageModelId } | { retry: number }
 
 /** A take waiting, being made, or failed, until it is made. */
-interface Entry {
-  n: number
-  state: 'waiting' | 'making' | 'failed'
-  startedAt: number
-  message: string
+interface Entry extends TakeEntry {
   /** The model it is made with. */
   model: ImageModelId
-  /** Ends the take while it is being made (Stop). */
-  stop?: AbortController
 }
 
 /** A fine-tuned take to add to an image's board. */
@@ -221,12 +216,6 @@ const notHere = (model: ImageModelId): { ok: false; message: string } => ({
 /** A take's game version, relative to the project root: the model's picture brought to the look. */
 const gameOf = (id: string, n: number) => `${IMAGE_TAKES_DIR}/${id}/${n}.game.png`
 
-/** The reason a generator gave, as a sentence. */
-export function describeFailure(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error)
-  return /[.!?]$/.test(text) ? text : `${text}.`
-}
-
 /**
  * The takes of the game's images: made by `generator` on the GPU `queue` (shared with music and
  * Whisper), and kept on a board per image in `content-studio/cache/images/<id>.json`, the pictures in
@@ -252,13 +241,12 @@ export function createImageTakes({
   health?: ImageHealthStore
 }): ImageTakes {
   const shared = globalThis as {
-    contentStudioImageTakes?: Map<string, Map<number, Entry>>
+    contentStudioImageBoards?: Serial
     contentStudioImageBringing?: Set<string>
     contentStudioLookRuns?: Map<string, LookRunView>
     contentStudioImageStopped?: Map<string, number>
     contentStudioImageBatches?: Map<string, StoredBatch>
   }
-  const active = (shared.contentStudioImageTakes ??= new Map())
   /** Takes being brought to the look right now (`<image key>\0<n>`). */
   const bringing = (shared.contentStudioImageBringing ??= new Set())
   const lookRuns = (shared.contentStudioLookRuns ??= new Map())
@@ -268,13 +256,17 @@ export function createImageTakes({
   const batches = (shared.contentStudioImageBatches ??= new Map())
   // Set while Make all starts its own takes, which are not hand starts.
   let pressing = false
-  const boards = boardQueue()
+  // The entries are kept under the engine's slot on `globalThis`, so a `--dev` reload keeps them.
+  const engine = createTakeEngine<Entry, ImageBoard>({
+    slot: 'contentStudioImageTakes',
+    boards: (shared.contentStudioImageBoards ??= createSerial()),
+    now,
+  })
+  const { entriesOf } = engine
 
   /** Whether any take of the press is still waiting or being made. */
   const pressRunning = (projectFile: string, press: StoredBatch) =>
-    press.images.some((id) =>
-      [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])].some((e) => e.state !== 'failed'),
-    )
+    press.images.some((id) => entriesOf(projectFile, id).some((entry) => entry.state !== 'failed'))
 
   async function resolve(projectFile: string, id: string) {
     if (!isSafeId(id)) return null
@@ -299,8 +291,6 @@ export function createImageTakes({
     }
   }
   type Found = Exclude<Awaited<ReturnType<typeof resolve>>, ProjectFailure | null>
-
-  const turn = (found: Found) => `image\0${found.key}`
 
   /** Every image model, and whether this computer has its weights. */
   async function installedModels() {
@@ -329,19 +319,17 @@ export function createImageTakes({
     return board
   }
 
+  /** An image's board: read with its problems, written through the refusal. */
+  const accessOf = (found: Found): BoardAccess<ImageBoard> => ({
+    read: () => readBoard(found),
+    write: (text) => writeOrRefuse(found.root, found.board, text),
+  })
+
   function changeBoard<T>(
     found: Found,
     change: (board: ImageBoard) => T | Promise<T>,
   ): Promise<T | ProjectFailure> {
-    return boards.run(turn(found), async () => {
-      const board = await readBoard(found)
-      if ('ok' in board) return board
-      const before = JSON.stringify(board, null, 2)
-      const answer = await change(board)
-      const after = JSON.stringify(board, null, 2)
-      if (after !== before) await writeOrRefuse(found.root, found.board, `${after}\n`)
-      return answer
-    })
+    return engine.changeBoard(found.projectFile, found.id, accessOf(found), change)
   }
 
   /** The lock as it is: empty if there is none; null (with the problems added) if broken. */
@@ -365,9 +353,6 @@ export function createImageTakes({
     const figures = figuresOf(await readTakeTimes(projectFile))
     return (model: ImageModelId) => figures[model].seconds
   }
-
-  const entriesOf = (key: string) =>
-    [...(active.get(key)?.values() ?? [])].sort((a, b) => a.n - b.n)
 
   /**
    * Makes the game show `png` for the image: the picture in the clips folder, the manifest entry
@@ -487,77 +472,78 @@ export function createImageTakes({
     found: Found,
     entry: Entry,
     request: { prompt: string; madeFrom: ImageRow['madeFrom'] },
-    entries: Map<number, Entry>,
   ): Promise<void> {
-    if (entries.get(entry.n) !== entry || entry.state !== 'waiting') return
-    const stop = new AbortController()
-    entry.stop = stop
-    try {
-      const size = takeSize(found.row)
-      const model = imageModel(entry.model)
-      let began: number | null = null
-      const made = await makeImageTake(
-        { generator, queue, free },
-        { prompt: request.prompt, ...size, seed: newSeed(), model: entry.model },
-        stop.signal,
-        () => {
-          entry.state = 'making'
-          entry.startedAt = now()
-          began = entry.startedAt
-        },
-      ).catch(async (error: unknown) => {
-        // Only a take the model failed to make is the model's failure; saving it is not.
-        if (!stop.signal.aborted) {
-          const message = describeFailure(error)
-          const line = error instanceof ImageToolError ? error.lastLine.trim() : ''
-          await health
-            .record(found.projectFile, entry.model, {
-              image: found.id,
-              take: entry.n,
-              error: line || message,
-            })
-            .catch(() => {})
+    // Set once the picture is on the board; what follows runs after the take left the entries.
+    let made: { n: number; took: number | null } | null = null
+    await engine.run(found.projectFile, found.id, entry, {
+      // A take waits for the GPU as `waiting`: it is being made when the model starts.
+      queued: true,
+      async job(stop, began) {
+        const size = takeSize(found.row)
+        const model = imageModel(entry.model)
+        const generated = await makeImageTake(
+          { generator, queue, free },
+          { prompt: request.prompt, ...size, seed: newSeed(), model: entry.model },
+          stop,
+          began,
+        ).catch(async (error: unknown) => {
+          // Only a take the model failed to make is the model's failure; saving it is not.
+          if (!stop.aborted) {
+            const message = describeFailure(error)
+            const line = error instanceof ImageToolError ? error.lastLine.trim() : ''
+            await health
+              .record(found.projectFile, entry.model, {
+                image: found.id,
+                take: entry.n,
+                error: line || message,
+              })
+              .catch(() => {})
+          }
+          throw error
+        })
+        if (stop.aborted) return
+        // Timed from when the take started making, so its wait for the GPU is not counted.
+        const took = entry.state === 'making' ? (now() - entry.startedAt) / 1000 : null
+        const take: ImageBoardTake = {
+          n: entry.n,
+          seed: generated.seed,
+          model: model.mflux,
+          ...size,
+          madeFrom: request.madeFrom,
+          seen: false,
         }
-        throw error
-      })
-      if (stop.signal.aborted) return
-      // Timed from when the take started making, so its wait for the GPU is not counted.
-      const took = began === null ? null : (now() - began) / 1000
-      const take: ImageBoardTake = {
-        n: entry.n,
-        seed: made.seed,
-        model: model.mflux,
-        ...size,
-        madeFrom: request.madeFrom,
-        seen: false,
-      }
-      // The picture first: a take is on the board only once its file is there.
-      await writeOrRefuse(found.root, pictureOf(found.id, take.n), made.png)
-      // Marked before it is on the board, so the page never sees it between made and brought.
-      bringing.add(`${found.key}\0${take.n}`)
-      const saved = await changeBoard(found, (board) => {
-        if (stop.signal.aborted) return
-        board.takes = [...board.takes.filter((t) => t.n !== take.n), take].sort((a, b) => a.n - b.n)
-      })
-      if (stop.signal.aborted) {
-        bringing.delete(`${found.key}\0${take.n}`)
-        await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
-        return
-      }
-      if (saved && 'ok' in saved) {
-        bringing.delete(`${found.key}\0${take.n}`)
-        await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
-        throw new Error(`${saved.file} cannot be used`)
-      }
-      entries.delete(entry.n)
-      if (took !== null) await recordTakeTime(found.projectFile, entry.model, took)
-      await health.clear(found.projectFile, entry.model).catch(() => {})
-      await bringTake(found, take.n)
-    } catch (error) {
-      if (stop.signal.aborted) return
-      entry.state = 'failed'
-      entry.message = describeFailure(error)
-    }
+        // The picture first: a take is on the board only once its file is there.
+        await writeOrRefuse(found.root, pictureOf(found.id, take.n), generated.png)
+        // Marked before it is on the board, so the page never sees it between made and brought.
+        bringing.add(`${found.key}\0${take.n}`)
+        const saved = await changeBoard(found, (board) => {
+          if (stop.aborted) return
+          board.takes = [...board.takes.filter((t) => t.n !== take.n), take].sort(
+            (a, b) => a.n - b.n,
+          )
+        })
+        if (stop.aborted) {
+          bringing.delete(`${found.key}\0${take.n}`)
+          await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
+          return
+        }
+        if (saved && 'ok' in saved) {
+          bringing.delete(`${found.key}\0${take.n}`)
+          await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
+          throw new Error(`${saved.file} cannot be used`)
+        }
+        made = { n: take.n, took }
+      },
+      async settled() {
+        if (!made) return
+        // The take is made and out of the entries: what fails here must not fail the run.
+        try {
+          if (made.took !== null) await recordTakeTime(found.projectFile, entry.model, made.took)
+          await health.clear(found.projectFile, entry.model).catch(() => {})
+          await bringTake(found, made.n)
+        } catch {}
+      },
+    })
   }
 
   /**
@@ -620,45 +606,49 @@ export function createImageTakes({
     if (!found || !('row' in found)) return 'the image is not in the game any more'
     const key = found.row.look.key
     if (!key) return found.row.look.error ?? "the game's look cannot be used"
-    const outcome = await boards.run(turn(found), async (): Promise<string | null> => {
-      const board = await readBoard(found)
-      if ('ok' in board) return `${board.file} cannot be used`
-      const problems: Problem[] = []
-      const lock = await lockNow(found, problems)
-      const chosen = lock?.[id]
-      // A take that cannot be brought keeps the board's note of those before it, and the image
-      // stays old (so is tried again) through its chosen picture or its unbrought take.
-      let failure: string | null = null
-      let chosenPng: Uint8Array | null = null
-      for (const take of board.takes) {
-        const exists = await Bun.file(resolveInRoot(found.root, pictureOf(id, take.n))).exists()
-        if (!exists && take.n !== chosen?.take) continue
-        const there = await Bun.file(resolveInRoot(found.root, gameOf(id, take.n))).exists()
-        if (take.look === key && there && take.n !== chosen?.take) continue
-        const made = await renderGame(found, take.n)
-        if ('error' in made) {
-          failure ??= made.error
-          continue
+    const outcome = await engine.inTurn(
+      found.projectFile,
+      found.id,
+      async (): Promise<string | null> => {
+        const board = await readBoard(found)
+        if ('ok' in board) return `${board.file} cannot be used`
+        const problems: Problem[] = []
+        const lock = await lockNow(found, problems)
+        const chosen = lock?.[id]
+        // A take that cannot be brought keeps the board's note of those before it, and the image
+        // stays old (so is tried again) through its chosen picture or its unbrought take.
+        let failure: string | null = null
+        let chosenPng: Uint8Array | null = null
+        for (const take of board.takes) {
+          const exists = await Bun.file(resolveInRoot(found.root, pictureOf(id, take.n))).exists()
+          if (!exists && take.n !== chosen?.take) continue
+          const there = await Bun.file(resolveInRoot(found.root, gameOf(id, take.n))).exists()
+          if (take.look === key && there && take.n !== chosen?.take) continue
+          const made = await renderGame(found, take.n)
+          if ('error' in made) {
+            failure ??= made.error
+            continue
+          }
+          take.look = key
+          if (take.n === chosen?.take) chosenPng = made
         }
-        take.look = key
-        if (take.n === chosen?.take) chosenPng = made
-      }
-      await writeOrRefuse(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
-      if (failure) return failure
-      const patchFailure = await bringPatches(found, key)
-      if (chosen && chosen.look !== key) {
-        if (!chosenPng) return 'missing'
-        const answer = await publish(found, chosenPng, (previous) =>
-          previous && previous.look !== key ? { ...previous, look: key } : null,
-        )
-        if (!answer.ok) return answer.message
-      } else if (chosen) {
-        // The patches in the game are written again from their new versions.
-        const answer = await publish(found, null, () => null)
-        if (!answer.ok) return answer.message
-      }
-      return patchFailure
-    })
+        await writeOrRefuse(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
+        if (failure) return failure
+        const patchFailure = await bringPatches(found, key)
+        if (chosen && chosen.look !== key) {
+          if (!chosenPng) return 'missing'
+          const answer = await publish(found, chosenPng, (previous) =>
+            previous && previous.look !== key ? { ...previous, look: key } : null,
+          )
+          if (!answer.ok) return answer.message
+        } else if (chosen) {
+          // The patches in the game are written again from their new versions.
+          const answer = await publish(found, null, () => null)
+          if (!answer.ok) return answer.message
+        }
+        return patchFailure
+      },
+    )
     return outcome
   }
 
@@ -764,7 +754,7 @@ export function createImageTakes({
     async view(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return found
-      const entries = entriesOf(found.key)
+      const entries = entriesOf(found.projectFile, id)
       const board = await readBoard(found)
       if ('ok' in board) return board
       const problems: Problem[] = []
@@ -845,11 +835,9 @@ export function createImageTakes({
                 !pressRunning(projectFile, press),
             )
             .map(([at]) => at)
-      const entries = active.get(found.key) ?? new Map<number, Entry>()
-      active.set(found.key, entries)
       const queued: Entry[] = []
       if ('retry' in request) {
-        const failed = entries.get(request.retry)
+        const failed = engine.entry(projectFile, id, request.retry)
         if (!failed || failed.state !== 'failed') {
           return {
             ok: false,
@@ -857,7 +845,13 @@ export function createImageTakes({
           }
         }
         if (!(await generator.installed(failed.model))) return notHere(failed.model)
-        failed.state = 'waiting'
+        // Another press may have taken it while the model was checked.
+        if (!engine.retry(projectFile, id, request.retry, '')) {
+          return {
+            ok: false,
+            message: `Take ${request.retry} did not fail, so it is not made again.`,
+          }
+        }
         queued.push(failed)
       } else {
         const states = await modelStates(projectFile)
@@ -868,41 +862,26 @@ export function createImageTakes({
           request.model ?? defaultTakeModel(found.config.model ?? DEFAULT_IMAGE_MODEL, states)
         if (!installed[model]) return notHere(model)
         // The numbers are reserved at once, so none is used twice, even by a take that fails or is stopped.
-        const reserved = await changeBoard(found, (board) => {
-          const first = Math.max(board.next, ...[...entries.values()].map((e) => e.n + 1))
-          board.next = first + request.count
-          return first
-        })
-        if (typeof reserved !== 'number') return reserved
-        for (let i = 0; i < request.count; i++) {
-          const entry: Entry = {
-            n: reserved + i,
-            state: 'waiting',
-            startedAt: 0,
-            message: '',
-            model,
-          }
-          entries.set(entry.n, entry)
-          queued.push(entry)
-        }
+        const reserved = await engine.reserve(
+          projectFile,
+          id,
+          accessOf(found),
+          request.count,
+          (n) => ({ n, state: 'waiting', startedAt: 0, message: '', hash: '', model }),
+        )
+        if (!Array.isArray(reserved)) return reserved
+        queued.push(...reserved)
       }
       for (const key of ended) batches.delete(key)
       const asked = { prompt: found.row.prompt, madeFrom: found.row.madeFrom }
-      for (const entry of queued) void run(found, entry, asked, entries)
+      for (const entry of queued) void run(found, entry, asked)
       return { ok: true }
     },
 
     async stop(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return found
-      const entries = active.get(found.key)
-      let stopped = 0
-      for (const [n, entry] of entries ?? []) {
-        if (entry.state === 'failed') continue
-        entry.stop?.abort()
-        entries!.delete(n)
-        stopped++
-      }
+      const stopped = engine.stop(projectFile, id)
       if (stopped) stoppedCount.set(found.key, (stoppedCount.get(found.key) ?? 0) + stopped)
       return { ok: true, stopped }
     },
@@ -936,7 +915,7 @@ export function createImageTakes({
     async choose(projectFile, id, n) {
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return found
-      return boards.run(turn(found), async (): Promise<ImageTakesAnswer> => {
+      return engine.inTurn(found.projectFile, found.id, async (): Promise<ImageTakesAnswer> => {
         const board = await readBoard(found)
         if ('ok' in board) return board
         const take = board.takes.find((t) => t.n === n)
@@ -989,7 +968,7 @@ export function createImageTakes({
     async accept(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return found
-      return boards.run(turn(found), () =>
+      return engine.inTurn(found.projectFile, found.id, () =>
         choices().run(`image-choice\0${projectFile}`, async (): Promise<ImageTakesAnswer> => {
           const lock = await lockNow(found, [])
           if (!lock) return { ok: false, message: 'The images lock could not be read.' }
@@ -1020,7 +999,7 @@ export function createImageTakes({
     async unchoose(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return found
-      return boards.run(turn(found), async () => {
+      return engine.inTurn(found.projectFile, found.id, async () => {
         // Before the image-choice turn, as in choose: saving a box holds the edits and then waits for it.
         // A lock entry with no take number leaves the boxes of no take yet where they are.
         if (found.row.chosenTake !== null) {
@@ -1093,13 +1072,11 @@ export function createImageTakes({
       const summary: Record<string, ImageMakingSummary> = {}
       const secondsOf = await secondsFor(projectFile)
       const prefix = `${projectFile}\0`
-      const keys = new Set([...active.keys(), ...stoppedCount.keys()])
-      for (const key of keys) {
-        if (!key.startsWith(prefix)) continue
+      const ofEntries = engine.making(projectFile, (entries) => {
         let takes = 0
         let left = 0
         let failed = 0
-        for (const entry of active.get(key)?.values() ?? []) {
+        for (const entry of entries) {
           if (entry.state === 'failed') {
             failed++
             continue
@@ -1111,10 +1088,15 @@ export function createImageTakes({
               ? seconds
               : Math.max(0, seconds - (now() - entry.startedAt) / 1000)
         }
-        const stopped = stoppedCount.get(key) ?? 0
-        if (takes || failed || stopped) {
-          summary[key.slice(prefix.length)] = { takes, left, failed, stopped }
-        }
+        return { takes, left, failed }
+      })
+      const ids = new Set(Object.keys(ofEntries))
+      for (const key of stoppedCount.keys())
+        if (key.startsWith(prefix)) ids.add(key.slice(prefix.length))
+      for (const id of ids) {
+        const { takes, left, failed } = ofEntries[id] ?? { takes: 0, left: 0, failed: 0 }
+        const stopped = stoppedCount.get(`${prefix}${id}`) ?? 0
+        if (takes || failed || stopped) summary[id] = { takes, left, failed, stopped }
       }
       return summary
     },
