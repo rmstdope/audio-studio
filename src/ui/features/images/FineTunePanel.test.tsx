@@ -188,17 +188,19 @@ describe('the states of the panel', () => {
     ['a landscape picture', { kind: 'take', n: 3, width: 320, height: 200 }],
     ['the game’s whole image', { kind: 'game', width: 1024, height: 576 }],
   ] as const) {
-    it(`fits ${what} to the room its track has, so its buttons and the strip stay in view (as-5wln)`, async () => {
+    it(`shows ${what} as wide as the panel, up to its own size and never upscaled, under every control (as-uucl.2)`, async () => {
       const { host } = await render(() => view({ picture }))
       const stage = host.querySelector<HTMLElement>('.patch-stage')!
       expect(stage.style.getPropertyValue('--picture-ratio')).toBe(
         String(picture.width / picture.height),
       )
-      expect(stage.classList.contains('fit-shape')).toBe(true)
-      expect(stage.parentElement!.className).toBe('fit-picture')
-      // The strip is a row of the same frame as the stage, so the stage leaves it its room.
-      expect(host.querySelector('.fine-job > .fine-strip')).not.toBeNull()
-      expect(host.querySelector('.fine-job > .fine-stage > .fit-picture')).not.toBeNull()
+      expect(stage.style.maxWidth).toBe(`${picture.width}px`)
+      // Not fitted to the window's height.
+      expect(stage.classList.contains('fit-shape')).toBe(false)
+      expect(stage.closest('.fit-picture')).toBeNull()
+      // Top to bottom: the band, the bar, the picture, the strip; nothing beside the picture.
+      const order = [...host.querySelector('.fine-job')!.children].map((c) => c.className)
+      expect(order).toEqual(['fine-band', 'fine-bar', 'patch-stage fine-picture', 'fine-strip'])
     })
   }
 
@@ -323,7 +325,7 @@ describe('making fine-tunes', () => {
 describe('the form', () => {
   it('has its labels above its fields, the model label visible', async () => {
     const { host } = await render(() => view())
-    const form = host.querySelector('.fine-tools')!
+    const form = host.querySelector('.fine-band')!
     const labels = [...form.querySelectorAll('.lbl')].map((l) => text(l))
     expect(labels).toEqual(['What to change', 'Model for new takes'])
     const box = form.querySelector('textarea')!
@@ -586,6 +588,11 @@ const takesView = (
   })),
   ...over,
 })
+/** Opens the History popover when it is closed. */
+const openHistory = async (host: Element) => {
+  if (!host.querySelector('.history-popover'))
+    await act(async () => host.querySelector<HTMLButtonElement>('.history-button')!.click())
+}
 const steps = (host: Element) =>
   [...host.querySelectorAll('.history-step')].map((step) => text(step))
 const CHAIN: [number, number | null | undefined, string?][] = [
@@ -696,7 +703,10 @@ describe('History and Undo', () => {
       undefined,
       () => takesView(8, CHAIN),
     )
-    expect(text(host.querySelector('.history')!.previousElementSibling)).toBe('History')
+    expect(text(host.querySelector('.history-button'))).toBe('History (3) ▾')
+    expect(host.querySelector('.history-popover')).toBeNull()
+    await openHistory(host)
+    expect(text(host.querySelector('.history-button'))).toBe('History (3) ▴')
     expect(steps(host)).toEqual([
       'Take 3 · made from the prompt',
       'Take 7 · “Add a rowing boat by the pier”',
@@ -769,6 +779,7 @@ describe('History and Undo', () => {
     await key(document.body, 'z')
     await settle()
     expect(sent[1]).toEqual({ method: 'POST', path: '/api/images/inn/choose', body: { n: 1 } })
+    await openHistory(host)
     expect(steps(host)[0]).toContain('Take 1 · in the game')
     expect(text(host.querySelector('[role=status]'))).not.toContain('Take 6 is in the game now.')
   })
@@ -800,6 +811,7 @@ describe('History and Undo', () => {
       undefined,
       () => takesView(7, CHAIN),
     )
+    await openHistory(host)
     const later = host.querySelectorAll<HTMLElement>('.history-step')[2]!
     expect(later.dataset.after).toBe('true')
     await act(async () => later.querySelector('button')!.click())
@@ -813,6 +825,8 @@ describe('History and Undo', () => {
       undefined,
       () => takesView(3, [[3, undefined]]),
     )
+    expect(text(host.querySelector('.history-button'))).toBe('History (1) ▾')
+    await openHistory(host)
     expect(steps(host)).toEqual(['Take 3 · in the game · made from the prompt'])
     expect(button(host, 'Undo: back to Take 3 Z')).toBeUndefined()
     expect(text(host)).not.toContain('Undo')
@@ -824,6 +838,7 @@ describe('History and Undo', () => {
       undefined,
       () => takesView(null, [[1, undefined]]),
     )
+    await openHistory(host)
     expect(steps(host)).toEqual(["The game's own image"])
   })
 
@@ -849,7 +864,7 @@ describe('History and Undo', () => {
       undefined,
       () => takesView(8, CHAIN),
     )
-    expect(host.querySelector('.history')).toBeNull()
+    expect(host.querySelector('.history-button')).toBeNull()
     expect(text(host)).not.toContain("The game's own image")
   })
 
@@ -889,5 +904,72 @@ describe('History and Undo', () => {
     release()
     await settle()
     expect(sent.filter((s) => s.path.endsWith('/choose'))).toHaveLength(1)
+  })
+
+  it('chooses a step from the popover, which then closes with focus on the button', async () => {
+    const { host, sent } = await render(
+      () => view({ picture: picture(8) }),
+      undefined,
+      () => takesView(8, CHAIN),
+    )
+    await openHistory(host)
+    expect(document.activeElement?.closest('.history-step')?.getAttribute('data-now')).toBe('true')
+    await act(async () => host.querySelector<HTMLElement>('.history-pick')!.click())
+    await settle()
+    expect(sent[0]).toMatchObject({ path: '/api/images/inn/choose', body: { n: 3 } })
+    expect(host.querySelector('.history-popover')).toBeNull()
+    expect(document.activeElement).toBe(host.querySelector('.history-button'))
+  })
+
+  it('shows no History while the steps are not known, and the same words as before in Undo', async () => {
+    const { host } = await render(() => view({ picture: picture(8) }))
+    expect(host.querySelector('.history-button')).toBeNull()
+    expect(text(host)).not.toContain('Undo')
+  })
+
+  it('moves focus without scrolling the page after Make and after Drop', async () => {
+    const { host } = await render(() => view({ tunes: [tune(1), tune(2)] }))
+    const quiet: unknown[] = []
+    const focus = HTMLElement.prototype.focus
+    HTMLElement.prototype.focus = function (options?: FocusOptions) {
+      quiet.push(options?.preventScroll)
+      focus.call(this, options)
+    }
+    try {
+      await type(wordsBox(host), 'Add a cat')
+      await act(async () => button(host, 'Make 4 fine-tunes')!.click())
+      await settle()
+      expect(quiet.length).toBeGreaterThan(0)
+      expect(quiet.every((q) => q === true)).toBe(true)
+      quiet.length = 0
+      await act(async () => await new Promise((r) => setTimeout(r, 1050)))
+      await act(async () => button(host, 'Drop D')!.click())
+      await settle()
+      expect(quiet.length).toBeGreaterThan(0)
+      expect(quiet.every((q) => q === true)).toBe(true)
+    } finally {
+      HTMLElement.prototype.focus = focus
+    }
+  })
+
+  it('turns the steps in the popover off with the reason while the style needs fixing or the lock is unreadable', async () => {
+    for (const [over, why] of [
+      [
+        { lookError: 'The style is broken.' },
+        'The style needs fixing first. Fix it to choose this take.',
+      ],
+      [{ lockUnread: true }, IMAGES_LOCK_WHY],
+    ] as const) {
+      const { host } = await render(
+        () => view({ picture: picture(8) }),
+        undefined,
+        () => takesView(8, CHAIN, over),
+      )
+      await openHistory(host)
+      const picks = [...host.querySelectorAll<HTMLElement>('.history-pick')]
+      expect(picks.length).toBe(2)
+      expect(picks.every(isOff)).toBe(true)
+      expect(picks.every((p) => p.getAttribute('data-why') === why)).toBe(true)
+    }
   })
 })

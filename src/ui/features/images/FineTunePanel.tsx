@@ -1,7 +1,7 @@
 import { fieldOwnsKeys, NOT_YET, useDocumentKeys, usePendingFocus } from './useWorkbenchKeys'
 import { useJobOpen } from './ImageJobTabs'
-import { FitPicture, pictureShape } from './FitPicture'
-import { useFillWindow } from '../../fillWindow'
+import { pictureShape } from './FitPicture'
+import { HistoryMenu } from './HistoryMenu'
 import {
   useEffect,
   useLayoutEffect,
@@ -161,7 +161,6 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
     return !target && typeof want === 'object' ? NOT_YET : target
   }, query.data)
   const start = useRef<{ x: number; y: number } | null>(null)
-  const fill = useFillWindow()
   const asked = useRef(new Set<number>())
   const changing = useRef(false)
   const cameShown = useRef(false)
@@ -345,6 +344,7 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
           view.making.some((m) => m.n === n) && nextMaking
             ? { stop: nextMaking.n }
             : (next ?? 'words'),
+          true,
         )
       },
     })
@@ -454,122 +454,129 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
           </button>
         </section>
       )}
-      <div className="fine-job" ref={fill}>
-        <div className="fine-stage">
-          <FitPicture>
-            <div
-              className="patch-stage fit-shape"
-              style={pictureShape(picture.width, picture.height)}
-              onPointerDown={(event) => {
-                if (event.button !== 0 || event.ctrlKey) return
-                event.preventDefault()
-                event.currentTarget.setPointerCapture(event.pointerId)
-                start.current = { x: event.clientX, y: event.clientY }
-              }}
-              onPointerMove={dragTo}
-              onPointerUp={(event) => {
-                dragTo(event)
-                start.current = null
-              }}
-              onPointerCancel={() => {
-                start.current = null
-              }}
-            >
-              <img
-                className="patch-take"
-                src={baseSrc}
-                alt={pictureCaption(picture)}
-                draggable={false}
+      <div className="fine-job">
+        <div className="fine-band">
+          <div className="fine-words">
+            <label className="field">
+              <span className="lbl">What to change</span>
+              <textarea
+                ref={wordsBox}
+                className="input"
+                rows={3}
+                value={words}
+                placeholder="Say what to add, remove or change"
+                onChange={(event) => setWords(event.target.value)}
               />
-              {overlaid && (
-                <img
-                  className="patch-over"
-                  src={tuneSrc(overlaid.n)}
-                  alt={`Fine-tune ${overlaid.n}`}
-                  draggable={false}
-                />
+            </label>
+            <span className="muted small">
+              Drag on the picture to change only part of it; with no mark the whole picture is
+              changed.{' '}
+              {mark && (
+                <button type="button" className="patch-back" onClick={() => setMarked(null)}>
+                  Clear the mark
+                </button>
               )}
-              {showMark && mark && <div className="patch-mark" style={placed(mark, picture)} />}
-            </div>
-          </FitPicture>
-          <div className="fine-under">
-            <span className="fine-caption">
-              {stageCaption(picture, overlaid?.n ?? null)}
-              {overlaid?.isNew && <span className="chip chip-new">new</span>}
             </span>
-            <span className="fine-buttons">
-              <button
-                type="button"
-                className="btn"
-                aria-pressed={showing}
-                {...off(!shown && 'Make a fine-tune first.')}
-                onClick={() => setShowing((on) => !on)}
+          </div>
+          <div className="fine-controls">
+            <EditModelMenu
+              value={model}
+              onChange={setPick}
+              downloads={view.models}
+              failed={view.failedModels}
+              label="Model for new takes"
+              visible
+              why={menuWhy}
+            />
+            <div className="patch-make">
+              <select
+                className="takes-count"
+                aria-label="Number of fine-tunes"
+                value={count}
+                {...off(menuWhy)}
+                onChange={(event) => setCount(Number(event.target.value))}
               >
-                Before / after <span className="faint small">S</span>
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                {...off(
-                  !shown && 'Make a fine-tune first.',
-                  shown && changingPicture && WAIT_FOR_CHANGE,
-                  shown && justFinished(shown.n) && JUST_FINISHED,
-                )}
-                onClick={() => shown && onDrop(shown.n)}
-              >
-                Drop <span className="faint small">D</span>
-              </button>
+                {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 className="btn btn-primary"
-                {...off(
-                  !shown && 'Make a fine-tune first.',
-                  chooseWhy,
-                  shown && justFinished(shown.n) && JUST_FINISHED,
-                )}
-                onClick={() => shown && onUse(shown.n)}
+                {...off(makeWhy)}
+                onClick={() => {
+                  make.reset()
+                  // The button goes off while they are made: focus goes to the fine-tune looked at, so ← and → keep stepping.
+                  focusOn(lookingAt ?? 'words', true)
+                  make.mutate({ count, words: words1, area: mark, model })
+                }}
               >
-                Choose <span className="faint small">C</span>
+                {makeLabel(count)}
               </button>
-            </span>
+              {busy && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  {...off(stop.isPending && WAIT_FOR_CHANGE)}
+                  onClick={() => stop.mutate()}
+                >
+                  Stop
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="fine-tools">
+          {!modelHere && <span className="faint small">{EDIT_SETUP_LINE}</span>}
+          {!view.maker.ok && (
+            <span className="takes-missing small" role="status">
+              {view.maker.message}
+            </span>
+          )}
+          {problem && <span className="adopt-error">{problem}</span>}
+          {error && <span className="adopt-error">{error.message}</span>}
           {history && (
-            <>
-              <h3>History</h3>
-              <div className="history">
-                {steps.map((step) =>
-                  step.kind === 'game' ? (
-                    <div key="game" className="history-step" data-now="true">
-                      <span className="history-dot" />
-                      <span>The game&apos;s own image</span>
-                    </div>
-                  ) : (
-                    <div
-                      key={step.n}
-                      className="history-step"
-                      data-now={step.inGame ? 'true' : undefined}
-                      data-after={step.after ? 'true' : undefined}
-                    >
-                      <span className="history-dot" />
-                      {step.inGame ? (
-                        <span>{stepLabel(step)}</span>
+            <span className="fine-history">
+              <HistoryMenu count={steps.length} resetKey={pictureKey} active={jobOpen}>
+                {(close) => (
+                  <div className="history">
+                    {steps.map((step) =>
+                      step.kind === 'game' ? (
+                        <div key="game" className="history-step" data-now="true" tabIndex={-1}>
+                          <span className="history-dot" />
+                          <span>The game&apos;s own image</span>
+                        </div>
                       ) : (
-                        <button
-                          type="button"
-                          className="history-pick"
-                          title={`Choose Take ${step.n} again`}
-                          {...off(chooseWhy)}
-                          onClick={() => onStep(step.n)}
+                        <div
+                          key={step.n}
+                          className="history-step"
+                          data-now={step.inGame ? 'true' : undefined}
+                          data-after={step.after ? 'true' : undefined}
+                          tabIndex={step.inGame ? -1 : undefined}
                         >
-                          {stepLabel(step)}
-                        </button>
-                      )}
-                    </div>
-                  ),
+                          <span className="history-dot" />
+                          {step.inGame ? (
+                            <span>{stepLabel(step)}</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="history-pick"
+                              title={`Choose Take ${step.n} again`}
+                              {...off(chooseWhy)}
+                              onClick={() => {
+                                close()
+                                onStep(step.n)
+                              }}
+                            >
+                              {stepLabel(step)}
+                            </button>
+                          )}
+                        </div>
+                      ),
+                    )}
+                  </div>
                 )}
-              </div>
+              </HistoryMenu>
               {history.undoTo !== null && (
                 <button
                   type="button"
@@ -580,83 +587,86 @@ export function FineTunePanel({ row }: { row: ImageRow }) {
                   Undo: back to Take {history.undoTo} <span className="faint small">Z</span>
                 </button>
               )}
-            </>
+            </span>
           )}
-          <label className="field">
-            <span className="lbl">What to change</span>
-            <textarea
-              ref={wordsBox}
-              className="input"
-              rows={3}
-              value={words}
-              placeholder="Say what to add, remove or change"
-              onChange={(event) => setWords(event.target.value)}
-            />
-          </label>
-          <span className="muted small">
-            Drag on the picture to change only part of it; with no mark the whole picture is
-            changed.{' '}
-            {mark && (
-              <button type="button" className="patch-back" onClick={() => setMarked(null)}>
-                Clear the mark
-              </button>
-            )}
+        </div>
+        <div className="fine-bar">
+          <span className="fine-caption">
+            {stageCaption(picture, overlaid?.n ?? null)}
+            {overlaid?.isNew && <span className="chip chip-new">new</span>}
           </span>
-          <EditModelMenu
-            value={model}
-            onChange={setPick}
-            downloads={view.models}
-            failed={view.failedModels}
-            label="Model for new takes"
-            visible
-            why={menuWhy}
-          />
-          <div className="patch-make">
-            <select
-              className="takes-count"
-              aria-label="Number of fine-tunes"
-              value={count}
-              {...off(menuWhy)}
-              onChange={(event) => setCount(Number(event.target.value))}
+          <span className="fine-buttons">
+            <button
+              type="button"
+              className="btn"
+              aria-pressed={showing}
+              {...off(!shown && 'Make a fine-tune first.')}
+              onClick={() => setShowing((on) => !on)}
             >
-              {Array.from({ length: MAX_AT_ONCE }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+              Before / after <span className="faint small">S</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              {...off(
+                !shown && 'Make a fine-tune first.',
+                shown && changingPicture && WAIT_FOR_CHANGE,
+                shown && justFinished(shown.n) && JUST_FINISHED,
+              )}
+              onClick={() => shown && onDrop(shown.n)}
+            >
+              Drop <span className="faint small">D</span>
+            </button>
             <button
               type="button"
               className="btn btn-primary"
-              {...off(makeWhy)}
-              onClick={() => {
-                make.reset()
-                // The button goes off while they are made: focus goes to the fine-tune looked at, so ← and → keep stepping.
-                focusOn(lookingAt ?? 'words')
-                make.mutate({ count, words: words1, area: mark, model })
-              }}
+              {...off(
+                !shown && 'Make a fine-tune first.',
+                chooseWhy,
+                shown && justFinished(shown.n) && JUST_FINISHED,
+              )}
+              onClick={() => shown && onUse(shown.n)}
             >
-              {makeLabel(count)}
+              Choose <span className="faint small">C</span>
             </button>
-            {busy && (
-              <button
-                type="button"
-                className="btn btn-ghost"
-                {...off(stop.isPending && WAIT_FOR_CHANGE)}
-                onClick={() => stop.mutate()}
-              >
-                Stop
-              </button>
-            )}
-          </div>
-          {!modelHere && <span className="faint small">{EDIT_SETUP_LINE}</span>}
-          {!view.maker.ok && (
-            <span className="takes-missing small" role="status">
-              {view.maker.message}
-            </span>
+          </span>
+        </div>
+        <div
+          className="patch-stage fine-picture"
+          style={{
+            ...pictureShape(picture.width, picture.height),
+            maxWidth: `${picture.width}px`,
+          }}
+          onPointerDown={(event) => {
+            if (event.button !== 0 || event.ctrlKey) return
+            event.preventDefault()
+            event.currentTarget.setPointerCapture(event.pointerId)
+            start.current = { x: event.clientX, y: event.clientY }
+          }}
+          onPointerMove={dragTo}
+          onPointerUp={(event) => {
+            dragTo(event)
+            start.current = null
+          }}
+          onPointerCancel={() => {
+            start.current = null
+          }}
+        >
+          <img
+            className="patch-take"
+            src={baseSrc}
+            alt={pictureCaption(picture)}
+            draggable={false}
+          />
+          {overlaid && (
+            <img
+              className="patch-over"
+              src={tuneSrc(overlaid.n)}
+              alt={`Fine-tune ${overlaid.n}`}
+              draggable={false}
+            />
           )}
-          {problem && <span className="adopt-error">{problem}</span>}
-          {error && <span className="adopt-error">{error.message}</span>}
+          {showMark && mark && <div className="patch-mark" style={placed(mark, picture)} />}
         </div>
         <div className="fine-strip">
           <span className="fine-strip-label">Fine-tunes</span>
