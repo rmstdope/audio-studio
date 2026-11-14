@@ -274,6 +274,39 @@ describe('createEffectTakes', () => {
     expect(calls).toEqual([])
   })
 
+  it('shows a take only once the model’s failure is cleared', async () => {
+    let open: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (open = resolve))
+    const health: Pick<EffectHealthStore, 'read' | 'record' | 'clear'> = {
+      read: async () => ({}),
+      record: async () => {},
+      clear: () => gate,
+    }
+    const root = tempRepo({
+      'content-studio.json': projectJson({ effects }),
+      'tts/effects.json': [{ id: 'coins', text: 'Coins', seconds: 0.5 }],
+    })
+    const file = join(root, 'content-studio.json')
+    const { generator } = fakeGenerator()
+    const takes = createEffectTakes({ generator, health, queue: createSerial(), newSeed: () => 1 })
+    await takes.make(file, 'coins', { count: 1 })
+    // The board is written, the clear is held: a view waits for the turn rather than show the take.
+    for (let i = 0; i < 400; i++) {
+      const boardFile = join(root, 'content-studio/cache/effect-boards/coins.json')
+      if (existsSync(boardFile) && readFileSync(boardFile, 'utf8').includes('"takes": [\n')) break
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    let shown = false
+    const view = takes.view(file, 'coins').then((v) => {
+      shown = true
+      return v
+    })
+    await new Promise((r) => setTimeout(r, 60))
+    expect(shown).toBe(false)
+    open()
+    expect(await view).toMatchObject({ takes: [{ n: 1 }] })
+  })
+
   /**
    * A take of `coins` made up to the moment its WAV is written, with the effect's board turn held
    * there; `release` lets the board be saved.
@@ -373,8 +406,8 @@ describe('createEffectTakes', () => {
       await new Promise((r) => setTimeout(r, 5))
     }
     expect(readdirSync(takes)).toEqual([])
-    // The model made the take: no failure is recorded, and an earlier one is cleared.
-    expect(held.calls).toEqual(['clear small-sfx'])
+    // A save the board refused neither records a failure nor clears an earlier one.
+    expect(held.calls).toEqual([])
   })
 
   it('names the take’s file, not the model, when its WAV cannot be written, and leaves the model’s health as it was', async () => {

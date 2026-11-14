@@ -382,6 +382,60 @@ describe('the take engine', () => {
       expect(writes).toEqual([])
     })
 
+    it('keeps the file and answers true when Stop arrives after the board lists the take', async () => {
+      const { root, engine, access, writes } = saving()
+      const stop = new AbortController()
+      const saved = await engine.save('p', 'x', access, {
+        root,
+        path: 'takes/1.wav',
+        bytes: new Uint8Array([1]),
+        stop: stop.signal,
+        change: (board) => {
+          board.next = 7
+          // Stop arrives once the take is on the board, before the board turn returns.
+          stop.abort()
+        },
+      })
+      expect(saved).toBe(true)
+      expect(existsSync(file(root))).toBe(true)
+      expect(JSON.parse(writes[0]!).next).toBe(7)
+    })
+
+    it('calls written once the board lists the take, and never when the board is refused or the take stopped', async () => {
+      const { root, engine, access } = saving()
+      let written = 0
+      const base = { root, path: 'takes/1.wav', bytes: new Uint8Array([1]), change: () => {} }
+      await engine.save('p', 'x', access, {
+        ...base,
+        stop: new AbortController().signal,
+        change: (board) => void board.next++,
+        written: async () => void written++,
+      })
+      expect(written).toBe(1)
+      const refusing: BoardAccess<TakeBoard> = {
+        read: access.read,
+        write: async () => {
+          throw new WriteRefused('boards/x.json', 'permission denied', null)
+        },
+      }
+      await expect(
+        engine.save('p', 'x', refusing, {
+          ...base,
+          stop: new AbortController().signal,
+          change: (board) => void board.next++,
+          written: async () => void written++,
+        }),
+      ).rejects.toBeInstanceOf(WriteRefused)
+      const stopped = new AbortController()
+      stopped.abort()
+      await engine.save('p', 'x', access, {
+        ...base,
+        stop: stopped.signal,
+        written: async () => void written++,
+      })
+      expect(written).toBe(1)
+    })
+
     it('shows a save failure as a failed take without calling the medium’s failed hook', async () => {
       const { engine, access, entry } = setup()
       const [take] = (await engine.reserve('p', 'x', access, 1, entry)) as TakeEntry[]

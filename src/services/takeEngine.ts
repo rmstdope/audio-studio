@@ -114,6 +114,8 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
       change: (board: B) => T | Promise<T>,
       /** Called when the board cannot be written, to take back what `change` did elsewhere. */
       undo?: () => Promise<void>,
+      /** Called in the same turn once the board is saved (or needed no write), before the turn ends. */
+      written?: () => Promise<void>,
     ): Promise<T | ProjectFailure> {
       return this.inTurn(projectFile, id, async () => {
         const board = await access.read()
@@ -130,6 +132,7 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
             throw error
           }
         }
+        await written?.()
         return answer
       })
     },
@@ -219,7 +222,8 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
     /**
      * Saves a made take: its file first (a take is on the board only once its file is there), then
      * the board in its turn, where `change` puts it (not run once `stop` is aborted). The file is
-     * removed again, and `cleanup` called, when the take was stopped or could not be saved.
+     * removed again, and `cleanup` called, when the take was stopped before the board listed it or could
+     * not be saved; a take the board lists keeps its file and answers true, whenever Stop came.
      * Answers false when stopped; throws the `WriteRefused` of a file or board that cannot be
      * written, or `BoardUnusable` when the board cannot be read: neither is the model's failure.
      */
@@ -235,6 +239,8 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
         stop: AbortSignal
         change: (board: B) => void | Promise<void>
         cleanup?: () => void
+        /** Called in the board's turn once the board lists the take, before the turn ends; must not throw. */
+        written?: () => Promise<void>
       },
     ): Promise<boolean> {
       const removeFile = async () => {
@@ -248,17 +254,29 @@ export function createTakeEngine<E extends TakeEntry, B extends TakeBoard>({
         throw error
       }
       let saved: void | ProjectFailure
+      // Decided in the board's turn: a take that reached the board keeps its file, whenever Stop comes.
+      let listed = false
       try {
-        saved = await this.changeBoard(projectFile, id, access, async (board) => {
-          // Stopped while its file was written or it waited for the board: not put on it.
-          if (take.stop.aborted) return
-          await take.change(board)
-        })
+        saved = await this.changeBoard(
+          projectFile,
+          id,
+          access,
+          async (board) => {
+            // Stopped while its file was written or it waited for the board: not put on it.
+            if (take.stop.aborted) return
+            await take.change(board)
+            listed = true
+          },
+          undefined,
+          async () => {
+            if (listed) await take.written?.()
+          },
+        )
       } catch (error) {
         await removeFile()
         throw error
       }
-      if (take.stop.aborted) {
+      if (!listed && take.stop.aborted) {
         await removeFile()
         return false
       }
