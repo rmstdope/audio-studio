@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Patches final</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --err: #ff6b6b;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .about {
+        background: #1b1408;
+        border-bottom: 1px solid #4a3a18;
+        padding: 10px 16px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .about b {
+        color: var(--warn);
+      }
+      .about .opts {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+      }
+      .about label {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        cursor: pointer;
+      }
+      .shell {
+        display: flex;
+        min-height: calc(100vh - 60px);
+      }
+      .rail {
+        width: 56px;
+        flex: none;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding-top: 16px;
+      }
+      .rail i {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        background: var(--raised);
+        display: block;
+      }
+      .rail i.on {
+        background: #3a2416;
+        outline: 1px solid var(--accent);
+      }
+      main {
+        flex: 1;
+        min-width: 0;
+        padding: 18px 24px 40px;
+      }
+      .crumbs {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 2px 0 0;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin: 12px 0;
+        flex-wrap: wrap;
+      }
+      .tab {
+        padding: 7px 12px;
+        border-radius: 9px;
+        background: var(--chip);
+        color: var(--muted);
+      }
+      .tab.on {
+        background: #23263a;
+        outline: 1px solid #3a3f5c;
+        color: var(--text);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 20px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      .pchip {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        font-size: 13px;
+      }
+      .pchip.on {
+        outline: 2px solid var(--accent);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #3a3f4c;
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--muted);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .chip.new {
+        background: #2a1b12;
+        color: #ff9a6b;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        padding: 6px 12px;
+        border-radius: 9px;
+        font: inherit;
+        font-size: 13px;
+        cursor: default;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: transparent;
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      kbd {
+        font:
+          11px ui-monospace,
+          monospace;
+        padding: 0 4px;
+        border-radius: 4px;
+        border: 1px solid var(--line-strong);
+        color: var(--muted);
+        margin-left: 4px;
+      }
+      select {
+        background: var(--raised);
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 6px 8px;
+        font: inherit;
+        font-size: 13px;
+      }
+      textarea {
+        width: 100%;
+        background: #0d0f14;
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font: inherit;
+        resize: vertical;
+        min-height: 44px;
+      }
+      h3 {
+        margin: 0;
+        font-size: 15px;
+      }
+      .faint {
+        color: var(--faint);
+        font-size: 12.5px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      /* tools */
+      .tools {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px 20px;
+        align-items: start;
+      }
+      .tools .make {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .tools.stack {
+        display: flex;
+        flex-direction: column;
+      }
+      @container (max-width: 640px) {
+        .tools {
+          grid-template-columns: 1fr;
+        }
+      }
+      .bench-right {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 16px;
+        align-items: start;
+      }
+      .side-list {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .plist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .prow {
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .prow.on {
+        outline: 2px solid var(--accent);
+      }
+      .panel-inner {
+        container-type: inline-size;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      /* picture */
+      .looking {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      .lbl {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .pic-wrap {
+        position: relative;
+      }
+      .stage {
+        position: relative;
+        border-radius: 6px;
+        overflow: hidden;
+        cursor: crosshair;
+        background: #000;
+      }
+      .stage canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .stage.px canvas {
+        image-rendering: pixelated;
+      }
+      .mark {
+        position: absolute;
+        border: 2px dashed #fff;
+        box-shadow: 0 0 0 1px #000;
+        border-radius: 2px;
+      }
+      .measure {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        background: rgb(0 0 0/70%);
+        color: #fff;
+        font:
+          11px ui-monospace,
+          monospace;
+        padding: 2px 6px;
+        border-radius: 5px;
+      }
+
+      /* takes */
+      .takes-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+        align-items: center;
+      }
+      .takes-head h4 {
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .thumbs {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        gap: 8px;
+      }
+      .thumb {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 5px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .thumb.on {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .thumb .cu {
+        height: 64px;
+        border-radius: 5px;
+        background: linear-gradient(135deg, #5a3f22, #2b2016);
+      }
+      .thumb .cu.b {
+        background: linear-gradient(135deg, #4c3a28, #1f1a14);
+      }
+      .thumb .cu.c {
+        background: linear-gradient(135deg, #6a4a28, #2e2216);
+      }
+      .confirm {
+        background: #16130b;
+        border: 1px solid #6b5420;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 640px;
+      }
+      .ph {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 16px;
+        border: 1px dashed #2c3040;
+        background: #0d0f14;
+        color: var(--faint);
+        border-radius: 6px;
+      }
+      .ph.err {
+        color: var(--err);
+        border-color: #5a2a2a;
+      }
+      .empty {
+        border: 1px dashed #2c3040;
+        border-radius: 10px;
+        padding: 14px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .check {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="about">
+      <b>The agreed Patches tab</b> — Controls on top; the take’s row above the picture; every
+      picture as wide as the panel allows, up to the take’s own size (1024 px for a wide one), never
+      enlarged past it, the page scrolling when it is taller than the window. “What the game gets”
+      is shown at the take’s size with crisp pixels. Pick a state:
+      <div class="opts" id="opts"></div>
+    </div>
+    <div class="shell">
+      <nav class="rail"><i></i><i></i><i class="on"></i><i></i><i></i></nav>
+      <main>
+        <div class="crumbs">Act 1 · Images</div>
+        <h1 id="title">The lantern hall</h1>
+        <div class="mono" id="ident">lantern-hall · 320 × 200</div>
+        <div class="tabs">
+          <span class="tab">Make</span><span class="tab">Fine-tune</span
+          ><span class="tab on">Patches · 2</span><span class="tab">Named areas</span>
+        </div>
+        <section class="panel" id="panel"></section>
+      </main>
+    </div>
+    <script>
+      const CFG = { tools: 'above', fit: 'width', final: true }
+      if (CFG.final) {
+        const q = new URLSearchParams(location.search)
+        const st = q.get('state') || 'wide'
+        if (st === 'tall') ((CFG.portrait = true), (CFG.list = 'side'))
+        if (st === 'unchoose') CFG.confirm = 'inline'
+        if (st === 'bringing') CFG.bringing = true
+        if (st === 'error') CFG.lookError = true
+        if (st === 'nochosen') CFG.noChosen = true
+        if (st === 'notakes') CFG.noTakes = true
+        CFG.state = st
+      }
+      const portrait = !!CFG.portrait
+      const take = portrait ? { w: 816, h: 1024 } : { w: 1024, h: 640 }
+      const gameSz = portrait ? { w: 160, h: 200 } : { w: 320, h: 200 }
+      let gameOn = CFG.game !== false
+      if (portrait) {
+        document.getElementById('title').textContent = 'The cellar door'
+        document.getElementById('ident').textContent = 'cellar-door · 160 × 200'
+      }
+
+      const chips = `
+        <div class="chips"><span class="label">Patches the game asks for</span>
+          <span class="pchip on"><span class="dot"></span>${portrait ? 'Door open' : 'Bread taken'}</span>
+          <span class="pchip"><span class="dot ok"></span>${portrait ? 'Lamp lit' : 'Fire out'}</span>
+        </div>`
+      const sideList = `
+        <div class="col"><h3 style="font-size:13px">Patches the game asks for</h3>
+          <ul class="plist">
+            <li class="prow on"><b>Door open</b><span class="mono">door-open</span><span><span class="chip">3 takes</span></span></li>
+            <li class="prow"><b>Lamp lit</b><span class="mono">lamp-lit</span><span><span class="chip ok">Take 1 chosen</span></span></li>
+          </ul></div>`
+      const words = portrait
+        ? 'Open the door a crack, light spilling through'
+        : 'Remove the bread from the table'
+      const toolsHead = `
+        <div class="col">
+          <h3>${portrait ? 'Door open' : 'Bread taken'}</h3>
+          <textarea rows="2">${words}</textarea>
+          <span class="faint">Drag over the picture to mark what should change.</span>
+        </div>`
+      const toolsMake = `
+        <div class="make">
+          <label class="row"><span class="label">Model for new takes</span>
+            <select><option>FLUX.2 klein 4B</option><option>Qwen Image Edit</option></select></label>
+          <div class="row"><select aria-label="Number of new takes"><option>2 takes</option></select>
+            <button class="btn primary">Make 2 more takes</button></div>
+          <span class="faint"><kbd>←</kbd><kbd>→</kbd> take · <kbd>C</kbd> choose · <kbd>D</kbd> drop · <kbd>S</kbd> patch off/on</span>
+        </div>`
+      const tools = (stack) =>
+        `<div class="tools${stack ? ' stack' : ''}">${toolsHead}${toolsMake}</div>`
+      const looking = `
+        <div class="looking">
+          <span class="lbl">Looking at</span><b>Take 2</b><span class="faint">FLUX.2 klein</span>
+          <span style="flex:1"></span>
+          <button class="btn">Patch off<kbd>S</kbd></button>
+          <button class="btn ghost">Drop<kbd>D</kbd></button>
+          <button class="btn primary">Choose<kbd>C</kbd></button>
+        </div>`
+      const picture = `
+        <div class="pic-wrap" id="picwrap">
+          <div class="stage" id="stage"><canvas id="cv"></canvas>
+            <div class="mark" id="mark"></div>
+            <span class="measure" id="measure"></span>
+          </div>
+        </div>
+        <span class="faint" id="cap"></span>`
+      const takes = `
+        <div class="col">
+          <div class="takes-head"><h4>Takes · 3</h4>
+            <label class="check"><input type="checkbox" id="gamebox" ${gameOn ? 'checked' : ''}/> What the game gets</label></div>
+          <div class="thumbs">
+            <div class="thumb"><div class="cu"></div><span class="row"><span style="flex:1">Take 1</span></span><span class="faint">FLUX.2 klein</span></div>
+            <div class="thumb on"><div class="cu b"></div><span class="row"><span style="flex:1">Take 2</span><span class="chip new">new</span></span><span class="faint">FLUX.2 klein</span></div>
+            <div class="thumb"><div class="cu c"></div><span class="row"><span style="flex:1">Take 3</span><span class="chip new">new</span></span><span class="faint">Qwen Image Edit</span></div>
+          </div>
+          <span class="faint">Press a take, or use ← →, to lay it over the picture.</span>
+        </div>`
+
+      let body
+      const confirmBox = `
+        <div class="confirm" role="alertdialog">
+          <b>Un-choose take 1?</b>
+          <span class="muted">The game shows the image without this patch until you choose another. Take 1 stays among the takes.</span>
+          <div class="row"><button class="btn">Cancel</button><button class="btn primary">Un-choose</button></div>
+        </div>`
+      let picCol =
+        CFG.lookingPos === 'below'
+          ? `<div class="col">${picture}${looking}</div>`
+          : `<div class="col">${looking}${picture}</div>`
+      if (CFG.confirm === 'replace')
+        picCol = `<div class="col">${confirmBox}<div style="display:none">${picture}</div></div>`
+      if (CFG.confirm === 'inline') picCol = `<div class="col">${confirmBox}${picture}</div>`
+      if (CFG.tools === 'right') {
+        body = `${chips}<div class="bench-right">${picCol}<div class="col">${tools(true)}</div></div>${takes}`
+      } else if (CFG.tools === 'below') {
+        body = `${chips}${picCol}${tools(false)}${takes}`
+      } else {
+        const inner = `${tools(false)}${picCol}${takes}`
+        body =
+          CFG.list === 'side'
+            ? `<div class="side-list">${sideList}<div class="panel-inner">${inner}</div></div>`
+            : `${chips}<div class="panel-inner">${inner}</div>`
+      }
+      if (CFG.noChosen)
+        body = `${chips}<h3>Bread taken</h3><textarea rows="2">${words}</textarea><span class="muted">Choose a take of the image first. Patches are painted onto the take the game shows.</span>`
+      if (CFG.noTakes)
+        body = body
+          .replace(
+            /<div class="thumbs">[\s\S]*?Press a take, or use ← →, to lay it over the picture.<\/span>/,
+            '<div class="empty">No takes yet. Each take is a new try at this change, painted with the part of the picture around the mark in view.</div>',
+          )
+          .replace('Takes · 3', 'Takes')
+          .replace(
+            /<div class="looking">[\s\S]*?<\/div>/,
+            '<div class="looking"><span class="lbl">The chosen take of the image</span></div>',
+          )
+          .replace('Make 2 more takes', 'Make 2 takes')
+      document.getElementById('panel').innerHTML = body
+      if (CFG.final) {
+        const states = [
+          ['wide', 'A wide picture'],
+          ['tall', 'A tall picture (side list)'],
+          ['unchoose', 'Un-choose question open'],
+          ['bringing', "Bringing to the game's look"],
+          ['error', 'The style cannot be read'],
+          ['notakes', 'No takes yet'],
+          ['nochosen', 'No chosen take of the image'],
+        ]
+        document.getElementById('opts').innerHTML = states
+          .map(([k, l]) =>
+            k === CFG.state
+              ? `<b>${l}</b>`
+              : `<a href="?state=${k}" style="color:var(--accent)">${l}</a>`,
+          )
+          .join(' · ')
+      }
+      if (CFG.toggle) {
+        document.getElementById('opts').innerHTML =
+          `<label><input type="checkbox" id="gt" ${gameOn ? 'checked' : ''}/> Tick “What the game gets” (as the tab opens)</label>`
+        document.getElementById('gt').onchange = (e) => {
+          gameOn = e.target.checked
+          document.getElementById('gamebox').checked = gameOn
+          draw()
+        }
+      }
+      const gb = document.getElementById('gamebox')
+      if (gb)
+        gb.onchange = (e) => {
+          gameOn = e.target.checked
+          const gt = document.getElementById('gt')
+          if (gt) gt.checked = gameOn
+          draw()
+        }
+
+      // A made-up scene, drawn at the size being shown: smooth for a take, blocky for the game's look.
+      function paint(cv, w, h) {
+        cv.width = w
+        cv.height = h
+        const g = cv.getContext('2d')
+        g.imageSmoothingEnabled = false
+        const s = w / (portrait ? 816 : 1024)
+        const gr = g.createLinearGradient(0, 0, 0, h)
+        gr.addColorStop(0, '#2b2236')
+        gr.addColorStop(0.55, '#4a3326')
+        gr.addColorStop(1, '#1d1510')
+        g.fillStyle = gr
+        g.fillRect(0, 0, w, h)
+        if (portrait) {
+          g.fillStyle = '#3a3a42'
+          for (let y = 0; y < h; y += 90 * s) g.fillRect(0, y, w, 4 * s)
+          g.fillStyle = '#5a3a1e'
+          g.fillRect(208 * s, 260 * s, 400 * s, 640 * s)
+          g.fillStyle = '#2a2a30'
+          for (const y of [360, 560, 760]) g.fillRect(208 * s, y * s, 400 * s, 24 * s)
+          g.fillStyle = '#c9a24a'
+          g.beginPath()
+          g.arc(560 * s, 600 * s, 18 * s, 0, 7)
+          g.fill()
+          g.fillStyle = '#ffcf6b'
+          g.beginPath()
+          g.arc(120 * s, 300 * s, 30 * s, 0, 7)
+          g.fill()
+        } else {
+          g.fillStyle = '#3a2a1e'
+          g.fillRect(0, 420 * s, w, h)
+          for (const x of [120, 340, 560, 780, 960]) {
+            g.fillStyle = '#ffcf6b'
+            g.beginPath()
+            g.arc(x * s, 90 * s, 14 * s, 0, 7)
+            g.fill()
+            g.fillStyle = 'rgba(255,200,100,.15)'
+            g.beginPath()
+            g.arc(x * s, 90 * s, 48 * s, 0, 7)
+            g.fill()
+          }
+          g.fillStyle = '#6b4424'
+          g.fillRect(260 * s, 360 * s, 520 * s, 40 * s)
+          g.fillRect(290 * s, 400 * s, 20 * s, 120 * s)
+          g.fillRect(730 * s, 400 * s, 20 * s, 120 * s)
+          g.fillStyle = '#c99a52'
+          g.beginPath()
+          g.ellipse(470 * s, 350 * s, 50 * s, 22 * s, 0, 0, 7)
+          g.fill()
+          g.fillStyle = '#e8e2d0'
+          g.beginPath()
+          g.ellipse(600 * s, 356 * s, 34 * s, 10 * s, 0, 0, 7)
+          g.fill()
+          g.fillStyle = '#2b1a10'
+          g.fillRect(860 * s, 250 * s, 140 * s, 170 * s)
+          g.fillStyle = '#ff7a2c'
+          g.beginPath()
+          g.moveTo(890 * s, 410 * s)
+          g.lineTo(930 * s, 320 * s)
+          g.lineTo(970 * s, 410 * s)
+          g.fill()
+        }
+      }
+
+      const markBox = portrait
+        ? { x: 200, y: 250, w: 420, h: 660 }
+        : { x: 400, y: 310, w: 150, h: 80 }
+
+      function draw() {
+        if (CFG.noChosen) return
+        const stage = document.getElementById('stage')
+        const wrap = document.getElementById('picwrap')
+        const cv = document.getElementById('cv')
+        const showGame = gameOn
+        const own = showGame && CFG.gameCap === 'own' ? gameSz : take
+        const ratio = take.w / take.h
+        let width = Math.min(wrap.clientWidth, own.w)
+        if (CFG.fit === 'window') {
+          const top = wrap.getBoundingClientRect().top + window.scrollY
+          const room = Math.max(240, window.innerHeight - top - 40)
+          width = Math.min(width, room * ratio)
+        }
+        width = Math.floor(width)
+        const height = Math.round(width / ratio)
+        stage.style.width = width + 'px'
+        stage.style.height = height + 'px'
+        stage.classList.toggle('px', showGame)
+        if (CFG.bringing || CFG.lookError) {
+          stage.innerHTML = CFG.lookError
+            ? '<div class="ph err" role="alert">‹the reason the studio gives today, unchanged›</div>'
+            : '<div class="ph" role="status">Bringing to the game\u2019s look…</div>'
+          document.getElementById('cap').textContent =
+            `${gameSz.w} × ${gameSz.h} · the space stays the picture’s size, so nothing moves when it arrives`
+          return
+        }
+        if (showGame) paint(cv, gameSz.w, gameSz.h)
+        else paint(cv, take.w, take.h)
+        const k = width / take.w
+        const m = document.getElementById('mark')
+        Object.assign(m.style, {
+          left: markBox.x * k + 'px',
+          top: markBox.y * k + 'px',
+          width: markBox.w * k + 'px',
+          height: markBox.h * k + 'px',
+        })
+        const shown = showGame ? gameSz : take
+        const scale = width / shown.w
+        document.getElementById('measure').textContent =
+          `shown ${width} px wide · ${scale >= 0.995 && scale <= 1.005 ? 'its own size' : scale > 1 ? scale.toFixed(1) + '× its own size' : Math.round(scale * 100) + '% of its own size'}`
+        document.getElementById('cap').textContent = showGame
+          ? `${gameSz.w} × ${gameSz.h}`
+          : `${take.w} × ${take.h}, made at the model's size`
+      }
+      addEventListener('resize', draw)
+      draw()
+    </script>
+  </body>
+</html>
