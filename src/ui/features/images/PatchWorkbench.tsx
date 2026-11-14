@@ -352,7 +352,8 @@ export function PatchWorkbench({
     choose.mutate(n, {
       onSettled: () => {
         changing.current = false
-        focusOn(lookingAt ?? 'heading')
+        // Quietly: the picture and the take's row stay in view, the strip may be far below.
+        focusOn(lookingAt ?? 'heading', true)
       },
     })
   }
@@ -364,7 +365,7 @@ export function PatchWorkbench({
     drop.mutate(n, {
       onSettled: () => {
         changing.current = false
-        focusOn(next ?? 'heading')
+        focusOn(next ?? 'heading', true)
       },
     })
   }
@@ -433,7 +434,7 @@ export function PatchWorkbench({
           onClick={() =>
             unchoose.mutate(undefined, {
               onSuccess: (answer) => {
-                if (answer.ok) focusOn(lookingAt ?? 'heading')
+                if (answer.ok) focusOn(lookingAt ?? 'heading', true)
                 else refocusUnchoose()
                 setAsking(false)
               },
@@ -619,6 +620,27 @@ export function PatchWorkbench({
           )}
           {problem && <span className="adopt-error">{problem}</span>}
           {error && <span className="adopt-error">{error.message}</span>}
+          {/* A take that could not be made is told in the band, in view with the picture (as-uucl.3). */}
+          {failed.map((f) => (
+            <div className="errbox" role="alert" key={f.n}>
+              <div className="errbox-text">
+                <strong>Take {f.n} could not be made.</strong>
+                <span className="muted small">{failureLine(f.message, takes.length > 0)}</span>
+              </div>
+              <button
+                type="button"
+                className="btn"
+                {...off(
+                  !view.maker.ok && view.maker.message,
+                  view.models[f.model] !== 'whole' && modelMissingWhy(editModel(f.model).name),
+                  make.isPending && WAIT_FOR_CHANGE,
+                )}
+                onClick={() => make.mutate({ retry: f.n })}
+              >
+                Try again
+              </button>
+            </div>
+          ))}
         </div>
         <div className="patch-band-tools">
           <EditModelMenu
@@ -696,27 +718,6 @@ export function PatchWorkbench({
             What the game gets
           </label>
         </div>
-        {/* A take that could not be made is told among the takes, which stay in view (as-2ida). */}
-        {failed.map((f) => (
-          <div className="errbox" role="alert" key={f.n}>
-            <div className="errbox-text">
-              <strong>Take {f.n} could not be made.</strong>
-              <span className="muted small">{failureLine(f.message, takes.length > 0)}</span>
-            </div>
-            <button
-              type="button"
-              className="btn"
-              {...off(
-                !view.maker.ok && view.maker.message,
-                view.models[f.model] !== 'whole' && modelMissingWhy(editModel(f.model).name),
-                make.isPending && WAIT_FOR_CHANGE,
-              )}
-              onClick={() => make.mutate({ retry: f.n })}
-            >
-              Try again
-            </button>
-          </div>
-        ))}
         {lockUnread && takes.length > 0 && (
           <span className="takes-missing small">
             Choosing, dropping and un-choosing wait until the images lock can be read. You can still
