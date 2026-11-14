@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Make tab: the agreed Make tab</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --edge: rgb(255 255 255 / 8%);
+        --glass: rgb(255 255 255 / 3.5%);
+        --glass-strong: rgb(255 255 255 / 6%);
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --panel: #10121a;
+        --inset: #0d0f14;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(900px 500px at 85% -10%, rgb(255 90 120 / 12%), transparent 60%),
+          var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        display: flex;
+        flex-direction: column;
+      }
+      .demo {
+        flex: none;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 8px 16px;
+        background: #1d1426;
+        border-bottom: 1px solid #4a2d5c;
+        font-size: 12.5px;
+        color: #e4cdf0;
+      }
+      .demo b {
+        color: #fff;
+      }
+      .demo button {
+        font: inherit;
+        font-size: 12px;
+        background: rgb(255 255 255 / 6%);
+        color: #e4cdf0;
+        border: 1px solid #4a2d5c;
+        border-radius: 999px;
+        padding: 3px 10px;
+        cursor: pointer;
+      }
+      .demo button[aria-pressed='true'] {
+        background: #4a2d5c;
+        color: #fff;
+      }
+      .app {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+      .rail {
+        flex: 0 0 72px;
+        border-right: 1px solid var(--edge);
+        background: rgb(10 11 18 / 55%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding-top: 14px;
+        color: var(--faint);
+        font-size: 10.5px;
+      }
+      .rail .logo {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+      }
+      .rail .on {
+        color: var(--text);
+      }
+      main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 14px 20px 14px;
+        overflow: auto;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      h2 {
+        margin: 2px 0 8px;
+        font-size: 19px;
+      }
+      h2 .id {
+        color: var(--faint);
+        font:
+          12px ui-monospace,
+          Menlo,
+          monospace;
+        margin-left: 8px;
+        font-weight: 400;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid var(--edge);
+        margin-bottom: 12px;
+      }
+      .tabs span {
+        padding: 6px 12px;
+        color: var(--muted);
+        border-bottom: 2px solid transparent;
+      }
+      .tabs .on {
+        color: var(--text);
+        border-color: var(--accent);
+      }
+      .tabs kbd,
+      .kbd {
+        font:
+          11px ui-monospace,
+          Menlo,
+          monospace;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        padding: 0 4px;
+        color: var(--faint);
+        margin-left: 4px;
+      }
+      h3 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+      .band {
+        flex: none;
+        display: grid;
+        gap: 14px;
+        margin-bottom: 12px;
+      }
+      .band.row {
+        grid-template-columns: minmax(0, 1fr) 360px;
+      }
+      .band.stack {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .box {
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+      .field {
+        background: var(--inset);
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        padding: 7px 9px;
+        color: var(--text-soft);
+        min-height: 54px;
+      }
+      .stack .field {
+        min-height: 40px;
+      }
+      .line {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 7px;
+        color: var(--text-soft);
+        font-size: 13px;
+      }
+      .line .fold {
+        color: var(--muted);
+      }
+      .sel {
+        background: var(--chip);
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        padding: 5px 9px;
+        color: var(--text-soft);
+        white-space: nowrap;
+      }
+      .btn {
+        background: var(--glass-strong);
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        padding: 5px 11px;
+        color: var(--text);
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+      }
+      .btn.pri {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .btn.pri .kbd {
+        color: var(--accent-ink);
+        border-color: rgb(0 0 0 / 25%);
+      }
+      .hint {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .row-gap {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .mk {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .stack .mk {
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .stack .mk .sp {
+        flex: 1;
+      }
+
+      /* Stage */
+      .stage {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .fit-window .stage {
+        flex: 1 1 auto;
+        min-height: 160px;
+      }
+      .fit-width .stage {
+        flex: none;
+      }
+      .side {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        min-width: 0;
+      }
+      .track {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .fit-window .track {
+        container-type: size;
+      }
+      .pic {
+        border-radius: 6px;
+        overflow: hidden;
+        background: #12151f;
+        border: 1px solid var(--edge);
+        position: relative;
+        aspect-ratio: var(--ratio);
+      }
+      .fit-window .pic {
+        width: min(100cqw, calc(100cqh * var(--ratio)), var(--own));
+      }
+      .fit-width .pic {
+        width: min(100%, var(--own));
+      }
+      .pic svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .pic .size {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        font:
+          11px ui-monospace,
+          Menlo,
+          monospace;
+        background: rgb(0 0 0 / 55%);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: #ddd;
+      }
+      .empty {
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        text-align: center;
+        padding: 20px;
+        border: 1px dashed var(--edge);
+      }
+      .cap-above .under {
+        margin: 0 0 7px;
+        min-height: 30px;
+      }
+      .under {
+        flex: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-top: 7px;
+        flex-wrap: wrap;
+        font-size: 13px;
+      }
+      .chip {
+        font-size: 11px;
+        border-radius: 999px;
+        padding: 1px 7px;
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+        margin-left: 4px;
+      }
+
+      /* Strip */
+      .strip {
+        flex: none;
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+        overflow-x: auto;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid var(--edge);
+      }
+      .strip h3 {
+        writing-mode: horizontal-tb;
+        align-self: center;
+        margin: 0 6px 0 0;
+        white-space: nowrap;
+      }
+      .thumb {
+        flex: none;
+        width: 112px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .thumb .p {
+        aspect-ratio: var(--ratio);
+        border-radius: 5px;
+        overflow: hidden;
+        border: 2px solid transparent;
+        background: #12151f;
+      }
+      .thumb.portrait-t {
+        width: 66px;
+      }
+      .thumb .p svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .thumb.on .p {
+        border-color: var(--accent);
+      }
+      .thumb.chosen .p {
+        border-color: var(--ok);
+      }
+      .thumb.making .p {
+        display: grid;
+        place-items: center;
+        color: var(--faint);
+        border: 1px dashed var(--edge);
+      }
+
+      .note {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        max-width: 330px;
+        background: #1d1426;
+        border: 1px solid #4a2d5c;
+        color: #e4cdf0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 12.5px;
+        box-shadow: 0 8px 30px rgb(0 0 0 / 50%);
+      }
+      .note b {
+        color: #fff;
+      }
+      .note .x {
+        float: right;
+        cursor: pointer;
+        color: #b58fc9;
+        margin-left: 8px;
+      }
+    </style>
+  </head>
+  <body class="fit-width cap-above">
+    <div class="demo">
+      <b>Drawing — the agreed Make tab</b>
+      <span>Picture:</span>
+      <button data-shape="land" aria-pressed="true">Wide image (1920 × 1080)</button>
+      <button data-shape="port">Tall image (480 × 640)</button>
+      <button data-shape="small">Small image (320 × 200)</button>
+      <span>State:</span>
+      <button data-state="takes" aria-pressed="true">Takes made</button>
+      <button data-state="none">No take yet</button>
+    </div>
+    <div class="app">
+      <aside class="rail">
+        <div class="logo"></div>
+        <span>Narration</span><span>Music</span><span class="on">Images</span><span>Effects</span
+        ><span>Scenes</span>
+      </aside>
+      <main id="main"></main>
+    </div>
+    <div class="note" id="note">
+      <span class="x" onclick="this.parentNode.remove()">✕</span><b>Agreed</b> — Prompt and Make
+      takes side by side above the pictures; each picture's caption and its buttons (Un-choose; Drop
+      and Choose) sit on a line just above it, straight under the Prompt band, so they stay on
+      screen even when a tall picture runs below the fold. The pictures fill the width up to their
+      own pixel size, never enlarged; the page scrolls when they are taller than the window, and the
+      takes strip stays below them.
+    </div>
+    <script>
+      const BAND = 'row'
+      const CAPABOVE = 'above' === 'above'
+      const side = (track, under) =>
+        `<div class="side">${CAPABOVE ? under + track : track + under}</div>`
+      const SHAPES = {
+        land: { w: 1920, h: 1080, label: '1920 × 1080' },
+        port: { w: 480, h: 640, label: '480 × 640' },
+        small: { w: 320, h: 200, label: '320 × 200' },
+      }
+      const state = { shape: 'land', st: 'takes' }
+      function scene(alt) {
+        const sky = alt ? ['#2b3a6b', '#e2875a'] : ['#1f2a55', '#c96b4a']
+        return `<svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g${alt ? 1 : 0}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs>
+        <rect width="160" height="90" fill="url(#g${alt ? 1 : 0})"/><circle cx="${alt ? 118 : 40}" cy="30" r="7" fill="#ffd9a0" opacity=".85"/>
+        <rect y="58" width="160" height="32" fill="#14233d"/><rect x="${alt ? 20 : 112}" y="22" width="6" height="36" fill="#d9d2c4"/><polygon points="${alt ? '19,22 27,22 23,16' : '111,22 119,22 115,16'}" fill="#b0433a"/>
+        <circle cx="${alt ? 23 : 115}" cy="25" r="2.2" fill="#ffe7a3"/><rect x="30" y="55" width="70" height="3" fill="#5a4330"/>
+        ${[34, 50, 66, 82].map((x, i) => `<path d="M${x} ${62 + (i % 2)} h12 l-2 4 h-8z" fill="#7a5a3c"/><rect x="${x + 5}" y="${52 + (i % 2)}" width="1" height="10" fill="#ccc"/>`).join('')}
+        <path d="M70 18 q3 -3 6 0 q3 -3 6 0" stroke="#eee" fill="none" stroke-width=".8"/><path d="M90 26 q2 -2 4 0 q2 -2 4 0" stroke="#eee" fill="none" stroke-width=".7"/>
+        ${Array.from({ length: 14 }, (_, i) => `<rect x="${i * 12 + 3}" y="${70 + (i % 3) * 5}" width="7" height=".8" fill="#6d8bbd" opacity=".6"/>`).join('')}</svg>`
+      }
+      function pic(alt) {
+        const s = SHAPES[state.shape]
+        return `<div class="pic" style="--ratio:${s.w}/${s.h};--own:${s.w}px">${scene(alt)}<span class="size">${s.label}</span></div>`
+      }
+      function band() {
+        const prompt = `<div class="box"><h3>Prompt</h3>
+          <div class="field">The harbour at dusk, the lighthouse lit, fishing boats tied along the pier, gulls over the water.</div>
+          <div class="line"><label><input type="checkbox" checked /> Add Act 2's style to this image</label><span class="fold">▸ The whole prompt the model gets</span></div></div>`
+        const make = `<div class="box"><h3>Make takes</h3><div class="mk">
+          <span class="sel">FLUX.2 klein · about 20 s a take ▾</span>
+          <span class="row-gap"><span class="sel">4 ▾</span><span class="btn pri">Make 4 takes</span><span class="hint">1 to 10 at a time · about 1 min 20 s for 4</span></span>
+          ${BAND === 'stack' ? '<span class="sp"></span>' : ''}
+          <span class="row-gap"><label><input type="checkbox" checked /> What the game gets</label><span class="hint"><span class="kbd">←</span><span class="kbd">→</span> takes · <span class="kbd">C</span> choose · <span class="kbd">D</span> drop</span></span>
+        </div></div>`
+        return `<div class="band ${BAND}">${prompt}${make}</div>`
+      }
+      function render() {
+        const s = SHAPES[state.shape]
+        const none = state.st === 'none'
+        const left = side(
+          `<div class="track">${pic(false)}</div>`,
+          `<div class="under"><span>In the game · <b>Take 8</b></span><span class="btn">Un-choose</span></div>`,
+        )
+        const right = none
+          ? side(
+              `<div class="track"><div class="pic empty" style="--ratio:${s.w}/${s.h};--own:${s.w}px">Make takes to compare them here.</div></div>`,
+              `<div class="under"><span>Comparing</span></div>`,
+            )
+          : side(
+              `<div class="track">${pic(true)}</div>`,
+              `<div class="under"><span>Comparing · <b>Take 5</b><span class="chip">new</span></span><span class="row-gap"><span class="btn">Drop <span class="kbd">D</span></span><span class="btn pri">Choose <span class="kbd">C</span></span></span></div>`,
+            )
+        const leftNone = side(
+          `<div class="track"><div class="pic empty" style="--ratio:${s.w}/${s.h};--own:${s.w}px">No picture yet</div></div>`,
+          `<div class="under"><span>In the game</span></div>`,
+        )
+        const tcls = state.shape === 'port' ? 'portrait-t' : ''
+        const th = (t, c = '', alt = false) =>
+          `<div class="thumb ${c} ${tcls}"><div class="p" style="--ratio:${s.w}/${s.h}">${c === 'making' ? '42%' : scene(alt)}</div>${t}</div>`
+        const strip = none
+          ? `<div class="strip"><h3>Takes · 0</h3><span class="hint">No takes yet.</span></div>`
+          : `<div class="strip"><h3>Takes · 9</h3>${th('Take 1')}${th('Take 2', '', true)}${th('Take 3')}${th('Take 4', '', true)}${th('Take 5', 'on', true)}${th('Take 6')}${th('Take 7')}${th('Take 8', 'chosen')}${th('Take 9', 'making')}</div>`
+        document.getElementById('main').innerHTML = `
+          <div class="crumbs">Images › Act 2: Under the Pier</div>
+          <h2>Harbour at dusk <span class="id">harbour-at-dusk · ${s.label}</span></h2>
+          <div class="tabs"><span class="on">Make<kbd>1</kbd></span><span>Fine-tune<kbd>2</kbd></span><span>Patches<kbd>3</kbd></span><span>Named areas<kbd>4</kbd></span></div>
+          ${band()}
+          <div class="stage">${none ? leftNone + right : left + right}</div>
+          ${strip}`
+      }
+      document.querySelectorAll('.demo button').forEach((b) =>
+        b.addEventListener('click', () => {
+          const k = b.dataset.shape ? 'shape' : 'st'
+          state[k] = b.dataset.shape || b.dataset.state
+          document
+            .querySelectorAll(`.demo button[data-${k === 'shape' ? 'shape' : 'state'}]`)
+            .forEach((x) => x.setAttribute('aria-pressed', x === b))
+          render()
+        }),
+      )
+      render()
+    </script>
+  </body>
+</html>
