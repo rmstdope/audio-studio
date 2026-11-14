@@ -2343,7 +2343,9 @@ Images' and scenes' routes are described with them:
   lock is unread, a missing one is read and empty) and the summaries take it, so a page cannot say
   "none yet" or "not chosen" about a file it could not read; an unreadable images lock reads
   "not known" on the act's list (amber, as music's and effects' are), the act's heading gives no count, and Make all offers nothing and says so (`ImagesMakeAllPlan` `lock-unread`).
-  An image's own page does the same (as-su3y): the Make and Patches tab chips read "not known", the
+  An image's own page does the same (as-su3y): the Make and Patches tab chips read "not known", also
+  when the act's list was read before the lock broke and only the image's own takes or patches
+  (fetched on arrival by the pager) find it unread (`JobTabsInput.lockUnread`, as-b3od), the
   "In the game" side is an amber block with an empty frame and no claim about a take (the frame as wide as the take
   beside it, and the block's padding counted in the room the pictures are fitted to, down and
   across, so the hint is never clipped by the workbench and the block, painted inside its column,

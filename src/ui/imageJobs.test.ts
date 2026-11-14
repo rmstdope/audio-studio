@@ -25,7 +25,13 @@ function row(over: {
   } as unknown as ImageRow
 }
 
-const quiet = { makingTakes: false, newFineTunes: 0, makingFineTunes: false, makingPatches: false }
+const quiet = {
+  makingTakes: false,
+  newFineTunes: 0,
+  makingFineTunes: false,
+  makingPatches: false,
+  lockUnread: false,
+}
 
 describe('imageJobTabs', () => {
   it('lists only Make and Fine-tune when the game asks for no patches or areas', () => {
@@ -68,6 +74,17 @@ describe('imageJobTabs', () => {
     expect(tabs[3]!.chip).toEqual({ text: '1 of 1', tone: 'ok' })
   })
 
+  it('says not known on Make and Patches when the image’s own views find the lock unread, whatever the row says', () => {
+    const tabs = imageJobTabs({
+      row: row({ status: 'chosen', chosenTake: 1, patches: [{ id: 'p', chosenOn: [1] }] }),
+      ...quiet,
+      lockUnread: true,
+    })
+    const warn = { text: 'not known', tone: 'warn' as const }
+    expect(tabs[0]!.chip).toEqual(warn)
+    expect(tabs[2]!.chip).toEqual(warn)
+  })
+
   it('counts the unseen fine-tunes, and has no chip without any', () => {
     expect(imageJobTabs({ row: row({}), ...quiet, newFineTunes: 2 })[1]!.chip).toEqual({
       text: '2 new',
@@ -108,6 +125,7 @@ describe('imageJobTabs', () => {
       newFineTunes: 0,
       makingFineTunes: true,
       makingPatches: true,
+      lockUnread: false,
     })
     expect(tabs.map((t) => t.making)).toEqual([true, true, true])
   })

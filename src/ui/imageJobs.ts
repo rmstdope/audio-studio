@@ -19,13 +19,16 @@ export interface JobTabsInput {
   newFineTunes: number
   makingFineTunes: boolean
   makingPatches: boolean
+  /** The image's own takes or patches, read after the list, found the images lock unreadable. */
+  lockUnread: boolean
 }
 
 /** The tabs an image's page shows, in order; a job the game does not ask for has none. */
 export function imageJobTabs(input: JobTabsInput): JobTab[] {
   const { row } = input
   // The lock cannot be read: which take the game shows is not known, so Make and Patches say so.
-  const unknown = row.status === 'unknown'
+  // The list may be older than the image's own views (kept across the pager), so either says it.
+  const unknown = row.status === 'unknown' || input.lockUnread
   const notKnown = { text: IMAGE_STATUS_LABEL.unknown, tone: 'warn' } as const
   const tabs: JobTab[] = [
     {
