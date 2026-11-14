@@ -176,7 +176,8 @@ export function ActPage({
                   )
                 }
                 const row = act.rows.find((r) => r.id === id)
-                const again = row ? makeAgainOf(row) : []
+                // While the images lock cannot be read, no take is known to be chosen.
+                const again = row && row.status !== 'unknown' ? makeAgainOf(row) : []
                 const overlaps = row ? overlappingPatches(row.patches) : []
                 return (
                   row && (

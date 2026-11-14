@@ -1242,6 +1242,14 @@ describe('the patches the game asks for', () => {
       ).toEqual(["the game changed a patch's words", 'make again: Door ajar'])
     })
 
+    it('says nothing of making again on the act’s row while the images lock cannot be read', () => {
+      const choices = { 'lamp-lit': [4], 'door-ajar': [2] }
+      const readable = render(actRoute, settled({ choices }))
+      expect(text(readable.querySelector('.images-prompt .chg'))).toBe('make again: Door ajar')
+      const page = render(actRoute, settled({ choices, lockUnread: true }))
+      expect(text(page.querySelector('tbody tr'))).not.toContain('make again')
+    })
+
     // The page says nothing of making again until the patches are loaded.
     const loaded = (client: InstanceType<typeof QueryClient>) =>
       client.setQueryData(['image-patches', 'inn'], {
