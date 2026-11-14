@@ -1,6 +1,7 @@
 import { useJobOpen } from './ImageJobTabs'
 import { clampToWindow, revealDelta } from '../../areaReveal'
 import { off } from '../../off'
+import { flushSync } from 'react-dom'
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { AreaBox, AreaRow, ImageRow } from '../../../core/images'
 import { useImagePatches, useSetImageAreaBox } from '../../api'
@@ -280,6 +281,7 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
       clampToWindow(
         { x: event.clientX, y: event.clientY },
         { width: window.innerWidth, height: window.innerHeight },
+        bar.current?.getBoundingClientRect().bottom ?? 0,
       ),
       stage.current!.getBoundingClientRect(),
       size,
@@ -287,7 +289,8 @@ export function NamedAreasPanel({ row }: { row: ImageRow }) {
 
   /** Selects an area; when its box is out of sight the page scrolls smoothly just far enough to show it below the bar. */
   const choose = (id: string) => {
-    select(id)
+    // Drawn before measuring: the chosen area's buttons can add a line to the bar.
+    flushSync(() => select(id))
     const box = stage.current?.querySelector(`[data-area="${CSS.escape(id)}"]`)
     if (!box || !bar.current) return
     const top = revealDelta(

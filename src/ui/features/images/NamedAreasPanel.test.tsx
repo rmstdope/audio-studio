@@ -1144,6 +1144,24 @@ describe('the pinned bar and the full-width picture (as-uucl.4)', () => {
     ])
   })
 
+  it('tabs through the area buttons, then the chosen area’s buttons, then the switches', async () => {
+    const { host } = await render(
+      [placedAt('a', { ...box, point: { x: 110, y: 60 } }), area('b')],
+      {
+        patches,
+      },
+    )
+    await act(async () => mainOf(host, 0).click())
+    const order = [...host.querySelectorAll('.named-areas-bar button, .named-areas-bar input')]
+    expect(order.map((e) => e.className || e.tagName)).toEqual([
+      'named-area-main',
+      'named-area-main',
+      'btn named-area-point-centre',
+      'btn named-area-clear',
+      'INPUT',
+    ])
+  })
+
   it('puts the chosen area’s title, Centre the point and Clear at the row’s end, for it alone', async () => {
     const { host } = await render([
       placedAt('a', { ...box, point: { x: 110, y: 60 } }, { title: 'Hearth' }),
@@ -1184,6 +1202,9 @@ describe('the pinned bar and the full-width picture (as-uucl.4)', () => {
 
   describe('scrolling to the chosen area', () => {
     const scrolls = () => {
+      const height = window.innerHeight
+      window.innerHeight = 800
+      cleanups.push(() => (window.innerHeight = height))
       const calls: ScrollToOptions[] = []
       const real = window.scrollBy
       window.scrollBy = ((o: ScrollToOptions) => void calls.push(o)) as typeof window.scrollBy
@@ -1199,16 +1220,34 @@ describe('the pinned bar and the full-width picture (as-uucl.4)', () => {
     it('scrolls smoothly when the pressed area’s box is out of sight', async () => {
       const calls = scrolls()
       const { host } = await render([placedAt('a', box), area('b')], { chosenTake: 2 })
-      window.innerHeight = 800
       place(host, 900, 1000)
       await act(async () => mainOf(host, 0).click())
       expect(calls).toEqual([{ top: 208, behavior: 'smooth' }])
     })
 
+    it('measures the bar after the chosen area’s buttons are in it', async () => {
+      const calls = scrolls()
+      const { host } = await render([placedAt('a', box), placedAt('b', box)], { chosenTake: 2 })
+      // The bar is 100 high, and 36 higher once a chosen area's buttons are on a new line.
+      const list = host.querySelector('.named-area-list')!
+      host.querySelector('.named-areas-bar')!.getBoundingClientRect = () =>
+        ({ top: 0, bottom: list.querySelector('.named-area-actions') ? 136 : 100 }) as DOMRect
+      tagOf(host, 'a').getBoundingClientRect = () => ({ top: 20, bottom: 60 }) as DOMRect
+      await act(async () => mainOf(host, 0).click())
+      expect(calls).toEqual([{ top: 20 - 136 - 8, behavior: 'smooth' }])
+    })
+
+    it('does not move for a box partly in view', async () => {
+      const calls = scrolls()
+      const { host } = await render([placedAt('a', box)], { chosenTake: 2 })
+      place(host, 700, 900)
+      await act(async () => mainOf(host, 0).click())
+      expect(calls).toEqual([])
+    })
+
     it('does not move for a box in view, or an area with no box', async () => {
       const calls = scrolls()
       const { host } = await render([placedAt('a', box), area('b')], { chosenTake: 2 })
-      window.innerHeight = 800
       place(host, 300, 400)
       await act(async () => mainOf(host, 0).click())
       await act(async () => mainOf(host, 1).click())
@@ -1221,10 +1260,16 @@ describe('the pinned bar and the full-width picture (as-uucl.4)', () => {
     const real = window.scrollBy
     window.scrollBy = ((o: unknown) => void calls.push(o)) as typeof window.scrollBy
     cleanups.push(() => (window.scrollBy = real))
+    const height = window.innerHeight
     window.innerHeight = 100
-    const { stage, puts } = await render([area('a')])
-    await drag(stage!, [10, 10], [50, 190])
-    expect(puts[0]!.body.box).toEqual({ x: 10, y: 10, width: 40, height: 90 })
+    cleanups.push(() => (window.innerHeight = height))
+    const { host, stage, puts } = await render([area('a')])
+    host.querySelector('.named-areas-bar')!.getBoundingClientRect = () =>
+      ({ top: 0, bottom: 20 }) as DOMRect
+    await drag(stage!, [10, 60], [50, 190])
+    expect(puts[0]!.body.box).toEqual({ x: 10, y: 60, width: 40, height: 40 })
+    await drag(stage!, [100, 60], [140, -30])
+    expect(puts[1]!.body.box).toEqual({ x: 100, y: 20, width: 40, height: 40 })
     expect(calls).toEqual([])
   })
 })
