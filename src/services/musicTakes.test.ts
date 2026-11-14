@@ -641,6 +641,50 @@ describe('createMusicTakes', () => {
     ])
   })
 
+  it('names the take’s file when it cannot be written, keeps no half-saved file, and says it is no news of the model', async () => {
+    const { root, file, takes, settled } = setup()
+    const folder = join(root, 'content-studio/cache/music-takes/hall')
+    mkdirSync(folder, { recursive: true })
+    chmodSync(folder, 0o555)
+    const quiet = console.error
+    console.error = () => {}
+    try {
+      await takes.make(file, 'hall', { count: 1 })
+      const view = await settled('hall')
+      if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+      expect(view.failed).toHaveLength(1)
+      expect(view.failed[0]!.message).toMatch(
+        /^content-studio\/cache\/music-takes\/hall\/[^/]+\.1\.wav could not be written\.$/,
+      )
+    } finally {
+      console.error = quiet
+      chmodSync(folder, 0o755)
+    }
+    expect(readdirSync(folder)).toEqual([])
+  })
+
+  it('names the board file when it cannot be read after the take’s file is written, and removes the file', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { root, file, takes, settled } = setup(undefined, {}, [], gate)
+    await takes.make(file, 'hall', { count: 1 })
+    const board = join(root, 'content-studio/cache/music/hall.json')
+    const text = readFileSync(board, 'utf8')
+    writeFileSync(board, '{ nope')
+    release()
+    const folder = join(root, 'content-studio/cache/music-takes/hall')
+    for (let i = 0; i < 400 && !(existsSync(folder) && readdirSync(folder).length === 0); i++) {
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    writeFileSync(board, text)
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(view.failed.map((f) => f.message)).toEqual([
+      'content-studio/cache/music/hall.json cannot be used.',
+    ])
+    expect(existsSync(folder) ? readdirSync(folder) : []).toEqual([])
+  })
+
   it('says a crashed worker stopped, in the same words', async () => {
     const crashing: MusicGenerator = {
       ready: () => ({ ok: true }),

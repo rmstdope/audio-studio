@@ -456,20 +456,17 @@ export function createMusicTakes({
           peaks: peaks(wav, WAVEFORM_BARS),
           inputs,
         }
-        // The file first: a take is on the board only once its WAV is there.
-        await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, shaped)
-        const saved = await changeBoard(projectFile, found, (board) => {
-          // Stopped while its file was written or it waited for the board: not put on it.
-          if (stop.aborted) return
-          board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort(
-            (a, b) => a.n - b.n,
-          )
+        await engine.save(projectFile, found.id, accessOf(found), {
+          root: found.root,
+          path: `${found.folder}/${fileOf(made)}`,
+          bytes: shaped,
+          stop,
+          change(board) {
+            board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort(
+              (a, b) => a.n - b.n,
+            )
+          },
         })
-        if (stop.aborted) {
-          await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
-          return
-        }
-        if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       },
       async settled() {
         const stopped = entry.stop?.signal.aborted ?? false
