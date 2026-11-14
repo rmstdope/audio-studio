@@ -1939,6 +1939,8 @@ eligible, then calls the ordinary `make` with 4 takes per effect, so the model i
 else the other one when it cannot run, and the question says so). While anything is making takes the
 panel shows the running line (worked out from `GET /api/effects/making`, hand starts included) and
 **Stop all** (`POST /api/effects/stop-all`, every waiting or running take of the project; made takes stay).
+Each time an effect drops out of `GET /api/effects/making` the page reads the project again, so its
+Status says "not chosen" within one poll of its last take arriving, not when the whole press ends (as-qxya).
 The service keeps the latest press in memory (`contentStudioEffectBatches`, like the entries) as the
 takes it started, so `GET /api/effects/batch` can say how many were made, stopped (by Stop all or an
 effect's own Stop) and failed; the page shows that as a summary, in place of the count line and button, in every tab and after a reload (as-4m0),

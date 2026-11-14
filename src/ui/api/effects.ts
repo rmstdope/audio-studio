@@ -245,12 +245,19 @@ export function useEffectsMaking() {
     queryFn: () => getJson<Record<string, EffectMakingSummary>>('/api/effects/making'),
     refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 1000 : false),
   })
-  // A batch that has just ended changed the effects' statuses: read the project again.
-  const busy = Object.keys(query.data ?? {}).length > 0
-  const was = useRef(false)
+  // An effect no longer being made has its takes now, so its status changed: read the project
+  // again, without waiting for the rest of the batch.
+  // The ids as one string, so the effect below runs only when the set of effects changes.
+  const key = Object.keys(query.data ?? {})
+    .sort()
+    .join('\n')
+  const was = useRef<string[]>([])
   useEffect(() => {
-    if (was.current && !busy) void client.invalidateQueries({ queryKey: ['project'] })
-    was.current = busy
-  }, [busy, client])
+    const now = key ? key.split('\n') : []
+    if (was.current.some((id) => !now.includes(id))) {
+      void client.invalidateQueries({ queryKey: ['project'] })
+    }
+    was.current = now
+  }, [key, client])
   return query
 }
