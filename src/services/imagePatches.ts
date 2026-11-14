@@ -307,11 +307,10 @@ export function createImagePatches({
     const mark = `${found.key}\0${entry.n}`
     return engine
       .run(found.projectFile, found.engineId, entry, {
-        async job(stop) {
-          // The engine says making at once; a take waits for the GPU first, and says so.
-          entry.state = 'waiting'
+        // A take waits for the GPU first, and says so until the model starts.
+        queued: true,
+        async job(stop, began) {
           const seed = newSeed() // before any await, so the takes of one press take their seeds in order
-          let began: number | null = null
           const made = await editStep(
             { generator, queue, free },
             {
@@ -324,15 +323,11 @@ export function createImagePatches({
               seed,
             },
             stop,
-            () => {
-              entry.state = 'making'
-              entry.startedAt = now()
-              began = entry.startedAt
-            },
+            began,
           )
           if (!made) return
           // Timed from when the take started making, so its wait for the GPU is not counted.
-          took = began === null ? null : (now() - began) / 1000
+          took = entry.state === 'making' ? (now() - entry.startedAt) / 1000 : null
           const saving: PatchTake = {
             n: entry.n,
             base: entry.base,
