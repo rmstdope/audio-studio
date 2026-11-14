@@ -196,8 +196,8 @@ export function GamePatchesPanel({ row }: { row: ImageRow }) {
   const [picks, setPicks] = useState<Record<string, EditModelId>>({})
   const [remakePick, setRemakePick] = useState<EditModelId | null>(null)
   const view = query.data && 'patches' in query.data ? query.data : null
-  // An unread lock gives no take as chosen, so no patch is said to need making again.
-  const again = new Set(view?.lockUnread ? [] : makeAgainOf(row).map((patch) => patch.id))
+  // Nothing is said until the patches are loaded, nor when the lock cannot be read: unread, it gives no take as chosen.
+  const again = new Set(view && !view.lockUnread ? makeAgainOf(row).map((patch) => patch.id) : [])
   const [openPick, setOpenId] = useState<string | null>(
     () => row.patches.find((patch) => patch.gameChanged)?.id ?? null,
   )

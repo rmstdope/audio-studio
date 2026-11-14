@@ -1204,18 +1204,33 @@ describe('the patches the game asks for', () => {
       ).toEqual(["the game changed a patch's words", 'make again: Door ajar'])
     })
 
+    // The page says nothing of making again until the patches are loaded.
+    const loaded = (client: InstanceType<typeof QueryClient>) =>
+      client.setQueryData(['image-patches', 'inn'], {
+        ok: true,
+        take: 4,
+        pictureGone: false,
+        lockUnread: false,
+        remake: { earlier: {}, press: null, failedModels: [] },
+        maker: { ok: true },
+        models: { klein: 'whole' },
+        patches: [],
+      })
+    const onImage = (shown: ProjectSummary) =>
+      render(image, shown, undefined, undefined, undefined, undefined, loaded)
+
     it('marks the patch on the image’s page with a chip', () => {
       const edits = {
         inn: { patches: { 'lamp-lit': { text: 'Dim it', gameWas: 'Light the lamp' } } },
       }
-      const page = render(image, settled({ edits, choices: { 'lamp-lit': [2] } }))
+      const page = onImage(settled({ edits, choices: { 'lamp-lit': [2] } }))
       const [first, second] = [...page.querySelectorAll('.patch-pick')]
       expect(first!.querySelector('.chip-warn')?.textContent).toBe('Make again')
       expect(second!.querySelector('.chip-warn')).toBeNull()
     })
 
     it('says, in a line above the words when opened, where it was chosen and how to get it back', () => {
-      const page = render(image, settled({ choices: { 'lamp-lit': [1, 2] } }))
+      const page = onImage(settled({ choices: { 'lamp-lit': [1, 2] } }))
       act(() => page.querySelector<HTMLButtonElement>('.patch-pick')!.click())
       const line = page.querySelector('.game-patch-body .make-again-line')
       expect(text(line)).toBe(
@@ -1224,7 +1239,7 @@ describe('the patches the game asks for', () => {
     })
 
     it('has no chip or line once the patch has a chosen take on the take in the game', () => {
-      const page = render(image, settled({ choices: { 'lamp-lit': [2, 4] } }))
+      const page = onImage(settled({ choices: { 'lamp-lit': [2, 4] } }))
       expect(page.querySelector('.patch-pick .chip-warn')).toBeNull()
     })
   })

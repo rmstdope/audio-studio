@@ -133,6 +133,11 @@ describe('GamePatchesPanel', () => {
         expect(host.querySelector('.make-again-line')).toBeNull()
       }
     })
+    it('says nothing of a patch to make again until the patches are loaded', async () => {
+      const { host } = await render(two(), undefined, null, {})
+      expect(host.querySelectorAll('.patch-pick .chip-warn').length).toBe(0)
+      expect(host.querySelector('.make-again-line')).toBeNull()
+    })
     it('marks the patch to make again and opens on its line when the lock is readable', async () => {
       const { host } = await render(two(), undefined, {}, {})
       expect(text(pickButtons(host)[0]!.querySelector('.chip-warn'))).toBe('Make again')
